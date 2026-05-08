@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Topbar } from "@/components/layout/topbar";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import type { UserRole } from "@/types/auth";
 
@@ -12,12 +11,13 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-zinc-50">
+    <div className="flex min-h-screen bg-muted/40">
       <Sidebar role={role} />
       <div className="flex min-h-screen flex-1 flex-col">
         <ImpersonationBanner />
-        <Topbar />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 px-4 py-6 md:px-8">
+          <div className="mx-auto w-full max-w-7xl">{children}</div>
+        </main>
       </div>
     </div>
   );

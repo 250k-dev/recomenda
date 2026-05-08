@@ -5,6 +5,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  impersonator?: Omit<AuthUser, "impersonator">;
 }
 
 export interface LoginResponse {

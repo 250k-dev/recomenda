@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Recomenda Web",
-  description: "Plataforma web para Admin e Agronomista",
+  title: "Recomenda",
+  description: "Plataforma web para administradores e agrônomos.",
+  icons: {
+    icon: [{ url: "/recomenda/mark-positive.svg", type: "image/svg+xml", sizes: "any" }],
+    apple: [{ url: "/recomenda/app-icon-1024.svg", type: "image/svg+xml", sizes: "1024x1024" }],
+  },
 };
 
 export default function RootLayout({

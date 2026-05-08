@@ -13,12 +13,13 @@ export function ImpersonationBanner() {
   }
 
   return (
-    <div className="sticky top-0 z-20 flex items-center justify-between border-b border-yellow-300 bg-yellow-100 px-6 py-3 text-sm text-yellow-900">
+    <div className="sticky top-0 z-20 flex items-center justify-between border-b border-amber-200/80 bg-amber-50 px-4 py-2.5 text-sm text-amber-950 md:px-8">
       <span>
         Atuando como <strong>{producerName}</strong>
       </span>
       <Button
         variant="secondary"
+        size="sm"
         className="h-8"
         onClick={() => exitImpersonationMutation.mutate()}
       >

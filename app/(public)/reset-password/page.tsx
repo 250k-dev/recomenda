@@ -1,13 +1,16 @@
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ResetPasswordPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-100 p-4">
-      <Card className="w-full max-w-lg">
-        <h1 className="text-lg font-semibold">Redefinir senha</h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          Fluxo público para tokens de recuperação.
-        </p>
+    <div className="flex flex-1 items-center justify-center p-4 py-12">
+      <Card className="w-full max-w-lg shadow-sm ring-1 ring-foreground/5">
+        <CardHeader>
+          <CardTitle className="text-xl tracking-tight">Redefinir senha</CardTitle>
+          <CardDescription>Fluxo público para tokens de recuperação enviados por e-mail.</CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground leading-relaxed">
+          Use o token válido da sua mensagem para completar a redefinição pela API de autenticação.
+        </CardContent>
       </Card>
     </div>
   );

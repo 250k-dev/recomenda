@@ -13,40 +13,29 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (isPublicPath(pathname)) {
+    const accessToken = request.cookies.get("access_token")?.value;
+    if (accessToken && (pathname === "/login" || pathname === "/")) {
+      const role = request.cookies.get("role")?.value;
+      const redirectTo = role === "ADMIN" ? "/admin" : "/dashboard";
+      return NextResponse.redirect(new URL(redirectTo, request.url));
+    }
+    return NextResponse.next();
+  }
+
   const accessToken = request.cookies.get("access_token")?.value;
   const role = request.cookies.get("role")?.value;
 
-  if (!accessToken && !isPublicPath(pathname)) {
+  if (!accessToken) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (accessToken && (pathname === "/login" || pathname === "/")) {
-    if (role === "ADMIN") {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
-    if (role === "AGRONOMIST") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-    if (role === "PRODUCER") {
-      return NextResponse.redirect(new URL("/producer-only", request.url));
-    }
+  if (role === "PRODUCER") {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (role === "PRODUCER" && !pathname.startsWith("/producer-only")) {
-    return NextResponse.redirect(new URL("/producer-only", request.url));
-  }
-
-  if (pathname.startsWith("/admin") && role !== "ADMIN") {
+  if (role === "AGRONOMIST" && pathname.startsWith("/admin")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  if (
-    !pathname.startsWith("/admin") &&
-    pathname !== "/producer-only" &&
-    role === "ADMIN" &&
-    !isPublicPath(pathname)
-  ) {
-    return NextResponse.redirect(new URL("/admin", request.url));
   }
 
   return NextResponse.next();

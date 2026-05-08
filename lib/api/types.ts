@@ -26,6 +26,21 @@ export interface PaginatedResponse<T> {
   pagination: Pagination;
 }
 
+export interface AgronomistMePlanResponse {
+  plan: {
+    id: string;
+    name: string;
+    plot_quota: number;
+    price_brl_monthly: string;
+    is_active?: boolean;
+  };
+  quota_usage: {
+    current: number;
+    limit: number;
+  };
+}
+
+/** @deprecated Use AgronomistMePlanResponse — mantido só se algum consumidor esperar só a fatia de quota. */
 export interface PlanQuota {
   current: number;
   limit: number;
