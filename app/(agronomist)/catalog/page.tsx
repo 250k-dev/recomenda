@@ -115,8 +115,8 @@ export default function CatalogPage() {
   return (
     <>
       <PageHeader
-        title="Catálogo local"
-        description="Todos os produtos ativos do catálogo global entram aqui automaticamente. Use adicionar para incluir produtos exclusivos do seu escritório."
+        title="Produtos"
+        description="Todos os produtos ativos disponibilizados pela plataforma entram aqui automaticamente. Use adicionar para incluir produtos exclusivos do seu escritório."
       />
 
       <div className="mb-6 flex gap-2">
@@ -239,7 +239,7 @@ export default function CatalogPage() {
           <TableRowsSkeleton rows={10} columns={5} />
         </>
       ) : localProducts.length === 0 ? (
-        <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto no seu catálogo local</p>
+        <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto na sua lista</p>
       ) : (
         <DataTable headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]} rows={localRows} />
       )}

@@ -167,7 +167,7 @@ export default function AdminGlobalCatalogPage() {
   return (
     <>
       <PageHeader
-        title="Catálogo global"
+        title="Produtos"
         description="Produtos de referência administrados pela plataforma. Agrônomos podem clonar para o catálogo local."
       />
 
@@ -194,7 +194,7 @@ export default function AdminGlobalCatalogPage() {
           </SheetTrigger>
           <SheetContent side="right" className="w-full sm:max-w-md">
             <SheetHeader>
-              <SheetTitle>Novo produto global</SheetTitle>
+              <SheetTitle>Novo produto</SheetTitle>
             </SheetHeader>
             <form onSubmit={onCreate} className="mt-6 space-y-4">
               <div>
@@ -265,7 +265,7 @@ export default function AdminGlobalCatalogPage() {
       <Sheet open={Boolean(editProduct)} onOpenChange={(o) => !o && setEditProduct(null)}>
         <SheetContent side="right" className="w-full sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>Editar produto global</SheetTitle>
+            <SheetTitle>Editar produto</SheetTitle>
           </SheetHeader>
           <form onSubmit={onEdit} className="mt-6 space-y-4">
             <div>

@@ -113,7 +113,7 @@ export default function TimingTemplatesPage() {
   return (
     <>
       <PageHeader
-        title="Calendários de Aplicação"
+        title="Recomendação"
         description="Definição de estágios e janelas de aplicação por cultura."
       />
 
@@ -149,11 +149,11 @@ export default function TimingTemplatesPage() {
         {tab === "active" && (
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button>Novo calendário</Button>
+              <Button>Nova recomendação</Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-full sm:w-96">
               <SheetHeader>
-                <SheetTitle>Criar novo calendário</SheetTitle>
+                <SheetTitle>Criar nova recomendação</SheetTitle>
               </SheetHeader>
               <form onSubmit={onSubmit} className="mt-6 space-y-4">
                 <div>
@@ -182,7 +182,7 @@ export default function TimingTemplatesPage() {
                   disabled={createMutation.isPending}
                   className="w-full"
                 >
-                  {createMutation.isPending ? "Criando..." : "Criar calendário"}
+                  {createMutation.isPending ? "Criando..." : "Criar recomendação"}
                 </Button>
               </form>
             </SheetContent>
@@ -199,7 +199,7 @@ export default function TimingTemplatesPage() {
       ) : isLoadingArchived ? (
         <TableRowsSkeleton rows={6} columns={3} />
       ) : archivedRows.length === 0 ? (
-        <p className="text-sm text-zinc-500">Nenhum calendário removido.</p>
+        <p className="text-sm text-zinc-500">Nenhuma recomendação removida.</p>
       ) : (
         <DataTable headers={["Nome", "Cultura", ""]} rows={archivedRows} />
       )}

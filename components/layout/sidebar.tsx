@@ -21,7 +21,6 @@ import {
   CreditCard,
   Settings,
   Shield,
-  Globe,
   LogOut,
   Bell,
 } from "lucide-react";
@@ -49,7 +48,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "/admin/plans": <CreditCard className="h-4 w-4" />,
   "/admin/agronomists": <Users className="h-4 w-4" />,
   "/admin/producers": <UsersRound className="h-4 w-4" />,
-  "/admin/global-catalog": <Globe className="h-4 w-4" />,
+  "/admin/global-catalog": <Package className="h-4 w-4" />,
   "/admin/settings": <Settings className="h-4 w-4" />,
 };
 

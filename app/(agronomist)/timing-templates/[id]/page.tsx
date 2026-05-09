@@ -118,7 +118,7 @@ function StageRow({
             <Input type="number" {...form.register("window_end_days", { valueAsNumber: true })} />
           </div>
           <div className="min-w-48 flex-1">
-            <label className="mb-1 block text-xs text-zinc-600">Receita de mistura padrão</label>
+            <label className="mb-1 block text-xs text-zinc-600">Receita de produtos padrão</label>
             <select
               {...form.register("default_mix_template_id")}
               className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-(--brand)"
@@ -246,7 +246,7 @@ export default function TimingTemplateDetailPage() {
   }
 
   if (isLoading) return <TemplateEditorSkeleton />;
-  if (!template) return <p className="text-sm text-red-600">Calendário não encontrado.</p>;
+  if (!template) return <p className="text-sm text-red-600">Recomendação não encontrada.</p>;
 
   const sortedStages = [...(template.stages ?? [])].sort(
     (a, b) => a.order_index - b.order_index,
@@ -339,7 +339,7 @@ export default function TimingTemplateDetailPage() {
               <Input type="number" {...stageForm.register("window_end_days", { valueAsNumber: true })} />
             </div>
             <div className="min-w-48 flex-1">
-              <label className="mb-1 block text-xs text-zinc-600">Receita de mistura padrão</label>
+              <label className="mb-1 block text-xs text-zinc-600">Receita de produtos padrão</label>
               <select
                 {...stageForm.register("default_mix_template_id")}
                 className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-(--brand)"

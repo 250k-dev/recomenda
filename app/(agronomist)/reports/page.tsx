@@ -1,10 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Info } from "lucide-react";
 import { PageHeader } from "@/components/domain/page-header";
 import { ReportPageSkeleton } from "@/components/domain/page-skeletons";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/table";
 import type { ComparativeReport } from "@/lib/api/client";
@@ -105,22 +103,6 @@ export default function ReportsPage() {
       <PageHeader title="Relatórios" description="Custos por hectare e produtividade por safra." />
 
       {!showMock && isLoading ? <ReportPageSkeleton /> : null}
-
-      {showMock ? (
-        <Alert className="mb-6 border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-          <Info className="text-amber-700 dark:text-amber-400" />
-          <AlertTitle>Dados de demonstração</AlertTitle>
-          <AlertDescription>
-            Exibindo safras colhidas fictícias para pré-visualizar gráficos e tabela. Com a API real, estes blocos
-            aparecem quando houver colheitas registradas. Em desenvolvimento o mock vem ligado; use{" "}
-            <code className="rounded bg-amber-100/80 px-1 text-xs dark:bg-amber-900/50">
-              NEXT_PUBLIC_REPORTS_MOCK_HARVEST=false
-            </code>{" "}
-            no <code className="rounded bg-amber-100/80 px-1 text-xs dark:bg-amber-900/50">.env.local</code> para
-            ver apenas dados reais.
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       {showContent && report && (
         <>

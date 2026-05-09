@@ -114,7 +114,7 @@ export default function MixTemplatesPage() {
   return (
     <>
       <PageHeader
-        title="Receitas de Mistura"
+        title="Receitas de produtos"
         description="Composição de doses por produto para cada aplicação."
       />
 
@@ -154,7 +154,7 @@ export default function MixTemplatesPage() {
             </SheetTrigger>
             <SheetContent side="right" className="w-full sm:w-96">
               <SheetHeader>
-                <SheetTitle>Criar nova receita de mistura</SheetTitle>
+                <SheetTitle>Criar nova receita de produtos</SheetTitle>
               </SheetHeader>
               <form onSubmit={onSubmit} className="mt-6 space-y-4">
                 <div>

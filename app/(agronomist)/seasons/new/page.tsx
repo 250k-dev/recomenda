@@ -25,7 +25,7 @@ const seasonSchema = z.object({
   crop: z.enum(["SOYBEAN", "CORN"]),
   variety: z.string().min(1, "Variedade obrigatória"),
   cycle_days: z.number().int().min(1, "Dias de ciclo obrigatório"),
-  timing_template_id: z.string().min(1, "Template de timing obrigatório"),
+  timing_template_id: z.string().min(1, "Recomendação obrigatória"),
   desiccation_date: z.string().min(1, "Data de dessecação obrigatória"),
 });
 
@@ -185,13 +185,13 @@ export default function NewSeasonPage() {
 
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-700">
-              Template de Timing
+              Recomendação
             </label>
             <select
               className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand)]"
               {...form.register("timing_template_id")}
             >
-              <option value="">Selecione um template</option>
+              <option value="">Selecione uma recomendação</option>
               {templates.map((t: any) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.crop === "SOYBEAN" ? "Soja" : "Milho"})
