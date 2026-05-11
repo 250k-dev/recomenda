@@ -4,13 +4,24 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
 import { TableRowsSkeleton, ToolbarSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { useLocalCatalog, useCreateLocalProduct, useUpdateLocalProduct } from "@/lib/api/hooks";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import {
+  useClonePeerLocalProduct,
+  useCreateLocalProduct,
+  useInactiveLocalCatalog,
+  usePlatformCatalog,
+  useUpdateLocalProduct,
+} from "@/lib/api/hooks";
+import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
+import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { cn } from "@/lib/utils";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -50,12 +61,15 @@ const DOSE_UNITS: Record<string, string> = {
 };
 
 export default function CatalogPage() {
-  const { data: localData, isLoading: localLoading } = useLocalCatalog();
+  const { data: platformRes, isLoading: platformLoading } = usePlatformCatalog();
+  const { data: inactiveData, isLoading: inactiveLoading } = useInactiveLocalCatalog();
   const createProduct = useCreateLocalProduct();
   const updateProduct = useUpdateLocalProduct();
+  const clonePeer = useClonePeerLocalProduct();
 
   const [openCreate, setOpenCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"global" | "inativos">("global");
 
   const createForm = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
@@ -72,43 +86,134 @@ export default function CatalogPage() {
       onSuccess: () => {
         setOpenCreate(false);
         createForm.reset();
+        toast.success("Produto adicionado ao catálogo.");
       },
+      onError: () => toast.error("Não foi possível criar o produto."),
     });
   });
 
   const onEditSubmit = editForm.handleSubmit((values) => {
     if (editingId) {
-      updateProduct.mutate({ id: editingId, ...values }, {
-        onSuccess: () => {
-          setEditingId(null);
-          editForm.reset();
+      updateProduct.mutate(
+        { id: editingId, ...values },
+        {
+          onSuccess: () => {
+            setEditingId(null);
+            editForm.reset();
+            toast.success("Produto atualizado.");
+          },
+          onError: () => toast.error("Não foi possível salvar."),
         },
-      });
+      );
     }
   });
 
-  const localProducts = localData?.data ?? [];
+  const platformRows = platformRes?.data ?? [];
+  const inactiveProducts = inactiveData?.data ?? [];
 
-  const localRows = localProducts.map((product) => [
-    <div key={`name-${product.id}`} className="font-medium">{product.name}</div>,
+  const globalRows = platformRows.map((row) => {
+    const cat =
+      PRODUCT_CATEGORY_LABELS[row.category as keyof typeof PRODUCT_CATEGORY_LABELS] ??
+      CATEGORIES[row.category] ??
+      row.category;
+    const unit = DOSE_UNITS[row.dose_unit]?.split(" ")[0] ?? row.dose_unit;
+    const price = row.price_brl ? `R$ ${parseFloat(String(row.price_brl)).toFixed(2)}` : "—";
+
+    const actions = (
+      <div key={`act-${row.entry_type}-${row.local_product_id ?? row.peer_local_product_id}`} className="flex flex-wrap justify-end gap-1">
+        {row.can_clone_to_my_catalog && row.peer_local_product_id ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            disabled={clonePeer.isPending}
+            onClick={() =>
+              clonePeer.mutate(row.peer_local_product_id!, {
+                onSuccess: () => toast.success("Produto copiado para o seu catálogo."),
+                onError: () => toast.error("Não foi possível adicionar o produto."),
+              })
+            }
+          >
+            Usar no meu catálogo
+          </Button>
+        ) : null}
+        {row.can_edit && row.local_product_id ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => {
+              setEditingId(row.local_product_id!);
+              editForm.setValue("name", row.name);
+              editForm.setValue("category", row.category ?? "");
+              editForm.setValue("dose_unit", row.dose_unit ?? "");
+              editForm.setValue("price_brl", row.price_brl != null ? String(row.price_brl) : "");
+              editForm.setValue("label_url", row.label_url ?? "");
+            }}
+          >
+            Editar
+          </Button>
+        ) : null}
+        {row.can_deactivate && row.local_product_id ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(deactivateOutlineButtonClass, "h-7 px-2 text-xs")}
+            onClick={() => {
+              updateProduct.mutate(
+                { id: row.local_product_id!, is_active: false },
+                {
+                  onSuccess: () => toast.success("Produto desativado."),
+                  onError: () => toast.error("Não foi possível desativar."),
+                },
+              );
+            }}
+            disabled={updateProduct.isPending}
+          >
+            Desativar
+          </Button>
+        ) : null}
+      </div>
+    );
+
+    return [
+      <div key={`n-${row.local_product_id ?? row.peer_local_product_id ?? row.global_product_id}`} className="font-medium">
+        {row.name}
+      </div>,
+      cat,
+      unit,
+      price,
+      actions,
+    ];
+  });
+
+  const inactiveRows = inactiveProducts.map((product: { id: string; name: string; category?: string; dose_unit?: string; price_brl?: string | null }) => [
+    <div key={`name-${product.id}`} className="font-medium">
+      {product.name}
+    </div>,
     product.category ? (CATEGORIES[product.category] ?? product.category) : "-",
     product.dose_unit ? (DOSE_UNITS[product.dose_unit]?.split(" ")[0] ?? product.dose_unit) : "-",
-    product.price_brl ? `R$ ${parseFloat(product.price_brl).toFixed(2)}` : "-",
+    product.price_brl ? `R$ ${parseFloat(String(product.price_brl)).toFixed(2)}` : "-",
     <Button
-      key={`edit-${product.id}`}
+      key={`reactivate-${product.id}`}
       variant="outline"
       size="sm"
       className="h-7 px-2 text-xs"
       onClick={() => {
-        setEditingId(product.id);
-        editForm.setValue("name", product.name);
-        editForm.setValue("category", product.category ?? "");
-        editForm.setValue("dose_unit", product.dose_unit ?? "");
-        editForm.setValue("price_brl", product.price_brl ?? "");
-        editForm.setValue("label_url", product.label_url ?? "");
+        updateProduct.mutate(
+          { id: product.id, is_active: true },
+          {
+            onSuccess: () => toast.success("Produto reativado."),
+            onError: () => toast.error("Não foi possível reativar."),
+          },
+        );
       }}
+      disabled={updateProduct.isPending}
     >
-      Editar
+      Reativar
     </Button>,
   ]);
 
@@ -116,17 +221,17 @@ export default function CatalogPage() {
     <>
       <PageHeader
         title="Produtos"
-        description="Todos os produtos ativos disponibilizados pela plataforma entram aqui automaticamente. Use adicionar para incluir produtos exclusivos do seu escritório."
+        description="Catálogo global reúne produtos da plataforma e customizados de todos os agrônomos. Você só edita ou desativa produtos que criou; copie itens de outros para o seu catálogo quando precisar."
       />
 
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
         <Sheet open={openCreate} onOpenChange={setOpenCreate}>
           <SheetTrigger asChild>
-            <Button>Adicionar produto</Button>
+            <Button type="button">Adicionar produto</Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-full sm:w-96">
             <SheetHeader>
-              <SheetTitle>Adicionar produto</SheetTitle>
+              <SheetTitle>Adicionar produto customizado</SheetTitle>
             </SheetHeader>
             <form onSubmit={onCreateSubmit} className="mt-6 space-y-4">
               <div>
@@ -141,7 +246,9 @@ export default function CatalogPage() {
                 >
                   <option value="">Selecionar...</option>
                   {Object.entries(CATEGORIES).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -153,7 +260,9 @@ export default function CatalogPage() {
                 >
                   <option value="">Selecionar...</option>
                   {Object.entries(DOSE_UNITS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -164,6 +273,50 @@ export default function CatalogPage() {
           </SheetContent>
         </Sheet>
       </div>
+
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <SegmentedTabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          items={[
+            { value: "global", label: "Catálogo global" },
+            { value: "inativos", label: "Desativados", badgeCount: inactiveProducts.length },
+          ]}
+        />
+      </div>
+
+      {activeTab === "global" && (
+        <>
+          {platformLoading ? (
+            <>
+              <ToolbarSkeleton />
+              <TableRowsSkeleton rows={10} columns={5} />
+            </>
+          ) : globalRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto no catálogo</p>
+          ) : (
+            <DataTable
+              headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]}
+              rows={globalRows}
+            />
+          )}
+        </>
+      )}
+
+      {activeTab === "inativos" && (
+        <>
+          {inactiveLoading ? (
+            <>
+              <ToolbarSkeleton />
+              <TableRowsSkeleton rows={10} columns={5} />
+            </>
+          ) : inactiveProducts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto customizado desativado</p>
+          ) : (
+            <DataTable headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]} rows={inactiveRows} />
+          )}
+        </>
+      )}
 
       {editingId && (
         <Sheet open={editingId !== null} onOpenChange={() => setEditingId(null)}>
@@ -188,7 +341,9 @@ export default function CatalogPage() {
                 >
                   <option value="">Selecionar...</option>
                   {Object.entries(CATEGORIES).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -201,28 +356,21 @@ export default function CatalogPage() {
                 >
                   <option value="">Selecionar...</option>
                   {Object.entries(DOSE_UNITS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-zinc-700">Preço (BRL)</label>
-                <Input
-                  {...editForm.register("price_brl")}
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                />
+                <Input {...editForm.register("price_brl")} type="number" step="0.01" placeholder="0.00" />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-zinc-700">URL do rótulo</label>
-                <Input
-                  {...editForm.register("label_url")}
-                  type="url"
-                  placeholder="https://exemplo.com/rotulo.jpg"
-                />
+                <Input {...editForm.register("label_url")} type="url" placeholder="https://exemplo.com/rotulo.jpg" />
               </div>
 
               <Button type="submit" disabled={updateProduct.isPending} className="w-full">
@@ -231,17 +379,6 @@ export default function CatalogPage() {
             </form>
           </SheetContent>
         </Sheet>
-      )}
-
-      {localLoading ? (
-        <>
-          <ToolbarSkeleton />
-          <TableRowsSkeleton rows={10} columns={5} />
-        </>
-      ) : localProducts.length === 0 ? (
-        <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto na sua lista</p>
-      ) : (
-        <DataTable headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]} rows={localRows} />
       )}
     </>
   );

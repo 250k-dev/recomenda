@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +14,9 @@ import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
+import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 import type { AdminAgronomist } from "@/lib/api/client";
 import {
   useAdminAgronomists,
@@ -184,7 +187,9 @@ export default function AdminAgronomistsPage() {
   };
 
   const activeRows = filtered.map((a) => [
-    a.name,
+    <Link key={`nm-${a.user_id}`} href={`/admin/agronomists/${a.user_id}`} className="font-medium text-primary hover:underline">
+      {a.name}
+    </Link>,
     a.email,
     plans?.find((p) => p.id === a.plan_id)?.name ?? a.plan_id,
     new Date(a.plan_started_at).toLocaleDateString("pt-BR"),
@@ -197,7 +202,7 @@ export default function AdminAgronomistsPage() {
         type="button"
         variant="outline"
         size="sm"
-        className="border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
+        className={deactivateOutlineButtonClass}
         disabled={updateMutation.isPending}
         onClick={() => deactivate(a)}
       >
@@ -207,7 +212,9 @@ export default function AdminAgronomistsPage() {
   ]);
 
   const inactiveRows = filtered.map((a) => [
-    a.name,
+    <Link key={`nm-${a.user_id}`} href={`/admin/agronomists/${a.user_id}`} className="font-medium text-primary hover:underline">
+      {a.name}
+    </Link>,
     a.email,
     plans?.find((p) => p.id === a.plan_id)?.name ?? a.plan_id,
     new Date(a.plan_started_at).toLocaleDateString("pt-BR"),
@@ -219,9 +226,7 @@ export default function AdminAgronomistsPage() {
       <Button type="button" variant="secondary" size="sm" disabled={updateMutation.isPending} onClick={() => reactivate(a)}>
         Reativar
       </Button>
-      <Button type="button" variant="destructive" size="sm" disabled={deleteMutation.isPending} onClick={() => removeHard(a)}>
-        Excluir
-      </Button>
+      <DeletePermanentIconButton disabled={deleteMutation.isPending} onClick={() => removeHard(a)} />
     </div>,
   ]);
 
@@ -235,39 +240,17 @@ export default function AdminAgronomistsPage() {
       />
 
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setTab("active");
-              setFilter("");
-            }}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-              tab === "active" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800",
-            )}
-          >
-            Ativos
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTab("inactive");
-              setFilter("");
-            }}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-              tab === "inactive" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800",
-            )}
-          >
-            Inativos
-            {inactiveList.length > 0 && (
-              <span className="ml-2 rounded-full bg-zinc-300 px-1.5 py-0.5 text-xs text-zinc-700">
-                {inactiveList.length}
-              </span>
-            )}
-          </button>
-        </div>
+        <SegmentedTabs
+          value={tab}
+          onValueChange={(v) => {
+            setTab(v);
+            setFilter("");
+          }}
+          items={[
+            { value: "active", label: "Ativos" },
+            { value: "inactive", label: "Inativos", badgeCount: inactiveList.length },
+          ]}
+        />
 
         <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-end sm:justify-end">
           <div className="min-w-0 flex-1 sm:max-w-md">

@@ -6,8 +6,11 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Trash2 } from "lucide-react";
+import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/domain/page-header";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -80,7 +83,7 @@ export default function TimingTemplatesPage() {
       </Button>
       <Button
         variant="outline"
-        className="h-8 px-3 text-xs border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700"
+        className={cn("h-8 px-3 text-xs", deactivateOutlineButtonClass)}
         disabled={deleteMutation.isPending}
         onClick={() => deleteMutation.mutate(t.id)}
       >
@@ -93,20 +96,14 @@ export default function TimingTemplatesPage() {
     t.name,
     CROP_LABELS[t.crop] ?? t.crop,
     <div key={`archived-actions-${t.id}`} className="flex gap-2">
-      <Button
-        variant="destructive"
-        size="icon"
-        className="h-8 w-8"
+      <DeletePermanentIconButton
         disabled={hardDeleteMutation.isPending}
-        title="Excluir permanentemente"
         onClick={() => {
           if (confirm(`Excluir permanentemente "${t.name}"? Esta ação não pode ser desfeita.`)) {
             hardDeleteMutation.mutate(t.id);
           }
         }}
-      >
-        <Trash2 className="size-4" />
-      </Button>
+      />
     </div>,
   ]);
 
@@ -118,33 +115,14 @@ export default function TimingTemplatesPage() {
       />
 
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1">
-          <button
-            onClick={() => setTab("active")}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              tab === "active"
-                ? "bg-white text-zinc-900 shadow-sm"
-                : "text-zinc-500 hover:text-zinc-800"
-            }`}
-          >
-            Ativos
-          </button>
-          <button
-            onClick={() => setTab("archived")}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-              tab === "archived"
-                ? "bg-white text-zinc-900 shadow-sm"
-                : "text-zinc-500 hover:text-zinc-800"
-            }`}
-          >
-            Removidos
-            {archivedData.length > 0 && (
-              <span className="ml-2 rounded-full bg-zinc-300 px-1.5 py-0.5 text-xs text-zinc-700">
-                {archivedData.length}
-              </span>
-            )}
-          </button>
-        </div>
+        <SegmentedTabs
+          value={tab}
+          onValueChange={setTab}
+          items={[
+            { value: "active", label: "Ativos" },
+            { value: "archived", label: "Removidos", badgeCount: archivedData.length },
+          ]}
+        />
 
         {tab === "active" && (
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

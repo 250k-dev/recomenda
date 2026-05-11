@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { useCreateInvitation, useFarms, useImpersonateProducer, useProducers } from "@/lib/api/hooks";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
-import { cn } from "@/lib/utils";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import type { AgronomistProducerListRow } from "@/lib/api/client";
 import { ProducerAccountStatusBadge } from "@/components/domain/producer-account-status-badge";
 
@@ -173,39 +173,17 @@ export default function ProducersPage() {
 
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2 lg:flex-1">
-          <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setTab("active");
-                setFilter("");
-              }}
-              className={cn(
-                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-                tab === "active" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800",
-              )}
-            >
-              Ativos
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTab("archived");
-                setFilter("");
-              }}
-              className={cn(
-                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-                tab === "archived" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800",
-              )}
-            >
-              Inativos
-              {archivedList.length > 0 && (
-                <span className="ml-2 rounded-full bg-zinc-300 px-1.5 py-0.5 text-xs text-zinc-700">
-                  {archivedList.length}
-                </span>
-              )}
-            </button>
-          </div>
+          <SegmentedTabs
+            value={tab}
+            onValueChange={(v) => {
+              setTab(v);
+              setFilter("");
+            }}
+            items={[
+              { value: "active", label: "Ativos" },
+              { value: "archived", label: "Inativos", badgeCount: archivedList.length },
+            ]}
+          />
           <div className="min-w-0 w-full sm:max-w-md lg:max-w-lg">
             <AdminListFilter
               value={filter}

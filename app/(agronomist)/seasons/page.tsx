@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/domain/page-header";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/table";
@@ -13,6 +14,8 @@ import {
   useHardDeleteSeason,
   useSeasons,
 } from "@/lib/api/hooks";
+import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { cn } from "@/lib/utils";
 
 const CROP_LABELS: Record<string, string> = {
   SOYBEAN: "Soja",
@@ -76,7 +79,7 @@ export default function SeasonsPage() {
         <div key={`actions-${season.id}`} className="flex gap-2">
           <Button
             variant="outline"
-            className="h-8 px-3 text-xs border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700"
+            className={cn("h-8 px-3 text-xs", deactivateOutlineButtonClass)}
             disabled={archiveMutation.isPending}
             onClick={() => archiveMutation.mutate(season.id)}
           >
@@ -85,20 +88,14 @@ export default function SeasonsPage() {
         </div>
       ) : (
         <div key={`archived-actions-${season.id}`} className="flex gap-2">
-          <Button
-            variant="destructive"
-            size="icon"
-            className="h-8 w-8"
+          <DeletePermanentIconButton
             disabled={hardDeleteMutation.isPending}
-            title="Excluir permanentemente"
             onClick={() => {
               if (confirm(`Excluir permanentemente a safra "${displayName}"? Esta ação não pode ser desfeita.`)) {
                 hardDeleteMutation.mutate(season.id);
               }
             }}
-          >
-            <Trash2 className="size-4" />
-          </Button>
+          />
         </div>
       ),
     ];
@@ -118,32 +115,15 @@ export default function SeasonsPage() {
         )}
       </div>
 
-      <div className="mb-4 flex gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1 w-fit">
-        <button
-          onClick={() => setTab("active")}
-          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-            tab === "active"
-              ? "bg-white text-zinc-900 shadow-sm"
-              : "text-zinc-500 hover:text-zinc-800"
-          }`}
-        >
-          Ativas
-        </button>
-        <button
-          onClick={() => setTab("archived")}
-          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-            tab === "archived"
-              ? "bg-white text-zinc-900 shadow-sm"
-              : "text-zinc-500 hover:text-zinc-800"
-          }`}
-        >
-          Removidas
-          {archived.length > 0 && (
-            <span className="ml-2 rounded-full bg-zinc-300 px-1.5 py-0.5 text-xs text-zinc-700">
-              {archived.length}
-            </span>
-          )}
-        </button>
+      <div className="mb-4 flex gap-1">
+        <SegmentedTabs
+          value={tab}
+          onValueChange={setTab}
+          items={[
+            { value: "active", label: "Ativas" },
+            { value: "archived", label: "Removidas", badgeCount: archived.length },
+          ]}
+        />
       </div>
 
       {tab === "active" ? (

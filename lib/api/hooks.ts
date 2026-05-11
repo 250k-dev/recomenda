@@ -26,7 +26,9 @@ import {
   deletePlot,
   deleteTimingStage,
   deleteTimingTemplate,
+  deleteLocalProduct,
   exitImpersonation,
+  getAdminAgronomistDetail,
   getAdminAgronomists,
   getAdminProducers,
   getComparativeReport,
@@ -37,6 +39,13 @@ import {
   getGlobalCatalog,
   getInvitationByToken,
   getLocalCatalog,
+  getInactiveLocalCatalog,
+  getAllInactiveLocalCatalog,
+  getAllLocalProducts,
+  getPlatformCatalog,
+  getAdminPlatformActiveCatalog,
+  getAdminDeactivatedCatalog,
+  clonePeerLocalProduct,
   getMe,
   getMixTemplate,
   getMixTemplates,
@@ -96,6 +105,9 @@ export const queryKeys = {
   producers: ["producers"],
   localCatalog: ["local-catalog"],
   globalCatalog: ["global-catalog"],
+  platformCatalog: ["platform-catalog"],
+  adminPlatformActive: ["admin-platform-active"],
+  adminDeactivatedCatalog: ["admin-deactivated-catalog"],
   seasons: ["seasons"],
   season: (id: string) => ["season", id],
   seasonTimeline: (seasonId: string) => ["season-timeline", seasonId],
@@ -107,6 +119,7 @@ export const queryKeys = {
   mixTemplate: (id: string) => ["mix-template", id],
   plans: ["plans"],
   adminAgronomists: (status: "active" | "inactive") => ["admin-agronomists", status] as const,
+  adminAgronomistDetail: (id: string) => ["admin-agronomist-detail", id] as const,
   adminProducers: ["admin-producers"],
   producerStock: (producerId: string) => ["producer-stock", producerId],
   producer: (id: string) => ["producer", id],
@@ -155,10 +168,70 @@ export function useLocalCatalog() {
   return useQuery({ queryKey: queryKeys.localCatalog, queryFn: getLocalCatalog });
 }
 
+export function useInactiveLocalCatalog() {
+  return useQuery({ queryKey: ["inactiveLocalCatalog"], queryFn: getInactiveLocalCatalog });
+}
+
+export function useAllLocalProducts() {
+  return useQuery({ queryKey: ["allLocalProducts"], queryFn: getAllLocalProducts });
+}
+
+export function useAllInactiveLocalProducts() {
+  return useQuery({ queryKey: ["allInactiveLocalProducts"], queryFn: getAllInactiveLocalCatalog });
+}
+
 export function useGlobalCatalog() {
   return useQuery({
     queryKey: queryKeys.globalCatalog,
     queryFn: getGlobalCatalog,
+  });
+}
+
+export function usePlatformCatalog() {
+  return useQuery({
+    queryKey: queryKeys.platformCatalog,
+    queryFn: getPlatformCatalog,
+  });
+}
+
+export function useAdminPlatformActiveCatalog() {
+  return useQuery({
+    queryKey: queryKeys.adminPlatformActive,
+    queryFn: getAdminPlatformActiveCatalog,
+  });
+}
+
+export function useAdminDeactivatedCatalog() {
+  return useQuery({
+    queryKey: queryKeys.adminDeactivatedCatalog,
+    queryFn: getAdminDeactivatedCatalog,
+  });
+}
+
+export function useClonePeerLocalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: clonePeerLocalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+    },
+  });
+}
+
+export function useDeleteLocalProductAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteLocalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: ["allLocalProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["allInactiveLocalProducts"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+    },
   });
 }
 
@@ -257,7 +330,11 @@ export function useExitImpersonation() {
 
   return useMutation({
     mutationFn: exitImpersonation,
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setAccessToken(data.access_token);
+      if (data.role) {
+        setUserRole(data.role);
+      }
       clearImpersonation();
       queryClient.invalidateQueries();
     },
@@ -501,6 +578,14 @@ export function useAdminAgronomists(status: "active" | "inactive" = "active") {
   });
 }
 
+export function useAdminAgronomistDetail(id: string) {
+  return useQuery({
+    queryKey: queryKeys.adminAgronomistDetail(id),
+    queryFn: () => getAdminAgronomistDetail(id),
+    enabled: Boolean(id),
+  });
+}
+
 export function useCreateAdminAgronomist() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -523,8 +608,9 @@ export function useUpdateAdminAgronomist() {
       const { id, ...body } = vars;
       return updateAdminAgronomist(id, body);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-agronomists"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminAgronomistDetail(variables.id) });
     },
   });
 }
@@ -600,6 +686,9 @@ export function useCreateGlobalProduct() {
     mutationFn: createGlobalProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
     },
   });
 }
@@ -613,6 +702,9 @@ export function useUpdateGlobalProduct() {
     }) => updateGlobalProduct(vars.id, vars.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
     },
   });
 }
@@ -623,6 +715,9 @@ export function useDeleteGlobalProduct() {
     mutationFn: deleteGlobalProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
     },
   });
 }
@@ -798,7 +893,9 @@ export function useCreateLocalProduct() {
   return useMutation({
     mutationFn: createLocalProduct,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["local-catalog"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
     },
   });
 }
@@ -808,7 +905,8 @@ export function useCloneGlobalProduct() {
   return useMutation({
     mutationFn: cloneGlobalProduct,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["local-catalog"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
     },
   });
 }
@@ -816,10 +914,14 @@ export function useCloneGlobalProduct() {
 export function useUpdateLocalProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; label_url?: string }) =>
+    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; label_url?: string; is_active?: boolean }) =>
       updateLocalProduct(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["local-catalog"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: ["inactiveLocalCatalog"] });
     },
   });
 }

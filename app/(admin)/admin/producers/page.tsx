@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
@@ -8,10 +9,12 @@ import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
 import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { AdminProducer } from "@/lib/api/client";
 import { useAdminProducers, useDeleteAdminProducer, usePatchAdminProducer } from "@/lib/api/hooks";
 import { ProducerAccountStatusBadge } from "@/components/domain/producer-account-status-badge";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
+import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
@@ -101,7 +104,17 @@ export default function AdminProducersPage() {
   const headers = ["Nome", "E-mail", "Agrônomo", "E-mail do agrônomo", "Status", "Ações"];
 
   const activeRows = filtered.map((p) => [
-    p.name,
+    p.row_type === "producer" && p.producer_id ? (
+      <Link
+        key={`nm-${rowKey(p)}`}
+        href={`/admin/producers/${p.producer_id}`}
+        className="font-medium text-primary hover:underline"
+      >
+        {p.name}
+      </Link>
+    ) : (
+      <span key={`nm-${rowKey(p)}`}>{p.name}</span>
+    ),
     p.email,
     p.agronomist_name,
     p.agronomist_email,
@@ -112,7 +125,7 @@ export default function AdminProducersPage() {
           type="button"
           variant="outline"
           size="sm"
-          className="border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
+          className={deactivateOutlineButtonClass}
           disabled={patchMutation.isPending}
           onClick={() => archive(p)}
         >
@@ -125,7 +138,17 @@ export default function AdminProducersPage() {
   ]);
 
   const archivedRows = filtered.map((p) => [
-    p.name,
+    p.row_type === "producer" && p.producer_id ? (
+      <Link
+        key={`nm-${rowKey(p)}`}
+        href={`/admin/producers/${p.producer_id}`}
+        className="font-medium text-primary hover:underline"
+      >
+        {p.name}
+      </Link>
+    ) : (
+      <span key={`nm-${rowKey(p)}`}>{p.name}</span>
+    ),
     p.email,
     p.agronomist_name,
     p.agronomist_email,
@@ -136,15 +159,10 @@ export default function AdminProducersPage() {
           <Button type="button" variant="secondary" size="sm" disabled={patchMutation.isPending} onClick={() => restore(p)}>
             Restaurar
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
+          <DeletePermanentIconButton
             disabled={deleteMutation.isPending}
             onClick={() => removeHard(p)}
-          >
-            Excluir
-          </Button>
+          />
         </>
       ) : (
         <span className="text-xs text-muted-foreground">—</span>
@@ -162,39 +180,17 @@ export default function AdminProducersPage() {
       />
 
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setTab("active");
-              setFilter("");
-            }}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-              tab === "active" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800",
-            )}
-          >
-            Ativos
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTab("archived");
-              setFilter("");
-            }}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-              tab === "archived" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-800",
-            )}
-          >
-            Removidos
-            {archivedList.length > 0 && (
-              <span className="ml-2 rounded-full bg-zinc-300 px-1.5 py-0.5 text-xs text-zinc-700">
-                {archivedList.length}
-              </span>
-            )}
-          </button>
-        </div>
+        <SegmentedTabs
+          value={tab}
+          onValueChange={(v) => {
+            setTab(v);
+            setFilter("");
+          }}
+          items={[
+            { value: "active", label: "Ativos" },
+            { value: "archived", label: "Removidos", badgeCount: archivedList.length },
+          ]}
+        />
 
         <div className="min-w-0 flex-1 sm:max-w-md lg:max-w-lg">
           <AdminListFilter value={filter} onChange={setFilter} placeholder="Filtrar por nome, e-mail, agrônomo ou ID..." />
