@@ -143,12 +143,109 @@ export async function impersonateProducer(producerId: string) {
   return data;
 }
 
-export async function exitImpersonation() {
-  await api.post("/auth/impersonate/exit");
+function jwtPayloadRole(accessToken: string): string | null {
+  try {
+    const parts = accessToken.split(".");
+    if (parts.length < 2) return null;
+    let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4) base64 += "=";
+    const payload = JSON.parse(atob(base64)) as { role?: unknown };
+    return typeof payload.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function exitImpersonation(): Promise<{ access_token: string; role: string | null }> {
+  const { data } = await api.post<{ access_token: string }>("/auth/impersonate/exit");
+  return { access_token: data.access_token, role: jwtPayloadRole(data.access_token) };
 }
 
 export async function getLocalCatalog() {
   const { data } = await api.get<PaginatedResponse<Product>>("/catalog/local");
+  return data;
+}
+
+export type PlatformCatalogEntry = {
+  entry_type: "GLOBAL" | "OWN_CUSTOM" | "PEER_CUSTOM";
+  local_product_id: string | null;
+  global_product_id: string | null;
+  peer_local_product_id: string | null;
+  name: string;
+  category: string;
+  dose_unit: string;
+  label_url?: string | null;
+  price_brl?: string | null;
+  owner_name?: string | null;
+  can_edit: boolean;
+  can_deactivate: boolean;
+  can_clone_to_my_catalog: boolean;
+};
+
+export async function getPlatformCatalog() {
+  const { data } = await api.get<{ data: PlatformCatalogEntry[] }>("/catalog/platform");
+  return data;
+}
+
+export type AdminPlatformActiveEntry = {
+  entry_type: "GLOBAL" | "CUSTOM";
+  global_product_id: string | null;
+  local_product_id: string | null;
+  name: string;
+  category: string;
+  dose_unit: string;
+  label_url?: string | null;
+  price_brl?: string | null;
+  equivalence_group?: string | null;
+  default_label_url?: string | null;
+  is_active?: boolean;
+  owner_agronomist_id?: string | null;
+  owner_name?: string | null;
+};
+
+export async function getAdminPlatformActiveCatalog() {
+  const { data } = await api.get<{ data: AdminPlatformActiveEntry[] }>("/catalog/admin/platform-active");
+  return data;
+}
+
+export type AdminDeactivatedCatalogEntry = {
+  entry_type: "GLOBAL_INACTIVE" | "CUSTOM_INACTIVE";
+  global_product_id: string | null;
+  local_product_id: string | null;
+  name: string;
+  category: string;
+  dose_unit: string;
+  label_url?: string | null;
+  price_brl?: string | null;
+  agronomist_name?: string | null;
+};
+
+export async function getAdminDeactivatedCatalog() {
+  const { data } = await api.get<{ data: AdminDeactivatedCatalogEntry[] }>("/catalog/admin/deactivated");
+  return data;
+}
+
+export async function clonePeerLocalProduct(sourceLocalId: string) {
+  const { data } = await api.post<Product>(`/catalog/local/from-peer/${encodeURIComponent(sourceLocalId)}`);
+  return data;
+}
+
+export async function deleteLocalProduct(id: string) {
+  await api.delete(`/catalog/local/${encodeURIComponent(id)}`);
+}
+
+export async function getInactiveLocalCatalog() {
+  const { data } = await api.get<PaginatedResponse<Product>>("/catalog/local/inactive");
+  return data;
+}
+
+export async function getAllInactiveLocalCatalog() {
+  const { data } = await api.get<PaginatedResponse<Product & { agronomist_name?: string }>>("/catalog/local/inactive/all");
+  return data;
+}
+
+export async function getAllLocalProducts() {
+  const { data } = await api.get<PaginatedResponse<Product>>("/catalog/admin/local-all");
   return data;
 }
 
@@ -209,7 +306,7 @@ export async function cloneGlobalProduct(globalId: string) {
   return data;
 }
 
-export async function updateLocalProduct(id: string, payload: { name?: string; category?: string; dose_unit?: string; price_brl?: string; label_url?: string }) {
+export async function updateLocalProduct(id: string, payload: { name?: string; category?: string; dose_unit?: string; price_brl?: string; label_url?: string; is_active?: boolean }) {
   const { data } = await api.patch<Product>(`/catalog/local/${id}`, payload);
   return data;
 }
@@ -489,6 +586,40 @@ export interface AdminAgronomist {
   plan_started_at: string;
   active_plots_count: number;
   is_active: boolean;
+}
+
+export interface AdminAgronomistDetail {
+  user_id: string;
+  name: string;
+  email: string;
+  is_active: boolean;
+  plan_id: string;
+  plan_started_at: string;
+  active_plots_count: number;
+  counts: {
+    farms: number;
+    producers: number;
+    seasons: number;
+    pending_invitations: number;
+  };
+  farms: Array<{
+    id: string;
+    name: string;
+    location: string | null;
+    plot_count: number;
+    created_at: string;
+  }>;
+  producers: Array<{
+    producer_id: string;
+    name: string;
+    email: string;
+    is_active: boolean;
+  }>;
+}
+
+export async function getAdminAgronomistDetail(id: string) {
+  const { data } = await api.get<AdminAgronomistDetail>(`/admin/agronomists/${id}/detail`);
+  return data;
 }
 
 export async function getAdminAgronomists(params?: { status?: "active" | "inactive" }) {
