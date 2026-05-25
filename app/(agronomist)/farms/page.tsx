@@ -11,8 +11,12 @@ import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCreateFarm, useFarms } from "@/lib/api/hooks";
+import { Building2, Info, Plus } from "lucide-react";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -53,58 +57,81 @@ export default function FarmsPage() {
   }, [data, filterName, filterLocation]);
 
   const rows = filteredFarms.map((farm) => [
-    <Link key={farm.id} href={`/farms/${farm.id}`} className="font-medium text-[var(--brand)] underline">
+    <Link
+      key={farm.id}
+      href={`/farms/${farm.id}`}
+      className="font-medium text-primary underline-offset-4 hover:underline"
+    >
       {farm.name}
     </Link>,
-    farm.location ?? "-",
+    farm.location ?? "—",
     <Button
       key={`edit-${farm.id}`}
       variant="outline"
-      className="h-8 px-3 text-xs"
-      onClick={() => {
-        const url = `/farms/${farm.id}`;
-        window.location.href = url;
-      }}
+      size="sm"
+      onClick={() => router.push(`/farms/${farm.id}`)}
     >
-      Editar
+      Abrir
     </Button>,
   ]);
 
   return (
     <>
-      <PageHeader title="Fazendas" description="Cadastro e gestão de fazendas e talhões." />
+      <PageHeader
+        icon={<Building2 className="h-5 w-5" />}
+        section="Estrutura"
+        title="Fazendas"
+        description="Cadastro e gestão de fazendas e talhões."
+      />
+
+      <Alert className="mb-6">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Esta listagem permanece disponível como atalho.</AlertTitle>
+        <AlertDescription>
+          O fluxo recomendado agora é:{" "}
+          <Link href="/producers" className="font-medium text-primary underline-offset-4 hover:underline">
+            Produtores
+          </Link>{" "}
+          → Fazenda → Safra.
+        </AlertDescription>
+      </Alert>
 
       <div className="mb-6 flex justify-end">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button>Nova fazenda</Button>
+            <Button>
+              <Plus className="h-4 w-4" />
+              Nova fazenda
+            </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-full sm:w-96">
             <SheetHeader>
-              <SheetTitle>Criar nova fazenda</SheetTitle>
+              <SheetTitle>Nova fazenda</SheetTitle>
             </SheetHeader>
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-700">Nome da fazenda</label>
+              <div className="space-y-1.5">
+                <Label htmlFor="farm-name">Nome da fazenda</Label>
                 <Input
+                  id="farm-name"
                   {...form.register("name")}
-                  placeholder="Ex: Fazenda Santa Rosa"
+                  placeholder="Ex.: Fazenda Santa Rosa"
                   autoFocus
                 />
                 {form.formState.errors.name && (
-                  <p className="mt-1 text-xs text-red-600">{form.formState.errors.name.message}</p>
+                  <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
                 )}
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-700">Localização</label>
+              <div className="space-y-1.5">
+                <Label htmlFor="farm-location">Localização</Label>
                 <Input
+                  id="farm-location"
                   {...form.register("location")}
-                  placeholder="Ex: Chapadão do Sul, MS"
+                  placeholder="Ex.: Chapadão do Sul, MS"
                 />
               </div>
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-2 pt-2">
                 <Button type="submit" disabled={createMutation.isPending} className="flex-1">
-                  {createMutation.isPending ? "Criando..." : "Criar"}
+                  {createMutation.isPending ? "Criando…" : "Criar"}
                 </Button>
               </div>
             </form>
@@ -114,25 +141,41 @@ export default function FarmsPage() {
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <Input
-          placeholder="Filtrar por nome..."
+          placeholder="Filtrar por nome…"
           value={filterName}
           onChange={(e) => setFilterName(e.target.value)}
-          className="text-sm"
         />
         <Input
-          placeholder="Filtrar por localização..."
+          placeholder="Filtrar por localização…"
           value={filterLocation}
           onChange={(e) => setFilterLocation(e.target.value)}
-          className="text-sm"
         />
       </div>
 
       {isLoading ? (
         <TableRowsSkeleton rows={8} columns={3} />
       ) : filteredFarms.length === 0 ? (
-        <p className="py-8 text-center text-sm text-zinc-500">
-          {data?.data?.length === 0 ? "Nenhuma fazenda cadastrada" : "Nenhuma fazenda encontrada"}
-        </p>
+        <EmptyState
+          icon={Building2}
+          title={
+            data?.data?.length === 0
+              ? "Nenhuma fazenda cadastrada"
+              : "Nenhuma fazenda encontrada"
+          }
+          description={
+            data?.data?.length === 0
+              ? "Crie a primeira fazenda para começar a planejar suas safras."
+              : "Ajuste os filtros para encontrar a fazenda desejada."
+          }
+          action={
+            data?.data?.length === 0 ? (
+              <Button onClick={() => setOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Nova fazenda
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <DataTable headers={["Nome", "Localização", ""]} rows={rows} />
       )}

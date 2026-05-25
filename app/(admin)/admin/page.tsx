@@ -3,34 +3,45 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { PageHeader } from "@/components/domain/page-header";
+import { LayoutDashboard } from "lucide-react";
 import { DashboardKpiSkeleton } from "@/components/domain/page-skeletons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAdminAgronomists, useAdminProducers, useGlobalCatalog, usePlans } from "@/lib/api/hooks";
+import {
+  useAdminAgronomists,
+  useAdminDeactivatedCatalog,
+  useAdminPlatformActiveCatalog,
+  useAdminProducers,
+  usePlans,
+} from "@/lib/api/hooks";
 
 export default function AdminHomePage() {
   const { data: agronomists, isLoading: loadingA } = useAdminAgronomists("active");
   const { data: producers, isLoading: loadingProd } = useAdminProducers();
   const { data: plans, isLoading: loadingP } = usePlans();
-  const { data: globalRes, isLoading: loadingG } = useGlobalCatalog();
+  const { data: platformActiveRes, isLoading: loadingCatActive } = useAdminPlatformActiveCatalog();
+  const { data: platformDeactivatedRes, isLoading: loadingCatOff } = useAdminDeactivatedCatalog();
 
   const counts = useMemo(() => {
     const aList = Array.isArray(agronomists) ? agronomists : [];
     const prodList = Array.isArray(producers) ? producers : [];
     const pList = plans ?? [];
-    const gList = globalRes?.data ?? [];
+    const activeCatalog = platformActiveRes?.data ?? [];
+    const deactivatedCatalog = platformDeactivatedRes?.data ?? [];
     return {
       agronomists: aList.length,
       producers: prodList.filter((p) => p.row_type === "producer").length,
       plans: pList.length,
-      global: gList.length,
+      catalogProducts: activeCatalog.length + deactivatedCatalog.length,
     };
-  }, [agronomists, producers, plans, globalRes]);
+  }, [agronomists, producers, plans, platformActiveRes, platformDeactivatedRes]);
 
-  const loading = loadingA || loadingProd || loadingP || loadingG;
+  const loading = loadingA || loadingProd || loadingP || loadingCatActive || loadingCatOff;
 
   return (
     <>
       <PageHeader
+        icon={<LayoutDashboard className="h-5 w-5" />}
+        section="Admin"
         title="Painel Admin"
         description="Visão geral: agrônomos, produtores, planos e produtos."
       />
@@ -86,11 +97,13 @@ export default function AdminHomePage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base font-medium">Produtos</CardTitle>
               <span className="text-2xl font-bold tabular-nums text-[var(--brand)]">
-                {counts.global}
+                {counts.catalogProducts}
               </span>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Produtos de referência para todos os agrônomos.</p>
+              <p className="text-sm text-muted-foreground">
+                Total no catálogo da plataforma (oficiais, customizados e removidos).
+              </p>
             </CardContent>
           </Card>
         </Link>

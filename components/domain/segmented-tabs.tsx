@@ -24,31 +24,45 @@ export function SegmentedTabs<T extends string>({
 }: SegmentedTabsProps<T>) {
   return (
     <div
+      role="tablist"
       className={cn(
-        "flex w-fit gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1",
+        "inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted p-1 shadow-xs",
         className,
       )}
     >
-      {items.map((item) => (
-        <button
-          key={item.value}
-          type="button"
-          onClick={() => onValueChange(item.value)}
-          className={cn(
-            "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-            value === item.value
-              ? "bg-white text-zinc-900 shadow-sm"
-              : "text-zinc-500 hover:text-zinc-800",
-          )}
-        >
-          {item.label}
-          {item.badgeCount != null && item.badgeCount > 0 ? (
-            <span className="ml-2 rounded-full bg-zinc-300 px-1.5 py-0.5 text-xs text-zinc-700">
-              {item.badgeCount}
-            </span>
-          ) : null}
-        </button>
-      ))}
+      {items.map((item) => {
+        const isActive = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onValueChange(item.value)}
+            className={cn(
+              "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 outline-none",
+              "focus-visible:ring-[3px] focus-visible:ring-ring/40",
+              isActive
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <span>{item.label}</span>
+            {item.badgeCount != null && item.badgeCount > 0 ? (
+              <span
+                className={cn(
+                  "min-w-5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted-foreground/15 text-muted-foreground group-hover:bg-muted-foreground/25",
+                )}
+              >
+                {item.badgeCount}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

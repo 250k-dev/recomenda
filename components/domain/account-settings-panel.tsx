@@ -7,6 +7,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useMe, useUpdateProfile, useChangePassword } from "@/lib/api/hooks";
 import { SettingsFormSkeleton } from "@/components/domain/page-skeletons";
@@ -107,82 +108,116 @@ export function AccountSettingsPanel() {
   return (
     <div className="space-y-6">
       <Card>
-        <div className="mb-4 border-b border-zinc-200 pb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Meu perfil</h2>
-          <p className="text-sm text-zinc-600">Atualize suas informações pessoais</p>
+        <div className="mb-4 border-b border-border pb-4">
+          <h2 className="text-lg font-semibold text-foreground">Meu perfil</h2>
+          <p className="text-sm text-muted-foreground">Atualize suas informações pessoais</p>
         </div>
 
         <form onSubmit={onUpdateProfile} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
-            <Input placeholder="Seu nome completo" {...profileForm.register("name")} />
+          <div className="space-y-1.5">
+            <Label htmlFor="account-name">Nome</Label>
+            <Input
+              id="account-name"
+              placeholder="Seu nome completo"
+              {...profileForm.register("name")}
+            />
             {profileForm.formState.errors.name && (
-              <p className="mt-1 text-xs text-red-600">{profileForm.formState.errors.name.message}</p>
+              <p className="text-xs text-destructive">{profileForm.formState.errors.name.message}</p>
             )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-700">Email</label>
-            <Input type="email" placeholder="seu.email@example.com" {...profileForm.register("email")} />
+          <div className="space-y-1.5">
+            <Label htmlFor="account-email">Email</Label>
+            <Input
+              id="account-email"
+              type="email"
+              placeholder="seu.email@exemplo.com"
+              {...profileForm.register("email")}
+            />
             {profileForm.formState.errors.email && (
-              <p className="mt-1 text-xs text-red-600">{profileForm.formState.errors.email.message}</p>
+              <p className="text-xs text-destructive">{profileForm.formState.errors.email.message}</p>
             )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-700">Telefone</label>
-            <Input placeholder="(11) 99999-9999" {...profileForm.register("phone")} />
+          <div className="space-y-1.5">
+            <Label htmlFor="account-phone">Telefone</Label>
+            <Input
+              id="account-phone"
+              placeholder="(11) 99999-9999"
+              {...profileForm.register("phone")}
+            />
           </div>
 
           <Button type="submit" disabled={updateProfileMutation.isPending} className="w-full">
-            {updateProfileMutation.isPending ? "Salvando..." : "Salvar alterações"}
+            {updateProfileMutation.isPending ? "Salvando…" : "Salvar"}
           </Button>
         </form>
       </Card>
 
       <Card>
-        <div className="mb-4 border-b border-zinc-200 pb-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Segurança</h2>
-          <p className="text-sm text-zinc-600">Altere sua senha para manter sua conta segura</p>
+        <div className="mb-4 border-b border-border pb-4">
+          <h2 className="text-lg font-semibold text-foreground">Segurança</h2>
+          <p className="text-sm text-muted-foreground">Altere sua senha para manter sua conta segura</p>
         </div>
 
         {!showPasswordForm ? (
-          <Button variant="secondary" onClick={() => setShowPasswordForm(true)}>
+          <Button variant="outline" onClick={() => setShowPasswordForm(true)}>
             Alterar senha
           </Button>
         ) : (
-          <form onSubmit={onChangePassword} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Senha atual</label>
-              <Input type="password" placeholder="Digite sua senha atual" {...passwordForm.register("old_password")} />
+          <form onSubmit={onChangePassword} className="space-y-4 animate-slide-up">
+            <div className="space-y-1.5">
+              <Label htmlFor="account-old-pass">Senha atual</Label>
+              <Input
+                id="account-old-pass"
+                type="password"
+                placeholder="Digite sua senha atual"
+                {...passwordForm.register("old_password")}
+              />
               {passwordForm.formState.errors.old_password && (
-                <p className="mt-1 text-xs text-red-600">{passwordForm.formState.errors.old_password.message}</p>
+                <p className="text-xs text-destructive">
+                  {passwordForm.formState.errors.old_password.message}
+                </p>
               )}
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Nova senha</label>
-              <Input type="password" placeholder="Digite uma nova senha" {...passwordForm.register("new_password")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="account-new-pass">Nova senha</Label>
+              <Input
+                id="account-new-pass"
+                type="password"
+                placeholder="Digite uma nova senha"
+                {...passwordForm.register("new_password")}
+              />
               {passwordForm.formState.errors.new_password && (
-                <p className="mt-1 text-xs text-red-600">{passwordForm.formState.errors.new_password.message}</p>
+                <p className="text-xs text-destructive">
+                  {passwordForm.formState.errors.new_password.message}
+                </p>
               )}
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Confirmar nova senha</label>
-              <Input type="password" placeholder="Confirme a nova senha" {...passwordForm.register("confirm_password")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="account-confirm-pass">Confirmar nova senha</Label>
+              <Input
+                id="account-confirm-pass"
+                type="password"
+                placeholder="Confirme a nova senha"
+                {...passwordForm.register("confirm_password")}
+              />
               {passwordForm.formState.errors.confirm_password && (
-                <p className="mt-1 text-xs text-red-600">{passwordForm.formState.errors.confirm_password.message}</p>
+                <p className="text-xs text-destructive">
+                  {passwordForm.formState.errors.confirm_password.message}
+                </p>
               )}
             </div>
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={changePasswordMutation.isPending}>
-                {changePasswordMutation.isPending ? "Alterando..." : "Alterar senha"}
+                {changePasswordMutation.isPending ? "Alterando…" : "Alterar senha"}
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
                 onClick={() => {
                   setShowPasswordForm(false);
                   passwordForm.reset();

@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+
+import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHeader } from "@/components/domain/page-header";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
+import { SectionTitle } from "@/components/ui/section-title";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/table";
@@ -18,12 +22,9 @@ export default function AdminAgronomistDetailPage() {
   if (isLoading) {
     return (
       <>
-        <Link
-          href="/admin/agronomists"
-          className="mb-4 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
-        >
-          ← Voltar
-        </Link>
+        <BreadcrumbBack
+          items={[{ label: "Agrônomos", href: "/admin/agronomists" }, { label: "Carregando…" }]}
+        />
         <PageHeader title="Agrônomo" description="Carregando…" />
         <div className="mt-6 space-y-6">
           <TableRowsSkeleton rows={4} columns={4} />
@@ -36,13 +37,10 @@ export default function AdminAgronomistDetailPage() {
   if (isError || !data) {
     return (
       <>
-        <Link
-          href="/admin/agronomists"
-          className="mb-4 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
-        >
-          ← Voltar
-        </Link>
-        <p className="text-sm text-red-600 p-6">Agrônomo não encontrado.</p>
+        <BreadcrumbBack
+          items={[{ label: "Agrônomos", href: "/admin/agronomists" }, { label: "Não encontrado" }]}
+        />
+        <p className="text-sm text-destructive">Agrônomo não encontrado.</p>
       </>
     );
   }
@@ -69,24 +67,24 @@ export default function AdminAgronomistDetailPage() {
   ]);
 
   return (
-    <>
-      <Link
-        href="/admin/agronomists"
-        className="mb-4 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
-      >
-        ← Voltar
-      </Link>
+    <div className="space-y-8 animate-fade-in">
+      <BreadcrumbBack
+        items={[{ label: "Agrônomos", href: "/admin/agronomists" }, { label: data.name }]}
+      />
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader title={data.name} description={data.email} />
-        {data.is_active ? (
-          <Badge variant="default">Conta ativa</Badge>
-        ) : (
-          <Badge variant="secondary">Conta inativa</Badge>
-        )}
-      </div>
+      <PageHeader
+        title={data.name}
+        description={data.email}
+        action={
+          data.is_active ? (
+            <Badge variant="default">Conta ativa</Badge>
+          ) : (
+            <Badge variant="secondary">Conta inativa</Badge>
+          )
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Fazendas</CardTitle>
@@ -113,53 +111,49 @@ export default function AdminAgronomistDetailPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Dados do consultor</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">ID</span>
-              <span className="font-mono text-xs text-right break-all">{data.user_id}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Plano</span>
-              <span className="font-medium">{planName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Início do plano</span>
-              <span className="font-medium">
-                {new Date(data.plan_started_at).toLocaleString("pt-BR")}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Talhões ativos (armazenado)</span>
-              <span className="font-medium">{data.active_plots_count}</span>
-            </div>
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados do consultor</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">ID</span>
+            <span className="font-mono text-xs text-right break-all">{data.user_id}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Plano</span>
+            <span className="font-medium">{planName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Início do plano</span>
+            <span className="font-medium">
+              {new Date(data.plan_started_at).toLocaleString("pt-BR")}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Talhões ativos</span>
+            <span className="font-medium">{data.active_plots_count}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        <SectionTitle title="Fazendas cadastradas" />
+        {data.farms.length === 0 ? (
+          <EmptyState title="Nenhuma fazenda" variant="inline" />
+        ) : (
+          <DataTable headers={["Nome", "Localização", "Talhões", "Criada em"]} rows={farmRows} />
+        )}
       </div>
 
-      <div className="mt-8 space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Fazendas cadastradas</h2>
-          {data.farms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma fazenda.</p>
-          ) : (
-            <DataTable headers={["Nome", "Localização", "Talhões", "Criada em"]} rows={farmRows} />
-          )}
-        </div>
-
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Produtores vinculados</h2>
-          {data.producers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum produtor.</p>
-          ) : (
-            <DataTable headers={["Nome", "E-mail", "Conta"]} rows={producerRows} />
-          )}
-        </div>
+      <div className="space-y-4">
+        <SectionTitle title="Produtores vinculados" />
+        {data.producers.length === 0 ? (
+          <EmptyState title="Nenhum produtor vinculado" variant="inline" />
+        ) : (
+          <DataTable headers={["Nome", "E-mail", "Conta"]} rows={producerRows} />
+        )}
       </div>
-    </>
+    </div>
   );
 }

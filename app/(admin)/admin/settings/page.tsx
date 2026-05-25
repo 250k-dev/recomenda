@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/domain/page-header";
+import { Settings } from "lucide-react";
 import { PageHeaderSkeleton, SettingsFormSkeleton } from "@/components/domain/page-skeletons";
 import { AccountSettingsPanel } from "@/components/domain/account-settings-panel";
 import { useMe } from "@/lib/api/hooks";
@@ -19,7 +20,12 @@ export default function AdminSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Configurações" description="Nome, e-mail e senha da sua conta de administrador." />
+      <PageHeader
+        icon={<Settings className="h-5 w-5" />}
+        section="Conta"
+        title="Configurações"
+        description="Nome, e-mail e senha da sua conta de administrador."
+      />
       <AccountSettingsPanel />
     </>
   );

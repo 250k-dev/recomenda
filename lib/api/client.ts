@@ -13,6 +13,7 @@ export interface Producer {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
 }
 
 export type AdminProducerAccountStatus =
@@ -30,6 +31,7 @@ export interface AgronomistProducerListRow {
   email: string;
   is_active: boolean;
   account_status: AdminProducerAccountStatus;
+  total_hectares?: number;
 }
 
 /** Produtores com conta ativa (ex.: selects de safra e concessão de fazenda). */
@@ -296,7 +298,21 @@ export async function deleteGlobalProduct(id: string) {
   await api.delete(`/catalog/global/${id}`);
 }
 
-export async function createLocalProduct(payload: { name: string; category?: string; dose_unit?: string }) {
+export type GlobalCatalogImportResult = {
+  created: number;
+  skipped: number;
+  failed: number;
+  errors: Array<{ row: number; message: string }>;
+};
+
+export async function importGlobalCatalogFile(file: File): Promise<GlobalCatalogImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await api.post<GlobalCatalogImportResult>("/catalog/admin/global/import", formData);
+  return data;
+}
+
+export async function createLocalProduct(payload: { name: string; category?: string; dose_unit?: string; label_url?: string }) {
   const { data } = await api.post<Product>("/catalog/local", payload);
   return data;
 }
@@ -306,7 +322,7 @@ export async function cloneGlobalProduct(globalId: string) {
   return data;
 }
 
-export async function updateLocalProduct(id: string, payload: { name?: string; category?: string; dose_unit?: string; price_brl?: string; label_url?: string; is_active?: boolean }) {
+export async function updateLocalProduct(id: string, payload: { name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean }) {
   const { data } = await api.patch<Product>(`/catalog/local/${id}`, payload);
   return data;
 }
@@ -525,7 +541,7 @@ export async function hardDeleteMixTemplate(id: string) {
 
 export async function createMixTemplateItem(
   templateId: string,
-  payload: { local_product_id: string; dose_per_hectare: number },
+  payload: { local_product_id: string; dose_per_hectare: number; dose_unit?: string },
 ) {
   const { data } = await api.post<MixTemplateItem>(`/mix_templates/${templateId}/items`, payload);
   return data;
@@ -533,7 +549,7 @@ export async function createMixTemplateItem(
 
 export async function updateMixTemplateItem(
   id: string,
-  payload: { dose_per_hectare: number },
+  payload: { dose_per_hectare?: number; dose_unit?: string },
 ) {
   const { data } = await api.patch<MixTemplateItem>(`/mix_template_items/${id}`, payload);
   return data;
@@ -574,7 +590,7 @@ export interface Plan {
 }
 
 export async function getPlans() {
-  const { data } = await api.get<{ data: Plan[]; pagination: unknown }>("/plans");
+  const { data } = await api.get<{ data: Plan[]; pagination: unknown }>("/admin/plans");
   return Array.isArray(data) ? data : data.data;
 }
 
@@ -703,6 +719,10 @@ export async function updateAdminPlan(
   return data;
 }
 
+export async function deleteAdminPlan(id: string) {
+  await api.delete(`/admin/plans/${id}`);
+}
+
 export interface Plot {
   id: string;
   farm_id: string;
@@ -754,6 +774,24 @@ export async function updateFarm(id: string, payload: { name?: string; location?
   return data;
 }
 
+export interface FarmSeason {
+  id: string;
+  farm_id: string;
+  plot_id: string;
+  plot_name: string;
+  plot_area_hectares: number | null;
+  crop: string;
+  variety?: string | null;
+  status: string;
+  planting_date?: string | null;
+  cycle_days?: number | null;
+}
+
+export async function getFarmSeasons(farmId: string) {
+  const { data } = await api.get<{ data: FarmSeason[] } | FarmSeason[]>(`/farms/${farmId}/seasons`);
+  return Array.isArray(data) ? data : data.data;
+}
+
 export async function createFarm(payload: { name: string; location?: string; agronomist_id?: string }) {
   const { data } = await api.post<Farm>("/farms", payload);
   return data;
@@ -764,6 +802,8 @@ export interface ShoppingListItem {
   product_name: string;
   total_quantity: number;
   dose_unit: string;
+  current_stock?: number;
+  quantity_to_buy?: number;
 }
 
 export async function getSeasonShoppingList(seasonId: string) {
@@ -789,14 +829,171 @@ export async function getProducer(id: string) {
   return data;
 }
 
+export interface CreatedProducer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+}
+
+export async function createProducer(payload: { name: string; email: string; phone?: string }) {
+  const { data } = await api.post<CreatedProducer>("/producers", payload);
+  return data;
+}
+
+export interface PurchaseListItemInput {
+  local_product_id: string;
+  stage: string;
+  dose_per_hectare: number;
+  dose_unit: string;
+  n_applications?: number;
+  current_stock?: number;
+  supplier?: string | null;
+  area_factor?: number;
+  price_usd?: number | null;
+  price_brl_fixed?: number | null;
+  cost_per_ha_mode?: "DOSE_PRICE" | "TOTAL_OVER_AREA";
+  deduct_stock?: boolean;
+  calc_rule?: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
+}
+
+export interface PurchaseListPlotInput {
+  plot_id: string;
+  planting_date?: string | null;
+  desiccation_date?: string | null;
+  cycle_days?: number | null;
+}
+
+export interface PurchaseListInput {
+  producer_id: string;
+  crop: string;
+  name: string;
+  variety?: string;
+  fx_rate_usd_brl?: number | null;
+  grain_price_brl?: number | null;
+  season_id?: string | null;
+  plots: PurchaseListPlotInput[];
+  items: PurchaseListItemInput[];
+}
+
+export interface CostPlanCategoryBreakdown {
+  category: string;
+  total_brl: number;
+  share_pct: number;
+  sacks_per_ha: number;
+}
+
+export interface CostPlanSummary {
+  grand_total_brl: number;
+  cost_per_ha_brl: number;
+  total_sacks: number;
+  sacks_per_ha: number;
+  category_breakdown: CostPlanCategoryBreakdown[];
+}
+
+export interface PurchaseListDetail {
+  id: string;
+  producer_id: string;
+  season_id: string | null;
+  crop: string;
+  name: string;
+  variety: string | null;
+  fx_rate_usd_brl: number | null;
+  grain_price_brl: number | null;
+  created_at: string;
+  updated_at?: string;
+  total_hectares: number;
+  plots: Array<{
+    id: string;
+    plot_id: string;
+    plot_name: string;
+    area_hectares: number;
+    planting_date: string | null;
+    desiccation_date: string | null;
+    cycle_days: number | null;
+  }>;
+  items: Array<{
+    id: string;
+    local_product_id: string;
+    product_name: string;
+    category: string;
+    stage: string;
+    dose_per_hectare: number;
+    dose_unit: string;
+    n_applications: number;
+    current_stock: number;
+    required_quantity: number;
+    quantity_to_buy: number;
+    supplier: string | null;
+    area_factor: number;
+    price_usd: number | null;
+    price_brl_fixed: number | null;
+    cost_per_ha_mode: "DOSE_PRICE" | "TOTAL_OVER_AREA";
+    deduct_stock: boolean;
+    calc_rule: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
+    quantity_final: number;
+    unit_price_brl: number;
+    total_brl: number;
+    cost_per_ha_brl: number;
+  }>;
+  cost_summary?: CostPlanSummary;
+}
+
+export async function createPurchaseList(payload: PurchaseListInput) {
+  const { data } = await api.post<PurchaseListDetail>("/purchase-lists", payload);
+  return data;
+}
+
+export async function getPurchaseList(id: string) {
+  const { data } = await api.get<PurchaseListDetail>(`/purchase-lists/${id}`);
+  return data;
+}
+
+export async function getProducerPurchaseLists(producerId: string) {
+  const { data } = await api.get<PurchaseListDetail[]>(`/purchase-lists`, {
+    params: { producer_id: producerId },
+  });
+  return data;
+}
+
+export async function getFarmPurchaseLists(farmId: string) {
+  const { data } = await api.get<PurchaseListDetail[]>(`/farms/${farmId}/purchase-lists`);
+  return data;
+}
+
+export async function getPurchaseListBySeason(seasonId: string) {
+  const { data } = await api.get<PurchaseListDetail | null>(
+    `/purchase-lists/by-season/${seasonId}`,
+  );
+  return data;
+}
+
+export async function updatePurchaseList(id: string, payload: Partial<PurchaseListInput>) {
+  const { data } = await api.put<PurchaseListDetail>(`/purchase-lists/${id}`, payload);
+  return data;
+}
+
+export async function duplicatePurchaseList(id: string) {
+  const { data } = await api.post<PurchaseListDetail>(`/purchase-lists/${id}/duplicate`);
+  return data;
+}
+
 export async function getProducerFarms(producerId: string) {
   const { data } = await api.get<ProducerFarm[]>(`/producers/${producerId}/farms`);
   return data;
 }
 
-export async function updateProducer(id: string, payload: { name?: string }) {
+export async function updateProducer(id: string, payload: { name?: string; email?: string; phone?: string }) {
   const { data } = await api.patch<Producer>(`/producers/${id}`, payload);
   return data;
+}
+
+export async function setProducerActive(id: string, isActive: boolean) {
+  await api.patch(`/producers/${id}`, { is_active: isActive });
+}
+
+export async function deleteProducer(id: string) {
+  await api.delete(`/producers/${id}`);
 }
 
 export async function removeFarmAccess(producerId: string, farmId: string) {
@@ -838,5 +1035,93 @@ export interface Invitation {
 
 export async function createInvitation(payload: { email?: string; farm_ids: string[] }) {
   const { data } = await api.post<Invitation>("/invitations", payload);
+  return data;
+}
+
+export async function revokeInvitation(id: string) {
+  const { data } = await api.post(`/invitations/${id}/revoke`);
+  return data;
+}
+
+// ── Recommendations ────────────────────────────────────────────────────────
+
+export interface RecommendationItem {
+  id: string;
+  recommendation_id: string;
+  local_product_id: string;
+  product_name: string;
+  dose_per_hectare: number;
+  total_quantity: number;
+  dose_unit: string;
+  is_substitution: boolean;
+}
+
+export interface Recommendation {
+  id: string;
+  season_id: string;
+  order_index: number;
+  name: string;
+  status: "PENDING" | "APPLIED_ON_TIME" | "APPLIED_LATE" | "SKIPPED";
+  predicted_date_current: string | null;
+  predicted_date_original: string | null;
+  executed_date: string | null;
+  notes: string | null;
+  window_start_days: number;
+  window_end_days: number;
+  items: RecommendationItem[];
+}
+
+export async function patchRecommendation(
+  id: string,
+  payload: {
+    name?: string;
+    predicted_date_current?: string | null;
+    window_start_days?: number;
+    window_end_days?: number;
+    notes?: string | null;
+  },
+) {
+  const { data } = await api.patch(`/recommendations/${id}`, payload);
+  return data;
+}
+
+export async function applyRecommendation(
+  id: string,
+  payload: { executed_date: string; notes?: string },
+) {
+  const { data } = await api.post(`/recommendations/${id}/apply`, payload);
+  return data;
+}
+
+export async function skipRecommendation(id: string, notes?: string) {
+  const { data } = await api.post(`/recommendations/${id}/skip`, { notes: notes ?? "" });
+  return data;
+}
+
+export async function undoRecommendation(id: string) {
+  const { data } = await api.post(`/recommendations/${id}/undo`);
+  return data;
+}
+
+export async function createRecommendationItem(payload: {
+  recommendation_id: string;
+  local_product_id: string;
+  dose_per_hectare: number;
+  dose_unit?: string;
+}) {
+  const { data } = await api.post(`/recommendation_items`, payload);
+  return data;
+}
+
+export async function updateRecommendationItem(
+  id: string,
+  payload: { dose_per_hectare?: number; dose_unit?: string },
+) {
+  const { data } = await api.patch(`/recommendation_items/${id}`, payload);
+  return data;
+}
+
+export async function deleteRecommendationItem(id: string) {
+  const { data } = await api.delete(`/recommendation_items/${id}`);
   return data;
 }

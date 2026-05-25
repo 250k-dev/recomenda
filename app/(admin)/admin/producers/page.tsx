@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
 import { PageHeader } from "@/components/domain/page-header";
+import { UsersRound } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
 import { DataTable } from "@/components/ui/table";
@@ -175,6 +176,8 @@ export default function AdminProducersPage() {
   return (
     <>
       <PageHeader
+        icon={<UsersRound className="h-5 w-5" />}
+        section="Usuários"
         title="Produtores"
         description="Produtores vinculados e convites pendentes. O status reflete conta ativa, inativa (removida da lista ativa) ou convite (enviado / expirado). Remover desativa o acesso; na aba Removidos você pode restaurar ou excluir definitivamente."
       />

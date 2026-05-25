@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Info, Leaf, Plus } from "lucide-react";
+
 import { PageHeader } from "@/components/domain/page-header";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   useArchiveSeason,
   useArchivedSeasons,
@@ -30,13 +35,21 @@ const STATUS_LABELS: Record<string, string> = {
   ARCHIVED: "Removida",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-zinc-100 text-zinc-700",
-  PUBLISHED: "bg-blue-100 text-blue-700",
-  IN_PROGRESS: "bg-green-100 text-green-700",
-  COMPLETED: "bg-emerald-100 text-emerald-700",
-  ARCHIVED: "bg-orange-100 text-orange-700",
+const STATUS_CLASSES: Record<string, string> = {
+  DRAFT: "bg-muted text-muted-foreground",
+  PUBLISHED: "bg-sky-soft text-sky",
+  IN_PROGRESS: "bg-primary/15 text-primary",
+  COMPLETED: "bg-primary/15 text-primary",
+  ARCHIVED: "bg-clay-soft text-clay",
 };
+
+interface SeasonRow {
+  id: string;
+  crop: string;
+  status: string;
+  farm_name?: string | null;
+  plot_name?: string | null;
+}
 
 export default function SeasonsPage() {
   const { data, isLoading: loadingActiveSeasons } = useSeasons();
@@ -44,78 +57,110 @@ export default function SeasonsPage() {
   const archiveMutation = useArchiveSeason();
   const hardDeleteMutation = useHardDeleteSeason();
   const [tab, setTab] = useState<"active" | "archived">("active");
-
-  const seasons = (Array.isArray(data) ? data : data?.data ?? []).filter(
-    (s: any) => s.status !== "ARCHIVED"
+  const [archiveConfirm, setArchiveConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [hardDeleteConfirm, setHardDeleteConfirm] = useState<{ id: string; name: string } | null>(
+    null,
   );
-  const archived = Array.isArray(archivedData) ? archivedData : [];
 
-  const makeRow = (season: any, showArchive: boolean) => {
-    const cropLabel = CROP_LABELS[season.crop] ?? season.crop;
-    const statusLabel = STATUS_LABELS[season.status] ?? season.status;
-    const statusColor = STATUS_COLORS[season.status] ?? "bg-zinc-100 text-zinc-700";
+  const seasonsRaw = (Array.isArray(data) ? data : data?.data ?? []) as SeasonRow[];
+  const seasons = seasonsRaw.filter((s) => s.status !== "ARCHIVED");
+  const archived = (Array.isArray(archivedData) ? archivedData : []) as SeasonRow[];
 
-    const parts = [cropLabel];
+  const formatDisplay = (season: SeasonRow) => {
+    const parts: string[] = [CROP_LABELS[season.crop] ?? season.crop];
     if (season.farm_name) parts.push(season.farm_name);
     if (season.plot_name) parts.push(season.plot_name);
-    const displayName = parts.join(" • ");
+    return parts.join(" · ");
+  };
+
+  const makeRow = (season: SeasonRow, isActive: boolean) => {
+    const statusLabel = STATUS_LABELS[season.status] ?? season.status;
+    const statusClass = STATUS_CLASSES[season.status] ?? "bg-muted text-muted-foreground";
+    const displayName = formatDisplay(season);
 
     return [
-      showArchive ? (
+      isActive ? (
         <Link
           key={season.id}
           href={`/seasons/${season.id}`}
-          className="font-medium text-[var(--brand)] underline"
+          className="font-medium text-primary underline-offset-4 hover:underline"
         >
           {displayName}
         </Link>
       ) : (
-        <span key={season.id} className="font-medium text-zinc-700">{displayName}</span>
+        <span key={season.id} className="font-medium text-foreground">
+          {displayName}
+        </span>
       ),
-      <span key={`status-${season.id}`} className={`inline-block rounded px-2 py-1 text-xs font-medium ${statusColor}`}>
+      <span
+        key={`status-${season.id}`}
+        className={cn(
+          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+          statusClass,
+        )}
+      >
         {statusLabel}
       </span>,
-      showArchive ? (
-        <div key={`actions-${season.id}`} className="flex gap-2">
+      isActive ? (
+        <div key={`actions-${season.id}`} className="flex justify-end">
           <Button
             variant="outline"
-            className={cn("h-8 px-3 text-xs", deactivateOutlineButtonClass)}
-            disabled={archiveMutation.isPending}
-            onClick={() => archiveMutation.mutate(season.id)}
+            size="sm"
+            className={cn(deactivateOutlineButtonClass)}
+            onClick={() => setArchiveConfirm({ id: season.id, name: displayName })}
           >
             Remover
           </Button>
         </div>
       ) : (
-        <div key={`archived-actions-${season.id}`} className="flex gap-2">
+        <div key={`archived-actions-${season.id}`} className="flex justify-end">
           <DeletePermanentIconButton
             disabled={hardDeleteMutation.isPending}
-            onClick={() => {
-              if (confirm(`Excluir permanentemente a safra "${displayName}"? Esta ação não pode ser desfeita.`)) {
-                hardDeleteMutation.mutate(season.id);
-              }
-            }}
+            onClick={() => setHardDeleteConfirm({ id: season.id, name: displayName })}
           />
         </div>
       ),
     ];
   };
 
-  const activeRows = seasons.map((s: any) => makeRow(s, true));
-  const archivedRows = archived.map((s: any) => makeRow(s, false));
+  const activeRows = seasons.map((s) => makeRow(s, true));
+  const archivedRows = archived.map((s) => makeRow(s, false));
 
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
-        <PageHeader title="Safras" description="Gestão de ciclo, timeline e status de execução." />
-        {tab === "active" && (
-          <Link href="/seasons/new">
-            <Button>Nova safra</Button>
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        icon={<Leaf className="h-5 w-5" />}
+        section="Planejamento"
+        title="Safras"
+        description="Gestão de ciclo, timeline e status de execução."
+        action={
+          tab === "active" ? (
+            <Link href="/seasons/new">
+              <Button>
+                <Plus className="h-4 w-4" />
+                Nova safra
+              </Button>
+            </Link>
+          ) : null
+        }
+      />
 
-      <div className="mb-4 flex gap-1">
+      <Alert className="mb-6">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Atalho disponível</AlertTitle>
+        <AlertDescription>
+          O fluxo recomendado agora é:{" "}
+          <Link
+            href="/producers"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Produtores
+          </Link>{" "}
+          → Fazenda → Safra.
+        </AlertDescription>
+      </Alert>
+
+      <div className="mb-4">
         <SegmentedTabs
           value={tab}
           onValueChange={setTab}
@@ -129,16 +174,79 @@ export default function SeasonsPage() {
       {tab === "active" ? (
         loadingActiveSeasons ? (
           <TableRowsSkeleton rows={8} columns={3} />
+        ) : activeRows.length === 0 ? (
+          <EmptyState
+            icon={Leaf}
+            title="Nenhuma safra ativa"
+            description="Crie uma nova safra a partir do fluxo Produtor → Fazenda → Safra."
+            action={
+              <Link href="/producers">
+                <Button>Ir para Produtores</Button>
+              </Link>
+            }
+          />
         ) : (
           <DataTable headers={["Safra", "Status", ""]} rows={activeRows} />
         )
       ) : isLoadingArchived ? (
         <TableRowsSkeleton rows={6} columns={3} />
       ) : archivedRows.length === 0 ? (
-        <p className="text-sm text-zinc-500">Nenhuma safra removida.</p>
+        <EmptyState icon={Leaf} title="Nenhuma safra removida" variant="inline" />
       ) : (
         <DataTable headers={["Safra", "Status", ""]} rows={archivedRows} />
       )}
+
+      <ConfirmDialog
+        open={!!archiveConfirm}
+        onOpenChange={(open) => !open && setArchiveConfirm(null)}
+        title="Remover safra"
+        description={
+          archiveConfirm
+            ? `A safra "${archiveConfirm.name}" será movida para Removidas.`
+            : undefined
+        }
+        confirmLabel="Remover"
+        tone="destructive"
+        loading={archiveMutation.isPending}
+        onConfirm={async () => {
+          if (!archiveConfirm) return;
+          await new Promise<void>((resolve, reject) =>
+            archiveMutation.mutate(archiveConfirm.id, {
+              onSuccess: () => {
+                setArchiveConfirm(null);
+                resolve();
+              },
+              onError: (err) => reject(err),
+            }),
+          );
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!hardDeleteConfirm}
+        onOpenChange={(open) => !open && setHardDeleteConfirm(null)}
+        title="Excluir permanentemente"
+        description={
+          hardDeleteConfirm
+            ? `Excluir "${hardDeleteConfirm.name}" permanentemente? Esta ação não pode ser desfeita.`
+            : undefined
+        }
+        confirmLabel="Excluir"
+        tone="destructive"
+        loading={hardDeleteMutation.isPending}
+        onConfirm={async () => {
+          if (!hardDeleteConfirm) return;
+          await new Promise<void>((resolve, reject) =>
+            hardDeleteMutation.mutate(hardDeleteConfirm.id, {
+              onSuccess: () => {
+                setHardDeleteConfirm(null);
+                resolve();
+              },
+              onError: (err) => reject(err),
+            }),
+          );
+        }}
+      />
     </>
   );
 }

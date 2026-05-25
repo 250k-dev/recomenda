@@ -6,6 +6,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Clock, Plus } from "lucide-react";
+
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/domain/page-header";
@@ -15,7 +17,17 @@ import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   useArchivedTimingTemplates,
   useCreateTimingTemplate,
@@ -45,6 +57,10 @@ export default function TimingTemplatesPage() {
   const router = useRouter();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [tab, setTab] = useState<"active" | "archived">("active");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [hardDeleteConfirm, setHardDeleteConfirm] = useState<{ id: string; name: string } | null>(
+    null,
+  );
 
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
@@ -68,24 +84,20 @@ export default function TimingTemplatesPage() {
     <Link
       key={t.id}
       href={`/timing-templates/${t.id}`}
-      className="font-medium text-[var(--brand)] underline"
+      className="font-medium text-primary underline-offset-4 hover:underline"
     >
       {t.name}
     </Link>,
     CROP_LABELS[t.crop] ?? t.crop,
-    <div key={`actions-${t.id}`} className="flex gap-2">
-      <Button
-        variant="outline"
-        className="h-8 px-3 text-xs"
-        onClick={() => router.push(`/timing-templates/${t.id}`)}
-      >
+    <div key={`actions-${t.id}`} className="flex justify-end gap-2">
+      <Button variant="outline" size="sm" onClick={() => router.push(`/timing-templates/${t.id}`)}>
         Editar
       </Button>
       <Button
         variant="outline"
-        className={cn("h-8 px-3 text-xs", deactivateOutlineButtonClass)}
-        disabled={deleteMutation.isPending}
-        onClick={() => deleteMutation.mutate(t.id)}
+        size="sm"
+        className={cn(deactivateOutlineButtonClass)}
+        onClick={() => setDeleteConfirm({ id: t.id, name: t.name })}
       >
         Remover
       </Button>
@@ -95,14 +107,10 @@ export default function TimingTemplatesPage() {
   const archivedRows = archivedData.map((t: (typeof archivedData)[number]) => [
     t.name,
     CROP_LABELS[t.crop] ?? t.crop,
-    <div key={`archived-actions-${t.id}`} className="flex gap-2">
+    <div key={`archived-actions-${t.id}`} className="flex justify-end gap-2">
       <DeletePermanentIconButton
         disabled={hardDeleteMutation.isPending}
-        onClick={() => {
-          if (confirm(`Excluir permanentemente "${t.name}"? Esta ação não pode ser desfeita.`)) {
-            hardDeleteMutation.mutate(t.id);
-          }
-        }}
+        onClick={() => setHardDeleteConfirm({ id: t.id, name: t.name })}
       />
     </div>,
   ]);
@@ -110,11 +118,13 @@ export default function TimingTemplatesPage() {
   return (
     <>
       <PageHeader
-        title="Recomendação"
+        icon={<Clock className="h-5 w-5" />}
+        section="Configurações"
+        title="Recomendações"
         description="Definição de estágios e janelas de aplicação por cultura."
       />
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SegmentedTabs
           value={tab}
           onValueChange={setTab}
@@ -127,40 +137,36 @@ export default function TimingTemplatesPage() {
         {tab === "active" && (
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <Button>Nova recomendação</Button>
+              <Button>
+                <Plus className="h-4 w-4" />
+                Nova recomendação
+              </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-full sm:w-96">
               <SheetHeader>
-                <SheetTitle>Criar nova recomendação</SheetTitle>
+                <SheetTitle>Nova recomendação</SheetTitle>
               </SheetHeader>
               <form onSubmit={onSubmit} className="mt-6 space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-zinc-900">Nome</label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="timing-create-name">Nome</Label>
                   <Input
+                    id="timing-create-name"
                     {...form.register("name")}
-                    placeholder="Ex: Soja Padrão"
-                    className="h-10"
+                    placeholder="Ex.: Soja padrão"
                   />
                   {form.formState.errors.name && (
-                    <p className="mt-1 text-xs text-red-600">{form.formState.errors.name.message}</p>
+                    <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
                   )}
                 </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-zinc-900">Cultura</label>
-                  <select
-                    {...form.register("crop")}
-                    className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  >
+                <div className="space-y-1.5">
+                  <Label htmlFor="timing-create-crop">Cultura</Label>
+                  <NativeSelect id="timing-create-crop" {...form.register("crop")}>
                     <option value="SOYBEAN">Soja</option>
                     <option value="CORN">Milho</option>
-                  </select>
+                  </NativeSelect>
                 </div>
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="w-full"
-                >
-                  {createMutation.isPending ? "Criando..." : "Criar recomendação"}
+                <Button type="submit" disabled={createMutation.isPending} className="w-full">
+                  {createMutation.isPending ? "Criando…" : "Criar recomendação"}
                 </Button>
               </form>
             </SheetContent>
@@ -171,16 +177,80 @@ export default function TimingTemplatesPage() {
       {tab === "active" ? (
         isLoading ? (
           <TableRowsSkeleton rows={8} columns={3} />
+        ) : activeRows.length === 0 ? (
+          <EmptyState
+            icon={Clock}
+            title="Nenhuma recomendação criada"
+            description="Crie recomendações para padronizar o calendário de aplicações por cultura."
+            action={
+              <Button onClick={() => setSheetOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Nova recomendação
+              </Button>
+            }
+          />
         ) : (
           <DataTable headers={["Nome", "Cultura", ""]} rows={activeRows} />
         )
       ) : isLoadingArchived ? (
         <TableRowsSkeleton rows={6} columns={3} />
       ) : archivedRows.length === 0 ? (
-        <p className="text-sm text-zinc-500">Nenhuma recomendação removida.</p>
+        <EmptyState icon={Clock} title="Nenhuma recomendação removida" variant="inline" />
       ) : (
         <DataTable headers={["Nome", "Cultura", ""]} rows={archivedRows} />
       )}
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        title="Remover recomendação"
+        description={
+          deleteConfirm
+            ? `A recomendação "${deleteConfirm.name}" será movida para Removidos.`
+            : undefined
+        }
+        confirmLabel="Remover"
+        tone="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          await new Promise<void>((resolve, reject) =>
+            deleteMutation.mutate(deleteConfirm.id, {
+              onSuccess: () => {
+                setDeleteConfirm(null);
+                resolve();
+              },
+              onError: (err) => reject(err),
+            }),
+          );
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!hardDeleteConfirm}
+        onOpenChange={(open) => !open && setHardDeleteConfirm(null)}
+        title="Excluir permanentemente"
+        description={
+          hardDeleteConfirm
+            ? `Excluir "${hardDeleteConfirm.name}" permanentemente? Esta ação não pode ser desfeita.`
+            : undefined
+        }
+        confirmLabel="Excluir"
+        tone="destructive"
+        loading={hardDeleteMutation.isPending}
+        onConfirm={async () => {
+          if (!hardDeleteConfirm) return;
+          await new Promise<void>((resolve, reject) =>
+            hardDeleteMutation.mutate(hardDeleteConfirm.id, {
+              onSuccess: () => {
+                setHardDeleteConfirm(null);
+                resolve();
+              },
+              onError: (err) => reject(err),
+            }),
+          );
+        }}
+      />
     </>
   );
 }

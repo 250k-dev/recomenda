@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Package } from "lucide-react";
+
 import { PageHeader } from "@/components/domain/page-header";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useAllLocalProducts, useAllInactiveLocalProducts } from "@/lib/api/hooks";
 
 const CATEGORIES: Record<string, string> = {
@@ -32,25 +35,38 @@ export default function CustomCatalogPage() {
   const { data: inactiveData, isLoading: inactiveLoading } = useAllInactiveLocalProducts();
   const [activeTab, setActiveTab] = useState<"ativos" | "inativos">("ativos");
 
-  const activeProducts = activeData?.data ?? [];
-  const inactiveProducts = inactiveData?.data ?? [];
+  type ProductRow = {
+    id: string;
+    name: string;
+    is_active?: boolean;
+    category?: string | null;
+    dose_unit?: string | null;
+    price_brl?: string | number | null;
+    agronomist_name?: string | null;
+  };
+
+  const activeProducts = (activeData?.data ?? []) as ProductRow[];
+  const inactiveProducts = (inactiveData?.data ?? []) as ProductRow[];
+
+  const formatPrice = (value: ProductRow["price_brl"]) =>
+    value != null ? `R$ ${parseFloat(String(value)).toFixed(2)}` : "—";
 
   const activeRows = activeProducts
-    .filter((p: any) => p.is_active !== false)
-    .map((product: any) => [
+    .filter((p) => p.is_active !== false)
+    .map((product) => [
       <div key={`name-${product.id}`} className="font-medium">{product.name}</div>,
-      product.category ? (CATEGORIES[product.category] ?? product.category) : "-",
-      product.dose_unit ? (DOSE_UNITS[product.dose_unit]?.split(" ")[0] ?? product.dose_unit) : "-",
-      product.price_brl ? `R$ ${parseFloat(product.price_brl).toFixed(2)}` : "-",
-      "-",
+      product.category ? (CATEGORIES[product.category] ?? product.category) : "—",
+      product.dose_unit ? (DOSE_UNITS[product.dose_unit]?.split(" ")[0] ?? product.dose_unit) : "—",
+      formatPrice(product.price_brl),
+      "—",
     ]);
 
-  const inactiveRows = inactiveProducts.map((product: any) => [
+  const inactiveRows = inactiveProducts.map((product) => [
     <div key={`name-${product.id}`} className="font-medium">{product.name}</div>,
-    product.category ? (CATEGORIES[product.category] ?? product.category) : "-",
-    product.dose_unit ? (DOSE_UNITS[product.dose_unit]?.split(" ")[0] ?? product.dose_unit) : "-",
-    product.price_brl ? `R$ ${parseFloat(product.price_brl).toFixed(2)}` : "-",
-    (product as any).agronomist_name || "-",
+    product.category ? (CATEGORIES[product.category] ?? product.category) : "—",
+    product.dose_unit ? (DOSE_UNITS[product.dose_unit]?.split(" ")[0] ?? product.dose_unit) : "—",
+    formatPrice(product.price_brl),
+    product.agronomist_name || "—",
   ]);
 
   return (
@@ -66,7 +82,7 @@ export default function CustomCatalogPage() {
           onValueChange={setActiveTab}
           items={[
             { value: "ativos", label: "Ativos" },
-            { value: "inativos", label: "Desativados", badgeCount: inactiveProducts.length },
+            { value: "inativos", label: "Removidos", badgeCount: inactiveProducts.length },
           ]}
         />
       </div>
@@ -76,7 +92,11 @@ export default function CustomCatalogPage() {
           {activeLoading ? (
             <TableRowsSkeleton rows={10} columns={5} />
           ) : activeRows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto customizado ativo</p>
+            <EmptyState
+              icon={Package}
+              title="Nenhum produto customizado ativo"
+              description="Quando agrônomos criarem produtos próprios, eles aparecerão aqui."
+            />
           ) : (
             <DataTable headers={["Nome", "Categoria", "Unidade", "Preço", "Criado por"]} rows={activeRows} />
           )}
@@ -88,7 +108,11 @@ export default function CustomCatalogPage() {
           {inactiveLoading ? (
             <TableRowsSkeleton rows={10} columns={5} />
           ) : inactiveRows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto customizado desativado</p>
+            <EmptyState
+              icon={Package}
+              title="Nenhum produto removido"
+              variant="inline"
+            />
           ) : (
             <DataTable headers={["Nome", "Categoria", "Unidade", "Preço", "Criado por"]} rows={inactiveRows} />
           )}

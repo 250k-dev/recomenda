@@ -1,19 +1,22 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import {
   acceptInvitation,
   archiveSeason,
   changePassword,
   createAdminAgronomist,
   createAdminPlan,
+  deleteAdminPlan,
   createFarm,
   createGlobalProduct,
   createInvitation,
+  revokeInvitation,
   createLocalProduct,
   createMixTemplate,
   createMixTemplateItem,
   createPlot,
+  createProducer,
   createSeason,
   createTimingStage,
   createTimingTemplate,
@@ -35,8 +38,10 @@ import {
   getFarm,
   getFarmAccess,
   getFarmPlots,
+  getFarmSeasons,
   getFarms,
   getGlobalCatalog,
+  importGlobalCatalogFile,
   getInvitationByToken,
   getLocalCatalog,
   getInactiveLocalCatalog,
@@ -54,6 +59,10 @@ import {
   getPlanQuota,
   patchAdminProducer,
   getProducer,
+  getFarmPurchaseLists,
+  getProducerPurchaseLists,
+  getPurchaseListBySeason,
+  updatePurchaseList,
   getProducerFarms,
   getProducerStock,
   getProducers,
@@ -86,9 +95,18 @@ import {
   updateMixTemplate,
   updateMixTemplateItem,
   updateProducer,
+  setProducerActive,
+  deleteProducer,
   updateProfile,
   updateTimingStage,
   updateTimingTemplate,
+  applyRecommendation,
+  skipRecommendation,
+  undoRecommendation,
+  patchRecommendation,
+  createRecommendationItem,
+  updateRecommendationItem,
+  deleteRecommendationItem,
 } from "@/lib/api/client";
 import { setAccessToken, setUserRole } from "@/lib/auth/token-store";
 import { useImpersonationStore } from "@/stores/impersonation";
@@ -123,7 +141,33 @@ export const queryKeys = {
   adminProducers: ["admin-producers"],
   producerStock: (producerId: string) => ["producer-stock", producerId],
   producer: (id: string) => ["producer", id],
+  producerPurchaseLists: (producerId: string) =>
+    ["producer-purchase-lists", producerId] as const,
+  farmPurchaseLists: (farmId: string) => ["farm-purchase-lists", farmId] as const,
+  seasonCostPlan: (seasonId: string) => ["season-cost-plan", seasonId] as const,
 };
+
+export function useSeasonCostPlan(seasonId: string) {
+  return useQuery({
+    queryKey: queryKeys.seasonCostPlan(seasonId),
+    queryFn: () => getPurchaseListBySeason(seasonId),
+    enabled: Boolean(seasonId),
+  });
+}
+
+export function useUpdatePurchaseList(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof updatePurchaseList>[1]) =>
+      updatePurchaseList(id, payload),
+    onSuccess: (data) => {
+      if (data.season_id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.seasonCostPlan(data.season_id) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerPurchaseLists(data.producer_id) });
+    },
+  });
+}
 
 export function useMe() {
   return useQuery({ queryKey: queryKeys.me, queryFn: getMe });
@@ -277,6 +321,80 @@ export function useSeasonTimeline(seasonId: string) {
     queryKey: queryKeys.seasonTimeline(seasonId),
     queryFn: () => getTimeline(seasonId),
     enabled: Boolean(seasonId),
+  });
+}
+
+export function usePatchRecommendation(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: Parameters<typeof patchRecommendation>[1] & { id: string }) =>
+      patchRecommendation(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useCreateRecommendationItem(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createRecommendationItem,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useUpdateRecommendationItem(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: { id: string; dose_per_hectare?: number; dose_unit?: string }) =>
+      updateRecommendationItem(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useDeleteRecommendationItem(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteRecommendationItem,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useApplyRecommendation(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, executed_date, notes }: { id: string; executed_date: string; notes?: string }) =>
+      applyRecommendation(id, { executed_date, notes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useSkipRecommendation(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
+      skipRecommendation(id, notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useUndoRecommendation(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => undoRecommendation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
   });
 }
 
@@ -538,7 +656,7 @@ export function useHardDeleteMixTemplate() {
 export function useCreateMixTemplateItem(templateId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { local_product_id: string; dose_per_hectare: number }) =>
+    mutationFn: (payload: { local_product_id: string; dose_per_hectare: number; dose_unit?: string }) =>
       createMixTemplateItem(templateId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(templateId) });
@@ -549,7 +667,7 @@ export function useCreateMixTemplateItem(templateId: string) {
 export function useUpdateMixTemplateItem(templateId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...payload }: Pick<MixTemplateItem, "id"> & { dose_per_hectare: number }) =>
+    mutationFn: ({ id, ...payload }: Pick<MixTemplateItem, "id"> & { dose_per_hectare?: number; dose_unit?: string }) =>
       updateMixTemplateItem(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(templateId) });
@@ -680,10 +798,33 @@ export function useUpdateAdminPlan() {
   });
 }
 
+export function useDeleteAdminPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAdminPlan,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.plans });
+    },
+  });
+}
+
 export function useCreateGlobalProduct() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createGlobalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+    },
+  });
+}
+
+export function useImportGlobalCatalog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: importGlobalCatalogFile,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
@@ -740,6 +881,14 @@ export function useFarmPlots(farmId: string) {
   return useQuery({
     queryKey: queryKeys.farmPlots(farmId),
     queryFn: () => getFarmPlots(farmId),
+    enabled: Boolean(farmId),
+  });
+}
+
+export function useFarmSeasons(farmId: string) {
+  return useQuery({
+    queryKey: ["farm-seasons", farmId],
+    queryFn: () => getFarmSeasons(farmId),
     enabled: Boolean(farmId),
   });
 }
@@ -856,9 +1005,31 @@ export function useProducerFarms(producerId: string) {
 export function useUpdateProducer(producerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { name?: string }) => updateProducer(producerId, payload),
+    mutationFn: (payload: { name?: string; email?: string; phone?: string }) => updateProducer(producerId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producer(producerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producers });
+    },
+  });
+}
+
+export function useSetProducerActive() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; is_active: boolean }) =>
+      setProducerActive(vars.id, vars.is_active),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.producer(vars.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producers });
+    },
+  });
+}
+
+export function useDeleteProducer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteProducer(id),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producers });
     },
   });
@@ -878,10 +1049,92 @@ export function useComparativeReport() {
   return useQuery({ queryKey: ["comparative-report"], queryFn: getComparativeReport });
 }
 
+export function useCreateProducer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createProducer,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.producers });
+    },
+  });
+}
+
+export function useProducerPurchaseLists(producerId: string) {
+  return useQuery({
+    queryKey: queryKeys.producerPurchaseLists(producerId),
+    queryFn: () => getProducerPurchaseLists(producerId),
+    enabled: Boolean(producerId),
+  });
+}
+
+export function useFarmPurchaseLists(farmId: string) {
+  return useQuery({
+    queryKey: queryKeys.farmPurchaseLists(farmId),
+    queryFn: () => getFarmPurchaseLists(farmId),
+    enabled: Boolean(farmId),
+  });
+}
+
+export function useFarmAggregatedShoppingList(seasonIds: string[]) {
+  const queries = useQueries({
+    queries: seasonIds.map((seasonId) => ({
+      queryKey: queryKeys.seasonShoppingList(seasonId),
+      queryFn: () => getSeasonShoppingList(seasonId),
+      enabled: Boolean(seasonId),
+    })),
+  });
+
+  const isLoading = queries.some((q) => q.isLoading);
+  const items = queries.flatMap((q) => q.data ?? []).reduce<
+    Map<
+      string,
+      {
+        local_product_id: string;
+        product_name: string;
+        dose_unit: string;
+        total_quantity: number;
+        current_stock: number;
+        quantity_to_buy: number;
+      }
+    >
+  >((map, item) => {
+    const existing = map.get(item.local_product_id);
+    if (existing) {
+      existing.total_quantity += Number(item.total_quantity ?? 0);
+      existing.quantity_to_buy += Number(item.quantity_to_buy ?? 0);
+    } else {
+      map.set(item.local_product_id, {
+        local_product_id: item.local_product_id,
+        product_name: item.product_name,
+        dose_unit: item.dose_unit,
+        total_quantity: Number(item.total_quantity ?? 0),
+        current_stock: Number(item.current_stock ?? 0),
+        quantity_to_buy: Number(item.quantity_to_buy ?? 0),
+      });
+    }
+    return map;
+  }, new Map());
+
+  return {
+    items: [...items.values()],
+    isLoading,
+  };
+}
+
 export function useCreateInvitation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createInvitation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.producers });
+    },
+  });
+}
+
+export function useRevokeInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: revokeInvitation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producers });
     },
@@ -914,7 +1167,7 @@ export function useCloneGlobalProduct() {
 export function useUpdateLocalProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; label_url?: string; is_active?: boolean }) =>
+    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean }) =>
       updateLocalProduct(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });

@@ -1,17 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { ArrowDown, ArrowUp, Clock, Droplet, Pencil, Plus } from "lucide-react";
+
+import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHeader } from "@/components/domain/page-header";
 import { TemplateEditorSkeleton } from "@/components/domain/page-skeletons";
+import { SectionTitle } from "@/components/ui/section-title";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   useTimingTemplate,
   useCreateTimingStage,
@@ -63,6 +70,7 @@ function StageRow({
   onMoveDown: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const updateStage = useUpdateTimingStage(templateId);
   const deleteStage = useDeleteTimingStage(templateId);
 
@@ -92,48 +100,42 @@ function StageRow({
 
   if (editing) {
     return (
-      <li className="rounded-lg border border-zinc-200 bg-white p-4">
-        <form onSubmit={onSubmit} className="flex flex-wrap gap-3">
-          <div className="min-w-40 flex-1">
-            <label className="mb-1 block text-xs text-zinc-600">Nome</label>
+      <li className="rounded-xl border border-border bg-card p-4 shadow-xs animate-slide-up">
+        <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Nome</Label>
             <Input {...form.register("name")} />
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-zinc-600">Gatilho</label>
-            <select
-              {...form.register("trigger_type")}
-              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-(--brand)"
-            >
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Gatilho</Label>
+            <NativeSelect {...form.register("trigger_type")}>
               {Object.entries(TRIGGER_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
-          <div className="w-28">
-            <label className="mb-1 block text-xs text-zinc-600">Início (dias)</label>
+          <div className="space-y-1.5">
+            <Label>Início (dias)</Label>
             <Input type="number" {...form.register("window_start_days", { valueAsNumber: true })} />
           </div>
-          <div className="w-28">
-            <label className="mb-1 block text-xs text-zinc-600">Fim (dias)</label>
+          <div className="space-y-1.5">
+            <Label>Fim (dias)</Label>
             <Input type="number" {...form.register("window_end_days", { valueAsNumber: true })} />
           </div>
-          <div className="min-w-48 flex-1">
-            <label className="mb-1 block text-xs text-zinc-600">Receita de produtos padrão</label>
-            <select
-              {...form.register("default_mix_template_id")}
-              className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-(--brand)"
-            >
+          <div className="space-y-1.5 sm:col-span-4">
+            <Label>Receita padrão</Label>
+            <NativeSelect {...form.register("default_mix_template_id")}>
               <option value="">Nenhuma</option>
               {mixTemplates.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 sm:col-span-2 sm:justify-end">
             <Button type="submit" disabled={updateStage.isPending}>
               Salvar
             </Button>
-            <Button variant="secondary" onClick={() => setEditing(false)}>
+            <Button variant="ghost" type="button" onClick={() => setEditing(false)}>
               Cancelar
             </Button>
           </div>
@@ -143,44 +145,76 @@ function StageRow({
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4">
+    <li className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-xs transition-all duration-200 hover:border-primary/30 hover:shadow-md">
       <div className="flex flex-col gap-1">
         <button
+          type="button"
           onClick={onMoveUp}
           disabled={index === 0}
-          className="text-zinc-400 hover:text-zinc-700 disabled:opacity-30"
+          aria-label="Mover para cima"
+          className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
         >
-          ▲
+          <ArrowUp className="h-4 w-4" />
         </button>
         <button
+          type="button"
           onClick={onMoveDown}
           disabled={index === total - 1}
-          className="text-zinc-400 hover:text-zinc-700 disabled:opacity-30"
+          aria-label="Mover para baixo"
+          className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
         >
-          ▼
+          <ArrowDown className="h-4 w-4" />
         </button>
       </div>
-      <div className="flex-1">
-        <p className="font-medium text-zinc-900">{stage.name}</p>
-        <p className="text-xs text-zinc-500">
-          {TRIGGER_LABELS[stage.trigger_type] ?? stage.trigger_type} · Janela:{" "}
-          {stage.window_start_days}–{stage.window_end_days} dias
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+        {index + 1}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-foreground">{stage.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {TRIGGER_LABELS[stage.trigger_type] ?? stage.trigger_type} · Janela {stage.window_start_days}–{stage.window_end_days} dias
         </p>
         {mixName && (
-          <p className="mt-0.5 text-xs text-emerald-600">🧪 {mixName}</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary">
+            <Droplet className="h-3 w-3" />
+            {mixName}
+          </p>
         )}
       </div>
-      <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setEditing(true)}>
-        Editar
-      </Button>
-      <Button
-        variant="destructive"
-        className="h-8 px-3 text-xs"
-        disabled={deleteStage.isPending}
-        onClick={() => deleteStage.mutate(stage.id)}
-      >
-        Remover
-      </Button>
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Pencil className="h-3.5 w-3.5" />
+          Editar
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => setConfirmOpen(true)}
+        >
+          Remover
+        </Button>
+      </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Remover estágio"
+        description={`Remover o estágio "${stage.name}" da recomendação?`}
+        confirmLabel="Remover"
+        tone="destructive"
+        loading={deleteStage.isPending}
+        onConfirm={async () => {
+          await new Promise<void>((resolve, reject) =>
+            deleteStage.mutate(stage.id, {
+              onSuccess: () => {
+                setConfirmOpen(false);
+                resolve();
+              },
+              onError: (err) => reject(err),
+            }),
+          );
+        }}
+      />
     </li>
   );
 }
@@ -214,9 +248,8 @@ export default function TimingTemplateDetailPage() {
 
   const onAddStage = stageForm.handleSubmit((values: StageFormValues) => {
     const stages = template?.stages ?? [];
-    const nextOrderIndex = stages.length > 0
-      ? Math.max(...stages.map((s) => s.order_index)) + 1
-      : 1;
+    const nextOrderIndex =
+      stages.length > 0 ? Math.max(...stages.map((s) => s.order_index)) + 1 : 1;
 
     createStage.mutate(
       {
@@ -228,11 +261,11 @@ export default function TimingTemplateDetailPage() {
         onSuccess: () => {
           setShowStageForm(false);
           stageForm.reset();
-          toast.success("Estágio criado com sucesso!");
+          toast.success("Estágio criado.");
         },
-        onError: (error: any) => {
-          console.error("Erro ao criar estágio:", error);
-          toast.error(`Erro: ${error?.message || "Falha ao criar estágio"}`);
+        onError: (error: unknown) => {
+          const msg = error instanceof Error ? error.message : "Falha ao criar estágio.";
+          toast.error(msg);
         },
       },
     );
@@ -246,113 +279,139 @@ export default function TimingTemplateDetailPage() {
   }
 
   if (isLoading) return <TemplateEditorSkeleton />;
-  if (!template) return <p className="text-sm text-red-600">Recomendação não encontrada.</p>;
+  if (!template)
+    return (
+      <EmptyState
+        icon={Clock}
+        title="Recomendação não encontrada"
+        description="A recomendação pode ter sido removida ou você não tem acesso."
+      />
+    );
 
   const sortedStages = [...(template.stages ?? [])].sort(
     (a, b) => a.order_index - b.order_index,
   );
 
   return (
-    <>
-      <Link href="/timing-templates" className="mb-4 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800">
-        ← Voltar
-      </Link>
+    <div className="space-y-6 animate-fade-in">
+      <BreadcrumbBack
+        items={[
+          { label: "Recomendações", href: "/timing-templates" },
+          { label: template.name },
+        ]}
+      />
 
-      <div className="mb-6 flex items-start gap-3">
-        {editingName ? (
-          <div className="flex items-center gap-2">
-            <input
-              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-xl font-semibold outline-none focus:ring-2 focus:ring-(--brand)"
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              autoFocus
-            />
-            <Button
-              onClick={() => {
-                updateTemplate.mutate(
-                  { name: nameValue },
-                  { onSuccess: () => setEditingName(false) },
-                );
-              }}
-              disabled={updateTemplate.isPending}
-            >
-              Salvar
-            </Button>
-            <Button variant="secondary" onClick={() => setEditingName(false)}>
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <PageHeader
-            title={template.name}
-            description={`Cultura: ${template.crop === "SOYBEAN" ? "Soja" : "Milho"} · ${sortedStages.length} estágio(s)`}
+      {editingName ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            className="h-10 max-w-md text-xl font-semibold"
+            value={nameValue}
+            onChange={(e) => setNameValue(e.target.value)}
+            autoFocus
           />
-        )}
-        {!editingName && (
           <Button
-            variant="secondary"
-            className="mt-1 h-8 px-3 text-xs"
             onClick={() => {
-              setNameValue(template.name);
-              setEditingName(true);
+              updateTemplate.mutate(
+                { name: nameValue },
+                { onSuccess: () => setEditingName(false) },
+              );
             }}
+            disabled={updateTemplate.isPending}
           >
-            Renomear
+            Salvar
           </Button>
-        )}
-      </div>
+          <Button variant="ghost" onClick={() => setEditingName(false)}>
+            Cancelar
+          </Button>
+        </div>
+      ) : (
+        <PageHeader
+          title={template.name}
+          description={`${template.crop === "SOYBEAN" ? "Soja" : "Milho"} · ${sortedStages.length} estágio${sortedStages.length === 1 ? "" : "s"}`}
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setNameValue(template.name);
+                setEditingName(true);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Renomear
+            </Button>
+          }
+        />
+      )}
 
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-zinc-800">Estágios</h2>
-        <Button onClick={() => setShowStageForm((v) => !v)}>
-          {showStageForm ? "Cancelar" : "Adicionar estágio"}
-        </Button>
-      </div>
+      <SectionTitle
+        title="Estágios"
+        description="Ordene cronologicamente. Cada estágio pode ter uma receita padrão."
+        action={
+          <Button
+            variant={showStageForm ? "outline" : "default"}
+            onClick={() => setShowStageForm((v) => !v)}
+          >
+            {showStageForm ? (
+              "Cancelar"
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                Adicionar estágio
+              </>
+            )}
+          </Button>
+        }
+      />
 
       {showStageForm && (
-        <Card className="mb-4">
-          <form onSubmit={onAddStage} className="flex flex-wrap gap-3">
-            <div className="min-w-40 flex-1">
-              <label className="mb-1 block text-xs text-zinc-600">Nome</label>
-              <Input {...stageForm.register("name")} placeholder="Ex: Primeiro Fungicida" />
-              <p className="mt-1 text-xs text-red-600">{stageForm.formState.errors.name?.message}</p>
+        <Card className="animate-slide-up p-4">
+          <form onSubmit={onAddStage} className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="stage-name">Nome</Label>
+              <Input id="stage-name" {...stageForm.register("name")} placeholder="Ex.: Primeiro fungicida" />
+              {stageForm.formState.errors.name ? (
+                <p className="text-xs text-destructive">{stageForm.formState.errors.name.message}</p>
+              ) : null}
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-zinc-600">Gatilho</label>
-              <select
-                {...stageForm.register("trigger_type")}
-                className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-(--brand)"
-              >
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="stage-trigger">Gatilho</Label>
+              <NativeSelect id="stage-trigger" {...stageForm.register("trigger_type")}>
                 {Object.entries(TRIGGER_LABELS).map(([v, l]) => (
                   <option key={v} value={v}>
                     {l}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
-            <div className="w-28">
-              <label className="mb-1 block text-xs text-zinc-600">Início (dias)</label>
-              <Input type="number" {...stageForm.register("window_start_days", { valueAsNumber: true })} />
+            <div className="space-y-1.5">
+              <Label htmlFor="stage-start">Início (dias)</Label>
+              <Input
+                id="stage-start"
+                type="number"
+                {...stageForm.register("window_start_days", { valueAsNumber: true })}
+              />
             </div>
-            <div className="w-28">
-              <label className="mb-1 block text-xs text-zinc-600">Fim (dias)</label>
-              <Input type="number" {...stageForm.register("window_end_days", { valueAsNumber: true })} />
+            <div className="space-y-1.5">
+              <Label htmlFor="stage-end">Fim (dias)</Label>
+              <Input
+                id="stage-end"
+                type="number"
+                {...stageForm.register("window_end_days", { valueAsNumber: true })}
+              />
             </div>
-            <div className="min-w-48 flex-1">
-              <label className="mb-1 block text-xs text-zinc-600">Receita de produtos padrão</label>
-              <select
-                {...stageForm.register("default_mix_template_id")}
-                className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-(--brand)"
-              >
+            <div className="space-y-1.5 sm:col-span-4">
+              <Label htmlFor="stage-mix">Receita padrão</Label>
+              <NativeSelect id="stage-mix" {...stageForm.register("default_mix_template_id")}>
                 <option value="">Nenhuma</option>
                 {mixTemplates.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end justify-end sm:col-span-2">
               <Button type="submit" disabled={createStage.isPending}>
-                {createStage.isPending ? "Adicionando..." : "Adicionar"}
+                {createStage.isPending ? "Adicionando…" : "Adicionar"}
               </Button>
             </div>
           </form>
@@ -360,7 +419,19 @@ export default function TimingTemplateDetailPage() {
       )}
 
       {sortedStages.length === 0 ? (
-        <p className="text-sm text-zinc-500">Nenhum estágio cadastrado. Adicione o primeiro acima.</p>
+        <EmptyState
+          icon={Clock}
+          title="Nenhum estágio cadastrado"
+          description="Adicione o primeiro estágio para montar a linha do tempo desta recomendação."
+          action={
+            !showStageForm ? (
+              <Button onClick={() => setShowStageForm(true)}>
+                <Plus className="h-4 w-4" />
+                Adicionar estágio
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {sortedStages.map((stage, index) => (
@@ -377,6 +448,6 @@ export default function TimingTemplateDetailPage() {
           ))}
         </ul>
       )}
-    </>
+    </div>
   );
 }

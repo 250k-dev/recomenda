@@ -4,16 +4,27 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
+import { CreditCard } from "lucide-react";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
 import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { Plan } from "@/lib/api/client";
-import { useCreateAdminPlan, usePlans, useUpdateAdminPlan } from "@/lib/api/hooks";
+import {
+  useCreateAdminPlan,
+  useDeleteAdminPlan,
+  usePlans,
+  useUpdateAdminPlan,
+} from "@/lib/api/hooks";
+import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 
 const planFormSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -33,11 +44,24 @@ const planFormSchema = z.object({
 
 type PlanFormValues = z.infer<typeof planFormSchema>;
 
+type PlansTab = "ativos" | "removidos";
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  if (isAxiosError(error)) {
+    const msg = error.response?.data as { message?: string | string[] } | undefined;
+    if (typeof msg?.message === "string") return msg.message;
+    if (Array.isArray(msg?.message) && msg.message[0]) return String(msg.message[0]);
+  }
+  return fallback;
+}
+
 export default function AdminPlansPage() {
   const { data: plans, isLoading } = usePlans();
   const createMutation = useCreateAdminPlan();
   const updateMutation = useUpdateAdminPlan();
+  const deleteMutation = useDeleteAdminPlan();
   const [filter, setFilter] = useState("");
+  const [activeTab, setActiveTab] = useState<PlansTab>("ativos");
   const [createOpen, setCreateOpen] = useState(false);
   const [editPlan, setEditPlan] = useState<Plan | null>(null);
 
@@ -51,15 +75,26 @@ export default function AdminPlansPage() {
     defaultValues: { name: "", plot_quota: "1", price_brl_monthly: "0", is_active: true },
   });
 
-  const filteredPlans = useMemo(() => {
+  const removedCount = useMemo(() => (plans ?? []).filter((p) => !p.is_active).length, [plans]);
+
+  const tabPlans = useMemo(() => {
     const list = plans ?? [];
+    if (activeTab === "ativos") return list.filter((p) => p.is_active);
+    return list.filter((p) => !p.is_active);
+  }, [plans, activeTab]);
+
+  const filteredPlans = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((p) => {
-      const blob = `${p.name} ${p.plot_quota} ${p.price_brl_monthly} ${p.is_active ? "ativo" : "inativo"}`.toLowerCase();
+    if (!q) return tabPlans;
+    return tabPlans.filter((p) => {
+      const statusLabel = p.is_active ? "ativo" : "removido";
+      const blob = `${p.name} ${p.plot_quota} ${p.price_brl_monthly} ${statusLabel}`.toLowerCase();
       return blob.includes(q);
     });
-  }, [plans, filter]);
+  }, [tabPlans, filter]);
+
+  const mutationPending =
+    createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   const openEdit = (p: Plan) => {
     setEditPlan(p);
@@ -85,7 +120,7 @@ export default function AdminPlansPage() {
           setCreateOpen(false);
           createForm.reset({ name: "", plot_quota: "10", price_brl_monthly: "0", is_active: true });
         },
-        onError: () => toast.error("Não foi possível criar o plano."),
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível criar o plano.")),
       },
     );
   });
@@ -107,86 +142,186 @@ export default function AdminPlansPage() {
           toast.success("Plano atualizado.");
           setEditPlan(null);
         },
-        onError: () => toast.error("Não foi possível salvar o plano."),
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível salvar o plano.")),
       },
     );
   });
 
-  const rows =
+  const onRemoveFromActive = (p: Plan) => {
+    if (
+      !globalThis.confirm(
+        `Remover o plano "${p.name}" da listagem ativa? Ele deixará de aparecer para novas contratações; agrônomos já vinculados não são alterados.`,
+      )
+    ) {
+      return;
+    }
+    updateMutation.mutate(
+      { id: p.id, payload: { is_active: false } },
+      {
+        onSuccess: () => toast.success("Plano removido da listagem ativa."),
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível remover o plano.")),
+      },
+    );
+  };
+
+  const onReactivate = (p: Plan) => {
+    updateMutation.mutate(
+      { id: p.id, payload: { is_active: true } },
+      {
+        onSuccess: () => toast.success("Plano reativado."),
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível reativar o plano.")),
+      },
+    );
+  };
+
+  const onDeletePermanent = (p: Plan) => {
+    if (
+      !globalThis.confirm(
+        `Excluir permanentemente o plano "${p.name}"? Esta ação não pode ser desfeita.`,
+      )
+    ) {
+      return;
+    }
+    deleteMutation.mutate(p.id, {
+      onSuccess: () => toast.success("Plano excluído."),
+      onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível excluir o plano.")),
+    });
+  };
+
+  const activeRows =
     filteredPlans?.map((p) => [
       p.name,
       String(p.plot_quota),
       `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
-      p.is_active ? "Ativo" : "Inativo",
-      <Button key={`e-${p.id}`} type="button" variant="outline" size="sm" onClick={() => openEdit(p)}>
-        Editar
-      </Button>,
+      "Ativo",
+      <div key={`a-${p.id}`} className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => openEdit(p)} disabled={mutationPending}>
+          Editar
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={deactivateOutlineButtonClass}
+          onClick={() => onRemoveFromActive(p)}
+          disabled={mutationPending}
+        >
+          Remover
+        </Button>
+      </div>,
+    ]) ?? [];
+
+  const removedRows =
+    filteredPlans?.map((p) => [
+      p.name,
+      String(p.plot_quota),
+      `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
+      "Removido",
+      <div key={`r-${p.id}`} className="flex flex-wrap justify-end gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => openEdit(p)} disabled={mutationPending}>
+          Editar
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => onReactivate(p)} disabled={mutationPending}>
+          Reativar
+        </Button>
+        <DeletePermanentIconButton disabled={mutationPending} onClick={() => onDeletePermanent(p)} />
+      </div>,
     ]) ?? [];
 
   return (
     <>
-      <PageHeader title="Planos" description="Planos disponíveis na plataforma, quotas e preços mensais." />
+      <PageHeader
+        icon={<CreditCard className="h-5 w-5" />}
+        section="Assinaturas"
+        title="Planos"
+        description="Planos disponíveis na plataforma, quotas e preços mensais. Remova da listagem ativa ou exclua definitivamente itens sem vínculos."
+      />
+
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <SegmentedTabs
+          value={activeTab}
+          onValueChange={(v) => {
+            setActiveTab(v);
+            setFilter("");
+          }}
+          items={[
+            { value: "ativos", label: "Ativos" },
+            { value: "removidos", label: "Removidos", badgeCount: removedCount },
+          ]}
+        />
+      </div>
 
       <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <AdminListFilter value={filter} onChange={setFilter} placeholder="Filtrar por nome, quota, preço ou status..." />
-        <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-          <SheetTrigger asChild>
-            <Button type="button">Novo plano</Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-full sm:max-w-md">
-            <SheetHeader>
-              <SheetTitle>Novo plano</SheetTitle>
-            </SheetHeader>
-            <form onSubmit={onCreateSubmit} className="mt-4 space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
-                <Input {...createForm.register("name")} />
-                {createForm.formState.errors.name && (
-                  <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.name.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-700">Quota de talhões</label>
-                <Input type="number" min={1} {...createForm.register("plot_quota")} />
-                {createForm.formState.errors.plot_quota && (
-                  <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.plot_quota.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-700">Preço mensal (R$)</label>
-                <Input type="number" step="0.01" min={0} {...createForm.register("price_brl_monthly")} />
-                {createForm.formState.errors.price_brl_monthly && (
-                  <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.price_brl_monthly.message}</p>
-                )}
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="rounded border-zinc-300"
-                  checked={createForm.watch("is_active")}
-                  onChange={(e) =>
-                    createForm.setValue("is_active", e.target.checked, { shouldValidate: true, shouldDirty: true })
-                  }
-                />
-                Plano ativo
-              </label>
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Salvando..." : "Criar plano"}
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
-                  Fechar
-                </Button>
-              </div>
-            </form>
-          </SheetContent>
-        </Sheet>
+        <AdminListFilter
+          value={filter}
+          onChange={setFilter}
+          placeholder="Filtrar por nome, quota, preço..."
+        />
+        {activeTab === "ativos" ? (
+          <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+            <SheetTrigger asChild>
+              <Button type="button">Novo plano</Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-md">
+              <SheetHeader>
+                <SheetTitle>Novo plano</SheetTitle>
+              </SheetHeader>
+              <form onSubmit={onCreateSubmit} className="mt-4 space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="plan-create-name">Nome</Label>
+                  <Input id="plan-create-name" {...createForm.register("name")} />
+                  {createForm.formState.errors.name && (
+                    <p className="text-xs text-destructive">{createForm.formState.errors.name.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="plan-create-quota">Quota de talhões</Label>
+                  <Input id="plan-create-quota" type="number" min={1} {...createForm.register("plot_quota")} />
+                  {createForm.formState.errors.plot_quota && (
+                    <p className="text-xs text-destructive">{createForm.formState.errors.plot_quota.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="plan-create-price">Preço mensal (R$)</Label>
+                  <Input id="plan-create-price" type="number" step="0.01" min={0} {...createForm.register("price_brl_monthly")} />
+                  {createForm.formState.errors.price_brl_monthly && (
+                    <p className="text-xs text-destructive">
+                      {createForm.formState.errors.price_brl_monthly.message}
+                    </p>
+                  )}
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-input bg-background accent-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                    checked={createForm.watch("is_active")}
+                    onChange={(e) =>
+                      createForm.setValue("is_active", e.target.checked, { shouldValidate: true, shouldDirty: true })
+                    }
+                  />
+                  Plano ativo
+                </label>
+                <div className="flex gap-2 pt-2">
+                  <Button type="submit" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? "Salvando…" : "Criar"}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+                    Fechar
+                  </Button>
+                </div>
+              </form>
+            </SheetContent>
+          </Sheet>
+        ) : null}
       </div>
 
       {isLoading ? (
         <TableRowsSkeleton rows={8} columns={5} />
       ) : (
-        <DataTable headers={["Nome", "Quota de talhões", "Preço", "Status", ""]} rows={rows} />
+        <DataTable
+          headers={["Nome", "Quota de talhões", "Preço", "Status", ""]}
+          rows={activeTab === "ativos" ? activeRows : removedRows}
+        />
       )}
 
       <Sheet open={Boolean(editPlan)} onOpenChange={(o) => !o && setEditPlan(null)}>
@@ -195,43 +330,43 @@ export default function AdminPlansPage() {
             <SheetTitle>Editar plano</SheetTitle>
           </SheetHeader>
           <form onSubmit={onEditSubmit} className="mt-4 space-y-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
-              <Input {...editForm.register("name")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-edit-name">Nome</Label>
+              <Input id="plan-edit-name" {...editForm.register("name")} />
               {editForm.formState.errors.name && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.name.message}</p>
+                <p className="text-xs text-destructive">{editForm.formState.errors.name.message}</p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Quota de talhões</label>
-              <Input type="number" min={1} {...editForm.register("plot_quota")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-edit-quota">Quota de talhões</Label>
+              <Input id="plan-edit-quota" type="number" min={1} {...editForm.register("plot_quota")} />
               {editForm.formState.errors.plot_quota && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.plot_quota.message}</p>
+                <p className="text-xs text-destructive">{editForm.formState.errors.plot_quota.message}</p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Preço mensal (R$)</label>
-              <Input type="number" step="0.01" min={0} {...editForm.register("price_brl_monthly")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-edit-price">Preço mensal (R$)</Label>
+              <Input id="plan-edit-price" type="number" step="0.01" min={0} {...editForm.register("price_brl_monthly")} />
               {editForm.formState.errors.price_brl_monthly && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.price_brl_monthly.message}</p>
+                <p className="text-xs text-destructive">{editForm.formState.errors.price_brl_monthly.message}</p>
               )}
             </div>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
-                className="rounded border-zinc-300"
+                className="size-4 rounded border-input bg-background accent-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
                 checked={editForm.watch("is_active")}
                 onChange={(e) =>
                   editForm.setValue("is_active", e.target.checked, { shouldValidate: true, shouldDirty: true })
                 }
               />
-              Plano ativo
+              Plano na listagem ativa
             </label>
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Salvando..." : "Salvar alterações"}
+                {updateMutation.isPending ? "Salvando…" : "Salvar"}
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setEditPlan(null)}>
+              <Button type="button" variant="ghost" onClick={() => setEditPlan(null)}>
                 Fechar
               </Button>
             </div>

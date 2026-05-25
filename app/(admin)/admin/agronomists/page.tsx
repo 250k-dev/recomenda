@@ -8,11 +8,14 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
 import { PageHeader } from "@/components/domain/page-header";
+import { Users } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
 import { DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
@@ -235,8 +238,10 @@ export default function AdminAgronomistsPage() {
   return (
     <>
       <PageHeader
+        icon={<Users className="h-5 w-5" />}
+        section="Usuários"
         title="Agrônomos"
-        description="Contas ativas e inativas. Desative para bloquear acesso; na aba Inativos você pode reativar ou excluir definitivamente."
+        description="Contas ativas e removidas da lista ativa. Use Desativar para bloquear acesso; na aba Removidos você pode reativar ou excluir definitivamente."
       />
 
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -248,7 +253,7 @@ export default function AdminAgronomistsPage() {
           }}
           items={[
             { value: "active", label: "Ativos" },
-            { value: "inactive", label: "Inativos", badgeCount: inactiveList.length },
+            { value: "inactive", label: "Removidos", badgeCount: inactiveList.length },
           ]}
         />
 
@@ -268,49 +273,46 @@ export default function AdminAgronomistsPage() {
                   <SheetTitle>Novo agrônomo</SheetTitle>
                 </SheetHeader>
                 <form onSubmit={onCreate} className="mt-6 space-y-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
-                    <Input {...createForm.register("name")} placeholder="Nome completo" />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="agro-create-name">Nome</Label>
+                    <Input id="agro-create-name" {...createForm.register("name")} placeholder="Nome completo" />
                     {createForm.formState.errors.name && (
-                      <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.name.message}</p>
+                      <p className="text-xs text-destructive">{createForm.formState.errors.name.message}</p>
                     )}
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-700">E-mail</label>
-                    <Input type="email" {...createForm.register("email")} placeholder="email@exemplo.com" />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="agro-create-email">E-mail</Label>
+                    <Input id="agro-create-email" type="email" {...createForm.register("email")} placeholder="email@exemplo.com" />
                     {createForm.formState.errors.email && (
-                      <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.email.message}</p>
+                      <p className="text-xs text-destructive">{createForm.formState.errors.email.message}</p>
                     )}
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-700">Senha inicial</label>
-                    <Input type="password" autoComplete="new-password" {...createForm.register("password")} />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="agro-create-pass">Senha inicial</Label>
+                    <Input id="agro-create-pass" type="password" autoComplete="new-password" {...createForm.register("password")} />
                     {createForm.formState.errors.password && (
-                      <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.password.message}</p>
+                      <p className="text-xs text-destructive">{createForm.formState.errors.password.message}</p>
                     )}
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-700">Plano</label>
-                    <select
-                      {...createForm.register("plan_id")}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <option value="">Selecione...</option>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="agro-create-plan">Plano</Label>
+                    <NativeSelect id="agro-create-plan" {...createForm.register("plan_id")}>
+                      <option value="">Selecione…</option>
                       {plans?.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                     {createForm.formState.errors.plan_id && (
-                      <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.plan_id.message}</p>
+                      <p className="text-xs text-destructive">{createForm.formState.errors.plan_id.message}</p>
                     )}
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button type="submit" disabled={createMutation.isPending}>
-                      {createMutation.isPending ? "Criando..." : "Criar agrônomo"}
+                      {createMutation.isPending ? "Criando…" : "Criar"}
                     </Button>
-                    <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+                    <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
                       Fechar
                     </Button>
                   </div>
@@ -336,52 +338,61 @@ export default function AdminAgronomistsPage() {
             <SheetTitle>Editar agrônomo</SheetTitle>
           </SheetHeader>
           <form onSubmit={onEdit} className="mt-6 space-y-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
-              <Input {...editForm.register("name")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="agro-edit-name">Nome</Label>
+              <Input id="agro-edit-name" {...editForm.register("name")} />
               {editForm.formState.errors.name && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.name.message}</p>
+                <p className="text-xs text-destructive">{editForm.formState.errors.name.message}</p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">E-mail</label>
-              <Input type="email" {...editForm.register("email")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="agro-edit-email">E-mail</Label>
+              <Input id="agro-edit-email" type="email" {...editForm.register("email")} />
               {editForm.formState.errors.email && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.email.message}</p>
+                <p className="text-xs text-destructive">{editForm.formState.errors.email.message}</p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Nova senha (opcional)</label>
-              <Input type="password" autoComplete="new-password" placeholder="Deixe em branco para manter" {...editForm.register("password")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="agro-edit-pass">Nova senha (opcional)</Label>
+              <Input
+                id="agro-edit-pass"
+                type="password"
+                autoComplete="new-password"
+                placeholder="Deixe em branco para manter"
+                {...editForm.register("password")}
+              />
               {editForm.formState.errors.password && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.password.message}</p>
+                <p className="text-xs text-destructive">{editForm.formState.errors.password.message}</p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Plano</label>
-              <select
-                {...editForm.register("plan_id")}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
+            <div className="space-y-1.5">
+              <Label htmlFor="agro-edit-plan">Plano</Label>
+              <NativeSelect id="agro-edit-plan" {...editForm.register("plan_id")}>
                 {plans?.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Início do plano</label>
-              <Input type="datetime-local" {...editForm.register("plan_started_at")} />
+            <div className="space-y-1.5">
+              <Label htmlFor="agro-edit-start">Início do plano</Label>
+              <Input
+                id="agro-edit-start"
+                type="datetime-local"
+                {...editForm.register("plan_started_at")}
+              />
               {editForm.formState.errors.plan_started_at && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.plan_started_at.message}</p>
+                <p className="text-xs text-destructive">
+                  {editForm.formState.errors.plan_started_at.message}
+                </p>
               )}
             </div>
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Salvando..." : "Salvar"}
+                {updateMutation.isPending ? "Salvando…" : "Salvar"}
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setEditRow(null)}>
+              <Button type="button" variant="ghost" onClick={() => setEditRow(null)}>
                 Fechar
               </Button>
             </div>

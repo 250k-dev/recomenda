@@ -122,16 +122,33 @@ function isActionsLastColumn(headers: string[]): boolean {
   return last === "Ações" || last === ""
 }
 
+/** Célula de nome longo: evita estourar layout da tabela. */
+export function AdminCatalogNameCell({ name }: { name: string }) {
+  return (
+    <span
+      className="block min-w-0 max-w-[min(32rem,70vw)] truncate align-top font-medium"
+      title={name}
+    >
+      {name}
+    </span>
+  )
+}
+
 /** Helper componente para tabelas simples com dados estruturados */
 export function DataTable({
   headers,
   rows,
   /** Se true, a última coluna fica alinhada ao fim (direita em LTR). "auto" detecta Ações ou header vazio. */
   alignLastColumnEnd = "auto" as boolean | "auto",
+  /** classes extras por índice de coluna (ex.: max-w-0 na primeira para truncar nome) */
+  columnCellClassNames,
+  footer,
 }: {
   headers: string[]
   rows: React.ReactNode[][]
   alignLastColumnEnd?: boolean | "auto"
+  columnCellClassNames?: (string | undefined)[]
+  footer?: React.ReactNode
 }) {
   const lastIdx = headers.length - 1
   const alignEnd =
@@ -172,7 +189,11 @@ export function DataTable({
                 {row.map((cell, cellIndex) => (
                   <TableCell
                     key={`${index}-${cellIndex}`}
-                    className={cn(alignEnd && cellIndex === lastIdx && "text-end")}
+                    className={cn(
+                      "align-top",
+                      alignEnd && cellIndex === lastIdx && "text-end",
+                      columnCellClassNames?.[cellIndex],
+                    )}
                   >
                     {cell}
                   </TableCell>
@@ -182,6 +203,7 @@ export function DataTable({
           )}
         </TableBody>
       </Table>
+      {footer}
     </div>
   )
 }

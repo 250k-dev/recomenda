@@ -1,20 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
+import { Package } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { AdminListFilter } from "@/components/domain/admin-list-filter";
-import { DataTable } from "@/components/ui/table";
+import { AdminCatalogNameCell, DataTable } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalProduct } from "@/lib/api/client";
+import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalCatalogImportResult, GlobalProduct } from "@/lib/api/client";
 import {
   DOSE_UNIT_LABELS,
   GLOBAL_DOSE_UNITS,
@@ -25,12 +26,89 @@ import {
   useCreateGlobalProduct,
   useDeleteGlobalProduct,
   useDeleteLocalProductAdmin,
+  useImportGlobalCatalog,
   useAdminPlatformActiveCatalog,
   useAdminDeactivatedCatalog,
   useUpdateGlobalProduct,
   useUpdateLocalProduct,
 } from "@/lib/api/hooks";
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+
+const CATALOG_PAGE_SIZE = 15;
+
+/** Filtro de origem: alinhado à coluna Origem (Plataforma vs. produto customizado do consultor). */
+type CatalogOriginFilterValue = "" | "platform" | "custom";
+
+function originMatchesFilter(
+  entryType: AdminPlatformActiveEntry["entry_type"] | AdminDeactivatedCatalogEntry["entry_type"],
+  origin: CatalogOriginFilterValue,
+): boolean {
+  if (!origin) return true;
+  if (origin === "platform") {
+    return entryType === "GLOBAL" || entryType === "GLOBAL_INACTIVE";
+  }
+  return entryType === "CUSTOM" || entryType === "CUSTOM_INACTIVE";
+}
+
+function matchesCatalogListFilters(
+  row: {
+    name: string;
+    category: string;
+    dose_unit: string;
+    entry_type: AdminPlatformActiveEntry["entry_type"] | AdminDeactivatedCatalogEntry["entry_type"];
+  },
+  filters: { name: string; category: string; doseUnit: string; origin: CatalogOriginFilterValue },
+): boolean {
+  if (!originMatchesFilter(row.entry_type, filters.origin)) return false;
+  if (filters.category && row.category !== filters.category) return false;
+  if (filters.doseUnit && row.dose_unit !== filters.doseUnit) return false;
+  const q = filters.name.trim().toLowerCase();
+  if (q && !row.name.toLowerCase().includes(q)) return false;
+  return true;
+}
+
+function CatalogPaginationBar(props: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (p: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(props.total / props.pageSize));
+  const safePage = Math.min(Math.max(1, props.page), totalPages);
+  const from = props.total === 0 ? 0 : (safePage - 1) * props.pageSize + 1;
+  const to = Math.min(props.total, safePage * props.pageSize);
+
+  return (
+    <div className="flex flex-col gap-2 border-t bg-muted/30 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-muted-foreground">
+        {props.total === 0 ? "Nenhum item" : `Mostrando ${from}–${to} de ${props.total}`}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={safePage <= 1}
+          onClick={() => props.onPageChange(safePage - 1)}
+        >
+          Anterior
+        </Button>
+        <span className="min-w-[5rem] text-center tabular-nums text-muted-foreground">
+          {safePage} / {totalPages}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={safePage >= totalPages}
+          onClick={() => props.onPageChange(safePage + 1)}
+        >
+          Próxima
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 const productSchema = z
   .object({
@@ -79,6 +157,28 @@ const DOSE_UNITS: Record<string, string> = {
   ML: "mL (Mililitro)",
   DOSE: "Dose",
 };
+
+function downloadProdutosPlataformaTemplate() {
+  const csv = "MARCA,DOSAGEM,TIPO,CLASSE\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "modelo_produtos_plataforma.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function catalogImportApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  if (isAxiosError(error)) {
+    const payload = error.response?.data as { error?: { message?: string } } | undefined;
+    if (typeof payload?.error?.message === "string") return payload.error.message;
+  }
+  return fallback;
+}
 
 function AdminProductRowActions(props: {
   onEdit: () => void;
@@ -129,29 +229,80 @@ export default function AdminGlobalCatalogPage() {
   const updateLocalMutation = useUpdateLocalProduct();
   const deleteGlobalMutation = useDeleteGlobalProduct();
   const deleteLocalMutation = useDeleteLocalProductAdmin();
-  const [filter, setFilter] = useState("");
+  const importMutation = useImportGlobalCatalog();
+  const [filterName, setFilterName] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterDoseUnit, setFilterDoseUnit] = useState("");
+  const [filterOrigin, setFilterOrigin] = useState<CatalogOriginFilterValue>("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importResult, setImportResult] = useState<GlobalCatalogImportResult | null>(null);
   const [editProduct, setEditProduct] = useState<GlobalProduct | null>(null);
   const [editCustomRow, setEditCustomRow] = useState<AdminPlatformActiveEntry | null>(null);
   const [activeTab, setActiveTab] = useState<"global" | "customizados" | "desativados">("global");
+  const [globalPage, setGlobalPage] = useState(1);
+  const [customPage, setCustomPage] = useState(1);
+  const [inactivePage, setInactivePage] = useState(1);
 
   const platformRows = platformRes?.data ?? [];
 
-  const filteredPlatform = useMemo(() => {
-    if (activeTab !== "global") return platformRows;
-    const q = filter.trim().toLowerCase();
-    if (!q) return platformRows;
-    return platformRows.filter((p) => {
-      const originSearch =
-        p.entry_type === "GLOBAL"
-          ? "plataforma oficial global"
-          : `${p.owner_name ?? ""} ${p.owner_agronomist_id ?? ""}`.trim().toLowerCase();
-      const blob = `${p.name} ${p.category} ${p.dose_unit} ${originSearch}`.toLowerCase();
-      return blob.includes(q);
-    });
-  }, [platformRows, filter, activeTab]);
+  const filteredGlobalRows = useMemo(() => {
+    const f = { name: filterName, category: filterCategory, doseUnit: filterDoseUnit, origin: filterOrigin };
+    return platformRows.filter((p) => matchesCatalogListFilters(p, f));
+  }, [platformRows, filterName, filterCategory, filterDoseUnit, filterOrigin]);
+
+  useEffect(() => {
+    setGlobalPage(1);
+    setCustomPage(1);
+    setInactivePage(1);
+  }, [filterName, filterCategory, filterDoseUnit, filterOrigin, activeTab]);
+
+  const globalTotalPages = Math.max(1, Math.ceil(filteredGlobalRows.length / CATALOG_PAGE_SIZE));
+  useEffect(() => {
+    setGlobalPage((p) => Math.min(p, globalTotalPages));
+  }, [globalTotalPages]);
+
+  const globalSafePage = Math.min(globalPage, globalTotalPages);
+  const paginatedGlobalRows = useMemo(() => {
+    const start = (globalSafePage - 1) * CATALOG_PAGE_SIZE;
+    return filteredGlobalRows.slice(start, start + CATALOG_PAGE_SIZE);
+  }, [filteredGlobalRows, globalSafePage]);
 
   const customizedRows = useMemo(() => platformRows.filter((p) => p.entry_type === "CUSTOM"), [platformRows]);
+
+  const inactiveProducts = deactivatedRes?.data ?? [];
+
+  const filteredCustomRows = useMemo(() => {
+    const f = { name: filterName, category: filterCategory, doseUnit: filterDoseUnit, origin: filterOrigin };
+    return customizedRows.filter((p) => matchesCatalogListFilters(p, f));
+  }, [customizedRows, filterName, filterCategory, filterDoseUnit, filterOrigin]);
+
+  const filteredInactiveProducts = useMemo(() => {
+    const f = { name: filterName, category: filterCategory, doseUnit: filterDoseUnit, origin: filterOrigin };
+    return inactiveProducts.filter((p) => matchesCatalogListFilters(p, f));
+  }, [inactiveProducts, filterName, filterCategory, filterDoseUnit, filterOrigin]);
+
+  const customTotalPages = Math.max(1, Math.ceil(filteredCustomRows.length / CATALOG_PAGE_SIZE));
+  useEffect(() => {
+    setCustomPage((p) => Math.min(p, customTotalPages));
+  }, [customTotalPages]);
+
+  const inactiveTotalPages = Math.max(1, Math.ceil(filteredInactiveProducts.length / CATALOG_PAGE_SIZE));
+  useEffect(() => {
+    setInactivePage((p) => Math.min(p, inactiveTotalPages));
+  }, [inactiveTotalPages]);
+
+  const customSafePage = Math.min(customPage, customTotalPages);
+  const paginatedCustomRows = useMemo(() => {
+    const start = (customSafePage - 1) * CATALOG_PAGE_SIZE;
+    return filteredCustomRows.slice(start, start + CATALOG_PAGE_SIZE);
+  }, [filteredCustomRows, customSafePage]);
+
+  const inactiveSafePage = Math.min(inactivePage, inactiveTotalPages);
+  const paginatedInactiveRows = useMemo(() => {
+    const start = (inactiveSafePage - 1) * CATALOG_PAGE_SIZE;
+    return filteredInactiveProducts.slice(start, start + CATALOG_PAGE_SIZE);
+  }, [filteredInactiveProducts, inactiveSafePage]);
 
   const createForm = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -191,6 +342,7 @@ export default function AdminGlobalCatalogPage() {
 
   const mutationPending =
     createMutation.isPending ||
+    importMutation.isPending ||
     updateGlobalMutation.isPending ||
     updateLocalMutation.isPending ||
     deleteGlobalMutation.isPending ||
@@ -250,6 +402,24 @@ export default function AdminGlobalCatalogPage() {
       onError: () => toast.error("Não foi possível criar o produto."),
     });
   });
+
+  const onPickImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    importMutation.mutate(file, {
+      onSuccess: (res) => {
+        setImportResult(res);
+        toast.success(
+          `Importação concluída: ${res.created} criados, ${res.skipped} ignorados, ${res.failed} falhas.`,
+        );
+      },
+      onError: (err) => {
+        setImportResult(null);
+        toast.error(catalogImportApiErrorMessage(err, "Não foi possível importar o arquivo."));
+      },
+    });
+  };
 
   const onEditGlobal = editForm.handleSubmit((values) => {
     if (!editProduct) return;
@@ -354,7 +524,7 @@ export default function AdminGlobalCatalogPage() {
     }
   };
 
-  const globalTableRows = filteredPlatform.map((p) => {
+  const globalTableRows = paginatedGlobalRows.map((p) => {
     const origin = <OriginCell key={`o-${p.entry_type}-${p.global_product_id ?? p.local_product_id}`} row={p} />;
 
     const actions =
@@ -379,7 +549,7 @@ export default function AdminGlobalCatalogPage() {
       );
 
     return [
-      p.name,
+      <AdminCatalogNameCell key={`n-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
       PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
       DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
       origin,
@@ -387,7 +557,7 @@ export default function AdminGlobalCatalogPage() {
     ];
   });
 
-  const customizedTableRows = customizedRows.map((p) => {
+  const customizedTableRows = paginatedCustomRows.map((p) => {
     const owner = p.owner_name?.trim();
     const agronomistCell = owner ? (
       <span className="block max-w-[10rem] truncate sm:max-w-[14rem]" title={owner}>
@@ -397,7 +567,7 @@ export default function AdminGlobalCatalogPage() {
       "—"
     );
     return [
-      p.name,
+      <AdminCatalogNameCell key={`cn-${p.local_product_id ?? p.name}`} name={p.name} />,
       PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
       DOSE_UNITS[p.dose_unit as keyof typeof DOSE_UNITS]?.split(" ")[0] ?? p.dose_unit,
       p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "-",
@@ -415,9 +585,8 @@ export default function AdminGlobalCatalogPage() {
     ];
   });
 
-  const inactiveProducts = deactivatedRes?.data ?? [];
-  const inactiveRows = inactiveProducts.map((p) => [
-    p.name,
+  const inactiveRows = paginatedInactiveRows.map((p) => [
+    <AdminCatalogNameCell key={`in-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
     PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
     DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
     p.entry_type === "GLOBAL_INACTIVE" ? (
@@ -448,12 +617,15 @@ export default function AdminGlobalCatalogPage() {
 
   const selectClass =
     "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const hasActiveListFilters = Boolean(filterName.trim() || filterCategory || filterDoseUnit || filterOrigin);
 
   return (
     <>
       <PageHeader
-        title="Produtos"
-        description="Como administrador, você pode editar e desativar produtos ativos; a exclusão definitiva fica na aba Desativados."
+        icon={<Package className="h-5 w-5" />}
+        section="Plataforma"
+        title="Catálogo Global"
+        description="Como administrador, você pode editar e desativar produtos ativos; a exclusão definitiva fica na aba Removidos."
       />
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -461,109 +633,285 @@ export default function AdminGlobalCatalogPage() {
           value={activeTab}
           onValueChange={(v) => {
             setActiveTab(v);
-            if (v !== "global") setFilter("");
+            setFilterName("");
+            setFilterCategory("");
+            setFilterDoseUnit("");
+            setFilterOrigin("");
           }}
           items={[
             { value: "global", label: "Catálogo Global" },
             { value: "customizados", label: "Customizados" },
-            { value: "desativados", label: "Desativados", badgeCount: inactiveProducts.length },
+            { value: "desativados", label: "Removidos", badgeCount: inactiveProducts.length },
           ]}
         />
       </div>
 
-      {activeTab === "global" && (
-        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <AdminListFilter value={filter} onChange={setFilter} placeholder="Filtrar por nome, categoria, unidade ou origem..." />
-          <Sheet
-            open={createOpen}
-            onOpenChange={(open) => {
-              setCreateOpen(open);
-              if (open) {
-                createForm.reset({
-                  name: "",
-                  category: "OTHER",
-                  dose_unit: "L",
-                  default_label_url: "",
-                  equivalence_group: "",
-                  is_active: true,
-                });
-              }
-            }}
-          >
-            <SheetTrigger asChild>
-              <Button type="button">Novo produto</Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-full sm:max-w-md">
-              <SheetHeader>
-                <SheetTitle>Novo produto global</SheetTitle>
-              </SheetHeader>
-              <form onSubmit={onCreate} className="mt-6 space-y-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
-                  <Input {...createForm.register("name")} />
-                  {createForm.formState.errors.name && (
-                    <p className="mt-1 text-xs text-red-600">{createForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-700">Categoria</label>
-                  <select {...createForm.register("category")} className={selectClass}>
-                    {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {PRODUCT_CATEGORY_LABELS[c]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-700">Unidade de dose</label>
-                  <select {...createForm.register("dose_unit")} className={selectClass}>
-                    {GLOBAL_DOSE_UNITS.map((u) => (
-                      <option key={u} value={u}>
-                        {DOSE_UNIT_LABELS[u]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-700">URL do rótulo (opcional)</label>
-                  <Input {...createForm.register("default_label_url")} placeholder="https://..." />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-zinc-700">Grupo de equivalência (opcional)</label>
-                  <Input {...createForm.register("equivalence_group")} />
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="rounded border-zinc-300"
-                    checked={createForm.watch("is_active")}
-                    onChange={(e) =>
-                      createForm.setValue("is_active", e.target.checked, { shouldValidate: true, shouldDirty: true })
-                    }
-                  />
-                  Ativo no catálogo
-                </label>
-                <div className="flex gap-2 pt-2">
-                  <Button type="submit" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? "Salvando..." : "Criar"}
+      <div className="mb-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-0 flex-1 sm:min-w-[12rem] sm:max-w-xs">
+              <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
+              <Input
+                value={filterName}
+                onChange={(e) => setFilterName(e.target.value)}
+                placeholder="Buscar por nome…"
+              />
+            </div>
+            <div className="w-full min-w-[10rem] sm:w-44">
+              <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
+              <select
+                className={selectClass}
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                <option value="">Todas</option>
+                {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {PRODUCT_CATEGORY_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full min-w-[10rem] sm:w-44">
+              <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
+              <select
+                className={selectClass}
+                value={filterDoseUnit}
+                onChange={(e) => setFilterDoseUnit(e.target.value)}
+              >
+                <option value="">Todas</option>
+                {GLOBAL_DOSE_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {DOSE_UNIT_LABELS[u]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full min-w-[10rem] sm:w-44">
+              <label className="mb-1 block text-xs font-medium text-foreground">Origem</label>
+              <select
+                className={selectClass}
+                value={filterOrigin}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFilterOrigin(v === "platform" || v === "custom" ? v : "");
+                }}
+              >
+                <option value="">Todas</option>
+                <option value="platform">Plataforma</option>
+                <option value="custom">Customizado</option>
+              </select>
+            </div>
+            {hasActiveListFilters ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0 self-end sm:self-auto"
+                onClick={() => {
+                  setFilterName("");
+                  setFilterCategory("");
+                  setFilterDoseUnit("");
+                  setFilterOrigin("");
+                }}
+              >
+                Limpar filtros
+              </Button>
+            ) : null}
+          </div>
+          {activeTab === "global" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Sheet
+                open={importOpen}
+                onOpenChange={(open) => {
+                  setImportOpen(open);
+                  if (!open) setImportResult(null);
+                }}
+              >
+              <SheetTrigger asChild>
+                <Button type="button" variant="secondary">
+                  Importar CSV / Excel
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full max-w-full overflow-y-auto sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Importar produtos da plataforma</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 space-y-4 text-sm">
+                  <p className="text-muted-foreground">
+                    O arquivo deve conter as colunas: <strong>MARCA</strong>, <strong>DOSAGEM</strong>,{" "}
+                    <strong>TIPO</strong>, <strong>CLASSE</strong> (primeira linha = cabeçalho).
+                  </p>
+                  <div>
+                    <p className="mb-2 font-medium text-foreground">Unidades de dose no sistema</p>
+                    <p className="mb-2 text-muted-foreground">
+                      A coluna <strong>DOSAGEM</strong> da planilha descreve a concentração (ex.: 720 g/L). O sistema
+                      infere a unidade de dose do cadastro (litros, kg, g, mL ou dose) quando possível; se não houver
+                      pistas claras, usa <strong>L</strong> (litros da calda).
+                    </p>
+                    <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+                      {GLOBAL_DOSE_UNITS.map((u) => (
+                        <li key={u}>
+                          <code className="text-xs">{u}</code> — {DOSE_UNIT_LABELS[u]}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={downloadProdutosPlataformaTemplate}>
+                    Baixar modelo CSV
                   </Button>
-                  <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
-                    Fechar
-                  </Button>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Arquivo (.csv ou .xlsx)</label>
+                    <Input
+                      type="file"
+                      accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      disabled={importMutation.isPending}
+                      onChange={onPickImportFile}
+                    />
+                    {importMutation.isPending ? (
+                      <p className="mt-2 text-xs text-muted-foreground">Importando…</p>
+                    ) : null}
+                  </div>
+                  {importResult ? (
+                    <div className="rounded-md border border-border bg-muted/40 p-3 text-xs">
+                      <p className="font-medium text-foreground">Último resultado</p>
+                      <p className="mt-1 text-muted-foreground">
+                        Criados: {importResult.created} · Ignorados (duplicados ou já existentes): {importResult.skipped}{" "}
+                        · Falhas: {importResult.failed}
+                      </p>
+                      {importResult.errors.length > 0 ? (
+                        <div className="mt-2 max-h-40 overflow-y-auto rounded border border-border bg-background p-2">
+                          <p className="mb-1 font-medium">Linhas com erro</p>
+                          <ul className="space-y-0.5 font-mono text-[11px]">
+                            {importResult.errors.map((e, idx) => (
+                              <li key={`${e.row}-${idx}-${e.message}`}>
+                                Linha {e.row}: {e.message}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-              </form>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+            <Sheet
+              open={createOpen}
+              onOpenChange={(open) => {
+                setCreateOpen(open);
+                if (open) {
+                  createForm.reset({
+                    name: "",
+                    category: "OTHER",
+                    dose_unit: "L",
+                    default_label_url: "",
+                    equivalence_group: "",
+                    is_active: true,
+                  });
+                }
+              }}
+            >
+              <SheetTrigger asChild>
+                <Button type="button">Novo produto</Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Novo produto global</SheetTitle>
+                </SheetHeader>
+                <form onSubmit={onCreate} className="mt-6 space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
+                    <Input {...createForm.register("name")} />
+                    {createForm.formState.errors.name && (
+                      <p className="mt-1 text-xs text-destructive">{createForm.formState.errors.name.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
+                    <select {...createForm.register("category")} className={selectClass}>
+                      {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {PRODUCT_CATEGORY_LABELS[c]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
+                    <select {...createForm.register("dose_unit")} className={selectClass}>
+                      {GLOBAL_DOSE_UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {DOSE_UNIT_LABELS[u]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">URL do rótulo (opcional)</label>
+                    <Input {...createForm.register("default_label_url")} placeholder="https://..." />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">
+                      Grupo de equivalência (opcional)
+                    </label>
+                    <Input {...createForm.register("equivalence_group")} />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-input bg-background accent-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                      checked={createForm.watch("is_active")}
+                      onChange={(e) =>
+                        createForm.setValue("is_active", e.target.checked, { shouldValidate: true, shouldDirty: true })
+                      }
+                    />
+                    Ativo no catálogo
+                  </label>
+                  <div className="flex gap-2 pt-2">
+                    <Button type="submit" disabled={createMutation.isPending}>
+                      {createMutation.isPending ? "Salvando..." : "Criar"}
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+                      Fechar
+                    </Button>
+                  </div>
+                </form>
+              </SheetContent>
+            </Sheet>
+            </div>
+          ) : null}
         </div>
-      )}
+      </div>
 
       {activeTab === "global" && (
         <>
           {platformLoading ? (
             <TableRowsSkeleton rows={10} columns={5} />
+          ) : platformRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto no catálogo da plataforma</p>
+          ) : filteredGlobalRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
           ) : (
-            <DataTable headers={["Nome", "Categoria", "Unidade", "Origem", "Ações"]} rows={globalTableRows} />
+            <DataTable
+              headers={["Nome", "Categoria", "Unidade", "Origem", "Ações"]}
+              rows={globalTableRows}
+              columnCellClassNames={[
+                "max-w-0 min-w-0",
+                "whitespace-nowrap",
+                "whitespace-nowrap",
+                "max-w-0 min-w-0",
+                "whitespace-nowrap",
+              ]}
+              footer={
+                <CatalogPaginationBar
+                  page={globalPage}
+                  pageSize={CATALOG_PAGE_SIZE}
+                  total={filteredGlobalRows.length}
+                  onPageChange={setGlobalPage}
+                />
+              }
+            />
           )}
         </>
       )}
@@ -573,11 +921,29 @@ export default function AdminGlobalCatalogPage() {
           {platformLoading ? (
             <TableRowsSkeleton rows={10} columns={6} />
           ) : customizedRows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto customizado ativo</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto customizado ativo</p>
+          ) : filteredCustomRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
           ) : (
             <DataTable
               headers={["Nome", "Categoria", "Unidade", "Preço", "Agrônomo", "Ações"]}
               rows={customizedTableRows}
+              columnCellClassNames={[
+                "max-w-0 min-w-0",
+                "whitespace-nowrap",
+                "whitespace-nowrap",
+                "whitespace-nowrap",
+                "max-w-0 min-w-0",
+                "whitespace-nowrap",
+              ]}
+              footer={
+                <CatalogPaginationBar
+                  page={customPage}
+                  pageSize={CATALOG_PAGE_SIZE}
+                  total={filteredCustomRows.length}
+                  onPageChange={setCustomPage}
+                />
+              }
             />
           )}
         </>
@@ -588,11 +954,28 @@ export default function AdminGlobalCatalogPage() {
           {deactivatedLoading ? (
             <TableRowsSkeleton rows={10} columns={5} />
           ) : inactiveProducts.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-500">Nenhum produto desativado</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto removido do catálogo ativo</p>
+          ) : filteredInactiveProducts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
           ) : (
             <DataTable
               headers={["Nome", "Categoria", "Unidade", "Origem", "Ações"]}
               rows={inactiveRows}
+              columnCellClassNames={[
+                "max-w-0 min-w-0",
+                "whitespace-nowrap",
+                "whitespace-nowrap",
+                "max-w-0 min-w-0",
+                "whitespace-nowrap",
+              ]}
+              footer={
+                <CatalogPaginationBar
+                  page={inactivePage}
+                  pageSize={CATALOG_PAGE_SIZE}
+                  total={filteredInactiveProducts.length}
+                  onPageChange={setInactivePage}
+                />
+              }
             />
           )}
         </>
@@ -605,14 +988,14 @@ export default function AdminGlobalCatalogPage() {
           </SheetHeader>
           <form onSubmit={onEditGlobal} className="mt-6 space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
               <Input {...editForm.register("name")} />
               {editForm.formState.errors.name && (
-                <p className="mt-1 text-xs text-red-600">{editForm.formState.errors.name.message}</p>
+                <p className="mt-1 text-xs text-destructive">{editForm.formState.errors.name.message}</p>
               )}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Categoria</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
               <select {...editForm.register("category")} className={selectClass}>
                 {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -622,7 +1005,7 @@ export default function AdminGlobalCatalogPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Unidade de dose</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
               <select {...editForm.register("dose_unit")} className={selectClass}>
                 {GLOBAL_DOSE_UNITS.map((u) => (
                   <option key={u} value={u}>
@@ -632,17 +1015,17 @@ export default function AdminGlobalCatalogPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">URL do rótulo (opcional)</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">URL do rótulo (opcional)</label>
               <Input {...editForm.register("default_label_url")} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Grupo de equivalência (opcional)</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Grupo de equivalência (opcional)</label>
               <Input {...editForm.register("equivalence_group")} />
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                className="rounded border-zinc-300"
+                className="size-4 rounded border-input bg-background accent-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
                 checked={editForm.watch("is_active")}
                 onChange={(e) =>
                   editForm.setValue("is_active", e.target.checked, { shouldValidate: true, shouldDirty: true })
@@ -672,14 +1055,14 @@ export default function AdminGlobalCatalogPage() {
           </SheetHeader>
           <form onSubmit={onEditCustom} className="mt-6 space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Nome</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
               <Input {...customEditForm.register("name")} />
               {customEditForm.formState.errors.name && (
-                <p className="mt-1 text-xs text-red-600">{customEditForm.formState.errors.name.message}</p>
+                <p className="mt-1 text-xs text-destructive">{customEditForm.formState.errors.name.message}</p>
               )}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Categoria</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
               <select {...customEditForm.register("category")} className={selectClass}>
                 {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -689,7 +1072,7 @@ export default function AdminGlobalCatalogPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Unidade de dose</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
               <select {...customEditForm.register("dose_unit")} className={selectClass}>
                 {GLOBAL_DOSE_UNITS.map((u) => (
                   <option key={u} value={u}>
@@ -699,17 +1082,17 @@ export default function AdminGlobalCatalogPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">Preço (BRL)</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">Preço (BRL)</label>
               <Input {...customEditForm.register("price_brl")} placeholder="0,00" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-700">URL do rótulo (opcional)</label>
+              <label className="mb-1 block text-xs font-medium text-foreground">URL do rótulo (opcional)</label>
               <Input {...customEditForm.register("label_url")} placeholder="https://..." />
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                className="rounded border-zinc-300"
+                className="size-4 rounded border-input bg-background accent-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
                 checked={customEditForm.watch("is_active")}
                 onChange={(e) =>
                   customEditForm.setValue("is_active", e.target.checked, { shouldValidate: true, shouldDirty: true })
