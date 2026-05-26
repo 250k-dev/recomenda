@@ -1,0 +1,175 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getLocalCatalog,
+  getInactiveLocalCatalog,
+  getAllInactiveLocalCatalog,
+  getAllLocalProducts,
+  getGlobalCatalog,
+  getPlatformCatalog,
+  getAdminPlatformActiveCatalog,
+  getAdminDeactivatedCatalog,
+  createLocalProduct,
+  updateLocalProduct,
+  deleteLocalProduct,
+  cloneGlobalProduct,
+  clonePeerLocalProduct,
+  createGlobalProduct,
+  updateGlobalProduct,
+  deleteGlobalProduct,
+  importGlobalCatalogFile,
+} from "@/lib/api/catalog";
+import { queryKeys } from "./queryKeys";
+
+export function useLocalCatalog() {
+  return useQuery({ queryKey: queryKeys.localCatalog, queryFn: getLocalCatalog });
+}
+
+export function useInactiveLocalCatalog() {
+  return useQuery({ queryKey: queryKeys.inactiveLocalCatalog, queryFn: getInactiveLocalCatalog });
+}
+
+export function useAllLocalProducts() {
+  return useQuery({ queryKey: queryKeys.allLocalProducts, queryFn: getAllLocalProducts });
+}
+
+export function useAllInactiveLocalProducts() {
+  return useQuery({ queryKey: queryKeys.allInactiveLocalProducts, queryFn: getAllInactiveLocalCatalog });
+}
+
+export function useGlobalCatalog() {
+  return useQuery({ queryKey: queryKeys.globalCatalog, queryFn: getGlobalCatalog });
+}
+
+export function usePlatformCatalog() {
+  return useQuery({ queryKey: queryKeys.platformCatalog, queryFn: getPlatformCatalog });
+}
+
+export function useAdminPlatformActiveCatalog() {
+  return useQuery({ queryKey: queryKeys.adminPlatformActive, queryFn: getAdminPlatformActiveCatalog });
+}
+
+export function useAdminDeactivatedCatalog() {
+  return useQuery({ queryKey: queryKeys.adminDeactivatedCatalog, queryFn: getAdminDeactivatedCatalog });
+}
+
+export function useCreateLocalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createLocalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+    },
+  });
+}
+
+export function useUpdateLocalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean }) =>
+      updateLocalProduct(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inactiveLocalCatalog });
+    },
+  });
+}
+
+export function useCloneGlobalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: cloneGlobalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+    },
+  });
+}
+
+export function useClonePeerLocalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: clonePeerLocalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+    },
+  });
+}
+
+export function useDeleteLocalProductAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteLocalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allLocalProducts });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allInactiveLocalProducts });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+    },
+  });
+}
+
+export function useCreateGlobalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createGlobalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+    },
+  });
+}
+
+export function useUpdateGlobalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      payload: Parameters<typeof updateGlobalProduct>[1];
+    }) => updateGlobalProduct(vars.id, vars.payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+    },
+  });
+}
+
+export function useDeleteGlobalProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteGlobalProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+    },
+  });
+}
+
+export function useImportGlobalCatalog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: importGlobalCatalogFile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+    },
+  });
+}

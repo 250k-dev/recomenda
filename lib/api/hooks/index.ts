@@ -1,3 +1,6 @@
+"use client";
+
+export { queryKeys } from "./queryKeys";
 export * from "./auth";
 export * from "./farms";
 export * from "./seasons";
