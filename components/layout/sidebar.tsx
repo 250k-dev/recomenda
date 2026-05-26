@@ -28,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useMe, useNotifications } from "@/lib/api/hooks";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import {
@@ -126,15 +125,7 @@ export function SidebarBody({ role, onNavigate, forceExpanded }: SidebarBodyProp
                 alt=""
                 width={32}
                 height={32}
-                className="h-8 w-8 shrink-0 dark:hidden"
-                aria-hidden
-              />
-              <Image
-                src="/recomenda/mark-reverse.svg"
-                alt=""
-                width={32}
-                height={32}
-                className="hidden h-8 w-8 shrink-0 dark:block"
+                className="h-8 w-8 shrink-0"
                 aria-hidden
               />
               <div className="min-w-0">
@@ -151,17 +142,7 @@ export function SidebarBody({ role, onNavigate, forceExpanded }: SidebarBodyProp
               alt=""
               width={28}
               height={28}
-              className="h-7 w-7 shrink-0 dark:hidden"
-              aria-hidden
-            />
-          )}
-          {isCollapsed && (
-            <Image
-              src="/recomenda/mark-reverse.svg"
-              alt=""
-              width={28}
-              height={28}
-              className="hidden h-7 w-7 shrink-0 dark:block"
+              className="h-7 w-7 shrink-0"
               aria-hidden
             />
           )}
@@ -319,20 +300,10 @@ export function SidebarBody({ role, onNavigate, forceExpanded }: SidebarBodyProp
           </nav>
         </ScrollArea>
 
-        {/* Rodapé: tema + usuário + logout */}
+        {/* Rodapé: usuário + logout */}
         <div className={cn("border-t border-sidebar-border p-2", isCollapsed && "flex flex-col items-center gap-1")}>
           {isCollapsed ? (
             <>
-              {/* Tema compacto */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <ThemeToggle variant="compact" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="right">Tema</TooltipContent>
-              </Tooltip>
-
               {/* Avatar */}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -364,14 +335,6 @@ export function SidebarBody({ role, onNavigate, forceExpanded }: SidebarBodyProp
             </>
           ) : (
             <>
-              {/* Tema expandido */}
-              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-3 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Tema
-                </p>
-                <ThemeToggle />
-              </div>
-
               {/* Usuário + logout */}
               {currentUser && (
                 <div className="mb-1 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2">

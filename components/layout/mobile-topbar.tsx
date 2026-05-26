@@ -7,7 +7,6 @@ import { Menu } from "lucide-react";
 import { SidebarBody } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
 import type { UserRole } from "@/types/auth";
 
 export function MobileTopbar({ role }: { role: UserRole }) {
@@ -35,21 +34,12 @@ export function MobileTopbar({ role }: { role: UserRole }) {
             alt=""
             width={28}
             height={28}
-            className="h-7 w-7 dark:hidden"
-            aria-hidden
-          />
-          <Image
-            src="/recomenda/mark-reverse.svg"
-            alt=""
-            width={28}
-            height={28}
-            className="hidden h-7 w-7 dark:block"
+            className="h-7 w-7"
             aria-hidden
           />
           <span className="text-sm font-semibold text-foreground">Recomenda</span>
         </div>
       </div>
-      <ThemeToggle variant="compact" />
     </header>
   );
 }

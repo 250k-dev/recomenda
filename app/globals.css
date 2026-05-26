@@ -2,8 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -83,52 +81,12 @@
   --sidebar-ring: oklch(0.48 0.14 145);
 }
 
-.dark {
-  /* paleta dark inspirada no Verdejante: oliva profundo + verde primário luminoso */
-  --background: oklch(0.16 0.018 145);
-  --foreground: oklch(0.97 0.012 145);
-  --card: oklch(0.21 0.022 145);
-  --card-foreground: oklch(0.97 0.012 145);
-  --popover: oklch(0.21 0.022 145);
-  --popover-foreground: oklch(0.97 0.012 145);
-  --primary: oklch(0.72 0.18 145);
-  --primary-foreground: oklch(0.14 0.02 145);
-  --secondary: oklch(0.26 0.025 145);
-  --secondary-foreground: oklch(0.97 0.012 145);
-  --muted: oklch(0.24 0.022 145);
-  --muted-foreground: oklch(0.7 0.025 145);
-  --accent: oklch(0.28 0.04 145);
-  --accent-foreground: oklch(0.97 0.012 145);
-  --destructive: oklch(0.68 0.22 25);
-  --border: oklch(0.3 0.025 145);
-  --input: oklch(0.3 0.025 145);
-  --ring: oklch(0.72 0.18 145);
-  /* acentos com leve ajuste para contraste no dark */
-  --sun: #E8B859;
-  --sun-soft: #3F351C;
-  --clay: #D17850;
-  --clay-soft: #3D241B;
-  --sky: #7BA8C8;
-  --sky-soft: #1F2C36;
-  --sidebar: oklch(0.18 0.02 145);
-  --sidebar-foreground: oklch(0.94 0.012 145);
-  --sidebar-primary: oklch(0.72 0.18 145);
-  --sidebar-primary-foreground: oklch(0.14 0.02 145);
-  --sidebar-accent: oklch(0.26 0.025 145);
-  --sidebar-accent-foreground: oklch(0.97 0.012 145);
-  --sidebar-border: oklch(0.28 0.022 145);
-  --sidebar-ring: oklch(0.72 0.18 145);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   html {
     color-scheme: light;
-  }
-  html.dark {
-    color-scheme: dark;
   }
   body {
     background: var(--background);

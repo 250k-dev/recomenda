@@ -98,7 +98,7 @@ export default function PlanPage() {
 
               <Separator />
 
-              <div className="flex gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-4 dark:bg-primary/10">
+              <div className="flex gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
                   <Sparkles className="size-5" aria-hidden />
                 </div>

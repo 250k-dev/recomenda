@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const baseSelectClasses =
-  "flex h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-background px-3 pr-9 py-1 text-sm text-foreground shadow-xs outline-none transition-all placeholder:text-muted-foreground hover:border-ring/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30";
+  "flex h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-background px-3 pr-9 py-1 text-sm text-foreground shadow-xs outline-none transition-all placeholder:text-muted-foreground hover:border-ring/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm";
 
 const chevronStyle: React.CSSProperties = {
   backgroundImage:
