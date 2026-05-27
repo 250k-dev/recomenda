@@ -1,9 +1,9 @@
 import { ReactNode } from "react";
-import { Sidebar } from "@/components/layout/sidebar";
 import { MobileTopbar } from "@/components/layout/mobile-topbar";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
-import { SidebarProvider } from "@/components/layout/sidebar-context";
 import type { UserRole } from "@/types/auth";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "./app-sidebar";
 
 export function AppShell({
   role,
@@ -14,15 +14,13 @@ export function AppShell({
 }) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen bg-muted">
-        <Sidebar role={role} />
-        <div className="flex min-h-screen flex-1 flex-col min-w-0">
-          <MobileTopbar role={role} />
-          <ImpersonationBanner />
-          <main className="flex-1 px-4 py-6 md:px-8">
-            <div className="mx-auto w-full max-w-7xl">{children}</div>
-          </main>
-        </div>
+      <AppSidebar role={role} />
+      <div className="relative flex min-h-svh flex-1 flex-col min-w-0 bg-muted">
+        <MobileTopbar />
+        <ImpersonationBanner />
+        <main className="flex-1 px-4 py-6 md:px-8">
+          <div className="mx-auto w-full max-w-7xl">{children}</div>
+        </main>
       </div>
     </SidebarProvider>
   );

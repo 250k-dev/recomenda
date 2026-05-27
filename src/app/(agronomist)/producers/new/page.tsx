@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { useSidebar } from "@/components/layout/sidebar-context";
+import { useSidebar } from "@/components/ui/sidebar";
 import { useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -57,14 +57,14 @@ export default function OnboardingPage() {
   const wasCollapsedRef = useRef<boolean | null>(null);
 
   useEffect(() => {
-    wasCollapsedRef.current = sidebar.collapsed;
-    if (!sidebar.collapsed) {
-      sidebar.toggle();
+    wasCollapsedRef.current = !sidebar.open;
+    if (sidebar.open) {
+      sidebar.setOpen(false);
     }
 
     return () => {
       if (wasCollapsedRef.current === false) {
-        sidebar.toggle();
+        sidebar.setOpen(true);
       }
     };
   }, []);
