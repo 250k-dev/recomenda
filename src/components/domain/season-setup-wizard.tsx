@@ -207,7 +207,7 @@ function ContextBadge({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
         tone === "primary" && "bg-primary/10 text-primary",
-        tone === "sky" && "bg-sky-soft text-sky",
+        tone === "sky" && "bg-sky-100 text-sky-600",
       )}
     >
       {children}
@@ -1030,7 +1030,7 @@ function StepPlantation({
 
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-soft text-sky">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
             <CalendarDays className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">

@@ -88,8 +88,8 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_BADGE_CLASS: Record<string, string> = {
   PENDING: "bg-muted text-muted-foreground",
   APPLIED_ON_TIME: "bg-primary/10 text-primary",
-  APPLIED_LATE: "bg-sun-soft text-sun",
-  SKIPPED: "bg-clay-soft text-clay",
+  APPLIED_LATE: "bg-amber-100 text-amber-600",
+  SKIPPED: "bg-orange-100 text-orange-600",
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -141,7 +141,7 @@ function ProductRow({
       <span className="min-w-0 flex-1 font-medium text-foreground">
         {item.product_name}
         {item.is_substitution && (
-          <span className="ml-1.5 text-[10px] text-sun">(substituído)</span>
+          <span className="ml-1.5 text-[10px] text-amber-600">(substituído)</span>
         )}
       </span>
 
@@ -405,7 +405,7 @@ function RecommendationCard({
             isDone
               ? "bg-primary/10 text-primary"
               : isSkipped
-                ? "bg-clay-soft text-clay"
+                ? "bg-orange-100 text-orange-600"
                 : "bg-muted text-muted-foreground",
           )}
         >

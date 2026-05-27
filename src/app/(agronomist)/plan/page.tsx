@@ -83,13 +83,13 @@ export default function PlanPage() {
                     <div
                       className={cn(
                         "h-full rounded-full transition-all duration-500",
-                        pct >= 90 ? "bg-sun" : "bg-primary",
+                        pct >= 90 ? "bg-amber-500" : "bg-primary",
                       )}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
                   {limit > 0 && current >= limit ? (
-                    <p className="mt-2 text-xs text-sun">
+                    <p className="mt-2 text-xs text-amber-600">
                       Você atingiu o limite do plano. Para novas safras ativas, considere ampliar a quota.
                     </p>
                   ) : null}

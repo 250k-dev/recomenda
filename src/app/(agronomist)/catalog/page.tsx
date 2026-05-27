@@ -10,7 +10,7 @@ import { Plus, Package } from "lucide-react";
 import { PageHeader } from "@/components/domain/page-header";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { AdminCatalogNameCell, DataTable } from "@/components/ui/table";
+import { AdminCatalogNameCell, DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

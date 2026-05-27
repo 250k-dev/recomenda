@@ -5,9 +5,9 @@ type Accent = "primary" | "sun" | "clay" | "sky";
 
 const accentClasses: Record<Accent, string> = {
   primary: "bg-primary/10 text-primary",
-  sun: "bg-sun-soft text-sun",
-  clay: "bg-clay-soft text-clay",
-  sky: "bg-sky-soft text-sky",
+  sun: "bg-amber-100 text-amber-600",
+  clay: "bg-orange-100 text-orange-600",
+  sky: "bg-sky-100 text-sky-600",
 };
 
 export function StatCard({
@@ -40,7 +40,9 @@ export function StatCard({
         <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
           {value}
         </p>
-        {sub ? <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p> : null}
+        {sub ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+        ) : null}
       </div>
     </div>
   );

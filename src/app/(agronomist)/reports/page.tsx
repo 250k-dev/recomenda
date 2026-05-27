@@ -8,7 +8,7 @@ import { ReportPageSkeleton } from "@/components/domain/page-skeletons";
 import { StatCard } from "@/components/domain/stat-card";
 import { SectionTitle } from "@/components/ui/section-title";
 import { Card } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ComparativeReport } from "@/lib/api/client";
 import { useComparativeReport } from "@/lib/api/hooks";

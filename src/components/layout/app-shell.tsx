@@ -14,7 +14,7 @@ export function AppShell({
 }) {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen bg-muted/40">
+      <div className="flex min-h-screen bg-muted">
         <Sidebar role={role} />
         <div className="flex min-h-screen flex-1 flex-col min-w-0">
           <MobileTopbar role={role} />

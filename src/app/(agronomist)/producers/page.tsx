@@ -487,9 +487,9 @@ function KpiBox({
 }) {
   const accentClasses = {
     primary: "bg-primary/10 text-primary",
-    sky: "bg-sky-soft text-sky",
-    sun: "bg-sun-soft text-sun",
-    clay: "bg-clay-soft text-clay",
+    sky: "bg-sky-100 text-sky-600",
+    sun: "bg-amber-100 text-amber-600",
+    clay: "bg-orange-100 text-orange-600",
   } as const;
   return (
     <div className="rounded-xl border bg-card px-4 py-3.5 shadow-sm">

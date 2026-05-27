@@ -9,7 +9,7 @@ import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -37,10 +37,10 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_CLASSES: Record<string, string> = {
   DRAFT: "bg-muted text-muted-foreground",
-  PUBLISHED: "bg-sky-soft text-sky",
+  PUBLISHED: "bg-sky-100 text-sky-600",
   IN_PROGRESS: "bg-primary/15 text-primary",
   COMPLETED: "bg-primary/15 text-primary",
-  ARCHIVED: "bg-clay-soft text-clay",
+  ARCHIVED: "bg-orange-100 text-orange-600",
 };
 
 interface SeasonRow {

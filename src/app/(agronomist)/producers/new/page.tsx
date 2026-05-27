@@ -257,7 +257,7 @@ function ContextBadge({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
         tone === "primary" && "bg-primary/10 text-primary",
-        tone === "sky" && "bg-sky-soft text-sky",
+        tone === "sky" && "bg-sky-100 text-sky-600",
       )}
     >
       {children}

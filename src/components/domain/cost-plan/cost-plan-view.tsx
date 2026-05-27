@@ -610,10 +610,10 @@ function CropToggle({ crop }: { crop: string }) {
       <span
         className={cn(
           "flex items-center gap-1.5 rounded-full px-3 py-1",
-          !isSoy ? "bg-sun-soft text-sun" : "text-muted-foreground",
+          !isSoy ? "bg-amber-100 text-amber-600" : "text-muted-foreground",
         )}
       >
-        <span className="h-2 w-2 rounded-full bg-sun" />
+        <span className="h-2 w-2 rounded-full bg-amber-500" />
         Milho
       </span>
     </div>
@@ -678,8 +678,8 @@ function ParamsBar({
             soma dos {plotsCount} talhões
           </span>
         </div>
-        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-sun-soft px-2.5 py-1 text-xs text-sun">
-          <span className="h-1.5 w-1.5 rounded-full bg-sun" />
+        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-600">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
           {saving ? "Salvando…" : "Recalcula em tempo real"}
         </div>
       </div>
@@ -799,9 +799,9 @@ function KpiCard({
 }) {
   const accentClasses = {
     primary: "bg-primary/10 text-primary",
-    sky: "bg-sky-soft text-sky",
-    sun: "bg-sun-soft text-sun",
-    clay: "bg-clay-soft text-clay",
+    sky: "bg-sky-100 text-sky-600",
+    sun: "bg-amber-100 text-amber-600",
+    clay: "bg-orange-100 text-orange-600",
   } as const;
   return (
     <div className="rounded-xl border bg-card px-4 py-3.5 shadow-sm">

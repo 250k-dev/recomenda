@@ -10,7 +10,7 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { useAdminAgronomistDetail, usePlans } from "@/lib/api/hooks";
 
 export default function AdminAgronomistDetailPage() {

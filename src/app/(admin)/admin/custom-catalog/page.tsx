@@ -6,7 +6,7 @@ import { Package } from "lucide-react";
 import { PageHeader } from "@/components/domain/page-header";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { DataTable } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAllLocalProducts, useAllInactiveLocalProducts } from "@/lib/api/hooks";
 
