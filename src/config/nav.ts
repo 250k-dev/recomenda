@@ -7,7 +7,6 @@ export const navByRole: Record<UserRole, Array<{ label: string; href: string }>>
     { label: "Agrônomos", href: "/admin/agronomists" },
     { label: "Produtores", href: "/admin/producers" },
     { label: "Produtos", href: "/admin/global-catalog" },
-    { label: "Configurações", href: "/admin/settings" },
   ],
   AGRONOMIST: [
     { label: "Dashboard", href: "/dashboard" },

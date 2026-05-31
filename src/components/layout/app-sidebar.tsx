@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,11 +11,9 @@ import {
   Package,
   BarChart3,
   CreditCard,
-  Settings,
-  LogOut,
   Bell,
-  ChevronsUpDown,
-  UserCircle,
+  BadgeCheck,
+  EllipsisVertical,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,37 +22,29 @@ import {
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-  useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { markNotificationRead, type Notification } from "@/lib/api/client";
 import {
-  logout,
-  markNotificationRead,
-  type Notification,
-} from "@/lib/api/client";
-import { clearAccessToken } from "@/lib/auth/token-store";
-import { queryKeys, useMe, useNotifications } from "@/lib/api/hooks";
+  queryKeys,
+  useMe,
+  useNotifications,
+  usePlanQuota,
+} from "@/lib/api/hooks";
 import { navByRole } from "@/config/nav";
 import type { UserRole } from "@/types/auth";
 import { Logo } from "@/assets/logo";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 
 const iconMap: Record<string, React.ReactNode> = {
   "/dashboard": <LayoutDashboard className="size-4" />,
@@ -67,16 +56,15 @@ const iconMap: Record<string, React.ReactNode> = {
   "/admin/agronomists": <Users className="size-4" />,
   "/admin/producers": <UsersRound className="size-4" />,
   "/admin/global-catalog": <Package className="size-4" />,
-  "/admin/settings": <Settings className="size-4" />,
 };
 
 export function AppSidebar({ role }: { role: UserRole }) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const { isMobile } = useSidebar();
   const { data: currentUser } = useMe();
   const { data: notificationsResponse } = useNotifications();
+  const { data: planData } = usePlanQuota({ enabled: role === "AGRONOMIST" });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const items = navByRole[role];
@@ -101,19 +89,10 @@ export function AppSidebar({ role }: { role: UserRole }) {
     })();
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch {
-      /* ignore server errors */
-    }
-    clearAccessToken();
-    router.push("/login");
-  };
-
   const profileName =
     role === "ADMIN" ? "Administrador" : currentUser?.name?.trim() || "";
   const userInitial = profileName ? profileName.charAt(0).toUpperCase() : "U";
+  const profileHref = role === "ADMIN" ? "/admin/profile" : "/profile";
 
   return (
     <>
@@ -121,8 +100,8 @@ export function AppSidebar({ role }: { role: UserRole }) {
         {/* Logo */}
         <SidebarHeader>
           <div className="flex h-10 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-            <div className="bg-primary rounded-md p-1.5">
-              <Logo className="size-5" />
+            <div className="bg-primary rounded-lg p-2">
+              <Logo className="size-6" />
             </div>
             <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
               <span className="text-sm font-semibold text-sidebar-foreground">
@@ -132,6 +111,21 @@ export function AppSidebar({ role }: { role: UserRole }) {
                 {role === "ADMIN" ? "Administrador" : "Agronomista"}
               </span>
             </div>
+            <Button
+              type="button"
+              size="icon-lg"
+              variant="outline"
+              onClick={() => setNotificationsOpen(true)}
+              className="relative ml-auto group-data-[collapsible=icon]:hidden"
+            >
+              <Bell />
+              {unreadCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 border-4 border-sidebar"
+                />
+              )}
+            </Button>
           </div>
         </SidebarHeader>
 
@@ -167,83 +161,46 @@ export function AppSidebar({ role }: { role: UserRole }) {
         </SidebarContent>
 
         <SidebarSeparator />
-        {/* User dropdown */}
+
+        {/* User profile */}
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    size="lg"
-                    tooltip={{
-                      children: (
-                        <>
-                          <p className="font-medium">{profileName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {currentUser?.email}
-                          </p>
-                        </>
-                      ),
-                    }}
-                  >
-                    <div className="relative">
-                      {notificationsList.length > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="absolute -top-1 -right-1 w-3.5 h-3.5 p-0 border-2 border-sidebar"
-                        />
-                      )}
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-                        {userInitial}
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1 text-left leading-tight">
-                      <p className="truncate text-xs font-semibold">
-                        {profileName}
-                      </p>
-                      <p className="truncate text-[10px] text-muted-foreground">
+              <SidebarMenuButton
+                size="lg"
+                asChild
+                tooltip={{
+                  children: (
+                    <>
+                      <p className="font-medium">{profileName}</p>
+                      <p className="text-xs text-muted-foreground">
                         {currentUser?.email}
                       </p>
-                    </div>
-                    <ChevronsUpDown className="ml-auto size-4" />
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                  side={isMobile ? "bottom" : "right"}
-                  align="end"
-                  sideOffset={4}
-                >
-                  {role === "AGRONOMIST" && (
-                    <>
-                      <DropdownMenuItem asChild>
-                        <Link href="/profile">
-                          <UserCircle className="size-4" />
-                          Meu perfil
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
                     </>
-                  )}
-                  <DropdownMenuItem onClick={() => setNotificationsOpen(true)}>
-                    <Bell className="size-4" />
-                    Notificações
-                    {unreadCount > 0 && (
-                      <SidebarMenuBadge className="static ml-auto size-auto rounded-full px-1.5">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </SidebarMenuBadge>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleLogout}
-                    variant="destructive"
-                  >
-                    <LogOut className="size-4" />
-                    Sair
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  ),
+                }}
+              >
+                <Link href={profileHref}>
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
+                    {userInitial}
+                  </div>
+                  <div className="flex-1 flex items-center">
+                    <div className="min-w-0 flex-1 text-left leading-tight">
+                      {planData?.plan.name && (
+                        <Badge className="text-[0.6rem] gap-0.5 px-1.5 leading-none bg-sky-100 text-sky-700">
+                          <BadgeCheck className="size-2.5!" />
+                          {planData?.plan.name}
+                        </Badge>
+                      )}
+                      <p className="truncate text-sm font-semibold max-w-40">
+                        {profileName}
+                      </p>
+                    </div>
+
+                    <EllipsisVertical className="size-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
@@ -253,7 +210,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
 
       {/* Notification panel */}
       <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-        <SheetContent side="right" className="w-full sm:w-96">
+        <SheetContent side="left" className="w-full sm:w-96">
           <SheetHeader>
             <SheetTitle>Notificações</SheetTitle>
           </SheetHeader>

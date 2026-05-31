@@ -31,7 +31,13 @@ import { cn } from "@/lib/utils";
 
 type Producer = { id: string; name: string };
 type Farm = { id: string; name: string };
-type WizPlot = { id: string; name: string; area: number; farmId: string; farmName: string };
+type WizPlot = {
+  id: string;
+  name: string;
+  area: number;
+  farmId: string;
+  farmName: string;
+};
 const STEPS = [
   { n: 1, label: "Produtor", icon: User },
   { n: 2, label: "Fazenda", icon: Building2 },
@@ -47,30 +53,30 @@ const fmt = (n: number) =>
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const sidebar = useSidebar();
+  // const sidebar = useSidebar();
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState<Producer | null>(null);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [currentFarm, setCurrentFarm] = useState<Farm | null>(null);
   const [allPlots, setAllPlots] = useState<WizPlot[]>([]);
 
-  const wasCollapsedRef = useRef<boolean | null>(null);
+  // const wasCollapsedRef = useRef<boolean | null>(null);
 
-  useEffect(() => {
-    wasCollapsedRef.current = !sidebar.open;
-    if (sidebar.open) {
-      sidebar.setOpen(false);
-    }
+  // useEffect(() => {
+  //   wasCollapsedRef.current = !sidebar.open;
+  //   if (sidebar.open) {
+  //     sidebar.setOpen(false);
+  //   }
 
-    return () => {
-      if (wasCollapsedRef.current === false) {
-        sidebar.setOpen(true);
-      }
-    };
-  }, []);
+  //   return () => {
+  //     if (wasCollapsedRef.current === false) {
+  //       sidebar.setOpen(true);
+  //     }
+  //   };
+  // }, []);
 
   return (
-    <div className="-mx-4 -my-6 flex min-h-[calc(100vh-1px)] md:-mx-8">
+    <div className="-mx-4 -my-6 flex min-h-[calc(100vh-1px)] md:-mx-8 bg-background">
       <aside className="hidden w-64 shrink-0 flex-col gap-8 border-r bg-muted/40 px-6 py-8 lg:flex">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -82,7 +88,8 @@ export default function OnboardingPage() {
         </div>
         <ol className="flex flex-col">
           {STEPS.map((s) => {
-            const state = s.n < step ? "done" : s.n === step ? "current" : "todo";
+            const state =
+              s.n < step ? "done" : s.n === step ? "current" : "todo";
             const Icon = s.icon;
             return (
               <li
@@ -96,11 +103,16 @@ export default function OnboardingPage() {
                   className={cn(
                     "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
                     state === "done" && "bg-primary text-primary-foreground",
-                    state === "current" && "border-2 border-primary bg-background text-primary",
+                    state === "current" &&
+                      "border-2 border-primary bg-background text-primary",
                     state === "todo" && "bg-muted text-muted-foreground",
                   )}
                 >
-                  {state === "done" ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                  {state === "done" ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
                 </span>
                 <p
                   className={cn(
@@ -287,7 +299,11 @@ function StepProducer({
     setError(null);
     if (!name.trim()) return setError("Informe o nome do produtor.");
     if (!email.trim()) return setError("Informe o e-mail do produtor.");
-    mutation.mutate({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined });
+    mutation.mutate({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim() || undefined,
+    });
   };
 
   return (
@@ -341,12 +357,17 @@ function StepProducer({
 
       <StepFooter
         back={
-          <Button variant="ghost" onClick={onCancel}>
+          <Button variant="ghost" onClick={onCancel} size="lg">
             Cancelar
           </Button>
         }
         primary={
-          <Button onClick={submit} disabled={mutation.isPending} className="gap-2">
+          <Button
+            onClick={submit}
+            disabled={mutation.isPending}
+            className="gap-2"
+            size="lg"
+          >
             {mutation.isPending ? "Salvando…" : "Próximo"}
             <ArrowRight className="h-4 w-4" />
           </Button>
@@ -371,7 +392,10 @@ function StepFarm({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const created = await createFarm({ name: name.trim(), location: location.trim() || undefined });
+      const created = await createFarm({
+        name: name.trim(),
+        location: location.trim() || undefined,
+      });
       await grantFarmAccess(created.id, producer.id);
       return created;
     },
@@ -428,13 +452,18 @@ function StepFarm({
 
       <StepFooter
         back={
-          <Button variant="ghost" onClick={onBack} className="gap-2">
+          <Button variant="ghost" onClick={onBack} className="gap-2" size="lg">
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
         }
         primary={
-          <Button onClick={submit} disabled={mutation.isPending} className="gap-2">
+          <Button
+            onClick={submit}
+            disabled={mutation.isPending}
+            className="gap-2"
+            size="lg"
+          >
             {mutation.isPending ? "Salvando…" : "Próximo"}
             <ArrowRight className="h-4 w-4" />
           </Button>
@@ -466,9 +495,16 @@ function StepPlot({
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: () => createPlot(farm.id, { name: name.trim(), area_hectares: Number(area) }),
+    mutationFn: () =>
+      createPlot(farm.id, { name: name.trim(), area_hectares: Number(area) }),
     onSuccess: (p) => {
-      onAddPlot({ id: p.id, name: p.name, area: Number(area), farmId: farm.id, farmName: farm.name });
+      onAddPlot({
+        id: p.id,
+        name: p.name,
+        area: Number(area),
+        farmId: farm.id,
+        farmName: farm.name,
+      });
       setName("");
       setArea("");
     },
@@ -529,7 +565,12 @@ function StepPlot({
 
         <FieldError message={error ?? undefined} />
 
-        <Button variant="outline" onClick={submit} disabled={mutation.isPending} className="gap-2">
+        <Button
+          variant="outline"
+          onClick={submit}
+          disabled={mutation.isPending}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" />
           {mutation.isPending ? "Adicionando..." : "Adicionar talhão"}
         </Button>
@@ -539,10 +580,12 @@ function StepPlot({
         <div className="mt-8 max-w-xl">
           <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>
-              {farm.name} · {plots.length} {plots.length === 1 ? "talhão" : "talhões"}
+              {farm.name} · {plots.length}{" "}
+              {plots.length === 1 ? "talhão" : "talhões"}
             </span>
             <span>
-              Total <strong className="text-foreground">{fmt(totalHa)} ha</strong>
+              Total{" "}
+              <strong className="text-foreground">{fmt(totalHa)} ha</strong>
             </span>
           </div>
           <div className="flex flex-col gap-2">
@@ -568,19 +611,29 @@ function StepPlot({
 
       <StepFooter
         back={
-          <Button variant="ghost" onClick={onBack} className="gap-2">
+          <Button variant="ghost" onClick={onBack} className="gap-2" size="lg">
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
         }
         secondary={
-          <Button variant="outline" onClick={onAnotherFarm} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={onAnotherFarm}
+            className="gap-2"
+            size="lg"
+          >
             <Building2 className="h-4 w-4" />
             Outra fazenda
           </Button>
         }
         primary={
-          <Button onClick={onNext} disabled={plots.length === 0} className="gap-2">
+          <Button
+            onClick={onNext}
+            disabled={plots.length === 0}
+            className="gap-2"
+            size="lg"
+          >
             Próximo
             <ArrowRight className="h-4 w-4" />
           </Button>
