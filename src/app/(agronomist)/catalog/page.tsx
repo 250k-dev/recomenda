@@ -8,13 +8,20 @@ import { toast } from "sonner";
 import { Plus, Package } from "lucide-react";
 
 import { PageHeader } from "@/components/domain/page-header";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminCatalogNameCell, DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   useClonePeerLocalProduct,
   useCreateLocalProduct,
@@ -65,59 +72,20 @@ function matchesFilters(
   return true;
 }
 
-function PaginationBar(props: {
-  page: number;
-  pageSize: number;
-  total: number;
-  onPageChange: (p: number) => void;
-}) {
-  const totalPages = Math.max(1, Math.ceil(props.total / props.pageSize));
-  const safePage = Math.min(Math.max(1, props.page), totalPages);
-  const from = props.total === 0 ? 0 : (safePage - 1) * props.pageSize + 1;
-  const to = Math.min(props.total, safePage * props.pageSize);
-
-  return (
-    <div className="flex flex-col gap-2 border-t bg-muted/30 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-muted-foreground">
-        {props.total === 0 ? "Nenhum item" : `Mostrando ${from}–${to} de ${props.total}`}
-      </p>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={safePage <= 1}
-          onClick={() => props.onPageChange(safePage - 1)}
-        >
-          Anterior
-        </Button>
-        <span className="min-w-[5rem] text-center tabular-nums text-muted-foreground">
-          {safePage} / {totalPages}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={safePage >= totalPages}
-          onClick={() => props.onPageChange(safePage + 1)}
-        >
-          Próxima
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function CatalogPage() {
-  const { data: platformRes, isLoading: platformLoading } = usePlatformCatalog();
-  const { data: inactiveData, isLoading: inactiveLoading } = useInactiveLocalCatalog();
+  const { data: platformRes, isLoading: platformLoading } =
+    usePlatformCatalog();
+  const { data: inactiveData, isLoading: inactiveLoading } =
+    useInactiveLocalCatalog();
   const createProduct = useCreateLocalProduct();
   const updateProduct = useUpdateLocalProduct();
   const clonePeer = useClonePeerLocalProduct();
 
   const [openCreate, setOpenCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"global" | "customizados" | "inativos">("global");
+  const [activeTab, setActiveTab] = useState<
+    "global" | "customizados" | "inativos"
+  >("global");
 
   const [filterName, setFilterName] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
@@ -138,14 +106,17 @@ export default function CatalogPage() {
   });
 
   const onCreateSubmit = createForm.handleSubmit((values) => {
-    createProduct.mutate({ ...values, dose_unit: "DOSE" }, {
-      onSuccess: () => {
-        setOpenCreate(false);
-        createForm.reset();
-        toast.success("Produto adicionado ao catálogo.");
+    createProduct.mutate(
+      { ...values, dose_unit: "DOSE" },
+      {
+        onSuccess: () => {
+          setOpenCreate(false);
+          createForm.reset();
+          toast.success("Produto adicionado ao catálogo.");
+        },
+        onError: () => toast.error("Não foi possível criar o produto."),
       },
-      onError: () => toast.error("Não foi possível criar o produto."),
-    });
+    );
   });
 
   const onEditSubmit = editForm.handleSubmit((values) => {
@@ -178,24 +149,49 @@ export default function CatalogPage() {
     [platformRows],
   );
   const customEntries = useMemo(
-    () => platformRows.filter((r) => r.entry_type === "OWN_CUSTOM" || r.entry_type === "PEER_CUSTOM"),
+    () =>
+      platformRows.filter(
+        (r) => r.entry_type === "OWN_CUSTOM" || r.entry_type === "PEER_CUSTOM",
+      ),
     [platformRows],
   );
 
   const filteredGlobal = useMemo(
-    () => globalEntries.filter((p) => matchesFilters(p, { name: filterName, category: filterCategory, doseUnit: filterDoseUnit })),
+    () =>
+      globalEntries.filter((p) =>
+        matchesFilters(p, {
+          name: filterName,
+          category: filterCategory,
+          doseUnit: filterDoseUnit,
+        }),
+      ),
     [globalEntries, filterName, filterCategory, filterDoseUnit],
   );
   const filteredCustom = useMemo(
-    () => customEntries.filter((p) => matchesFilters(p, { name: filterName, category: filterCategory, doseUnit: filterDoseUnit })),
+    () =>
+      customEntries.filter((p) =>
+        matchesFilters(p, {
+          name: filterName,
+          category: filterCategory,
+          doseUnit: filterDoseUnit,
+        }),
+      ),
     [customEntries, filterName, filterCategory, filterDoseUnit],
   );
   const filteredInactive = useMemo(
     () =>
       inactiveProducts.filter((p) =>
         matchesFilters(
-          { name: p.name, category: p.category ?? "", dose_unit: p.dose_unit ?? "" },
-          { name: filterName, category: filterCategory, doseUnit: filterDoseUnit },
+          {
+            name: p.name,
+            category: p.category ?? "",
+            dose_unit: p.dose_unit ?? "",
+          },
+          {
+            name: filterName,
+            category: filterCategory,
+            doseUnit: filterDoseUnit,
+          },
         ),
       ),
     [inactiveProducts, filterName, filterCategory, filterDoseUnit],
@@ -207,17 +203,44 @@ export default function CatalogPage() {
     setInactivePage(1);
   }, [filterName, filterCategory, filterDoseUnit, activeTab]);
 
-  const globalTotalPages = Math.max(1, Math.ceil(filteredGlobal.length / CATALOG_PAGE_SIZE));
-  const customTotalPages = Math.max(1, Math.ceil(filteredCustom.length / CATALOG_PAGE_SIZE));
-  const inactiveTotalPages = Math.max(1, Math.ceil(filteredInactive.length / CATALOG_PAGE_SIZE));
+  const globalTotalPages = Math.max(
+    1,
+    Math.ceil(filteredGlobal.length / CATALOG_PAGE_SIZE),
+  );
+  const customTotalPages = Math.max(
+    1,
+    Math.ceil(filteredCustom.length / CATALOG_PAGE_SIZE),
+  );
+  const inactiveTotalPages = Math.max(
+    1,
+    Math.ceil(filteredInactive.length / CATALOG_PAGE_SIZE),
+  );
 
-  useEffect(() => setGlobalPage((p) => Math.min(p, globalTotalPages)), [globalTotalPages]);
-  useEffect(() => setCustomPage((p) => Math.min(p, customTotalPages)), [customTotalPages]);
-  useEffect(() => setInactivePage((p) => Math.min(p, inactiveTotalPages)), [inactiveTotalPages]);
+  useEffect(
+    () => setGlobalPage((p) => Math.min(p, globalTotalPages)),
+    [globalTotalPages],
+  );
+  useEffect(
+    () => setCustomPage((p) => Math.min(p, customTotalPages)),
+    [customTotalPages],
+  );
+  useEffect(
+    () => setInactivePage((p) => Math.min(p, inactiveTotalPages)),
+    [inactiveTotalPages],
+  );
 
-  const paginatedGlobal = filteredGlobal.slice((globalPage - 1) * CATALOG_PAGE_SIZE, globalPage * CATALOG_PAGE_SIZE);
-  const paginatedCustom = filteredCustom.slice((customPage - 1) * CATALOG_PAGE_SIZE, customPage * CATALOG_PAGE_SIZE);
-  const paginatedInactive = filteredInactive.slice((inactivePage - 1) * CATALOG_PAGE_SIZE, inactivePage * CATALOG_PAGE_SIZE);
+  const paginatedGlobal = filteredGlobal.slice(
+    (globalPage - 1) * CATALOG_PAGE_SIZE,
+    globalPage * CATALOG_PAGE_SIZE,
+  );
+  const paginatedCustom = filteredCustom.slice(
+    (customPage - 1) * CATALOG_PAGE_SIZE,
+    customPage * CATALOG_PAGE_SIZE,
+  );
+  const paginatedInactive = filteredInactive.slice(
+    (inactivePage - 1) * CATALOG_PAGE_SIZE,
+    inactivePage * CATALOG_PAGE_SIZE,
+  );
 
   const openEdit = (row: PlatformCatalogEntry) => {
     if (!row.local_product_id) return;
@@ -225,7 +248,10 @@ export default function CatalogPage() {
     editForm.setValue("name", row.name);
     editForm.setValue("category", row.category ?? "");
     editForm.setValue("dose_unit", row.dose_unit ?? "");
-    editForm.setValue("price_brl", row.price_brl != null ? String(row.price_brl) : "");
+    editForm.setValue(
+      "price_brl",
+      row.price_brl != null ? String(row.price_brl) : "",
+    );
     editForm.setValue(
       "price_usd",
       (row as { price_usd?: string | number | null }).price_usd != null
@@ -245,8 +271,10 @@ export default function CatalogPage() {
           disabled={clonePeer.isPending}
           onClick={() =>
             clonePeer.mutate(row.peer_local_product_id!, {
-              onSuccess: () => toast.success("Produto copiado para o seu catálogo."),
-              onError: () => toast.error("Não foi possível adicionar o produto."),
+              onSuccess: () =>
+                toast.success("Produto copiado para o seu catálogo."),
+              onError: () =>
+                toast.error("Não foi possível adicionar o produto."),
             })
           }
         >
@@ -254,7 +282,12 @@ export default function CatalogPage() {
         </Button>
       ) : null}
       {row.can_edit && row.local_product_id ? (
-        <Button type="button" variant="outline" size="sm" onClick={() => openEdit(row)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => openEdit(row)}
+        >
           Editar
         </Button>
       ) : null}
@@ -282,9 +315,15 @@ export default function CatalogPage() {
   );
 
   const globalTableRows = paginatedGlobal.map((p) => [
-    <AdminCatalogNameCell key={`g-${p.global_product_id ?? p.name}`} name={p.name} />,
-    PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
-    DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
+    <AdminCatalogNameCell
+      key={`g-${p.global_product_id ?? p.name}`}
+      name={p.name}
+    />,
+    PRODUCT_CATEGORY_LABELS[
+      p.category as keyof typeof PRODUCT_CATEGORY_LABELS
+    ] ?? p.category,
+    DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ??
+      p.dose_unit,
     p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "—",
     renderActions(p),
   ]);
@@ -295,16 +334,25 @@ export default function CatalogPage() {
       p.entry_type === "OWN_CUSTOM" ? (
         <span className="text-muted-foreground">Você</span>
       ) : owner ? (
-        <span className="block max-w-[10rem] truncate sm:max-w-[14rem]" title={owner}>
+        <span
+          className="block max-w-[10rem] truncate sm:max-w-[14rem]"
+          title={owner}
+        >
           {owner}
         </span>
       ) : (
         "—"
       );
     return [
-      <AdminCatalogNameCell key={`c-${p.local_product_id ?? p.peer_local_product_id ?? p.name}`} name={p.name} />,
-      PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
-      DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
+      <AdminCatalogNameCell
+        key={`c-${p.local_product_id ?? p.peer_local_product_id ?? p.name}`}
+        name={p.name}
+      />,
+      PRODUCT_CATEGORY_LABELS[
+        p.category as keyof typeof PRODUCT_CATEGORY_LABELS
+      ] ?? p.category,
+      DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ??
+        p.dose_unit,
       p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "—",
       ownerCell,
       renderActions(p),
@@ -314,12 +362,17 @@ export default function CatalogPage() {
   const inactiveTableRows = paginatedInactive.map((product) => [
     <AdminCatalogNameCell key={`i-${product.id}`} name={product.name} />,
     product.category
-      ? PRODUCT_CATEGORY_LABELS[product.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? product.category
+      ? (PRODUCT_CATEGORY_LABELS[
+          product.category as keyof typeof PRODUCT_CATEGORY_LABELS
+        ] ?? product.category)
       : "—",
     product.dose_unit
-      ? DOSE_UNIT_LABELS[product.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? product.dose_unit
+      ? (DOSE_UNIT_LABELS[product.dose_unit as keyof typeof DOSE_UNIT_LABELS] ??
+        product.dose_unit)
       : "—",
-    product.price_brl ? `R$ ${parseFloat(String(product.price_brl)).toFixed(2)}` : "—",
+    product.price_brl
+      ? `R$ ${parseFloat(String(product.price_brl)).toFixed(2)}`
+      : "—",
     <div key={`ia-${product.id}`} className="flex flex-wrap justify-end gap-2">
       <Button
         type="button"
@@ -341,7 +394,9 @@ export default function CatalogPage() {
     </div>,
   ]);
 
-  const hasActiveFilters = Boolean(filterName.trim() || filterCategory || filterDoseUnit);
+  const hasActiveFilters = Boolean(
+    filterName.trim() || filterCategory || filterDoseUnit,
+  );
 
   return (
     <>
@@ -364,11 +419,19 @@ export default function CatalogPage() {
               <form onSubmit={onCreateSubmit} className="mt-6 space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="catalog-name">Nome</Label>
-                  <Input id="catalog-name" {...createForm.register("name")} placeholder="Ex.: Produto XYZ" />
+                  <Input
+                    id="catalog-name"
+                    {...createForm.register("name")}
+                    placeholder="Ex.: Produto XYZ"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="catalog-category">Categoria</Label>
-                  <select id="catalog-category" {...createForm.register("category")} className={selectClass}>
+                  <select
+                    id="catalog-category"
+                    {...createForm.register("category")}
+                    className={selectClass}
+                  >
                     <option value="">Selecionar…</option>
                     {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
                       <option key={c} value={c}>
@@ -386,10 +449,15 @@ export default function CatalogPage() {
                     placeholder="Link da bula ou rótulo"
                   />
                   <p className="text-xs text-muted-foreground">
-                    PDF ou link externo. A unidade de dose é definida ao montar a lista de compra.
+                    PDF ou link externo. A unidade de dose é definida ao montar
+                    a lista de compra.
                   </p>
                 </div>
-                <Button type="submit" disabled={createProduct.isPending} className="w-full">
+                <Button
+                  type="submit"
+                  disabled={createProduct.isPending}
+                  className="w-full"
+                >
                   {createProduct.isPending ? "Adicionando…" : "Adicionar"}
                 </Button>
               </form>
@@ -409,15 +477,25 @@ export default function CatalogPage() {
           }}
           items={[
             { value: "global", label: "Catálogo Global" },
-            { value: "customizados", label: "Customizados", badgeCount: customEntries.length },
-            { value: "inativos", label: "Removidos", badgeCount: inactiveProducts.length },
+            {
+              value: "customizados",
+              label: "Customizados",
+              badgeCount: customEntries.length,
+            },
+            {
+              value: "inativos",
+              label: "Removidos",
+              badgeCount: inactiveProducts.length,
+            },
           ]}
         />
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1 sm:min-w-[12rem] sm:max-w-xs">
-          <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
+          <label className="mb-1 block text-xs font-medium text-foreground">
+            Nome
+          </label>
           <Input
             value={filterName}
             onChange={(e) => setFilterName(e.target.value)}
@@ -425,8 +503,14 @@ export default function CatalogPage() {
           />
         </div>
         <div className="w-full min-w-[10rem] sm:w-44">
-          <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
-          <select className={selectClass} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+          <label className="mb-1 block text-xs font-medium text-foreground">
+            Categoria
+          </label>
+          <select
+            className={selectClass}
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
             <option value="">Todas</option>
             {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -436,8 +520,14 @@ export default function CatalogPage() {
           </select>
         </div>
         <div className="w-full min-w-[10rem] sm:w-44">
-          <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
-          <select className={selectClass} value={filterDoseUnit} onChange={(e) => setFilterDoseUnit(e.target.value)}>
+          <label className="mb-1 block text-xs font-medium text-foreground">
+            Unidade de dose
+          </label>
+          <select
+            className={selectClass}
+            value={filterDoseUnit}
+            onChange={(e) => setFilterDoseUnit(e.target.value)}
+          >
             <option value="">Todas</option>
             {GLOBAL_DOSE_UNITS.map((u) => (
               <option key={u} value={u}>
@@ -468,9 +558,13 @@ export default function CatalogPage() {
           {platformLoading ? (
             <TableRowsSkeleton rows={10} columns={5} />
           ) : globalEntries.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto no catálogo da plataforma.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum produto no catálogo da plataforma.
+            </p>
           ) : filteredGlobal.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum resultado para o filtro.
+            </p>
           ) : (
             <DataTable
               headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]}
@@ -500,12 +594,23 @@ export default function CatalogPage() {
           {platformLoading ? (
             <TableRowsSkeleton rows={10} columns={6} />
           ) : customEntries.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto customizado ainda.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum produto customizado ainda.
+            </p>
           ) : filteredCustom.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum resultado para o filtro.
+            </p>
           ) : (
             <DataTable
-              headers={["Nome", "Categoria", "Unidade", "Preço", "Criado por", "Ações"]}
+              headers={[
+                "Nome",
+                "Categoria",
+                "Unidade",
+                "Preço",
+                "Criado por",
+                "Ações",
+              ]}
               rows={customTableRows}
               columnCellClassNames={[
                 "max-w-0 min-w-0",
@@ -533,9 +638,13 @@ export default function CatalogPage() {
           {inactiveLoading ? (
             <TableRowsSkeleton rows={10} columns={5} />
           ) : inactiveProducts.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto removido.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum produto removido.
+            </p>
           ) : filteredInactive.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nenhum resultado para o filtro.
+            </p>
           ) : (
             <DataTable
               headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]}
@@ -561,7 +670,10 @@ export default function CatalogPage() {
       )}
 
       {editingId && (
-        <Sheet open={editingId !== null} onOpenChange={() => setEditingId(null)}>
+        <Sheet
+          open={editingId !== null}
+          onOpenChange={() => setEditingId(null)}
+        >
           <SheetContent side="right" className="w-full sm:w-96 overflow-y-auto">
             <SheetHeader>
               <SheetTitle>Editar produto</SheetTitle>
@@ -569,15 +681,25 @@ export default function CatalogPage() {
             <form onSubmit={onEditSubmit} className="mt-6 space-y-4 pb-6">
               <div className="space-y-1.5">
                 <Label htmlFor="catalog-edit-name">Nome</Label>
-                <Input id="catalog-edit-name" {...editForm.register("name")} placeholder="Nome do produto" />
+                <Input
+                  id="catalog-edit-name"
+                  {...editForm.register("name")}
+                  placeholder="Nome do produto"
+                />
                 {editForm.formState.errors.name && (
-                  <p className="text-xs text-destructive">{editForm.formState.errors.name.message}</p>
+                  <p className="text-xs text-destructive">
+                    {editForm.formState.errors.name.message}
+                  </p>
                 )}
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="catalog-edit-category">Categoria</Label>
-                <select id="catalog-edit-category" {...editForm.register("category")} className={selectClass}>
+                <select
+                  id="catalog-edit-category"
+                  {...editForm.register("category")}
+                  className={selectClass}
+                >
                   <option value="">Selecionar…</option>
                   {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -589,7 +711,11 @@ export default function CatalogPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="catalog-edit-unit">Unidade de dose</Label>
-                <select id="catalog-edit-unit" {...editForm.register("dose_unit")} className={selectClass}>
+                <select
+                  id="catalog-edit-unit"
+                  {...editForm.register("dose_unit")}
+                  className={selectClass}
+                >
                   <option value="">Selecionar…</option>
                   {GLOBAL_DOSE_UNITS.map((u) => (
                     <option key={u} value={u}>
@@ -635,7 +761,11 @@ export default function CatalogPage() {
                 />
               </div>
 
-              <Button type="submit" disabled={updateProduct.isPending} className="w-full">
+              <Button
+                type="submit"
+                disabled={updateProduct.isPending}
+                className="w-full"
+              >
                 {updateProduct.isPending ? "Salvando…" : "Salvar"}
               </Button>
             </form>

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { isAxiosError } from "axios";
 import { PageHeader } from "@/components/domain/page-header";
+import { apiErrorMessage } from "@/lib/api-error";
 import { UsersRound } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
@@ -17,13 +17,6 @@ import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const body = error.response?.data as { message?: string } | undefined;
-    if (body?.message && typeof body.message === "string") return body.message;
-  }
-  return fallback;
-}
 
 function rowKey(p: AdminProducer): string {
   return p.row_type === "producer" ? `p-${p.producer_id}` : `i-${p.invitation_id}`;

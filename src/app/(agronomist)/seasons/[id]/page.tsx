@@ -8,7 +8,7 @@ import {
   PageHeaderSkeleton,
   TimelineCardsSkeleton,
 } from "@/components/domain/page-skeletons";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
   usePlatformCatalog,
 } from "@/lib/api/hooks";
 import { CostPlanView } from "@/components/domain/cost-plan/cost-plan-view";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import type { Recommendation, RecommendationItem } from "@/lib/api/client";
 import {
   Send,
@@ -47,29 +48,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
-
-const CROP_LABELS: Record<string, string> = { SOYBEAN: "Soja", CORN: "Milho" };
-
-const STATUS_LABELS_SEASON: Record<string, string> = {
-  DRAFT: "Rascunho",
-  PUBLISHED: "Publicada",
-  IN_PROGRESS: "Em andamento",
-  COMPLETED: "Concluída",
-  HARVESTED: "Colhida",
-  ARCHIVED: "Removida",
-};
-
-const STATUS_VARIANTS_SEASON: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  DRAFT: "secondary",
-  PUBLISHED: "default",
-  IN_PROGRESS: "default",
-  HARVESTED: "outline",
-  COMPLETED: "outline",
-  ARCHIVED: "secondary",
-};
+import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
 
 type TabValue = "recommendations" | "cost-plan";
 
@@ -691,13 +670,7 @@ function RecommendationsTab({ seasonId }: { seasonId: string }) {
   ) as Recommendation[];
 
   if (!recommendations.length)
-    return (
-      <Card className="border-dashed">
-        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          Nenhuma recomendação encontrada para esta safra.
-        </CardContent>
-      </Card>
-    );
+    return <EmptyState variant="inline" title="Nenhuma recomendação encontrada para esta safra." />;
 
   const done = recommendations.filter(
     (r) => r.status === "APPLIED_ON_TIME" || r.status === "APPLIED_LATE",
@@ -749,7 +722,7 @@ export default function SeasonDetailPage() {
   }
 
   const cropLabel = season ? CROP_LABELS[season.crop] ?? season.crop : "";
-  const statusLabel = season ? STATUS_LABELS_SEASON[season.status] ?? season.status : "";
+  const statusLabel = season ? STATUS_LABELS[season.status] ?? season.status : "";
   const title = season
     ? season.variety
       ? `${cropLabel} — ${season.variety}`
@@ -792,25 +765,18 @@ export default function SeasonDetailPage() {
       <BreadcrumbBack items={breadcrumbs} />
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-full border bg-card p-0.5 text-sm font-medium shadow-sm">
-          {(Object.keys(TAB_LABELS) as TabValue[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setActiveTab(key)}
-              className={
-                activeTab === key
-                  ? "rounded-full bg-primary px-4 py-1.5 text-primary-foreground shadow-sm"
-                  : "rounded-full px-4 py-1.5 text-muted-foreground hover:text-foreground"
-              }
-            >
-              {TAB_LABELS[key]}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          variant="pill"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          items={(Object.keys(TAB_LABELS) as TabValue[]).map((key) => ({
+            value: key,
+            label: TAB_LABELS[key],
+          }))}
+        />
         <div className="flex flex-wrap items-center gap-2">
           {season?.status ? (
-            <Badge variant={STATUS_VARIANTS_SEASON[season.status] || "default"}>
+            <Badge variant={STATUS_VARIANTS[season.status] || "default"}>
               {statusLabel}
             </Badge>
           ) : null}

@@ -14,6 +14,7 @@ import { StatCard } from "@/components/domain/stat-card";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ import {
 import type { PurchaseListDetail } from "@/lib/api/client";
 import { activeAgronomistProducerAccounts } from "@/lib/api/client";
 import { toast } from "sonner";
+import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
 import {
   ChevronRight,
   Eye,
@@ -58,29 +60,6 @@ import {
   Leaf,
 } from "lucide-react";
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Rascunho",
-  PUBLISHED: "Publicada",
-  IN_PROGRESS: "Em andamento",
-  HARVESTED: "Colhida",
-  ARCHIVED: "Removida",
-};
-
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  DRAFT: "secondary",
-  PUBLISHED: "default",
-  IN_PROGRESS: "default",
-  HARVESTED: "outline",
-  ARCHIVED: "secondary",
-};
-
-const CROP_LABELS: Record<string, string> = {
-  SOYBEAN: "Soja",
-  CORN: "Milho",
-};
 
 const SEASON_PRIORITY: Record<string, number> = {
   IN_PROGRESS: 0,
@@ -484,32 +463,16 @@ export default function FarmDetailPage() {
         />
       </div>
 
-      {/* Toggle Talhões | Lista de compra — estilo pill, igual ao da safra. */}
       <div className="mb-5">
-        <div className="inline-flex rounded-full border bg-card p-0.5 text-sm font-medium shadow-sm">
-          <button
-            type="button"
-            onClick={() => setFarmView("plots")}
-            className={
-              farmView === "plots"
-                ? "rounded-full bg-primary px-4 py-1.5 text-primary-foreground shadow-sm"
-                : "rounded-full px-4 py-1.5 text-muted-foreground hover:text-foreground"
-            }
-          >
-            Talhões
-          </button>
-          <button
-            type="button"
-            onClick={() => setFarmView("purchase")}
-            className={
-              farmView === "purchase"
-                ? "rounded-full bg-primary px-4 py-1.5 text-primary-foreground shadow-sm"
-                : "rounded-full px-4 py-1.5 text-muted-foreground hover:text-foreground"
-            }
-          >
-            Lista de compra
-          </button>
-        </div>
+        <SegmentedTabs
+          variant="pill"
+          value={farmView}
+          onValueChange={setFarmView}
+          items={[
+            { value: "plots", label: "Talhões" },
+            { value: "purchase", label: "Lista de compra" },
+          ]}
+        />
       </div>
 
       <div className="grid gap-6">
@@ -586,29 +549,17 @@ export default function FarmDetailPage() {
           {loadingPlots ? (
             <TableRowsSkeleton rows={4} columns={1} />
           ) : sortedPlots.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <MapPin className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    Nenhum talhão cadastrado
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Cadastre talhões para começar a planejar safras.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setPlotSheetOpen(true)}
-                >
+            <EmptyState
+              icon={MapPin}
+              title="Nenhum talhão cadastrado"
+              description="Cadastre talhões para começar a planejar safras."
+              action={
+                <Button size="sm" className="gap-1.5" onClick={() => setPlotSheetOpen(true)}>
                   <Plus className="h-4 w-4" />
                   Adicionar primeiro talhão
                 </Button>
-              </CardContent>
-            </Card>
+              }
+            />
           ) : (
             <div className="max-h-[calc(100vh-280px)] space-y-3 overflow-y-auto pr-1">
               {sortedPlots.map((plot) => {
@@ -756,11 +707,10 @@ function FarmPurchaseListTab({
 }) {
   if (!producerId) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          Abra esta fazenda a partir de um produtor para ver a lista de compra.
-        </CardContent>
-      </Card>
+      <EmptyState
+        variant="inline"
+        title="Abra esta fazenda a partir de um produtor para ver a lista de compra."
+      />
     );
   }
 
@@ -777,16 +727,10 @@ function FarmPurchaseListTab({
     }
 
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhuma lista de compra para esta fazenda.
-          </p>
-          <Button asChild size="sm">
-            <Link href={newSeasonHref}>Configurar safra</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title="Nenhuma lista de compra para esta fazenda."
+        action={<Button asChild size="sm"><Link href={newSeasonHref}>Configurar safra</Link></Button>}
+      />
     );
   }
 
@@ -811,16 +755,10 @@ function FarmPurchaseListTab({
 
   if (items.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            A lista &quot;{list.name}&quot; ainda não tem produtos cadastrados.
-          </p>
-          <Button asChild size="sm">
-            <Link href={newSeasonHref}>Atualizar safra</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title={`A lista "${list.name}" ainda não tem produtos cadastrados.`}
+        action={<Button asChild size="sm"><Link href={newSeasonHref}>Atualizar safra</Link></Button>}
+      />
     );
   }
 
@@ -857,28 +795,28 @@ function FarmPurchaseListTab({
 
       {/* KPIs no estilo do Plano de Custo */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiBox
+        <StatCard
           label="Valor total a gastar"
           value={totalValue > 0 ? fmtBrl(totalValue) : "—"}
           sub={totalValue > 0 ? "soma dos itens com preço" : "informe preços para calcular"}
           accent="primary"
           icon={<Leaf className="h-4 w-4" />}
         />
-        <KpiBox
+        <StatCard
           label="Produtos"
           value={String(productsCount)}
           sub={`${categoriesCount} categorias`}
           accent="sky"
           icon={<MapPin className="h-4 w-4" />}
         />
-        <KpiBox
+        <StatCard
           label="Hectares"
           value={`${fmtQty(list.total_hectares)} ha`}
           sub={`${(list.plots ?? []).length} talhões`}
           accent="sun"
           icon={<Sprout className="h-4 w-4" />}
         />
-        <KpiBox
+        <StatCard
           label="Itens com preço"
           value={`${items.filter((it) => it.price_brl_fixed).length}/${productsCount}`}
           sub="cobertura de preços"
@@ -956,40 +894,6 @@ function FarmPurchaseListTab({
   );
 }
 
-function KpiBox({
-  label,
-  value,
-  sub,
-  accent,
-  icon,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  accent: "primary" | "sky" | "sun" | "clay";
-  icon: React.ReactNode;
-}) {
-  const accentClasses = {
-    primary: "bg-primary/10 text-primary",
-    sky: "bg-sky-100 text-sky-600",
-    sun: "bg-amber-100 text-amber-600",
-    clay: "bg-orange-100 text-orange-600",
-  } as const;
-  return (
-    <div className="rounded-xl border bg-card px-4 py-3.5 shadow-sm">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <span className={`flex h-6 w-6 items-center justify-center rounded-md ${accentClasses[accent]}`}>
-          {icon}
-        </span>
-        {label}
-      </div>
-      <p className="mt-1.5 text-2xl font-semibold leading-tight tabular-nums tracking-tight text-foreground">
-        {value}
-      </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
-    </div>
-  );
-}
 
 function FarmSeasonShoppingFallback({
   seasonIds,
@@ -1004,16 +908,10 @@ function FarmSeasonShoppingFallback({
 
   if (items.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhum produto pendente nas safras ativas desta fazenda.
-          </p>
-          <Button asChild size="sm">
-            <Link href={newSeasonHref}>Configurar safra</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title="Nenhum produto pendente nas safras ativas desta fazenda."
+        action={<Button asChild size="sm"><Link href={newSeasonHref}>Configurar safra</Link></Button>}
+      />
     );
   }
 
@@ -1150,16 +1048,10 @@ function FarmRecommendationTab({
     }
 
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Configure uma safra para ver o cronograma e as datas por talhão.
-          </p>
-          <Button asChild size="sm">
-            <Link href={newSeasonHref}>Configurar safra</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title="Configure uma safra para ver o cronograma e as datas por talhão."
+        action={<Button asChild size="sm"><Link href={newSeasonHref}>Configurar safra</Link></Button>}
+      />
     );
   }
 
@@ -1180,16 +1072,10 @@ function FarmRecommendationTab({
     }
 
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            A lista &quot;{list.name}&quot; ainda não tem talhões ou produtos vinculados.
-          </p>
-          <Button asChild size="sm">
-            <Link href={newSeasonHref}>Atualizar safra</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title={`A lista "${list.name}" ainda não tem talhões ou produtos vinculados.`}
+        action={<Button asChild size="sm"><Link href={newSeasonHref}>Atualizar safra</Link></Button>}
+      />
     );
   }
 

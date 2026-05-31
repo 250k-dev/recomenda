@@ -6,8 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { isAxiosError } from "axios";
 import { PageHeader } from "@/components/domain/page-header";
+import { apiErrorMessage } from "@/lib/api-error";
 import { Users } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
@@ -56,13 +56,6 @@ function toDatetimeLocalValue(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const msg = error.response?.data as { message?: string } | undefined;
-    if (msg?.message && typeof msg.message === "string") return msg.message;
-  }
-  return fallback;
-}
 
 export default function AdminAgronomistsPage() {
   const [tab, setTab] = useState<"active" | "inactive">("active");

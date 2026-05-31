@@ -7,6 +7,7 @@ import { z } from "zod";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { Package } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
@@ -67,48 +68,6 @@ function matchesCatalogListFilters(
   return true;
 }
 
-function CatalogPaginationBar(props: {
-  page: number;
-  pageSize: number;
-  total: number;
-  onPageChange: (p: number) => void;
-}) {
-  const totalPages = Math.max(1, Math.ceil(props.total / props.pageSize));
-  const safePage = Math.min(Math.max(1, props.page), totalPages);
-  const from = props.total === 0 ? 0 : (safePage - 1) * props.pageSize + 1;
-  const to = Math.min(props.total, safePage * props.pageSize);
-
-  return (
-    <div className="flex flex-col gap-2 border-t bg-muted/30 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-muted-foreground">
-        {props.total === 0 ? "Nenhum item" : `Mostrando ${from}–${to} de ${props.total}`}
-      </p>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={safePage <= 1}
-          onClick={() => props.onPageChange(safePage - 1)}
-        >
-          Anterior
-        </Button>
-        <span className="min-w-[5rem] text-center tabular-nums text-muted-foreground">
-          {safePage} / {totalPages}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={safePage >= totalPages}
-          onClick={() => props.onPageChange(safePage + 1)}
-        >
-          Próxima
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 const productSchema = z
   .object({
@@ -904,7 +863,7 @@ export default function AdminGlobalCatalogPage() {
                 "whitespace-nowrap",
               ]}
               footer={
-                <CatalogPaginationBar
+                <PaginationBar
                   page={globalPage}
                   pageSize={CATALOG_PAGE_SIZE}
                   total={filteredGlobalRows.length}
@@ -937,7 +896,7 @@ export default function AdminGlobalCatalogPage() {
                 "whitespace-nowrap",
               ]}
               footer={
-                <CatalogPaginationBar
+                <PaginationBar
                   page={customPage}
                   pageSize={CATALOG_PAGE_SIZE}
                   total={filteredCustomRows.length}
@@ -969,7 +928,7 @@ export default function AdminGlobalCatalogPage() {
                 "whitespace-nowrap",
               ]}
               footer={
-                <CatalogPaginationBar
+                <PaginationBar
                   page={inactivePage}
                   pageSize={CATALOG_PAGE_SIZE}
                   total={filteredInactiveProducts.length}

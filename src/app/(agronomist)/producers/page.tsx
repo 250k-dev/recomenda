@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { isAxiosError } from "axios";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
+import { apiErrorMessage } from "@/lib/api-error";
+import { StatCard } from "@/components/domain/stat-card";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { EmptyState } from "@/components/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import type { AgronomistProducerListRow } from "@/lib/api/client";
 import { ProducerAccountStatusBadge } from "@/components/domain/producer-account-status-badge";
@@ -44,14 +46,6 @@ type PendingAction =
   | { kind: "delete"; id: string; name: string }
   | { kind: "revoke-invitation"; id: string; name: string };
 
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const payload = error.response?.data as { error?: { message?: string }; message?: string } | undefined;
-    return payload?.error?.message ?? payload?.message ?? fallback;
-  }
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-}
 
 export default function ProducersPage() {
   const router = useRouter();
@@ -173,13 +167,13 @@ export default function ProducersPage() {
 
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <KpiBox
+        <StatCard
           label="Total de produtores"
           value={fmt(totalProducers)}
           accent="primary"
           icon={<UsersIcon className="h-4 w-4" />}
         />
-        <KpiBox
+        <StatCard
           label="Hectares totais"
           value={`${fmtHa(totalHectares)} ha`}
           sub="soma da carteira"
@@ -188,79 +182,35 @@ export default function ProducersPage() {
         />
       </div>
 
-      {/* Tabs */}
-      <div className="flex w-fit rounded-full border bg-card p-0.5 text-xs font-medium shadow-sm">
-        <button
-          type="button"
-          onClick={() => {
-            setTab("active");
-            setFilter("");
-          }}
-          className={
-            tab === "active"
-              ? "rounded-full bg-primary px-3 py-1 text-primary-foreground"
-              : "rounded-full px-3 py-1 text-muted-foreground hover:text-foreground"
-          }
-        >
-          Ativos
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setTab("archived");
-            setFilter("");
-          }}
-          className={
-            tab === "archived"
-              ? "rounded-full bg-primary px-3 py-1 text-primary-foreground"
-              : "rounded-full px-3 py-1 text-muted-foreground hover:text-foreground"
-          }
-        >
-          Removidos
-          {archivedList.length > 0 ? (
-            <span
-              className={cn(
-                "ml-1.5 rounded-full px-1.5 text-[10px]",
-                tab === "archived" ? "bg-primary-foreground/20" : "bg-muted",
-              )}
-            >
-              {archivedList.length}
-            </span>
-          ) : null}
-        </button>
-      </div>
+      <SegmentedTabs
+        variant="pill"
+        value={tab}
+        onValueChange={(v) => { setTab(v); setFilter(""); }}
+        items={[
+          { value: "active", label: "Ativos" },
+          { value: "archived", label: "Removidos", badgeCount: archivedList.length },
+        ]}
+      />
 
       {/* Tabela polida (estilo Plano de Custo) */}
       {isLoading ? (
         <TableRowsSkeleton rows={8} columns={5} />
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <UsersRound className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                {tab === "active"
-                  ? "Nenhum produtor ou convite na lista ativa."
-                  : "Nenhum produtor removido."}
-              </p>
-              {tab === "active" ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Cadastre o primeiro produtor para começar.
-                </p>
-              ) : null}
-            </div>
-            {tab === "active" ? (
+        <EmptyState
+          icon={UsersRound}
+          title={tab === "active" ? "Nenhum produtor ou convite na lista ativa." : "Nenhum produtor removido."}
+          description={tab === "active" ? "Cadastre o primeiro produtor para começar." : undefined}
+          action={
+            tab === "active" ? (
               <Link href="/producers/new">
                 <Button size="sm" className="gap-1.5">
                   <Plus className="h-4 w-4" />
                   Adicionar produtor
                 </Button>
               </Link>
-            ) : null}
-          </CardContent>
-        </Card>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="rounded-xl border bg-card shadow-sm">
           <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-3">
@@ -472,42 +422,3 @@ function ProducerRow({
   );
 }
 
-function KpiBox({
-  label,
-  value,
-  sub,
-  accent,
-  icon,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent: "primary" | "sky" | "sun" | "clay";
-  icon: React.ReactNode;
-}) {
-  const accentClasses = {
-    primary: "bg-primary/10 text-primary",
-    sky: "bg-sky-100 text-sky-600",
-    sun: "bg-amber-100 text-amber-600",
-    clay: "bg-orange-100 text-orange-600",
-  } as const;
-  return (
-    <div className="rounded-xl border bg-card px-4 py-3.5 shadow-sm">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <span
-          className={cn(
-            "flex h-6 w-6 items-center justify-center rounded-md",
-            accentClasses[accent],
-          )}
-        >
-          {icon}
-        </span>
-        {label}
-      </div>
-      <p className="mt-1.5 text-2xl font-semibold leading-tight tabular-nums tracking-tight text-foreground">
-        {value}
-      </p>
-      {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
-    </div>
-  );
-}

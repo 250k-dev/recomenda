@@ -35,11 +35,7 @@ import {
   useHardDeleteTimingTemplate,
   useTimingTemplates,
 } from "@/lib/api/hooks";
-
-const CROP_LABELS: Record<string, string> = {
-  SOYBEAN: "Soja",
-  CORN: "Milho",
-};
+import { CROP_LABELS } from "@/lib/season-constants";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),

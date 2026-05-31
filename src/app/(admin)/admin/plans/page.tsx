@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
+import { apiErrorMessage } from "@/lib/api-error";
 import { CreditCard } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
@@ -46,14 +46,6 @@ type PlanFormValues = z.infer<typeof planFormSchema>;
 
 type PlansTab = "ativos" | "removidos";
 
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (isAxiosError(error)) {
-    const msg = error.response?.data as { message?: string | string[] } | undefined;
-    if (typeof msg?.message === "string") return msg.message;
-    if (Array.isArray(msg?.message) && msg.message[0]) return String(msg.message[0]);
-  }
-  return fallback;
-}
 
 export default function AdminPlansPage() {
   const { data: plans, isLoading } = usePlans();

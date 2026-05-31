@@ -21,19 +21,7 @@ import {
 } from "@/lib/api/hooks";
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 import { cn } from "@/lib/utils";
-
-const CROP_LABELS: Record<string, string> = {
-  SOYBEAN: "Soja",
-  CORN: "Milho",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Rascunho",
-  PUBLISHED: "Publicada",
-  IN_PROGRESS: "Em andamento",
-  COMPLETED: "Concluída",
-  ARCHIVED: "Removida",
-};
+import { CROP_LABELS, STATUS_LABELS } from "@/lib/season-constants";
 
 const STATUS_CLASSES: Record<string, string> = {
   DRAFT: "bg-muted text-muted-foreground",

@@ -9,6 +9,7 @@ import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { StatCard } from "@/components/domain/stat-card";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,32 +19,7 @@ import {
   useProducer,
 } from "@/lib/api/hooks";
 import { Eye, Leaf, MapPin, Sprout } from "lucide-react";
-
-const CROP_LABELS: Record<string, string> = {
-  SOYBEAN: "Soja",
-  CORN: "Milho",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Rascunho",
-  PUBLISHED: "Publicada",
-  IN_PROGRESS: "Em andamento",
-  COMPLETED: "Concluída",
-  HARVESTED: "Colhida",
-  ARCHIVED: "Removida",
-};
-
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  DRAFT: "secondary",
-  PUBLISHED: "default",
-  IN_PROGRESS: "default",
-  HARVESTED: "outline",
-  COMPLETED: "outline",
-  ARCHIVED: "secondary",
-};
+import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
 
 const SEASON_PRIORITY: Record<string, number> = {
   IN_PROGRESS: 0,
@@ -122,14 +98,10 @@ export default function PlotDetailPage() {
     return (
       <>
         <BreadcrumbBack items={breadcrumbs} />
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-            <p className="text-sm text-muted-foreground">Talhão não encontrado.</p>
-            <Button asChild size="sm" variant="outline">
-              <Link href={farmHref}>Voltar à fazenda</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="Talhão não encontrado."
+          action={<Button asChild size="sm" variant="outline"><Link href={farmHref}>Voltar à fazenda</Link></Button>}
+        />
       </>
     );
   }
@@ -251,16 +223,10 @@ function PlotProgressTab({
 
   if (seasons.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhuma safra cadastrada no talhão {plotName}.
-          </p>
-          <Button asChild size="sm">
-            <Link href={newSeasonHref}>Configurar safra</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title={`Nenhuma safra cadastrada no talhão ${plotName}.`}
+        action={<Button asChild size="sm"><Link href={newSeasonHref}>Configurar safra</Link></Button>}
+      />
     );
   }
 
