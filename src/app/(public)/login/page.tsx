@@ -74,63 +74,64 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <Card className="py-8 px-3">
-          <CardHeader className="pb-4">
+        <Card>
+          <CardHeader>
             <CardTitle className="text-2xl font-semibold">Entrar</CardTitle>
             <CardDescription>
               Área restrita a administradores e agrônomos.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={onSubmit} className="space-y-4">
-              {loginMutation.isError ? (
-                <Alert variant="destructive">
-                  <AlertCircle />
-                  <AlertTitle>
-                    {loginMutation.error?.message?.includes("Produtores")
-                      ? "Acesso restrito"
-                      : "Não foi possível entrar"}
-                  </AlertTitle>
-                  <AlertDescription>
-                    {loginMutation.error?.message?.includes("Produtores")
-                      ? "Produtores devem acessar o Recomenda App, não este painel."
-                      : "Verifique e-mail e senha ou tente novamente em instantes."}
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  {...form.register("email")}
-                />
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.email?.message}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="password">Senha</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-                  >
-                    Esqueceu a senha?
-                  </Link>
+          <CardContent className="px-0">
+            <form onSubmit={onSubmit} className="space-y-6">
+              <div className="space-y-4 px-6">
+                {loginMutation.isError ? (
+                  <Alert variant="destructive">
+                    <AlertCircle />
+                    <AlertTitle>
+                      {loginMutation.error?.message?.includes("Produtores")
+                        ? "Acesso restrito"
+                        : "Não foi possível entrar"}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {loginMutation.error?.message?.includes("Produtores")
+                        ? "Produtores devem acessar o Recomenda App, não este painel."
+                        : "Verifique e-mail e senha ou tente novamente em instantes."}
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    {...form.register("email")}
+                  />
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.email?.message}
+                  </p>
                 </div>
-                <PasswordInput
-                  id="password"
-                  autoComplete="current-password"
-                  {...form.register("password")}
-                />
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.password?.message}
-                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <Link
+                      href="/forgot-password"
+                      className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Esqueceu a senha?
+                    </Link>
+                  </div>
+                  <PasswordInput
+                    id="password"
+                    autoComplete="current-password"
+                    {...form.register("password")}
+                  />
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.password?.message}
+                  </p>
+                </div>
               </div>
-
-              <CardFooter className="w-full px-0 pt-4">
+              <CardFooter className="w-full mt-6">
                 <Button
                   className="w-full"
                   size="lg"
