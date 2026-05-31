@@ -14,8 +14,6 @@ export const navByRole: Record<UserRole, Array<{ label: string; href: string }>>
     { label: "Produtores", href: "/producers" },
     { label: "Produtos", href: "/catalog" },
     { label: "Relatórios", href: "/reports" },
-    { label: "Plano", href: "/plan" },
-    { label: "Configurações", href: "/settings" },
   ],
   PRODUCER: [],
 };

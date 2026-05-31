@@ -16,6 +16,7 @@ import {
   LogOut,
   Bell,
   ChevronsUpDown,
+  UserCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -61,8 +62,6 @@ const iconMap: Record<string, React.ReactNode> = {
   "/producers": <Users className="size-4" />,
   "/catalog": <Package className="size-4" />,
   "/reports": <BarChart3 className="size-4" />,
-  "/plan": <CreditCard className="size-4" />,
-  "/settings": <Settings className="size-4" />,
   "/admin": <LayoutDashboard className="size-4" />,
   "/admin/plans": <CreditCard className="size-4" />,
   "/admin/agronomists": <Users className="size-4" />,
@@ -215,6 +214,17 @@ export function AppSidebar({ role }: { role: UserRole }) {
                   align="end"
                   sideOffset={4}
                 >
+                  {role === "AGRONOMIST" && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/profile">
+                          <UserCircle className="size-4" />
+                          Meu perfil
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem onClick={() => setNotificationsOpen(true)}>
                     <Bell className="size-4" />
                     Notificações

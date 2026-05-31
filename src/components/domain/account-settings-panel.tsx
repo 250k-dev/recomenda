@@ -5,7 +5,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -34,7 +41,8 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error && typeof error === "object" && "response" in error) {
-    const res = (error as { response?: { data?: { message?: string } } }).response;
+    const res = (error as { response?: { data?: { message?: string } } })
+      .response;
     if (res?.data?.message && typeof res.data.message === "string") {
       return res.data.message;
     }
@@ -108,126 +116,157 @@ export function AccountSettingsPanel() {
   return (
     <div className="space-y-6">
       <Card>
-        <div className="mb-4 border-b border-border pb-4">
-          <h2 className="text-lg font-semibold text-foreground">Meu perfil</h2>
-          <p className="text-sm text-muted-foreground">Atualize suas informações pessoais</p>
-        </div>
-
-        <form onSubmit={onUpdateProfile} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="account-name">Nome</Label>
-            <Input
-              id="account-name"
-              placeholder="Seu nome completo"
-              {...profileForm.register("name")}
-            />
-            {profileForm.formState.errors.name && (
-              <p className="text-xs text-destructive">{profileForm.formState.errors.name.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="account-email">Email</Label>
-            <Input
-              id="account-email"
-              type="email"
-              placeholder="seu.email@exemplo.com"
-              {...profileForm.register("email")}
-            />
-            {profileForm.formState.errors.email && (
-              <p className="text-xs text-destructive">{profileForm.formState.errors.email.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="account-phone">Telefone</Label>
-            <Input
-              id="account-phone"
-              placeholder="(11) 99999-9999"
-              {...profileForm.register("phone")}
-            />
-          </div>
-
-          <Button type="submit" disabled={updateProfileMutation.isPending} className="w-full">
-            {updateProfileMutation.isPending ? "Salvando…" : "Salvar"}
-          </Button>
-        </form>
+        <CardHeader className="border-b border-border pb-4">
+          <CardTitle>Meu perfil</CardTitle>
+          <CardDescription>Atualize suas informações pessoais</CardDescription>
+        </CardHeader>
+        <CardContent className="px-0">
+          <form onSubmit={onUpdateProfile} className="space-y-4">
+            <div className="space-y-4 px-6">
+              <div className="space-y-2">
+                <Label htmlFor="account-name">Nome</Label>
+                <Input
+                  id="account-name"
+                  placeholder="Seu nome completo"
+                  {...profileForm.register("name")}
+                />
+                {profileForm.formState.errors.name && (
+                  <p className="text-xs text-destructive">
+                    {profileForm.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="account-email">Email</Label>
+                <Input
+                  id="account-email"
+                  type="email"
+                  placeholder="seu.email@exemplo.com"
+                  {...profileForm.register("email")}
+                />
+                {profileForm.formState.errors.email && (
+                  <p className="text-xs text-destructive">
+                    {profileForm.formState.errors.email.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="account-phone">Telefone</Label>
+                <Input
+                  id="account-phone"
+                  placeholder="(11) 99999-9999"
+                  {...profileForm.register("phone")}
+                />
+              </div>
+            </div>
+            <CardFooter className="w-full mt-6">
+              <Button
+                type="submit"
+                disabled={updateProfileMutation.isPending}
+                className="w-full"
+              >
+                {updateProfileMutation.isPending ? "Salvando…" : "Salvar"}
+              </Button>
+            </CardFooter>
+          </form>
+        </CardContent>
       </Card>
 
       <Card>
-        <div className="mb-4 border-b border-border pb-4">
-          <h2 className="text-lg font-semibold text-foreground">Segurança</h2>
-          <p className="text-sm text-muted-foreground">Altere sua senha para manter sua conta segura</p>
-        </div>
+        <CardHeader>
+          <CardTitle>Segurança</CardTitle>
+          <CardDescription>
+            Altere sua senha para manter sua conta segura
+          </CardDescription>
+        </CardHeader>
 
-        {!showPasswordForm ? (
-          <Button variant="outline" onClick={() => setShowPasswordForm(true)}>
-            Alterar senha
-          </Button>
-        ) : (
-          <form onSubmit={onChangePassword} className="space-y-4 animate-slide-up">
-            <div className="space-y-1.5">
-              <Label htmlFor="account-old-pass">Senha atual</Label>
-              <Input
-                id="account-old-pass"
-                type="password"
-                placeholder="Digite sua senha atual"
-                {...passwordForm.register("old_password")}
-              />
-              {passwordForm.formState.errors.old_password && (
-                <p className="text-xs text-destructive">
-                  {passwordForm.formState.errors.old_password.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="account-new-pass">Nova senha</Label>
-              <Input
-                id="account-new-pass"
-                type="password"
-                placeholder="Digite uma nova senha"
-                {...passwordForm.register("new_password")}
-              />
-              {passwordForm.formState.errors.new_password && (
-                <p className="text-xs text-destructive">
-                  {passwordForm.formState.errors.new_password.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="account-confirm-pass">Confirmar nova senha</Label>
-              <Input
-                id="account-confirm-pass"
-                type="password"
-                placeholder="Confirme a nova senha"
-                {...passwordForm.register("confirm_password")}
-              />
-              {passwordForm.formState.errors.confirm_password && (
-                <p className="text-xs text-destructive">
-                  {passwordForm.formState.errors.confirm_password.message}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={changePasswordMutation.isPending}>
-                {changePasswordMutation.isPending ? "Alterando…" : "Alterar senha"}
-              </Button>
+        <CardContent className="px-0">
+          {!showPasswordForm ? (
+            <CardFooter className="w-full">
               <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setShowPasswordForm(false);
-                  passwordForm.reset();
-                }}
+                variant="outline"
+                onClick={() => setShowPasswordForm(true)}
+                className="w-full"
               >
-                Cancelar
+                Alterar senha
               </Button>
-            </div>
-          </form>
-        )}
+            </CardFooter>
+          ) : (
+            <form
+              onSubmit={onChangePassword}
+              className="space-y-4 animate-slide-up"
+            >
+              <div className="space-y-4 px-6">
+                <div className="space-y-2">
+                  <Label htmlFor="account-old-pass">Senha atual</Label>
+                  <Input
+                    id="account-old-pass"
+                    type="password"
+                    placeholder="Digite sua senha atual"
+                    {...passwordForm.register("old_password")}
+                  />
+                  {passwordForm.formState.errors.old_password && (
+                    <p className="text-xs text-destructive">
+                      {passwordForm.formState.errors.old_password.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-new-pass">Nova senha</Label>
+                  <Input
+                    id="account-new-pass"
+                    type="password"
+                    placeholder="Digite uma nova senha"
+                    {...passwordForm.register("new_password")}
+                  />
+                  {passwordForm.formState.errors.new_password && (
+                    <p className="text-xs text-destructive">
+                      {passwordForm.formState.errors.new_password.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-confirm-pass">
+                    Confirmar nova senha
+                  </Label>
+                  <Input
+                    id="account-confirm-pass"
+                    type="password"
+                    placeholder="Confirme a nova senha"
+                    {...passwordForm.register("confirm_password")}
+                  />
+                  {passwordForm.formState.errors.confirm_password && (
+                    <p className="text-xs text-destructive">
+                      {passwordForm.formState.errors.confirm_password.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <CardFooter className="w-full mt-6 gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowPasswordForm(false);
+                    passwordForm.reset();
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={changePasswordMutation.isPending}
+                  className="flex-1"
+                >
+                  {changePasswordMutation.isPending
+                    ? "Alterando…"
+                    : "Alterar senha"}
+                </Button>
+              </CardFooter>
+            </form>
+          )}
+        </CardContent>
       </Card>
     </div>
   );
