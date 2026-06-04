@@ -59,12 +59,12 @@
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.966 0.005 106.5);
-  --muted-foreground: oklch(0.58 0.031 107.3);
+  --muted-foreground: oklch(0.5 0.03 107.3);
   --accent: oklch(0.966 0.005 106.5);
   --accent-foreground: oklch(0.228 0.013 107.4);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.93 0.007 106.5);
-  --input: oklch(0.93 0.007 106.5);
+  --border: oklch(0.9 0.008 106.5);
+  --input: oklch(0.9 0.008 106.5);
   --ring: oklch(0.737 0.021 106.9);
   --chart-1: oklch(0.871 0.15 154.449);
   --chart-2: oklch(0.723 0.219 149.579);
@@ -122,6 +122,9 @@
   }
   html {
     color-scheme: light;
+    /* Bump base type ~6% for legibility (older users, outdoors). All rem-based
+       Tailwind sizes scale proportionally. Tune here if it reads too large. */
+    font-size: 17px;
   }
   body {
     background: var(--background);

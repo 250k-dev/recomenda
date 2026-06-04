@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { SeasonWizard } from "@/components/domain/season-wizard";
+import { PurchaseListWizard } from "@/components/domain/purchase-list-wizard";
 import { Button } from "@/components/ui/button";
 import { useFarm, useFarmPlots, useProducer } from "@/lib/api/hooks";
 
-export default function FarmSeasonNewPage() {
+export default function FarmPurchaseListNewPage() {
   const params = useParams<{ id: string }>();
   const farmId = params.id;
   const router = useRouter();
@@ -42,7 +42,7 @@ export default function FarmSeasonNewPage() {
       ? [{ label: producer.name, href: producerHref }]
       : []),
     ...(farm ? [{ label: farm.name, href: farmHref }] : []),
-    { label: "Nova safra" },
+    { label: "Lista de compra" },
   ];
 
   if (!producerId) {
@@ -68,7 +68,7 @@ export default function FarmSeasonNewPage() {
         <BreadcrumbBack items={breadcrumbs} />
         <div className="rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            Cadastre pelo menos um talhão nesta fazenda antes de configurar a safra.
+            Cadastre pelo menos um talhão nesta fazenda antes de montar a lista de compra.
           </p>
           <Button asChild className="mt-4" variant="outline">
             <Link href={farmHref}>Voltar à fazenda</Link>
@@ -81,17 +81,13 @@ export default function FarmSeasonNewPage() {
   return (
     <>
       <BreadcrumbBack items={breadcrumbs} />
-      <SeasonWizard
+      <PurchaseListWizard
         producerId={producerId}
         producerName={producer?.name ?? "Produtor"}
         plots={plots}
         farmName={farm?.name}
+        successRedirectLabel="Ir para o produtor"
         onComplete={() => router.push(producerHref)}
-        onViewSeason={(seasonId) =>
-          router.push(
-            `/seasons/${seasonId}?farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`,
-          )
-        }
         onCancel={() => router.push(producerHref)}
       />
     </>

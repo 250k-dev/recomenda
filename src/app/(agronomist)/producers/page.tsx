@@ -2,21 +2,19 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
-import { StatCard } from "@/components/domain/stat-card";
+import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import type { AgronomistProducerListRow } from "@/lib/api/client";
-import { ProducerAccountStatusBadge } from "@/components/domain/producer-account-status-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
-  Eye,
   Plus,
   UsersRound,
   Search,
@@ -26,6 +24,7 @@ import {
   Archive,
   RotateCcw,
   Trash2,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
@@ -147,134 +146,154 @@ export default function ProducersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header estilo Plano de Custo */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <UsersRound className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Produtores
-            </h1>
-            <p className="max-w-2xl text-xs text-muted-foreground">
-              Contas vinculadas a você e convites pendentes. O status indica conta ativa,
-              inativa ou convite enviado/expirado.
-            </p>
+      <div>
+        <BreadcrumbBack
+          items={[{ label: "Início", href: "/dashboard" }, { label: "Produtores" }]}
+        />
+
+        {/* Header: título à esquerda, ação à direita na mesma linha */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <UsersRound className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                Produtores
+              </h1>
+              <p className="max-w-2xl text-xs text-muted-foreground">
+                Contas vinculadas a você e convites pendentes. O status indica conta ativa,
+                inativa ou convite enviado/expirado.
+              </p>
+            </div>
+          </div>
+          <Link href="/producers/new" className="shrink-0">
+            <Button size="lg" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Adicionar produtor
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* KPI — card único com os dois indicadores */}
+      <div className="rounded-xl border bg-card shadow-sm">
+        <div className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          <div className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <UsersIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted-foreground">Total de produtores</p>
+              <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                {fmt(totalProducers)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+              <Sprout className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted-foreground">Hectares totais</p>
+              <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                {fmtHa(totalHectares)} ha
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">soma da carteira</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <StatCard
-          label="Total de produtores"
-          value={fmt(totalProducers)}
-          accent="primary"
-          icon={<UsersIcon className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Hectares totais"
-          value={`${fmtHa(totalHectares)} ha`}
-          sub="soma da carteira"
-          accent="sun"
-          icon={<Sprout className="h-4 w-4" />}
-        />
-      </div>
-
-      <SegmentedTabs
-        variant="pill"
-        value={tab}
-        onValueChange={(v) => { setTab(v); setFilter(""); }}
-        items={[
-          { value: "active", label: "Ativos" },
-          { value: "archived", label: "Removidos", badgeCount: archivedList.length },
-        ]}
-      />
-
-      {/* Tabela polida (estilo Plano de Custo) */}
-      {isLoading ? (
-        <TableRowsSkeleton rows={8} columns={5} />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={UsersRound}
-          title={tab === "active" ? "Nenhum produtor ou convite na lista ativa." : "Nenhum produtor removido."}
-          description={tab === "active" ? "Cadastre o primeiro produtor para começar." : undefined}
-          action={
-            tab === "active" ? (
-              <Link href="/producers/new">
-                <Button size="sm" className="gap-1.5">
-                  <Plus className="h-4 w-4" />
-                  Adicionar produtor
-                </Button>
-              </Link>
-            ) : undefined
-          }
-        />
-      ) : (
-        <div className="rounded-xl border bg-card shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-3">
-            <div className="relative min-w-0 flex-1 sm:max-w-md">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="Filtrar por nome, e-mail ou ID…"
-                className="h-9 pl-8"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2 pr-1 text-xs">
-              <ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground" />
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortMode)}
-                className="h-8 border-0 bg-transparent pr-2 text-xs outline-none"
-              >
-                <option value="name">Ordenar: Nome</option>
-                <option value="hectares-desc">Ordenar: Hectares ↓</option>
-                <option value="hectares-asc">Ordenar: Hectares ↑</option>
-              </select>
-            </div>
-            {tab === "active" && (
-              <Link href="/producers/new" className="ml-auto shrink-0">
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Adicionar produtor
-                </Button>
-              </Link>
-            )}
+      {/* Lista */}
+      <div className="rounded-xl border bg-card shadow-sm">
+        {/* Toolbar: abas + filtros na mesma linha */}
+        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-3 py-3">
+          <SegmentedTabs
+            value={tab}
+            onValueChange={(v) => { setTab(v); setFilter(""); }}
+            items={[
+              { value: "active", label: "Ativos" },
+              { value: "archived", label: "Removidos", badgeCount: archivedList.length },
+            ]}
+          />
+          <div className="relative min-w-0 flex-1 sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filtrar por nome, e-mail ou ID…"
+              className="pl-9"
+            />
           </div>
+          <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2.5 pr-1">
+            <ArrowDownUp className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortMode)}
+              className="h-10 border-0 bg-transparent pr-2 text-sm outline-none"
+            >
+              <option value="name">Ordenar: Nome</option>
+              <option value="hectares-desc">Ordenar: Hectares ↓</option>
+              <option value="hectares-asc">Ordenar: Hectares ↑</option>
+            </select>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="p-3">
+            <TableRowsSkeleton rows={8} columns={5} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            variant="inline"
+            icon={UsersRound}
+            title={tab === "active" ? "Nenhum produtor ou convite na lista ativa." : "Nenhum produtor removido."}
+            description={tab === "active" ? "Cadastre o primeiro produtor para começar." : undefined}
+            action={
+              tab === "active" ? (
+                <Link href="/producers/new">
+                  <Button size="sm" className="gap-1.5">
+                    <Plus className="h-4 w-4" />
+                    Adicionar produtor
+                  </Button>
+                </Link>
+              ) : undefined
+            }
+            className="px-4 py-10"
+          />
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5">Produtor</th>
-                <th className="px-2 py-2.5">E-mail</th>
-                <th className="px-2 py-2.5 text-right">Hectares</th>
-                <th className="w-12 px-2 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => (
-                <ProducerRow
-                  key={rowKey(p)}
-                  producer={p}
-                  tab={tab}
-                  actionPending={actionPending}
-                  onOpen={() =>
-                    p.producer_id ? router.push(`/producers/${p.producer_id}`) : null
-                  }
-                  onArchive={() => p.producer_id && onArchive(p.producer_id, p.name)}
-                  onReactivate={() => p.producer_id && onReactivate(p.producer_id)}
-                  onDelete={() => p.producer_id && onDelete(p.producer_id, p.name)}
-                  onRevokeInvitation={() => p.invitation_id && onRevokeInvitation(p.invitation_id, p.name)}
-                />
-              ))}
-            </tbody>
-          </table>
+              <thead>
+                <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2.5">Produtor</th>
+                  <th className="px-2 py-2.5">E-mail</th>
+                  <th className="px-2 py-2.5 text-right">Hectares</th>
+                  <th className="w-12 px-2 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <ProducerRow
+                    key={rowKey(p)}
+                    producer={p}
+                    tab={tab}
+                    actionPending={actionPending}
+                    onOpen={() =>
+                      p.producer_id ? router.push(`/producers/${p.producer_id}`) : null
+                    }
+                    onArchive={() => p.producer_id && onArchive(p.producer_id, p.name)}
+                    onReactivate={() => p.producer_id && onReactivate(p.producer_id)}
+                    onDelete={() => p.producer_id && onDelete(p.producer_id, p.name)}
+                    onRevokeInvitation={() => p.invitation_id && onRevokeInvitation(p.invitation_id, p.name)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <ConfirmDialog
         open={pendingAction !== null}
@@ -332,13 +351,24 @@ function ProducerRow({
   const initial = (producer.name?.trim().charAt(0) || "?").toUpperCase();
   const isInvitation = producer.row_type === "invitation";
   const canManage = producer.row_type === "producer" && Boolean(producer.producer_id);
+  const canOpen = Boolean(producer.producer_id);
+  const stop = (fn: () => void) => (e: MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
   return (
-    <tr className="border-b last:border-b-0 transition-colors hover:bg-accent/40">
-      <td className="px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
+    <tr
+      className={cn(
+        "border-b transition-colors last:border-b-0 hover:bg-accent/40",
+        canOpen && "cursor-pointer",
+      )}
+      onClick={canOpen ? onOpen : undefined}
+    >
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-3">
           <div
             className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
               isInvitation
                 ? "bg-muted text-muted-foreground"
                 : "bg-primary/10 text-primary",
@@ -346,75 +376,67 @@ function ProducerRow({
           >
             {initial}
           </div>
-          <span className="text-sm font-medium text-foreground">{producer.name}</span>
+          <span className="text-base font-medium text-foreground">{producer.name}</span>
         </div>
       </td>
-      <td className="px-2 py-2.5 text-muted-foreground">{producer.email}</td>
-      <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">
+      <td className="px-2 py-3 text-muted-foreground">{producer.email}</td>
+      <td className="px-2 py-3 text-right tabular-nums text-muted-foreground">
         {producer.total_hectares != null ? `${fmtHa(producer.total_hectares)} ha` : "—"}
       </td>
-      <td className="px-2 py-2.5 text-right">
+      <td className="px-2 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
-          {producer.producer_id ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Ver detalhes"
-              onClick={onOpen}
-              className="text-muted-foreground hover:text-primary"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-          ) : null}
           {canManage && tab === "active" ? (
             <Button
               variant="ghost"
-              size="icon"
-              title="Remover produtor"
-              onClick={onArchive}
+              size="sm"
+              onClick={stop(onArchive)}
               disabled={actionPending}
-              className="text-muted-foreground hover:text-destructive"
+              className="gap-1.5 text-muted-foreground hover:text-destructive"
             >
               <Archive className="h-4 w-4" />
+              <span className="hidden sm:inline">Remover</span>
             </Button>
           ) : null}
           {canManage && tab === "archived" ? (
             <>
               <Button
                 variant="ghost"
-                size="icon"
-                title="Reativar produtor"
-                onClick={onReactivate}
+                size="sm"
+                onClick={stop(onReactivate)}
                 disabled={actionPending}
-                className="text-muted-foreground hover:text-primary"
+                className="gap-1.5 text-muted-foreground hover:text-primary"
               >
                 <RotateCcw className="h-4 w-4" />
+                <span className="hidden sm:inline">Reativar</span>
               </Button>
               <Button
                 variant="outline"
-                size="icon"
-                title="Excluir definitivamente"
-                onClick={onDelete}
+                size="sm"
+                onClick={stop(onDelete)}
                 disabled={actionPending}
-                className={cn(deactivateOutlineButtonClass, "h-8 w-8")}
+                className={cn(deactivateOutlineButtonClass, "gap-1.5")}
               >
                 <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Excluir</span>
               </Button>
             </>
           ) : null}
           {isInvitation && producer.invitation_id ? (
             <Button
               variant="ghost"
-              size="icon"
-              title="Cancelar convite"
-              onClick={onRevokeInvitation}
+              size="sm"
+              onClick={stop(onRevokeInvitation)}
               disabled={actionPending}
-              className="text-muted-foreground hover:text-destructive"
+              className="gap-1.5 text-muted-foreground hover:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Cancelar convite</span>
             </Button>
-          ) : !canManage && !producer.producer_id ? (
-            <span className="text-xs text-muted-foreground">—</span>
+          ) : null}
+          {canOpen ? (
+            <ChevronRight className="ml-1 h-5 w-5 shrink-0 text-muted-foreground" />
+          ) : !canManage && !isInvitation ? (
+            <span className="text-sm text-muted-foreground">—</span>
           ) : null}
         </div>
       </td>

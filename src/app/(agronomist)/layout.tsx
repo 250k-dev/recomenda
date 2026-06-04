@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
-import { AppShell } from "@/components/layout/app-shell";
+import { AgronomistShell } from "@/components/layout/agronomist-shell";
 
 export default function AgronomistLayout({ children }: { children: ReactNode }) {
-  return <AppShell role="AGRONOMIST">{children}</AppShell>;
+  return <AgronomistShell>{children}</AgronomistShell>;
 }

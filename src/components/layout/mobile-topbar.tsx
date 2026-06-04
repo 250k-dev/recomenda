@@ -16,7 +16,6 @@ export function MobileTopbar() {
         size="icon"
         onClick={toggleSidebar}
         aria-label="Abrir menu"
-        className="h-9 w-9"
       >
         <Menu className="h-5 w-5" />
       </Button>

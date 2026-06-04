@@ -334,6 +334,10 @@ export default function FarmDetailPage() {
     ? `/farms/${farmId}/season/new?producer_id=${encodeURIComponent(resolvedProducerId)}`
     : `/farms/${farmId}/season/new`;
 
+  const newPurchaseListHref = resolvedProducerId
+    ? `/farms/${farmId}/purchase-list/new?producer_id=${encodeURIComponent(resolvedProducerId)}`
+    : `/farms/${farmId}/purchase-list/new`;
+
   return (
     <>
       <BreadcrumbBack items={breadcrumbs} />
@@ -433,7 +437,7 @@ export default function FarmDetailPage() {
             ) : null}
 
             <Link href={newSeasonHref}>
-              <Button className="gap-2">
+              <Button size="lg" className="gap-2">
                 <Plus className="h-4 w-4" />
                 Nova safra
               </Button>
@@ -596,25 +600,27 @@ export default function FarmDetailPage() {
                       <Button
                         asChild
                         variant="ghost"
-                        size="icon"
+                        size="sm"
                         title="Ver detalhes do talhão"
-                        className="text-muted-foreground hover:text-primary"
+                        className="gap-1.5 text-muted-foreground hover:text-primary"
                       >
                         <Link href={plotHref} aria-label={`Ver talhão ${plot.name}`}>
                           <Eye className="h-4 w-4" />
+                          <span className="hidden sm:inline">Ver</span>
                         </Link>
                       </Button>
                       <Button
                         variant="ghost"
-                        size="icon"
+                        size="sm"
                         title="Remover talhão"
-                        className="text-muted-foreground hover:text-destructive"
+                        className="gap-1.5 text-muted-foreground hover:text-destructive"
                         disabled={deletePlot.isPending}
                         onClick={() =>
                           setDeletePlotConfirm({ id: plot.id, name: plot.name })
                         }
                       >
                         <Trash2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Remover</span>
                       </Button>
                     </CardContent>
                   </Card>
@@ -630,7 +636,7 @@ export default function FarmDetailPage() {
             list={selectedList}
             isLoading={loadingPurchaseLists || loadingSeasons}
             producerId={resolvedProducerId}
-            newSeasonHref={newSeasonHref}
+            newPurchaseListHref={newPurchaseListHref}
             fallbackSeasonIds={activeSeasonIds}
           />
         </section>
@@ -696,13 +702,13 @@ function FarmPurchaseListTab({
   list,
   isLoading,
   producerId,
-  newSeasonHref,
+  newPurchaseListHref,
   fallbackSeasonIds,
 }: {
   list: PurchaseListDetail | null;
   isLoading: boolean;
   producerId: string | null;
-  newSeasonHref: string;
+  newPurchaseListHref: string;
   fallbackSeasonIds: string[];
 }) {
   if (!producerId) {
@@ -721,7 +727,7 @@ function FarmPurchaseListTab({
       return (
         <FarmSeasonShoppingFallback
           seasonIds={fallbackSeasonIds}
-          newSeasonHref={newSeasonHref}
+          newPurchaseListHref={newPurchaseListHref}
         />
       );
     }
@@ -729,7 +735,7 @@ function FarmPurchaseListTab({
     return (
       <EmptyState
         title="Nenhuma lista de compra para esta fazenda."
-        action={<Button asChild size="sm"><Link href={newSeasonHref}>Configurar safra</Link></Button>}
+        action={<Button asChild size="sm"><Link href={newPurchaseListHref}>Montar lista de compra</Link></Button>}
       />
     );
   }
@@ -757,7 +763,7 @@ function FarmPurchaseListTab({
     return (
       <EmptyState
         title={`A lista "${list.name}" ainda não tem produtos cadastrados.`}
-        action={<Button asChild size="sm"><Link href={newSeasonHref}>Atualizar safra</Link></Button>}
+        action={<Button asChild size="sm"><Link href={newPurchaseListHref}>Montar lista de compra</Link></Button>}
       />
     );
   }
@@ -897,10 +903,10 @@ function FarmPurchaseListTab({
 
 function FarmSeasonShoppingFallback({
   seasonIds,
-  newSeasonHref,
+  newPurchaseListHref,
 }: {
   seasonIds: string[];
-  newSeasonHref: string;
+  newPurchaseListHref: string;
 }) {
   const { items, isLoading } = useFarmAggregatedShoppingList(seasonIds);
 
@@ -910,7 +916,7 @@ function FarmSeasonShoppingFallback({
     return (
       <EmptyState
         title="Nenhum produto pendente nas safras ativas desta fazenda."
-        action={<Button asChild size="sm"><Link href={newSeasonHref}>Configurar safra</Link></Button>}
+        action={<Button asChild size="sm"><Link href={newPurchaseListHref}>Montar lista de compra</Link></Button>}
       />
     );
   }

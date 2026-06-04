@@ -45,7 +45,7 @@ export function SegmentedTabs<T extends string>({
             className={cn(
               "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 outline-none",
               "focus-visible:ring-[3px] focus-visible:ring-ring/40",
-              "rounded-md px-3 py-1.5 text-sm",
+              "rounded-md px-4 py-2 text-sm",
               isActive
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
@@ -55,7 +55,7 @@ export function SegmentedTabs<T extends string>({
             {item.badgeCount != null && item.badgeCount > 0 ? (
               <span
                 className={cn(
-                  "min-w-5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums transition-colors",
+                  "min-w-5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums transition-colors",
                   isActive
                     ? "bg-primary-foreground/20 text-primary-foreground"
                     : "bg-muted-foreground/15 text-muted-foreground group-hover:bg-muted-foreground/25",

@@ -1,8 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
-import { useSidebar } from "@/components/ui/sidebar";
 import { useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -10,9 +8,6 @@ import {
   User,
   Building2,
   Sprout,
-  ShoppingCart,
-  CalendarDays,
-  FileCheck,
   ArrowLeft,
   ArrowRight,
   Plus,
@@ -20,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SeasonSetupWizard } from "@/components/domain/season-setup-wizard";
 import {
   createProducer,
   createFarm,
@@ -42,10 +36,6 @@ const STEPS = [
   { n: 1, label: "Produtor", icon: User },
   { n: 2, label: "Fazenda", icon: Building2 },
   { n: 3, label: "Talhão", icon: Sprout },
-  { n: 4, label: "Lista de compra", icon: ShoppingCart },
-  { n: 5, label: "Safra", icon: CalendarDays },
-  { n: 6, label: "Plantação", icon: Sprout },
-  { n: 7, label: "Revisão", icon: FileCheck },
 ];
 
 const fmt = (n: number) =>
@@ -56,7 +46,6 @@ export default function OnboardingPage() {
   // const sidebar = useSidebar();
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState<Producer | null>(null);
-  const [farms, setFarms] = useState<Farm[]>([]);
   const [currentFarm, setCurrentFarm] = useState<Farm | null>(null);
   const [allPlots, setAllPlots] = useState<WizPlot[]>([]);
 
@@ -77,9 +66,9 @@ export default function OnboardingPage() {
 
   return (
     <div className="-mx-4 -my-6 flex min-h-[calc(100vh-1px)] md:-mx-8 bg-background">
-      <aside className="hidden w-64 shrink-0 flex-col gap-8 border-r bg-muted/40 px-6 py-8 lg:flex">
+      <aside className="flex-col hidden w-64 gap-8 px-6 py-8 border-r shrink-0 bg-muted/40 lg:flex">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
             Onboarding
           </p>
           <h2 className="mt-2 text-base font-semibold leading-snug tracking-tight text-foreground">
@@ -109,9 +98,9 @@ export default function OnboardingPage() {
                   )}
                 >
                   {state === "done" ? (
-                    <Check className="h-4 w-4" />
+                    <Check className="w-4 h-4" />
                   ) : (
-                    <Icon className="h-4 w-4" />
+                    <Icon className="w-4 h-4" />
                   )}
                 </span>
                 <p
@@ -130,20 +119,18 @@ export default function OnboardingPage() {
         </ol>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-8 sm:py-8 lg:px-12">
-        {step < 4 ? (
-          <div className="mb-6 flex items-center gap-3">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${(step / STEPS.length) * 100}%` }}
-              />
-            </div>
-            <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-              Passo {step} de {STEPS.length}
-            </span>
+      <section className="flex flex-col flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 lg:px-12">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full transition-all rounded-full bg-primary"
+              style={{ width: `${(step / STEPS.length) * 100}%` }}
+            />
           </div>
-        ) : null}
+          <span className="text-xs font-medium shrink-0 tabular-nums text-muted-foreground">
+            Passo {step} de {STEPS.length}
+          </span>
+        </div>
 
         {step === 1 && (
           <StepProducer
@@ -159,7 +146,6 @@ export default function OnboardingPage() {
             producer={producer}
             onBack={() => setStep(allPlots.length > 0 ? 3 : 1)}
             onDone={(f) => {
-              setFarms((prev) => [...prev, f]);
               setCurrentFarm(f);
               setStep(3);
             }}
@@ -173,18 +159,7 @@ export default function OnboardingPage() {
             onAddPlot={(p) => setAllPlots((prev) => [...prev, p])}
             onBack={() => setStep(2)}
             onAnotherFarm={() => setStep(2)}
-            onNext={() => setStep(4)}
-          />
-        )}
-        {step >= 4 && producer && (
-          <SeasonSetupWizard
-            producerId={producer.id}
-            producerName={producer.name}
-            plots={allPlots}
-            onCancel={() => setStep(3)}
-            onStepChange={(wizardStep) => setStep(wizardStep)}
-            onComplete={() => router.push(`/producers/${producer.id}`)}
-            successRedirectLabel="Ir para o produtor"
+            onFinish={() => router.push(`/producers/${producer.id}`)}
           />
         )}
       </section>
@@ -198,7 +173,7 @@ function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
       <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {title}
       </h1>
-      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+      <p className="max-w-2xl mt-2 text-sm leading-relaxed text-muted-foreground">
         {subtitle}
       </p>
     </div>
@@ -230,7 +205,7 @@ function Field({
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+    <div className="px-3 py-2 text-sm border rounded-md border-destructive/30 bg-destructive/5 text-destructive">
       {message}
     </div>
   );
@@ -246,7 +221,7 @@ function StepFooter({
   secondary?: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 mt-10 -mx-4 border-t bg-background/95 px-4 py-4 backdrop-blur sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12">
+    <div className="sticky bottom-0 px-4 py-4 mt-10 -mx-4 border-t bg-background/95 backdrop-blur sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12">
       <div className="flex flex-wrap items-center gap-2">
         {back}
         <div className="flex-1" />
@@ -298,16 +273,15 @@ function StepProducer({
   const submit = () => {
     setError(null);
     if (!name.trim()) return setError("Informe o nome do produtor.");
-    if (!email.trim()) return setError("Informe o e-mail do produtor.");
     mutation.mutate({
       name: name.trim(),
-      email: email.trim(),
+      email: email.trim() || undefined,
       phone: phone.trim() || undefined,
     });
   };
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-col flex-1">
       <StepHeader
         title="Comece pelo produtor"
         subtitle="Você não precisa enviar convite agora. O acesso ao app é opcional e pode ser ativado depois."
@@ -324,17 +298,7 @@ function StepProducer({
           />
         </Field>
 
-        <Field htmlFor="email" label="E-mail">
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="produtor@exemplo.com"
-          />
-        </Field>
-
-        <Field htmlFor="phone" label="Telefone (opcional)">
+        <Field htmlFor="phone" label="Telefone">
           <Input
             id="phone"
             value={phone}
@@ -349,6 +313,16 @@ function StepProducer({
               }
             }}
             placeholder="(00) 00000-0000"
+          />
+        </Field>
+
+        <Field htmlFor="email" label="E-mail (opcional)">
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="produtor@exemplo.com"
           />
         </Field>
 
@@ -369,7 +343,7 @@ function StepProducer({
             size="lg"
           >
             {mutation.isPending ? "Salvando…" : "Próximo"}
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="w-4 h-4" />
           </Button>
         }
       />
@@ -410,13 +384,13 @@ function StepFarm({
   };
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-col flex-1">
       <StepHeader
         title="A fazenda do produtor"
         subtitle="Você pode adicionar mais fazendas depois. O total de hectares é a soma dos talhões."
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <ContextBadge tone="primary">
           <Check className="h-3.5 w-3.5" />
           Produtor: <strong className="font-semibold">{producer.name}</strong>
@@ -453,7 +427,7 @@ function StepFarm({
       <StepFooter
         back={
           <Button variant="ghost" onClick={onBack} className="gap-2" size="lg">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="w-4 h-4" />
             Voltar
           </Button>
         }
@@ -465,7 +439,7 @@ function StepFarm({
             size="lg"
           >
             {mutation.isPending ? "Salvando…" : "Próximo"}
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="w-4 h-4" />
           </Button>
         }
       />
@@ -480,7 +454,7 @@ function StepPlot({
   onAddPlot,
   onBack,
   onAnotherFarm,
-  onNext,
+  onFinish,
 }: {
   producer: Producer;
   farm: Farm;
@@ -488,7 +462,7 @@ function StepPlot({
   onAddPlot: (p: WizPlot) => void;
   onBack: () => void;
   onAnotherFarm: () => void;
-  onNext: () => void;
+  onFinish: () => void;
 }) {
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
@@ -522,13 +496,13 @@ function StepPlot({
   const totalHa = plots.reduce((s, p) => s + p.area, 0);
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-col flex-1">
       <StepHeader
         title="Mapeie os talhões"
-        subtitle="Adicione quantos talhões quiser. O total de hectares da fazenda é a soma."
+        subtitle="Adicione quantos talhões quiser. O total de hectares da fazenda é a soma. A lista de compra e a safra são configuradas depois, dentro do produtor."
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         <ContextBadge tone="primary">
           <User className="h-3.5 w-3.5" />
           {producer.name}
@@ -571,14 +545,14 @@ function StepPlot({
           disabled={mutation.isPending}
           className="gap-2"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="w-4 h-4" />
           {mutation.isPending ? "Adicionando..." : "Adicionar talhão"}
         </Button>
       </div>
 
       {plots.length > 0 && (
-        <div className="mt-8 max-w-xl">
-          <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="max-w-xl mt-8">
+          <div className="flex items-center justify-between mb-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
             <span>
               {farm.name} · {plots.length}{" "}
               {plots.length === 1 ? "talhão" : "talhões"}
@@ -592,12 +566,12 @@ function StepPlot({
             {plots.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-3 rounded-lg border bg-card px-3 py-3 text-sm shadow-sm"
+                className="flex items-center gap-3 px-3 py-3 text-sm border rounded-lg shadow-sm bg-card"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Check className="h-4 w-4" />
+                <span className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 bg-primary/10 text-primary">
+                  <Check className="w-4 h-4" />
                 </span>
-                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                <span className="flex-1 min-w-0 font-medium truncate text-foreground">
                   {p.name}
                 </span>
                 <span className="shrink-0 tabular-nums text-foreground">
@@ -612,7 +586,7 @@ function StepPlot({
       <StepFooter
         back={
           <Button variant="ghost" onClick={onBack} className="gap-2" size="lg">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="w-4 h-4" />
             Voltar
           </Button>
         }
@@ -623,19 +597,19 @@ function StepPlot({
             className="gap-2"
             size="lg"
           >
-            <Building2 className="h-4 w-4" />
+            <Building2 className="w-4 h-4" />
             Outra fazenda
           </Button>
         }
         primary={
           <Button
-            onClick={onNext}
+            onClick={onFinish}
             disabled={plots.length === 0}
             className="gap-2"
             size="lg"
           >
-            Próximo
-            <ArrowRight className="h-4 w-4" />
+            <Check className="w-4 h-4" />
+            Concluir cadastro
           </Button>
         }
       />

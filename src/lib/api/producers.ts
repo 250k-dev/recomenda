@@ -4,14 +4,14 @@ import type { PaginatedResponse } from "@/lib/api/types";
 export interface Producer {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone?: string | null;
 }
 
 export interface CreatedProducer {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
 }
 
@@ -82,7 +82,7 @@ export async function getProducer(id: string) {
   return data;
 }
 
-export async function createProducer(payload: { name: string; email: string; phone?: string }) {
+export async function createProducer(payload: { name: string; email?: string; phone?: string }) {
   const { data } = await api.post<CreatedProducer>("/producers", payload);
   return data;
 }
