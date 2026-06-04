@@ -62,18 +62,18 @@ export function NotificationsBell({
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 border-4 border-background"
+              className="absolute w-5 h-5 p-1.5 border-4 rounded-full -top-0.5 -right-0.5 border-background"
             />
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align={align} className="w-80 p-0">
-        <div className="border-b border-border px-4 py-3">
+      <PopoverContent align={align} className="p-0 w-80">
+        <div className="px-4 py-3 border-b border-border">
           <p className="text-sm font-semibold text-foreground">Notificações</p>
         </div>
-        <div className="max-h-96 space-y-2 overflow-y-auto p-2">
+        <div className="p-2 space-y-2 overflow-y-auto max-h-96">
           {notificationsList.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
+            <p className="py-8 text-sm text-center text-muted-foreground">
               Nenhuma notificação
             </p>
           ) : (
@@ -82,9 +82,9 @@ export function NotificationsBell({
                 key={notification.id}
                 type="button"
                 onClick={() => handleNotificationClick(notification)}
-                className="flex w-full items-start gap-3 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-all hover:border-primary/30 hover:bg-accent/60"
+                className="flex items-start w-full gap-3 p-3 text-left transition-all border shadow-sm rounded-xl border-border bg-card hover:border-primary/30 hover:bg-accent/60"
               >
-                <div className="min-w-0 flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground">
                     {getNotificationTitle(notification)}
                   </p>

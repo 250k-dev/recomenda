@@ -30,7 +30,8 @@ export function UserMenu() {
 
   const current = planData?.quota_usage.current ?? 0;
   const limit = planData?.quota_usage.limit ?? planData?.plan.plot_quota ?? 0;
-  const pct = limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+  const pct =
+    limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
 
   const handleLogout = async () => {
     try {
@@ -47,25 +48,25 @@ export function UserMenu() {
       <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-lg p-1 pr-2 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
         {userLoading ? (
           <>
-            <Skeleton className="size-9 rounded-lg" />
-            <div className="hidden flex-col gap-1 sm:flex">
+            <Skeleton className="rounded-lg size-9" />
+            <div className="flex-col hidden gap-1 sm:flex">
               <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="h-3 w-16" />
+              <Skeleton className="w-16 h-3" />
             </div>
           </>
         ) : (
           <>
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+            <div className="flex items-center justify-center text-sm font-bold rounded-lg size-9 shrink-0 bg-primary text-primary-foreground">
               {initial}
             </div>
-            <div className="hidden min-w-0 flex-col leading-tight sm:flex">
-              <span className="max-w-36 truncate text-sm font-semibold text-foreground">
+            <div className="flex-col hidden min-w-0 leading-tight sm:flex">
+              <span className="text-sm font-semibold truncate max-w-36 text-foreground">
                 {name}
               </span>
               {planLoading ? (
                 <Skeleton className="mt-0.5 h-3 w-14" />
               ) : planName ? (
-                <span className="max-w-36 truncate text-xs text-muted-foreground">
+                <span className="text-xs truncate max-w-36 text-muted-foreground">
                   {planName}
                 </span>
               ) : null}
@@ -77,30 +78,20 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-64">
         <div className="flex flex-col gap-1 px-1.5 py-1.5">
           {userLoading ? (
-            <>
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-44" />
-            </>
+            <Skeleton className="w-32 h-4" />
           ) : (
-            <>
-              <p className="truncate text-sm font-semibold text-foreground">
-                {name}
-              </p>
-              {currentUser?.email && (
-                <p className="truncate text-xs text-muted-foreground">
-                  {currentUser.email}
-                </p>
-              )}
-            </>
+            <p className="text-sm font-semibold truncate text-foreground">
+              {name}
+            </p>
           )}
 
           {planLoading ? (
-            <div className="mt-1.5 space-y-1.5">
-              <Skeleton className="h-4 w-20" />
+            <div className="space-y-1.5">
+              <Skeleton className="w-20 h-4" />
               <Skeleton className="h-1.5 w-full" />
             </div>
           ) : planData ? (
-            <div className="mt-1.5 space-y-1.5">
+            <div className="space-y-1.5">
               {planName && (
                 <Badge className="w-fit gap-0.5 bg-sky-100 px-1.5 text-[0.6rem] leading-none text-sky-700">
                   <BadgeCheck className="size-2.5!" />
@@ -128,12 +119,16 @@ export function UserMenu() {
 
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/profile">
+          <Link href="/profile" className="mt-2 mb-1">
             <UserCircle className="size-4" />
             Meu perfil
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onSelect={handleLogout}>
+        <DropdownMenuItem
+          variant="destructive"
+          onSelect={handleLogout}
+          className="mb-1"
+        >
           <LogOut className="size-4" />
           Sair
         </DropdownMenuItem>
