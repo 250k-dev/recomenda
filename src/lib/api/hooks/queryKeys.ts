@@ -1,5 +1,6 @@
 export const queryKeys = {
-  timingTemplatesArchived: ["timing-templates-archived"],
+  timingTemplatesArchived: (producerId: string) =>
+    ["timing-templates-archived", producerId] as const,
   mixTemplatesArchived: ["mix-templates-archived"],
   seasonsArchived: ["seasons-archived"],
   me: ["me"],
@@ -26,7 +27,7 @@ export const queryKeys = {
   seasonTimeline: (seasonId: string) => ["season-timeline", seasonId],
   seasonShoppingList: (seasonId: string) => ["season-shopping-list", seasonId],
   notifications: ["notifications"],
-  timingTemplates: ["timing-templates"],
+  timingTemplates: (producerId: string) => ["timing-templates", producerId] as const,
   timingTemplate: (id: string) => ["timing-template", id],
   mixTemplates: ["mix-templates"],
   mixTemplate: (id: string) => ["mix-template", id],
@@ -39,4 +40,6 @@ export const queryKeys = {
   producerPurchaseLists: (producerId: string) => ["producer-purchase-lists", producerId] as const,
   farmPurchaseLists: (farmId: string) => ["farm-purchase-lists", farmId] as const,
   seasonCostPlan: (seasonId: string) => ["season-cost-plan", seasonId] as const,
+  agronomistAgenda: (producerId?: string) =>
+    ["agronomist-agenda", producerId ?? "all"] as const,
 };
