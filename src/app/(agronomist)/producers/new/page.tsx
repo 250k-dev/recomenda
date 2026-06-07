@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMemo, useState, type ReactNode } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Check,
   User,
@@ -11,16 +11,27 @@ import {
   ArrowLeft,
   ArrowRight,
   Plus,
+  Pencil,
+  Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   createProducer,
   createFarm,
   createPlot,
+  updatePlot,
+  deletePlot,
   grantFarmAccess,
 } from "@/lib/api/client";
+import {
+  BRAZIL_STATES,
+  fetchCitiesByState,
+  formatFarmLocation,
+} from "@/lib/brazil-locations";
 import { cn } from "@/lib/utils";
 
 type Producer = { id: string; name: string };
@@ -157,6 +168,10 @@ export default function OnboardingPage() {
             farm={currentFarm}
             plots={allPlots.filter((p) => p.farmId === currentFarm.id)}
             onAddPlot={(p) => setAllPlots((prev) => [...prev, p])}
+            onUpdatePlot={(p) =>
+              setAllPlots((prev) => prev.map((item) => (item.id === p.id ? p : item)))
+            }
+            onRemovePlot={(id) => setAllPlots((prev) => prev.filter((item) => item.id !== id))}
             onBack={() => setStep(2)}
             onAnotherFarm={() => setStep(2)}
             onFinish={() => router.push(`/producers/${producer.id}`)}
@@ -361,14 +376,43 @@ function StepFarm({
   onDone: (f: Farm) => void;
 }) {
   const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
+  const [stateUf, setStateUf] = useState("");
+  const [city, setCity] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const citiesQuery = useQuery({
+    queryKey: ["ibge-cities", stateUf],
+    queryFn: () => fetchCitiesByState(stateUf),
+    enabled: Boolean(stateUf),
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+
+  const stateOptions = useMemo(
+    () =>
+      BRAZIL_STATES.map((state) => ({
+        value: state.uf,
+        label: `${state.name} (${state.uf})`,
+        keywords: `${state.name} ${state.uf}`,
+      })),
+    [],
+  );
+
+  const cityOptions = useMemo(
+    () =>
+      (citiesQuery.data ?? []).map((cityName) => ({
+        value: cityName,
+        label: cityName,
+      })),
+    [citiesQuery.data],
+  );
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const location =
+        city.trim() && stateUf ? formatFarmLocation(city.trim(), stateUf) : undefined;
       const created = await createFarm({
         name: name.trim(),
-        location: location.trim() || undefined,
+        location,
       });
       await grantFarmAccess(created.id, producer.id);
       return created;
@@ -409,17 +453,57 @@ function StepFarm({
         </Field>
 
         <Field
-          htmlFor="farm-loc"
           label="Localização (opcional)"
           hint="Usado nos relatórios e na visualização da fazenda."
         >
-          <Input
-            id="farm-loc"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Cidade, UF"
-          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="farm-state" className="text-xs text-muted-foreground">
+                Estado
+              </Label>
+              <SearchableSelect
+                id="farm-state"
+                value={stateUf}
+                onValueChange={(nextUf) => {
+                  setStateUf(nextUf);
+                  setCity("");
+                }}
+                options={stateOptions}
+                placeholder="Selecione…"
+                searchPlaceholder="Buscar estado…"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="farm-city" className="text-xs text-muted-foreground">
+                Cidade
+              </Label>
+              <SearchableSelect
+                id="farm-city"
+                value={city}
+                onValueChange={setCity}
+                options={cityOptions}
+                placeholder={
+                  !stateUf
+                    ? "Selecione o estado"
+                    : citiesQuery.isError
+                      ? "Erro ao carregar"
+                      : "Selecione…"
+                }
+                searchPlaceholder="Buscar cidade…"
+                disabled={!stateUf || citiesQuery.isLoading || citiesQuery.isError}
+                loading={Boolean(stateUf) && citiesQuery.isLoading}
+                loadingMessage="Carregando cidades…"
+                emptyMessage="Nenhuma cidade encontrada."
+              />
+            </div>
+          </div>
         </Field>
+
+        {citiesQuery.isError ? (
+          <p className="text-xs text-destructive">
+            Não foi possível carregar as cidades. Verifique a conexão e selecione o estado novamente.
+          </p>
+        ) : null}
 
         <FieldError message={error ?? undefined} />
       </div>
@@ -452,6 +536,8 @@ function StepPlot({
   farm,
   plots,
   onAddPlot,
+  onUpdatePlot,
+  onRemovePlot,
   onBack,
   onAnotherFarm,
   onFinish,
@@ -460,15 +546,25 @@ function StepPlot({
   farm: Farm;
   plots: WizPlot[];
   onAddPlot: (p: WizPlot) => void;
+  onUpdatePlot: (p: WizPlot) => void;
+  onRemovePlot: (id: string) => void;
   onBack: () => void;
   onAnotherFarm: () => void;
   onFinish: () => void;
 }) {
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
+  const [editingPlotId, setEditingPlotId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const mutation = useMutation({
+  const resetForm = () => {
+    setName("");
+    setArea("");
+    setEditingPlotId(null);
+    setError(null);
+  };
+
+  const createMutation = useMutation({
     mutationFn: () =>
       createPlot(farm.id, { name: name.trim(), area_hectares: Number(area) }),
     onSuccess: (p) => {
@@ -479,18 +575,61 @@ function StepPlot({
         farmId: farm.id,
         farmName: farm.name,
       });
-      setName("");
-      setArea("");
+      resetForm();
     },
     onError: (e: unknown) => setError(extractError(e)),
   });
+
+  const updateMutation = useMutation({
+    mutationFn: (plotId: string) =>
+      updatePlot(plotId, { name: name.trim(), area_hectares: Number(area) }),
+    onSuccess: (p) => {
+      onUpdatePlot({
+        id: p.id,
+        name: p.name,
+        area: Number(p.area_hectares),
+        farmId: farm.id,
+        farmName: farm.name,
+      });
+      resetForm();
+    },
+    onError: (e: unknown) => setError(extractError(e)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deletePlot,
+    onSuccess: (_data, plotId) => {
+      onRemovePlot(plotId);
+      setEditingPlotId((current) => {
+        if (current === plotId) {
+          setName("");
+          setArea("");
+        }
+        return current === plotId ? null : current;
+      });
+    },
+    onError: (e: unknown) => setError(extractError(e)),
+  });
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const submit = () => {
     setError(null);
     if (!name.trim()) return setError("Informe o nome do talhão.");
     const n = Number(area);
     if (!n || n <= 0) return setError("Informe os hectares do talhão.");
-    mutation.mutate();
+    if (editingPlotId) {
+      updateMutation.mutate(editingPlotId);
+      return;
+    }
+    createMutation.mutate();
+  };
+
+  const startEdit = (plot: WizPlot) => {
+    setEditingPlotId(plot.id);
+    setName(plot.name);
+    setArea(String(plot.area));
+    setError(null);
   };
 
   const totalHa = plots.reduce((s, p) => s + p.area, 0);
@@ -515,6 +654,12 @@ function StepPlot({
       </div>
 
       <div className="max-w-xl space-y-5">
+        {editingPlotId ? (
+          <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">
+            Editando talhão — ajuste os campos e salve, ou cancele.
+          </div>
+        ) : null}
+
         <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
           <Field htmlFor="plot-name" label="Nome do talhão">
             <Input
@@ -539,15 +684,32 @@ function StepPlot({
 
         <FieldError message={error ?? undefined} />
 
-        <Button
-          variant="outline"
-          onClick={submit}
-          disabled={mutation.isPending}
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          {mutation.isPending ? "Adicionando..." : "Adicionar talhão"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={editingPlotId ? "default" : "outline"}
+            onClick={submit}
+            disabled={isSaving}
+            className="gap-2"
+          >
+            {editingPlotId ? (
+              <>
+                <Check className="w-4 h-4" />
+                {isSaving ? "Salvando…" : "Salvar alterações"}
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                {isSaving ? "Adicionando…" : "Adicionar talhão"}
+              </>
+            )}
+          </Button>
+          {editingPlotId ? (
+            <Button type="button" variant="ghost" onClick={resetForm} className="gap-2">
+              <X className="w-4 h-4" />
+              Cancelar edição
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {plots.length > 0 && (
@@ -563,22 +725,55 @@ function StepPlot({
             </span>
           </div>
           <div className="flex flex-col gap-2">
-            {plots.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-3 px-3 py-3 text-sm border rounded-lg shadow-sm bg-card"
-              >
-                <span className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 bg-primary/10 text-primary">
-                  <Check className="w-4 h-4" />
-                </span>
-                <span className="flex-1 min-w-0 font-medium truncate text-foreground">
-                  {p.name}
-                </span>
-                <span className="shrink-0 tabular-nums text-foreground">
-                  {fmt(p.area)} ha
-                </span>
-              </div>
-            ))}
+            {plots.map((p) => {
+              const isEditing = editingPlotId === p.id;
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border px-3 py-3 text-sm shadow-sm",
+                    isEditing ? "border-primary/40 bg-primary/5" : "bg-card",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                      isEditing ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+                    )}
+                  >
+                    {isEditing ? <Pencil className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+                  </span>
+                  <span className="flex-1 min-w-0 font-medium truncate text-foreground">
+                    {p.name}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-foreground">{fmt(p.area)} ha</span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label={`Editar ${p.name}`}
+                      onClick={() => startEdit(p)}
+                      disabled={deleteMutation.isPending || isSaving}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={`Remover ${p.name}`}
+                      onClick={() => deleteMutation.mutate(p.id)}
+                      disabled={deleteMutation.isPending || isSaving}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

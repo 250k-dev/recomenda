@@ -17,6 +17,7 @@ export type WizardPlot = {
 /** Item da lista de compra (estado de formulário). */
 export type ListItem = {
   key: string;
+  category: string;
   productId: string;
   productName: string;
   stage: string;
@@ -27,12 +28,21 @@ export type ListItem = {
   price: string;
 };
 
-/** Datas por talhão (plantio/dessecação/ciclo). */
+/** Configuração por talhão no wizard de safra. */
 export type PlotSchedule = {
   plotId: string;
+  variety: string;
   plantingDate: string;
-  desiccationDate: string;
   cycleDays: string;
+};
+
+/** Estágio rascunho para montar cronograma no wizard. */
+export type DraftTimingStage = {
+  key: string;
+  name: string;
+  trigger_type: string;
+  window_start_days: string;
+  window_end_days: string;
 };
 
 export const STAGES = [

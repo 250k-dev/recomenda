@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
+import { ProducerTimingTemplatesSection } from "@/components/domain/timing/producer-timing-templates-section";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +37,7 @@ import {
   ShoppingCart,
   CalendarDays,
   ChevronRight,
+  ChevronDown,
   MapPin,
   Sprout,
   Leaf,
@@ -74,9 +78,6 @@ export function ProducerDetailView({
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
-  const [flowPicker, setFlowPicker] = useState<"purchase" | "season" | null>(
-    null,
-  );
   const [newFarmOpen, setNewFarmOpen] = useState(false);
   const [newFarmName, setNewFarmName] = useState("");
   const [newFarmLocation, setNewFarmLocation] = useState("");
@@ -143,26 +144,6 @@ export function ProducerDetailView({
       },
       onError: () => toast.error("Não foi possível atualizar o produtor."),
     });
-  };
-
-  const flowHref = (farmId: string, type: "purchase" | "season") => {
-    const base =
-      type === "purchase"
-        ? `/farms/${farmId}/purchase-list/new`
-        : `/farms/${farmId}/season/new`;
-    return `${base}?producer_id=${encodeURIComponent(producerId)}`;
-  };
-
-  const startFlow = (type: "purchase" | "season") => {
-    if (farmsList.length === 0) {
-      toast.error("Cadastre uma fazenda e seus talhões antes de continuar.");
-      return;
-    }
-    if (farmsList.length === 1) {
-      router.push(flowHref(farmsList[0].id, type));
-      return;
-    }
-    setFlowPicker(type);
   };
 
   if (isLoading) return <ProducerDetailSkeleton />;
@@ -257,27 +238,46 @@ export function ProducerDetailView({
         </div>
       )}
 
-      {/* Próximos passos */}
       {showSeasonActions ? (
-        <section className="mb-8">
-          <h2 className="mb-3 text-lg font-semibold text-foreground">
-            Próximos passos
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <NextStepCard
-              icon={<ShoppingCart className="w-5 h-5" />}
-              title="Lista de compra"
-              description="Monte a lista de produtos da safra com doses e preços."
-              onClick={() => startFlow("purchase")}
-            />
-            <NextStepCard
-              icon={<CalendarDays className="w-5 h-5" />}
-              title="Safra / Plantação"
-              description="Defina cultura, cronograma e datas de plantio por talhão."
-              onClick={() => startFlow("season")}
+        <>
+          <section className="mb-8">
+            <details className="group overflow-hidden rounded-xl border border-primary/15 bg-card shadow-sm open:shadow-md">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors marker:content-none hover:bg-primary/3 group-open:border-b group-open:bg-primary/4 [&::-webkit-details-marker]:hidden sm:px-6 sm:py-5">
+                <div className="flex min-w-0 items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/10">
+                    <CalendarDays className="h-6 w-6" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                      Planejamento
+                    </p>
+                    <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                      Cronograma
+                    </h2>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      Aplicações pendentes e atrasadas deste produtor
+                    </p>
+                  </div>
+                </div>
+                <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <span className="group-open:hidden">Expandir</span>
+                  <span className="hidden group-open:inline">Recolher</span>
+                  <ChevronDown className="h-5 w-5 transition-transform duration-200 group-open:rotate-180" />
+                </span>
+              </summary>
+              <div className="border-t border-primary/10 px-4 pb-5 pt-4 sm:px-6">
+                <MonthCalendar producerId={producerId} focusNearestEvent />
+              </div>
+            </details>
+          </section>
+
+          <div id="timing-templates">
+            <ProducerTimingTemplatesSection
+              producerId={producerId}
+              producerName={producer.name}
             />
           </div>
-        </section>
+        </>
       ) : null}
 
       {/* Fazendas */}
@@ -336,53 +336,90 @@ export function ProducerDetailView({
               const activeSeasonsCount = farm.seasons.filter((s) =>
                 ACTIVE_SEASON_STATUSES.has(s.status),
               ).length;
-              const farmHref = `/farms/${farm.id}?producer_id=${encodeURIComponent(producerId)}`;
+              const farmBase = `/farms/${farm.id}?producer_id=${encodeURIComponent(producerId)}`;
+              const farmHref = farmBase;
+              const seasonsHref = `${farmBase}&tab=seasons`;
+              const purchaseHref = `${farmBase}&tab=purchase`;
 
               return (
                 <Card
                   key={farm.id}
-                  className="overflow-hidden transition-all cursor-pointer group hover:border-primary/40 hover:shadow-md"
-                  onClick={() => router.push(farmHref)}
+                  className="overflow-hidden transition-all group hover:border-primary/40 hover:shadow-md"
                 >
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="flex items-center justify-center w-12 h-12 transition-transform shrink-0 rounded-xl bg-primary/10 text-primary group-hover:scale-105">
-                      <Tractor className="w-6 h-6" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-semibold truncate text-foreground">
-                          {farm.name}
-                        </h3>
-                        {activeSeasonsCount > 0 ? (
-                          <Badge variant="default" className="shrink-0">
-                            {activeSeasonsCount}{" "}
-                            {activeSeasonsCount === 1 ? "safra" : "safras"}
-                          </Badge>
-                        ) : null}
+                  <CardContent className="p-4">
+                    <button
+                      type="button"
+                      className="flex w-full cursor-pointer items-center gap-4 text-left"
+                      onClick={() => router.push(farmHref)}
+                    >
+                      <div className="flex items-center justify-center w-12 h-12 transition-transform shrink-0 rounded-xl bg-primary/10 text-primary group-hover:scale-105">
+                        <Tractor className="w-6 h-6" />
                       </div>
-                      {farm.location ? (
-                        <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                          <MapPin className="w-3 h-3 shrink-0" />
-                          {farm.location}
-                        </p>
-                      ) : null}
-                      <p className="mt-1.5 text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">
-                          {farm.plots.length}
-                        </span>{" "}
-                        {farm.plots.length === 1 ? "talhão" : "talhões"}
-                        <span className="mx-1.5 text-muted-foreground/60">
-                          ·
-                        </span>
-                        <span className="font-medium text-foreground">
-                          {fmtHa(totalHectares)}
-                        </span>{" "}
-                        ha
-                      </p>
-                    </div>
 
-                    <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-semibold truncate text-foreground">
+                            {farm.name}
+                          </h3>
+                          {activeSeasonsCount > 0 ? (
+                            <Badge variant="default" className="shrink-0">
+                              {activeSeasonsCount}{" "}
+                              {activeSeasonsCount === 1 ? "safra" : "safras"}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {farm.location ? (
+                          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            {farm.location}
+                          </p>
+                        ) : null}
+                        <p className="mt-1.5 text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            {farm.plots.length}
+                          </span>{" "}
+                          {farm.plots.length === 1 ? "talhão" : "talhões"}
+                          <span className="mx-1.5 text-muted-foreground/60">
+                            ·
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {fmtHa(totalHectares)}
+                          </span>{" "}
+                          ha
+                        </p>
+                      </div>
+
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                    </button>
+
+                    {showSeasonActions ? (
+                      <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Link href={seasonsHref}>
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            Safras
+                          </Link>
+                        </Button>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Link href={purchaseHref}>
+                            <ShoppingCart className="h-3.5 w-3.5" />
+                            Lista de compra
+                          </Link>
+                        </Button>
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               );
@@ -501,48 +538,6 @@ export function ProducerDetailView({
         </SheetContent>
       </Sheet>
 
-      {/* Seleção de fazenda para os fluxos */}
-      <Sheet
-        open={flowPicker !== null}
-        onOpenChange={(open) => !open && setFlowPicker(null)}
-      >
-        <SheetContent side="right" className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>
-              {flowPicker === "purchase"
-                ? "Para qual fazenda é a lista de compra?"
-                : "Para qual fazenda é a safra?"}
-            </SheetTitle>
-          </SheetHeader>
-          <div className="flex flex-col gap-2 mt-4">
-            {farmsList.map((farm) => (
-              <button
-                key={farm.id}
-                type="button"
-                onClick={() => {
-                  if (flowPicker) router.push(flowHref(farm.id, flowPicker));
-                  setFlowPicker(null);
-                }}
-                className="flex items-center gap-3 px-3 py-3 text-left transition-colors border rounded-lg bg-card hover:border-primary/40 hover:bg-accent/30"
-              >
-                <span className="flex items-center justify-center rounded-lg h-9 w-9 shrink-0 bg-primary/10 text-primary">
-                  <Tractor className="w-4 h-4" />
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium truncate text-foreground">
-                    {farm.name}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {farm.plots.length}{" "}
-                    {farm.plots.length === 1 ? "talhão" : "talhões"}
-                  </span>
-                </span>
-                <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
-        </SheetContent>
-      </Sheet>
     </>
   );
 }
@@ -609,35 +604,3 @@ function ContactChip({
   );
 }
 
-function NextStepCard({
-  icon,
-  title,
-  description,
-  onClick,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-4 p-4 text-left transition-all border shadow-sm group rounded-xl bg-card hover:border-primary/40 hover:shadow-md"
-    >
-      <span className="flex items-center justify-center w-12 h-12 transition-transform shrink-0 rounded-xl bg-primary/10 text-primary group-hover:scale-105">
-        {icon}
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-base font-semibold text-foreground">
-          {title}
-        </span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">
-          {description}
-        </span>
-      </span>
-      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-    </button>
-  );
-}

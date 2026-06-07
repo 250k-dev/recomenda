@@ -6,25 +6,25 @@ import {
   Check,
   Sprout,
   ArrowRight,
-  Plus,
-  Trash2,
+  ShoppingCart,
+  Leaf,
+  Type,
 } from "lucide-react";
-import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLocalCatalog, queryKeys } from "@/lib/api/hooks";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import {
   createPurchaseList,
   type PurchaseListItemInput,
 } from "@/lib/api/client";
-import { cn } from "@/lib/utils";
+import { queryKeys } from "@/lib/api/hooks";
+import { CROP_LABELS } from "@/lib/season-constants";
 import {
-  Field,
   FieldError,
   StepFooter,
-  StepHeader,
   SummaryCard,
-  STAGES,
   fmt,
   extractError,
   type ListItem,
@@ -55,7 +55,6 @@ export function PurchaseListWizard({
   const [step, setStep] = useState(1);
   const [crop, setCrop] = useState<"SOYBEAN" | "CORN">("SOYBEAN");
   const [listName, setListName] = useState("");
-  const [variety, setVariety] = useState("");
   const [items, setItems] = useState<ListItem[]>([]);
 
   const totalHa = useMemo(() => plots.reduce((s, p) => s + p.area, 0), [plots]);
@@ -80,8 +79,6 @@ export function PurchaseListWizard({
           setCrop={(v) => setCrop(v as "SOYBEAN" | "CORN")}
           listName={listName}
           setListName={setListName}
-          variety={variety}
-          setVariety={setVariety}
           items={items}
           setItems={setItems}
           totalHa={totalHa}
@@ -97,7 +94,6 @@ export function PurchaseListWizard({
           plots={plots}
           crop={crop}
           listName={listName}
-          variety={variety}
           items={items}
           totalHa={totalHa}
           successRedirectLabel={successRedirectLabel}
@@ -114,8 +110,6 @@ function StepList({
   setCrop,
   listName,
   setListName,
-  variety,
-  setVariety,
   items,
   setItems,
   totalHa,
@@ -127,8 +121,6 @@ function StepList({
   setCrop: (v: string) => void;
   listName: string;
   setListName: (v: string) => void;
-  variety: string;
-  setVariety: (v: string) => void;
   items: ListItem[];
   setItems: React.Dispatch<React.SetStateAction<ListItem[]>>;
   totalHa: number;
@@ -136,352 +128,122 @@ function StepList({
   onBack: () => void;
   onNext: () => void;
 }) {
-  const catalog = useLocalCatalog();
-  const products = catalog.data?.data ?? [];
   const [error, setError] = useState<string | null>(null);
-
-  const addItem = () => {
-    setItems((prev) => [
-      ...prev,
-      {
-        key: `i-${Date.now()}-${prev.length}`,
-        productId: "",
-        productName: "",
-        stage: STAGES[0],
-        dose: "",
-        unit: "L",
-        nApps: "1",
-        stock: "0",
-        price: "",
-      },
-    ]);
-  };
-
-  const updateItem = (key: string, patch: Partial<ListItem>) => {
-    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
-  };
-
-  const removeItem = (key: string) => {
-    setItems((prev) => prev.filter((it) => it.key !== key));
-  };
 
   const next = () => {
     setError(null);
     if (!listName.trim()) return setError("Dê um nome para a lista de compra.");
     if (items.length === 0) return setError("Adicione pelo menos um produto.");
     for (const it of items) {
+      if (!it.category) return setError("Selecione a categoria em todos os itens.");
       if (!it.productId) return setError("Selecione o produto em todos os itens.");
       if (!Number(it.dose)) return setError("Informe a dose/ha em todos os itens.");
     }
     onNext();
   };
 
-  const selectClass =
-    "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
   return (
     <div className="flex flex-1 flex-col">
-      <StepHeader
-        title="Lista de compra"
-        subtitle="Adicione os produtos da safra inteira e marque a etapa de cada um. As quantidades são calculadas pelos hectares."
-        onBack={onBack}
-        backLabel="Cancelar"
-      />
-
-      <div className="grid max-w-4xl gap-4 sm:grid-cols-3">
-        <Field htmlFor="list-name" label="Nome da lista">
-          <Input
-            id="list-name"
-            value={listName}
-            onChange={(e) => setListName(e.target.value)}
-            placeholder="Ex: Soja 24/25"
-          />
-        </Field>
-        <Field htmlFor="crop" label="Cultura">
-          <select
-            id="crop"
-            value={crop}
-            onChange={(e) => setCrop(e.target.value)}
-            className={selectClass}
-          >
-            <option value="SOYBEAN">Soja</option>
-            <option value="CORN">Milho</option>
-          </select>
-        </Field>
-        <Field htmlFor="variety" label="Variedade (opcional)">
-          <Input
-            id="variety"
-            value={variety}
-            onChange={(e) => setVariety(e.target.value)}
-            placeholder="Ex: NS 5090"
-          />
-        </Field>
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-        <Sprout className="h-4 w-4 text-primary" />
-        {farmName ? (
-          <>
-            <span className="font-medium text-foreground">{farmName}</span>
-            <span className="text-muted-foreground/60">·</span>
-          </>
-        ) : null}
-        Área total: <strong className="text-foreground">{fmt(totalHa)} ha</strong>
-        <span className="text-muted-foreground/60">·</span>
-        as quantidades abaixo são dose/ha × área × nº de aplicações.
-      </div>
-
-      <div className="mt-6 hidden overflow-x-auto rounded-lg border bg-card lg:block">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2 text-left">Produto</th>
-              <th className="px-3 py-2 text-left">Etapa</th>
-              <th className="px-3 py-2 text-left">Dose/ha</th>
-              <th className="px-3 py-2 text-left">Un.</th>
-              <th className="px-3 py-2 text-left">Nº apl.</th>
-              <th className="px-3 py-2 text-left">Estoque</th>
-              <th className="px-3 py-2 text-left">Preço R$/un.</th>
-              <th className="px-3 py-2 text-right">Necessário</th>
-              <th className="px-3 py-2 text-right">A comprar</th>
-              <th className="px-3 py-2 text-right">Valor total</th>
-              <th className="w-10 px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {items.length === 0 ? (
-              <tr>
-                <td colSpan={11} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  Nenhum produto adicionado.
-                </td>
-              </tr>
-            ) : (
-              items.map((it) => {
-                const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
-                const toBuy = Math.max(0, required - Number(it.stock || 0));
-                const totalValue = toBuy * Number(it.price || 0);
-                return (
-                  <tr key={it.key} className="align-middle">
-                    <td className="px-3 py-2">
-                      <select
-                        value={it.productId}
-                        onChange={(e) => {
-                          const prod = products.find((p) => p.id === e.target.value);
-                          updateItem(it.key, {
-                            productId: e.target.value,
-                            productName: prod?.name ?? "",
-                            unit: prod?.dose_unit ?? it.unit,
-                          });
-                        }}
-                        className={cn(selectClass, "min-w-[180px]")}
-                      >
-                        <option value="">Selecione…</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={it.stage}
-                        onChange={(e) => updateItem(it.key, { stage: e.target.value })}
-                        className={cn(selectClass, "min-w-[150px]")}
-                      >
-                        {STAGES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={it.dose}
-                        onChange={(e) => updateItem(it.key, { dose: e.target.value })}
-                        className="w-24"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <DoseUnitSelect
-                        value={it.unit}
-                        onChange={(val) => updateItem(it.key, { unit: val })}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        value={it.nApps}
-                        onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
-                        className="w-20"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={it.stock}
-                        onChange={(e) => updateItem(it.key, { stock: e.target.value })}
-                        className="w-24"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="opcional"
-                        value={it.price}
-                        onChange={(e) => updateItem(it.key, { price: e.target.value })}
-                        className="w-28"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {fmt(required)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
-                      {fmt(toBuy)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-foreground">
-                      {it.price
-                        ? totalValue.toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                            maximumFractionDigits: 2,
-                          })
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(it.key)}
-                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                        aria-label="Remover"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-6 space-y-3 lg:hidden">
-        {items.length === 0 ? (
-          <div className="rounded-lg border border-dashed bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhum produto adicionado.
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ShoppingCart className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Lista de compra
+            </p>
+            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+              Montar insumos da safra
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Defina o nome e a cultura, depois adicione os produtos por categoria. As quantidades
+              são calculadas pelos hectares dos talhões.
+            </p>
           </div>
-        ) : (
-          items.map((it) => {
-            const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
-            const toBuy = Math.max(0, required - Number(it.stock || 0));
-            return (
-              <div key={it.key} className="rounded-lg border bg-card p-4 shadow-sm">
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Produto
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(it.key)}
-                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    aria-label="Remover"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                <select
-                  value={it.productId}
-                  onChange={(e) => {
-                    const prod = products.find((p) => p.id === e.target.value);
-                    updateItem(it.key, {
-                      productId: e.target.value,
-                      productName: prod?.name ?? "",
-                      unit: prod?.dose_unit ?? it.unit,
-                    });
-                  }}
-                  className={selectClass}
-                >
-                  <option value="">Selecione…</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Field label="Etapa">
-                    <select
-                      value={it.stage}
-                      onChange={(e) => updateItem(it.key, { stage: e.target.value })}
-                      className={selectClass}
-                    >
-                      {STAGES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Dose/ha">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={it.dose}
-                      onChange={(e) => updateItem(it.key, { dose: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Unidade">
-                    <DoseUnitSelect
-                      value={it.unit}
-                      onChange={(val) => updateItem(it.key, { unit: val })}
-                    />
-                  </Field>
-                  <Field label="Nº aplicações">
-                    <Input
-                      type="number"
-                      value={it.nApps}
-                      onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Estoque atual">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={it.stock}
-                      onChange={(e) => updateItem(it.key, { stock: e.target.value })}
-                    />
-                  </Field>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">
-                    Necessário{" "}
-                    <span className="tabular-nums text-foreground">{fmt(required)}</span>
-                  </span>
-                  <span className="font-semibold">
-                    A comprar{" "}
-                    <span className="tabular-nums text-foreground">{fmt(toBuy)}</span>
-                  </span>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <div className="mt-4">
-        <Button variant="outline" onClick={addItem} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Adicionar produto
+        </div>
+        <Button variant="ghost" onClick={onBack} className="shrink-0">
+          Cancelar
         </Button>
       </div>
+
+      <section className="mb-6 overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="border-b bg-muted/30 px-5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Identificação
+          </p>
+        </div>
+        <div className="grid gap-6 p-5 lg:grid-cols-2">
+          <div className="space-y-2.5 rounded-lg border border-primary/30 bg-primary/5 p-4 shadow-sm ring-1 ring-primary/10">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                <Type className="h-3.5 w-3.5" />
+              </span>
+              <Label htmlFor="list-name" className="text-sm font-semibold text-primary">
+                Nome da lista
+              </Label>
+            </div>
+            <Input
+              id="list-name"
+              value={listName}
+              onChange={(e) => setListName(e.target.value)}
+              placeholder="Ex: Soja 26/27"
+              className="h-12 border-primary/35 bg-background text-lg font-semibold shadow-sm focus-visible:border-primary focus-visible:ring-primary/30 placeholder:font-normal placeholder:text-muted-foreground/80"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Use um nome que identifique a safra ou o planejamento desta fazenda.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="list-crop" className="text-sm font-medium text-muted-foreground">
+              Cultura
+            </Label>
+            <NativeSelect
+              id="list-crop"
+              value={crop}
+              onChange={(e) => setCrop(e.target.value)}
+              className="w-full"
+            >
+              <option value="SOYBEAN">{CROP_LABELS.SOYBEAN}</option>
+              <option value="CORN">{CROP_LABELS.CORN}</option>
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">
+              A cultura orienta relatórios e vínculos futuros com a safra.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-5 py-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Produtos
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-foreground">
+              Selecione a categoria antes do produto
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {farmName ? (
+              <>
+                <Leaf className="h-4 w-4 text-primary" />
+                <span className="font-medium text-foreground">{farmName}</span>
+                <span>·</span>
+              </>
+            ) : null}
+            <Sprout className="h-4 w-4 text-primary" />
+            <span>
+              <strong className="text-foreground">{fmt(totalHa)} ha</strong> · dose/ha × área ×
+              nº de aplicações
+            </span>
+          </div>
+        </div>
+        <div className="p-5">
+          <PurchaseListItemsEditor items={items} setItems={setItems} totalHa={totalHa} />
+        </div>
+      </section>
 
       {error ? (
         <div className="mt-4 max-w-xl">
@@ -491,7 +253,7 @@ function StepList({
 
       <StepFooter
         primary={
-          <Button onClick={next} className="gap-2">
+          <Button onClick={next} size="lg" className="gap-2">
             Próximo
             <ArrowRight className="h-4 w-4" />
           </Button>
@@ -507,7 +269,6 @@ function StepReview({
   plots,
   crop,
   listName,
-  variety,
   items,
   totalHa,
   successRedirectLabel,
@@ -519,7 +280,6 @@ function StepReview({
   plots: WizardPlot[];
   crop: string;
   listName: string;
-  variety: string;
   items: ListItem[];
   totalHa: number;
   successRedirectLabel: string;
@@ -545,7 +305,6 @@ function StepReview({
         producer_id: producerId,
         crop,
         name: listName,
-        variety: variety || undefined,
         season_id: null,
         plots: plots.map((p) => ({
           plot_id: p.id,
@@ -596,12 +355,22 @@ function StepReview({
 
   return (
     <div className="flex flex-1 flex-col">
-      <StepHeader
-        title="Revisão da lista"
-        subtitle="Confira os produtos antes de salvar."
-        onBack={onBack}
-        backLabel="Voltar à lista"
-      />
+      <div className="mb-6 flex min-w-0 items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <ShoppingCart className="h-5 w-5" />
+        </span>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Revisão
+          </p>
+          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+            Confirme a lista
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Verifique os produtos antes de salvar.
+          </p>
+        </div>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <SummaryCard label="Produtor" value={producerName} />
@@ -613,11 +382,10 @@ function StepReview({
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-3">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              Lista de compra · {listName || "—"}
+              {listName || "—"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {crop === "CORN" ? "Milho" : "Soja"}
-              {variety ? ` · ${variety}` : ""} ·{" "}
+              {CROP_LABELS[crop as keyof typeof CROP_LABELS] ?? crop} ·{" "}
               {items.length} {items.length === 1 ? "produto" : "produtos"}
             </p>
           </div>
@@ -658,6 +426,11 @@ function StepReview({
       ) : null}
 
       <StepFooter
+        back={
+          <Button variant="ghost" onClick={onBack} size="lg" className="gap-2">
+            Voltar
+          </Button>
+        }
         primary={
           <Button size="lg" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
             <Check className="h-4 w-4" />

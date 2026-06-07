@@ -16,6 +16,7 @@ export interface TimingTemplate {
   id: string;
   name: string;
   crop: string;
+  producer_id?: string | null;
   is_archived: boolean;
   stages?: TimingStage[];
 }
@@ -37,8 +38,10 @@ export interface MixTemplate {
   items?: MixTemplateItem[];
 }
 
-export async function getTimingTemplates() {
-  const { data } = await api.get<TimingTemplate[]>("/timing_templates");
+export async function getTimingTemplates(producerId: string) {
+  const { data } = await api.get<TimingTemplate[]>("/timing_templates", {
+    params: { producer_id: producerId },
+  });
   return data;
 }
 
@@ -49,7 +52,11 @@ export async function getTimingTemplate(id: string) {
   return data;
 }
 
-export async function createTimingTemplate(payload: { name: string; crop: string }) {
+export async function createTimingTemplate(payload: {
+  name: string;
+  crop: string;
+  producer_id: string;
+}) {
   const { data } = await api.post<TimingTemplate>("/timing_templates", payload);
   return data;
 }
@@ -63,8 +70,11 @@ export async function deleteTimingTemplate(id: string) {
   await api.delete(`/timing_templates/${id}`);
 }
 
-export async function getArchivedTimingTemplates() {
-  const { data } = await api.get<TimingTemplate[] | { data: TimingTemplate[] } | null>("/timing_templates/archived");
+export async function getArchivedTimingTemplates(producerId: string) {
+  const { data } = await api.get<TimingTemplate[] | { data: TimingTemplate[] } | null>(
+    "/timing_templates/archived",
+    { params: { producer_id: producerId } },
+  );
   if (data == null) return [];
   if (Array.isArray(data)) return data;
   if (typeof data === "object" && Array.isArray(data.data)) return data.data;

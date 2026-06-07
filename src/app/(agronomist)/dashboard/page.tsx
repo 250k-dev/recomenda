@@ -11,6 +11,7 @@ import {
   Package,
   BarChart3,
   LayoutDashboard,
+  CalendarDays,
 } from "lucide-react";
 import { PageHeader } from "@/components/domain/page-header";
 import { StatCard } from "@/components/domain/stat-card";
@@ -85,6 +86,12 @@ export default function DashboardPage() {
           <ArrowRight className="absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 shrink-0 text-primary/60 transition-all group-hover:translate-x-1 group-hover:text-primary" />
         </Link>
 
+        <NavCard
+          href="/cronograma"
+          title="Cronograma geral"
+          description="Calendário mensal com aplicações pendentes e atrasadas de todos os produtores."
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
         <NavCard
           href="/producers"
           title="Produtores"

@@ -7,7 +7,7 @@ import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHeader } from "@/components/domain/page-header";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { StatCard } from "@/components/domain/stat-card";
-import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
+import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +89,7 @@ export default function PlotDetailPage() {
     return (
       <>
         <BreadcrumbBack items={breadcrumbs} />
-        <TableRowsSkeleton rows={4} columns={1} />
+        <ListCardsSkeleton count={4} />
       </>
     );
   }
@@ -219,7 +219,7 @@ function PlotProgressTab({
   newSeasonHref: string;
   plotName: string;
 }) {
-  if (isLoading) return <TableRowsSkeleton rows={4} columns={1} />;
+  if (isLoading) return <ListCardsSkeleton count={4} />;
 
   if (seasons.length === 0) {
     return (

@@ -18,7 +18,7 @@ export function useSeasonCostPlan(seasonId: string) {
   });
 }
 
-export function useUpdatePurchaseList(id: string) {
+export function useUpdatePurchaseList(id: string, options?: { farmId?: string }) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: Partial<PurchaseListInput>) => updatePurchaseList(id, payload),
@@ -27,6 +27,9 @@ export function useUpdatePurchaseList(id: string) {
         queryClient.invalidateQueries({ queryKey: queryKeys.seasonCostPlan(data.season_id) });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.producerPurchaseLists(data.producer_id) });
+      if (options?.farmId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmPurchaseLists(options.farmId) });
+      }
     },
   });
 }

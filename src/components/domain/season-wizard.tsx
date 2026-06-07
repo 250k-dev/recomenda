@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,14 +8,30 @@ import {
   CalendarDays,
   ArrowRight,
   Clock,
-  ExternalLink,
+  MapPin,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { useTimingTemplates, queryKeys } from "@/lib/api/hooks";
-import { createSeason } from "@/lib/api/client";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { useTimingTemplate, useTimingTemplates, queryKeys } from "@/lib/api/hooks";
+import {
+  createMixTemplate,
+  createMixTemplateItem,
+  createSeason,
+  createTimingTemplate,
+  createTimingStage,
+} from "@/lib/api/client";
 import { CROP_LABELS } from "@/lib/season-constants";
+import {
+  TimingStagesEditor,
+  TIMING_TRIGGER_LABELS,
+  newTimingStageField,
+  type TimingStageField,
+} from "@/components/domain/timing/timing-stages-editor";
 import {
   Field,
   FieldError,
@@ -34,14 +49,13 @@ export type SeasonWizardProps = {
   producerName: string;
   plots: WizardPlot[];
   farmName?: string;
-  /** Called for the "Ir para o produtor" success action. */
   onComplete: () => void;
-  /** Called for the "Ver safra" success action with the first created season id. */
   onViewSeason?: (seasonId: string) => void;
   onCancel: () => void;
 };
 
 type Crop = "SOYBEAN" | "CORN";
+type CronogramMode = "template" | "custom";
 
 const WIZARD_STEPS = 3;
 
@@ -56,18 +70,37 @@ export function SeasonWizard({
 }: SeasonWizardProps) {
   const [step, setStep] = useState(1);
   const [crop, setCrop] = useState<Crop>("SOYBEAN");
-  const [variety, setVariety] = useState("");
+  const [cronogramMode, setCronogramMode] = useState<CronogramMode>("template");
   const [timingTemplateId, setTimingTemplateId] = useState("");
+  const [draftStages, setDraftStages] = useState<TimingStageField[]>([
+    newTimingStageField("Dessecação"),
+    newTimingStageField("Pós-emergência"),
+  ]);
   const [schedules, setSchedules] = useState<PlotSchedule[]>(() =>
     plots.map((p) => ({
       plotId: p.id,
+      variety: "",
       plantingDate: "",
-      desiccationDate: "",
       cycleDays: "",
     })),
   );
+  const [selectedPlotIds, setSelectedPlotIds] = useState<Set<string>>(
+    () => new Set(plots.length === 1 ? [plots[0].id] : []),
+  );
 
-  const totalHa = useMemo(() => plots.reduce((s, p) => s + p.area, 0), [plots]);
+  const selectedPlots = useMemo(
+    () => plots.filter((p) => selectedPlotIds.has(p.id)),
+    [plots, selectedPlotIds],
+  );
+
+  const totalHa = useMemo(
+    () => selectedPlots.reduce((s, p) => s + p.area, 0),
+    [selectedPlots],
+  );
+
+  const setSchedulesState = (updater: React.SetStateAction<PlotSchedule[]>) => {
+    setSchedules(updater);
+  };
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -84,24 +117,32 @@ export function SeasonWizard({
       </div>
 
       {step === 1 && (
-        <StepConfig
+        <StepCronogram
+          producerId={producerId}
           crop={crop}
           setCrop={setCrop}
-          variety={variety}
-          setVariety={setVariety}
+          cronogramMode={cronogramMode}
+          setCronogramMode={setCronogramMode}
           timingTemplateId={timingTemplateId}
           setTimingTemplateId={setTimingTemplateId}
+          draftStages={draftStages}
+          setDraftStages={setDraftStages}
           farmName={farmName}
           onBack={onCancel}
-          onNext={() => setStep(2)}
+          onNext={(resolvedTemplateId) => {
+            setTimingTemplateId(resolvedTemplateId);
+            setStep(2);
+          }}
         />
       )}
       {step === 2 && (
         <StepPlantation
           plots={plots}
           farmName={farmName}
+          selectedPlotIds={selectedPlotIds}
+          setSelectedPlotIds={setSelectedPlotIds}
           schedules={schedules}
-          setSchedules={setSchedules}
+          setSchedules={setSchedulesState}
           onBack={() => setStep(1)}
           onNext={() => setStep(3)}
         />
@@ -110,9 +151,9 @@ export function SeasonWizard({
         <StepFinalize
           producerId={producerId}
           producerName={producerName}
-          plots={plots}
+          plots={selectedPlots}
+          allPlotsCount={plots.length}
           crop={crop}
-          variety={variety}
           timingTemplateId={timingTemplateId}
           schedules={schedules}
           totalHa={totalHa}
@@ -125,29 +166,41 @@ export function SeasonWizard({
   );
 }
 
-function StepConfig({
+function StepCronogram({
+  producerId,
   crop,
   setCrop,
-  variety,
-  setVariety,
+  cronogramMode,
+  setCronogramMode,
   timingTemplateId,
   setTimingTemplateId,
+  draftStages,
+  setDraftStages,
   farmName,
   onBack,
   onNext,
 }: {
+  producerId: string;
   crop: Crop;
   setCrop: (v: Crop) => void;
-  variety: string;
-  setVariety: (v: string) => void;
+  cronogramMode: CronogramMode;
+  setCronogramMode: (v: CronogramMode) => void;
   timingTemplateId: string;
   setTimingTemplateId: (v: string) => void;
+  draftStages: TimingStageField[];
+  setDraftStages: React.Dispatch<React.SetStateAction<TimingStageField[]>>;
   farmName?: string;
   onBack: () => void;
-  onNext: () => void;
+  onNext: (templateId: string) => void;
 }) {
-  const { data: templates, isLoading } = useTimingTemplates();
+  const { data: templates, isLoading } = useTimingTemplates(producerId);
+  const {
+    data: selectedTemplate,
+    isLoading: loadingSelected,
+    isError: selectedError,
+  } = useTimingTemplate(cronogramMode === "template" ? timingTemplateId : "");
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const cropTemplates = useMemo(
     () =>
@@ -157,19 +210,106 @@ function StepConfig({
     [templates, crop],
   );
 
-  const next = () => {
+  const next = async () => {
     setError(null);
-    if (!timingTemplateId) {
-      return setError("Selecione um cronograma (modelo de recomendação).");
+    setSaving(true);
+    try {
+      if (cronogramMode === "template") {
+        if (!timingTemplateId) {
+          setError("Selecione um cronograma salvo ou monte um novo aqui.");
+          return;
+        }
+        const stages = selectedTemplate?.stages ?? [];
+        if (stages.length === 0) {
+          setError(
+            "Este modelo não tem etapas cadastradas. Edite o modelo na tela do produtor ou monte o fluxo aqui.",
+          );
+          return;
+        }
+        onNext(timingTemplateId);
+        return;
+      }
+
+      const validStages = draftStages.filter((s) => s.name.trim());
+      if (validStages.length === 0) {
+        setError("Adicione pelo menos um estágio ao cronograma.");
+        return;
+      }
+
+      for (const stage of validStages) {
+        for (const product of stage.products) {
+          const hasCategory = Boolean(product.category);
+          const hasProduct = Boolean(product.productId);
+          const hasDose = Number(product.dose.replace(",", ".")) > 0;
+          if ((hasProduct || hasDose) && !hasCategory) {
+            setError(`Selecione a categoria do produto na etapa "${stage.name.trim()}".`);
+            return;
+          }
+          if (hasProduct && !hasDose) {
+            setError(`Informe a dose/ha do produto na etapa "${stage.name.trim()}".`);
+            return;
+          }
+          if (!hasProduct && (product.dose || product.productName || product.category)) {
+            setError(`Selecione o produto na etapa "${stage.name.trim()}".`);
+            return;
+          }
+        }
+      }
+
+      const templateName = farmName
+        ? `Safra ${farmName} — ${new Date().toLocaleDateString("pt-BR")}`
+        : `Safra ${CROP_LABELS[crop]} — ${new Date().toLocaleDateString("pt-BR")}`;
+
+      const template = await createTimingTemplate({
+        name: templateName,
+        crop,
+        producer_id: producerId,
+      });
+      for (let i = 0; i < validStages.length; i++) {
+        const stage = validStages[i];
+        const stageProducts = stage.products.filter(
+          (product) =>
+            product.productId && Number(product.dose.replace(",", ".")) > 0,
+        );
+
+        let defaultMixTemplateId: string | null = null;
+        if (stageProducts.length > 0) {
+          const mix = await createMixTemplate({
+            name: `${stage.name.trim()} — ${templateName}`,
+            crop,
+          });
+          for (const product of stageProducts) {
+            await createMixTemplateItem(mix.id, {
+              local_product_id: product.productId,
+              dose_per_hectare: Number(product.dose.replace(",", ".")),
+              dose_unit: product.unit,
+            });
+          }
+          defaultMixTemplateId = mix.id;
+        }
+
+        await createTimingStage(template.id, {
+          order_index: i,
+          name: stage.name.trim(),
+          trigger_type: stage.trigger_type,
+          window_start_days: Number(stage.window_start_days) || 0,
+          window_end_days: Number(stage.window_end_days) || 0,
+          default_mix_template_id: defaultMixTemplateId,
+        });
+      }
+      onNext(template.id);
+    } catch (e: unknown) {
+      setError(extractError(e));
+    } finally {
+      setSaving(false);
     }
-    onNext();
   };
 
   return (
     <div className="flex flex-1 flex-col">
       <StepHeader
-        title="Configurar a safra"
-        subtitle="Escolha a cultura e o cronograma de aplicação. O cronograma gera as recomendações da safra ao publicar."
+        title="Cronograma da safra"
+        subtitle="Escolha um modelo salvo ou monte o fluxo de aplicações com produtos por etapa. Na próxima etapa você define plantio e variedade por talhão."
         onBack={onBack}
         backLabel="Cancelar"
       />
@@ -181,7 +321,7 @@ function StepConfig({
         </div>
       ) : null}
 
-      <div className="grid max-w-2xl gap-5 sm:grid-cols-2">
+      <div className="mb-6 max-w-2xl">
         <Field htmlFor="season-crop" label="Cultura">
           <NativeSelect
             id="season-crop"
@@ -196,53 +336,83 @@ function StepConfig({
             <option value="CORN">Milho</option>
           </NativeSelect>
         </Field>
-        <Field htmlFor="season-variety" label="Variedade (opcional)">
-          <Input
-            id="season-variety"
-            value={variety}
-            onChange={(e) => setVariety(e.target.value)}
-            placeholder="Ex: NS 5090"
-          />
-        </Field>
       </div>
 
-      <div className="mt-6 max-w-2xl">
-        <Field
-          htmlFor="season-template"
-          label="Cronograma (modelo de recomendação)"
-          hint="Define os estágios de aplicação e janelas. Crie ou edite cronogramas em Cronogramas."
-        >
-          {isLoading ? (
-            <div className="h-9 animate-pulse rounded-md bg-muted" />
-          ) : cropTemplates.length === 0 ? (
-            <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-              Nenhum cronograma para {CROP_LABELS[crop] ?? crop}.
-              <div className="mt-3">
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href="/timing-templates">
-                    <ExternalLink className="h-4 w-4" />
-                    Criar cronograma
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <NativeSelect
-              id="season-template"
-              value={timingTemplateId}
-              onChange={(e) => setTimingTemplateId(e.target.value)}
-              className="w-full"
-            >
-              <option value="">Selecione…</option>
-              {cropTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </NativeSelect>
-          )}
-        </Field>
+      <div className="mb-4 max-w-3xl">
+        <SegmentedTabs
+          variant="pill"
+          value={cronogramMode}
+          onValueChange={(v) => setCronogramMode(v as CronogramMode)}
+          items={[
+            { value: "template", label: "Usar modelo salvo" },
+            { value: "custom", label: "Montar aqui" },
+          ]}
+        />
       </div>
+
+      {cronogramMode === "template" ? (
+        <div className="max-w-2xl">
+          <Field
+            htmlFor="season-template"
+            label="Modelo de cronograma"
+            hint="Modelos criados na tela do produtor, em Modelos de cronograma."
+          >
+            {isLoading ? (
+              <div className="h-9 animate-pulse rounded-md bg-muted" />
+            ) : cropTemplates.length === 0 ? (
+              <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+                Nenhum modelo para {CROP_LABELS[crop] ?? crop}. Use a aba &quot;Montar aqui&quot; para
+                criar o fluxo nesta safra.
+              </div>
+            ) : (
+              <NativeSelect
+                id="season-template"
+                value={timingTemplateId}
+                onChange={(e) => {
+                  setTimingTemplateId(e.target.value);
+                  setError(null);
+                }}
+                className="w-full"
+              >
+                <option value="">Selecione…</option>
+                {cropTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+          </Field>
+
+          {timingTemplateId ? (
+            <SelectedTemplatePreview
+              template={selectedTemplate}
+              isLoading={loadingSelected}
+              isError={selectedError}
+              crop={crop}
+            />
+          ) : null}
+        </div>
+      ) : (
+        <TimingStagesEditor
+          className="max-w-4xl"
+          stages={draftStages}
+          minStages={1}
+          showProducts
+          onChange={(key, patch) =>
+            setDraftStages((prev) => prev.map((s) => (s.key === key ? { ...s, ...patch } : s)))
+          }
+          onAdd={(presetName) =>
+            setDraftStages((prev) => {
+              if (presetName && prev.some((s) => s.name === presetName)) return prev;
+              return [...prev, newTimingStageField(presetName ?? "")];
+            })
+          }
+          onRemove={(key) =>
+            setDraftStages((prev) => prev.filter((s) => s.key !== key))
+          }
+        />
+      )}
 
       {error ? (
         <div className="mt-4 max-w-xl">
@@ -252,8 +422,8 @@ function StepConfig({
 
       <StepFooter
         primary={
-          <Button onClick={next} className="gap-2">
-            Próximo
+          <Button onClick={() => void next()} disabled={saving} className="gap-2">
+            {saving ? "Salvando…" : "Próximo"}
             <ArrowRight className="h-4 w-4" />
           </Button>
         }
@@ -262,9 +432,106 @@ function StepConfig({
   );
 }
 
+function SelectedTemplatePreview({
+  template,
+  isLoading,
+  isError,
+  crop,
+}: {
+  template?: {
+    id: string;
+    name: string;
+    crop: string;
+    stages?: Array<{
+      id: string;
+      order_index: number;
+      name: string;
+      trigger_type: string;
+      window_start_days: number;
+      window_end_days: number;
+    }>;
+  };
+  isLoading: boolean;
+  isError: boolean;
+  crop: Crop;
+}) {
+  if (isLoading) {
+    return (
+      <div className="mt-4 space-y-2 rounded-xl border bg-card p-4 shadow-sm">
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        Não foi possível carregar os detalhes do modelo selecionado.
+      </div>
+    );
+  }
+
+  if (!template) return null;
+
+  const stages = [...(template.stages ?? [])].sort((a, b) => a.order_index - b.order_index);
+  const cropMismatch = template.crop !== "ANY" && template.crop !== crop;
+
+  return (
+    <div className="mt-4 rounded-xl border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b pb-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{template.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {stages.length} {stages.length === 1 ? "etapa" : "etapas"} de aplicação
+          </p>
+        </div>
+        <Badge variant="outline">{CROP_LABELS[template.crop] ?? template.crop}</Badge>
+      </div>
+
+      {cropMismatch ? (
+        <p className="mb-3 text-xs text-amber-700">
+          Este modelo é de {CROP_LABELS[template.crop] ?? template.crop}, diferente da cultura
+          selecionada ({CROP_LABELS[crop]}).
+        </p>
+      ) : null}
+
+      {stages.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          O modelo foi encontrado, mas ainda não possui etapas. Edite na tela do produtor ou
+          use &quot;Montar aqui&quot;.
+        </p>
+      ) : (
+        <ol className="flex flex-col gap-2">
+          {stages.map((stage, index) => (
+            <li
+              key={stage.id}
+              className="flex flex-wrap items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {index + 1}
+              </span>
+              <span className="font-medium text-foreground">{stage.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {TIMING_TRIGGER_LABELS[stage.trigger_type] ?? stage.trigger_type}
+                {" · "}
+                {stage.window_start_days}–{stage.window_end_days} dias
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 function StepPlantation({
   plots,
   farmName,
+  selectedPlotIds,
+  setSelectedPlotIds,
   schedules,
   setSchedules,
   onBack,
@@ -272,6 +539,8 @@ function StepPlantation({
 }: {
   plots: WizardPlot[];
   farmName?: string;
+  selectedPlotIds: Set<string>;
+  setSelectedPlotIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   schedules: PlotSchedule[];
   setSchedules: React.Dispatch<React.SetStateAction<PlotSchedule[]>>;
   onBack: () => void;
@@ -283,12 +552,45 @@ function StepPlantation({
     setSchedules((prev) => prev.map((s) => (s.plotId === plotId ? { ...s, ...patch } : s)));
   };
 
-  const totalHa = useMemo(() => plots.reduce((s, p) => s + p.area, 0), [plots]);
+  const selectedPlots = useMemo(
+    () => plots.filter((p) => selectedPlotIds.has(p.id)),
+    [plots, selectedPlotIds],
+  );
+
+  const totalHa = useMemo(
+    () => selectedPlots.reduce((s, p) => s + p.area, 0),
+    [selectedPlots],
+  );
+
+  const togglePlot = (plotId: string) => {
+    setSelectedPlotIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(plotId)) next.delete(plotId);
+      else next.add(plotId);
+      return next;
+    });
+    setError(null);
+  };
+
+  const selectAll = () => {
+    setSelectedPlotIds(new Set(plots.map((p) => p.id)));
+    setError(null);
+  };
+
+  const clearSelection = () => {
+    setSelectedPlotIds(new Set());
+    setError(null);
+  };
 
   const next = () => {
     setError(null);
-    if (!plots.every((p) => schedules.find((s) => s.plotId === p.id)?.plantingDate)) {
-      return setError("Informe a data de plantio de todos os talhões.");
+    if (selectedPlots.length === 0) {
+      return setError("Selecione pelo menos um talhão para configurar nesta safra.");
+    }
+    if (
+      !selectedPlots.every((p) => schedules.find((s) => s.plotId === p.id)?.plantingDate)
+    ) {
+      return setError("Informe a data de plantio de todos os talhões selecionados.");
     }
     onNext();
   };
@@ -297,26 +599,56 @@ function StepPlantation({
     <div className="flex flex-1 flex-col">
       <StepHeader
         title="Plantação"
-        subtitle="Defina as datas de plantio, dessecação e ciclo para cada talhão."
+        subtitle="Selecione os talhões desta safra e preencha variedade, plantio e ciclo."
         onBack={onBack}
-        backLabel="Voltar à configuração"
+        backLabel="Voltar ao cronograma"
       />
 
       <div className="mb-6 rounded-xl border bg-card p-4 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Talhões</p>
-            <p className="mt-1 text-lg font-semibold text-foreground">{plots.length}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Selecionados
+            </p>
+            <p className="mt-1 text-lg font-semibold text-foreground">
+              {selectedPlots.length} de {plots.length}
+            </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Área total</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Área selecionada
+            </p>
             <p className="mt-1 text-lg font-semibold text-foreground">{fmt(totalHa)} ha</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fazenda</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Fazenda
+            </p>
             <p className="mt-1 overflow-hidden text-lg font-semibold text-ellipsis text-foreground">
               {farmName || plots[0]?.farmName || "—"}
             </p>
+          </div>
+          <div className="flex items-end justify-start sm:justify-end">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={selectAll}
+                disabled={selectedPlots.length === plots.length}
+              >
+                Selecionar todos
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearSelection}
+                disabled={selectedPlots.length === 0}
+              >
+                Limpar
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -324,60 +656,118 @@ function StepPlantation({
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
-            <CalendarDays className="h-4 w-4" />
+            <MapPin className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold tracking-tight text-foreground">
-              Datas por talhão
+              Talhões desta safra
             </h3>
             <p className="text-sm text-muted-foreground">
-              Dessecação (quando houver), plantio e ciclo de cada talhão.
+              Marque os talhões que entrarão nesta configuração. Os demais podem ser
+              configurados depois em uma nova safra.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="mb-5 grid gap-2 sm:grid-cols-2">
           {plots.map((p) => {
-            const sch = schedules.find((s) => s.plotId === p.id);
+            const selected = selectedPlotIds.has(p.id);
             return (
-              <div key={p.id} className="rounded-lg border bg-background p-4">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Sprout className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="font-medium text-foreground">{p.name}</span>
-                  <span className="text-sm text-muted-foreground">
-                    · {p.farmName} · {fmt(p.area)} ha
-                  </span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Field label="Dessecação" hint="Opcional — costuma ocorrer antes do plantio.">
-                    <Input
-                      type="date"
-                      value={sch?.desiccationDate ?? ""}
-                      onChange={(e) => updateSchedule(p.id, { desiccationDate: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Plantio">
-                    <Input
-                      type="date"
-                      value={sch?.plantingDate ?? ""}
-                      onChange={(e) => updateSchedule(p.id, { plantingDate: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Ciclo (dias)">
-                    <Input
-                      type="number"
-                      value={sch?.cycleDays ?? ""}
-                      onChange={(e) => updateSchedule(p.id, { cycleDays: e.target.value })}
-                      placeholder="Ex: 120"
-                    />
-                  </Field>
-                </div>
-              </div>
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => togglePlot(p.id)}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all",
+                  selected
+                    ? "border-primary/40 bg-primary/5 ring-1 ring-primary/15"
+                    : "bg-background hover:border-primary/25 hover:bg-muted/30",
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded border",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background",
+                  )}
+                >
+                  {selected ? <Check className="h-3.5 w-3.5" /> : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-foreground">{p.name}</span>
+                  <span className="text-xs text-muted-foreground">{fmt(p.area)} ha</span>
+                </span>
+              </button>
             );
           })}
         </div>
+
+        {selectedPlots.length > 0 ? (
+          <>
+            <div className="mb-4 flex flex-wrap items-center gap-3 border-t pt-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <CalendarDays className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-semibold tracking-tight text-foreground">
+                  Dados por talhão
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Variedade, plantio e ciclo dos {selectedPlots.length}{" "}
+                  {selectedPlots.length === 1 ? "talhão selecionado" : "talhões selecionados"}.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {selectedPlots.map((p) => {
+                const sch = schedules.find((s) => s.plotId === p.id);
+                return (
+                  <div key={p.id} className="rounded-lg border bg-background p-4">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Sprout className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="font-medium text-foreground">{p.name}</span>
+                      <span className="text-sm text-muted-foreground">· {fmt(p.area)} ha</span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <Field label="Variedade / Híbrido" hint="Opcional.">
+                        <Input
+                          value={sch?.variety ?? ""}
+                          onChange={(e) => updateSchedule(p.id, { variety: e.target.value })}
+                          placeholder="Ex: NS 5090"
+                        />
+                      </Field>
+                      <Field label="Plantio">
+                        <Input
+                          type="date"
+                          value={sch?.plantingDate ?? ""}
+                          onChange={(e) =>
+                            updateSchedule(p.id, { plantingDate: e.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="Ciclo (dias)">
+                        <Input
+                          type="number"
+                          value={sch?.cycleDays ?? ""}
+                          onChange={(e) => updateSchedule(p.id, { cycleDays: e.target.value })}
+                          placeholder="Ex: 120"
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+            Selecione um ou mais talhões acima para preencher os dados de plantação.
+          </div>
+        )}
       </section>
 
       {error ? (
@@ -402,8 +792,8 @@ function StepFinalize({
   producerId,
   producerName,
   plots,
+  allPlotsCount,
   crop,
-  variety,
   timingTemplateId,
   schedules,
   totalHa,
@@ -414,8 +804,8 @@ function StepFinalize({
   producerId: string;
   producerName: string;
   plots: WizardPlot[];
+  allPlotsCount: number;
   crop: Crop;
-  variety: string;
   timingTemplateId: string;
   schedules: PlotSchedule[];
   totalHa: number;
@@ -439,11 +829,10 @@ function StepFinalize({
           plot_id: p.id,
           producer_id: producerId,
           crop,
-          variety: variety.trim(),
+          variety: sch?.variety.trim() || undefined,
           cycle_days: sch?.cycleDays ? Number(sch.cycleDays) : undefined,
           timing_template_id: timingTemplateId,
           planting_date: sch?.plantingDate || undefined,
-          desiccation_date: sch?.desiccationDate || undefined,
           publish_now: publishNow,
         })) as { id: string };
         created.push(season.id);
@@ -453,6 +842,7 @@ function StepFinalize({
     onSuccess: (ids) => {
       setCreatedIds(ids);
       void queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplates(producerId) });
       if (farmId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.farmSeasons(farmId) });
       }
@@ -492,7 +882,11 @@ function StepFinalize({
     <div className="flex flex-1 flex-col">
       <StepHeader
         title="Revisão da safra"
-        subtitle="Confira os dados antes de concluir. Uma safra será criada para cada talhão."
+        subtitle={
+          plots.length === allPlotsCount
+            ? "Confira os dados antes de concluir. Uma safra será criada para cada talhão selecionado."
+            : `Confira os dados antes de concluir. ${plots.length} de ${allPlotsCount} talhões entrarão nesta safra; os demais podem ser configurados depois.`
+        }
         onBack={onBack}
         backLabel="Voltar à plantação"
       />
@@ -510,7 +904,6 @@ function StepFinalize({
           </span>
           <p className="text-sm font-semibold text-foreground">
             {plots.length} {plots.length === 1 ? "talhão" : "talhões"}
-            {variety ? ` · ${variety}` : ""}
           </p>
         </div>
         <ul className="flex flex-col gap-1.5">
@@ -523,6 +916,9 @@ function StepFinalize({
               >
                 <span className="font-medium text-foreground">{p.name}</span>
                 <span className="text-xs text-muted-foreground">· {fmt(p.area)} ha</span>
+                {sch?.variety ? (
+                  <span className="text-xs text-muted-foreground">· {sch.variety}</span>
+                ) : null}
                 <div className="flex-1" />
                 <span className="text-xs text-muted-foreground tabular-nums">
                   plantio{" "}

@@ -63,6 +63,14 @@ export async function createPlot(farmId: string, payload: { name: string; area_h
   return data;
 }
 
+export async function updatePlot(
+  id: string,
+  payload: { name?: string; area_hectares?: number },
+) {
+  const { data } = await api.patch<Plot>(`/plots/${id}`, payload);
+  return data;
+}
+
 export async function deletePlot(id: string) {
   await api.delete(`/plots/${id}`);
 }

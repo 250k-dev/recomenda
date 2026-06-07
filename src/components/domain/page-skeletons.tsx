@@ -71,6 +71,26 @@ export function TableRowsSkeleton({
   );
 }
 
+/** Lista de cards empilhados (safras, talhões, modelos). */
+export function ListCardsSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="space-y-3" aria-busy aria-label="Carregando">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-44 max-w-full" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <Skeleton className="h-8 w-24 shrink-0 rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Lista vertical de cartões (timeline, itens). */
 export function TimelineCardsSkeleton({ count = 4 }: { count?: number }) {
   return (

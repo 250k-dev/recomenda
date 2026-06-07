@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/domain/page-header";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import {
   PageHeaderSkeleton,
@@ -14,6 +13,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import {
+  GLOBAL_PRODUCT_CATEGORIES,
+  PRODUCT_CATEGORY_LABELS,
+} from "@/lib/catalog-global-options";
 import {
   useFarm,
   useProducer,
@@ -45,6 +49,8 @@ import {
   Trash2,
   Save,
   CalendarDays,
+  Leaf,
+  Sprout,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
@@ -84,6 +90,61 @@ const fmtDate = (d: string) =>
     month: "short",
     year: "numeric",
   });
+
+function StageDateBadge({
+  label,
+  date,
+  originalDate,
+  tone = "primary",
+}: {
+  label: string;
+  date: string;
+  originalDate?: string | null;
+  tone?: "primary" | "neutral" | "success";
+}) {
+  const toneClasses = {
+    primary: "border-primary/35 bg-primary/10 shadow-sm",
+    neutral: "border-border bg-muted/50",
+    success: "border-emerald-500/30 bg-emerald-500/10",
+  } as const;
+
+  const labelClasses = {
+    primary: "text-primary",
+    neutral: "text-muted-foreground",
+    success: "text-emerald-700",
+  } as const;
+
+  const showOriginal =
+    originalDate &&
+    originalDate.slice(0, 10) !== date.slice(0, 10);
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-[7.5rem] shrink-0 flex-col rounded-lg border px-3 py-2",
+        toneClasses[tone],
+      )}
+    >
+      <span
+        className={cn(
+          "flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider",
+          labelClasses[tone],
+        )}
+      >
+        <CalendarDays className="h-3 w-3 shrink-0" />
+        {label}
+      </span>
+      <span className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
+        {fmtDate(date)}
+      </span>
+      {showOriginal ? (
+        <span className="mt-0.5 text-[11px] text-muted-foreground line-through">
+          {fmtDate(originalDate)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function ProductRow({
   item,
@@ -194,26 +255,57 @@ function AddProductRow({
 }) {
   const { data: catalogData } = usePlatformCatalog();
   const catalog = catalogData?.data ?? [];
-  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [dose, setDose] = useState("");
   const [unit, setUnit] = useState("L");
   const createMut = useCreateRecommendationItem(seasonId);
 
-  const filtered = search.trim()
-    ? catalog.filter((p) =>
-        p.name.toLowerCase().includes(search.trim().toLowerCase()),
-      )
-    : [];
+  const rowProducts = useMemo(
+    () =>
+      catalog.filter(
+        (product) =>
+          product.local_product_id &&
+          (product.category ?? "OTHER") === category,
+      ),
+    [catalog, category],
+  );
 
-  const selected = catalog.find((p) => p.local_product_id === selectedId);
+  const handleCategoryChange = (nextCategory: string) => {
+    setCategory(nextCategory);
+    const selected = catalog.find((product) => product.local_product_id === selectedId);
+    if (
+      selectedId &&
+      selected &&
+      (selected.category ?? "OTHER") !== nextCategory
+    ) {
+      setSelectedId("");
+      setUnit("L");
+    }
+  };
 
   const handleAdd = () => {
     const localId = selectedId;
     const doseVal = parseFloat(dose.replace(",", "."));
-    if (!localId || !doseVal || doseVal <= 0) return;
+    if (!category) {
+      toast.error("Selecione a categoria do produto.");
+      return;
+    }
+    if (!localId) {
+      toast.error("Selecione o produto.");
+      return;
+    }
+    if (!doseVal || doseVal <= 0) {
+      toast.error("Informe a dose por hectare.");
+      return;
+    }
     createMut.mutate(
-      { recommendation_id: recommendationId, local_product_id: localId, dose_per_hectare: doseVal, dose_unit: unit },
+      {
+        recommendation_id: recommendationId,
+        local_product_id: localId,
+        dose_per_hectare: doseVal,
+        dose_unit: unit,
+      },
       {
         onSuccess: () => {
           toast.success("Produto adicionado.");
@@ -227,45 +319,72 @@ function AddProductRow({
   return (
     <div className="rounded-xl border border-dashed bg-muted/20 p-3">
       <p className="mb-2 text-xs font-semibold text-foreground">Adicionar produto</p>
-      <div className="flex flex-col gap-2">
-        <div className="relative">
-          <Input
-            placeholder="Buscar produto no catálogo…"
-            value={selected ? selected.name : search}
-            onChange={(e) => { setSearch(e.target.value); setSelectedId(""); }}
-            className="h-8 text-sm"
-          />
-          {filtered.length > 0 && !selectedId && (
-            <div className="absolute left-0 top-full z-10 mt-1 w-full rounded-lg border bg-popover shadow-md">
-              {filtered.slice(0, 8).map((p) => (
-                <button
-                  key={p.local_product_id}
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
-                  onClick={() => { setSelectedId(p.local_product_id ?? ""); setSearch(""); setUnit(p.dose_unit ?? "L"); }}
-                >
-                  <span className="flex-1 font-medium">{p.name}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{p.dose_unit}</span>
-                </button>
+      <div className="flex flex-col gap-3">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Categoria</Label>
+            <NativeSelect
+              value={category}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="h-8 w-full text-sm"
+            >
+              <option value="">Selecione…</option>
+              {GLOBAL_PRODUCT_CATEGORIES.map((item) => (
+                <option key={item} value={item}>
+                  {PRODUCT_CATEGORY_LABELS[item]}
+                </option>
               ))}
-            </div>
-          )}
+            </NativeSelect>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Produto</Label>
+            <NativeSelect
+              value={selectedId}
+              onChange={(e) => {
+                const product = rowProducts.find(
+                  (item) => item.local_product_id === e.target.value,
+                );
+                setSelectedId(e.target.value);
+                setUnit(product?.dose_unit ?? "L");
+              }}
+              disabled={!category}
+              className="h-8 w-full text-sm"
+            >
+              <option value="">
+                {category ? "Selecione…" : "Escolha a categoria"}
+              </option>
+              {rowProducts.map((product) => (
+                <option key={product.local_product_id} value={product.local_product_id ?? ""}>
+                  {product.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Dose/ha"
-            value={dose}
-            onChange={(e) => setDose(e.target.value)}
-            className="h-8 w-28 text-sm"
-          />
-          <DoseUnitSelect value={unit} onChange={setUnit} className="h-8" />
-          <span className="shrink-0 text-xs text-muted-foreground">/ha</span>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Dose/ha</Label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0"
+              value={dose}
+              onChange={(e) => setDose(e.target.value)}
+              className="h-8 w-28 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Un.</Label>
+            <DoseUnitSelect value={unit} onChange={setUnit} className="h-8" />
+          </div>
+          <span className="pb-1 text-xs text-muted-foreground">/ha</span>
           <div className="ml-auto flex gap-1">
             <Button
               size="sm"
               onClick={handleAdd}
-              disabled={!selectedId || !dose || createMut.isPending}
+              disabled={!category || !selectedId || !dose || createMut.isPending}
               className="h-8 gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -372,20 +491,29 @@ function RecommendationCard({
   };
 
   return (
-    <li className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <li
+      className={cn(
+        "overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow",
+        isPending && "border-primary/30 shadow-md ring-1 ring-primary/10",
+        open && isPending && "ring-2 ring-primary/20",
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/40"
+        className={cn(
+          "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors",
+          isPending ? "hover:bg-primary/5" : "hover:bg-accent/40",
+        )}
       >
         <span
           className={cn(
-            "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
             isDone
-              ? "bg-primary/10 text-primary"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : isSkipped
-                ? "bg-orange-100 text-orange-600"
-                : "bg-muted text-muted-foreground",
+                ? "bg-orange-100 text-orange-700"
+                : "bg-primary/15 text-primary ring-1 ring-primary/20",
           )}
         >
           {index + 1}
@@ -393,10 +521,10 @@ function RecommendationCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground">{rec.name}</span>
+            <span className="text-base font-semibold text-foreground">{rec.name}</span>
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold",
                 STATUS_BADGE_CLASS[rec.status] ?? "bg-muted text-muted-foreground",
               )}
             >
@@ -404,50 +532,56 @@ function RecommendationCard({
               {STATUS_LABEL[rec.status] ?? rec.status}
             </span>
           </div>
-          <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-            {rec.predicted_date_current && (
-              <span>Previsto: {fmtDate(rec.predicted_date_current)}</span>
-            )}
-            {rec.executed_date && (
-              <span>Executado: {fmtDate(rec.executed_date)}</span>
-            )}
-            {rec.items.length > 0 && (
-              <span>
-                {rec.items.length} {rec.items.length === 1 ? "produto" : "produtos"}
-              </span>
-            )}
-          </div>
+          {rec.items.length > 0 ? (
+            <p className="mt-1 text-xs font-medium text-muted-foreground">
+              {rec.items.length} {rec.items.length === 1 ? "produto" : "produtos"} na receita
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">Sem produtos vinculados</p>
+          )}
         </div>
 
-        <ChevronDown
-          className={cn(
-            "mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
+        <div className="flex shrink-0 items-start gap-2">
+          {isDone && rec.executed_date ? (
+            <StageDateBadge label="Aplicado" date={rec.executed_date} tone="success" />
+          ) : isSkipped ? null : rec.predicted_date_current ? (
+            <StageDateBadge
+              label="Previsto"
+              date={rec.predicted_date_current}
+              originalDate={rec.predicted_date_original}
+              tone="primary"
+            />
+          ) : null}
+          <ChevronDown
+            className={cn(
+              "mt-3 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
+        </div>
       </button>
 
       {open && (
         <div className="flex flex-col gap-4 border-t px-4 pb-4 pt-3">
           {editingHeader ? (
-            <div className="rounded-xl border bg-muted/20 p-3">
-              <p className="mb-2 text-xs font-semibold text-foreground">Editar etapa</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs">Nome da etapa</Label>
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <p className="mb-3 text-sm font-semibold text-foreground">Editar etapa</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-medium text-foreground">Nome da etapa</Label>
                   <Input
                     value={headerName}
                     onChange={(e) => setHeaderName(e.target.value)}
-                    className="h-8 text-sm"
+                    className="h-10 text-sm"
                   />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs">Data prevista</Label>
+                <div className="flex flex-col gap-1.5 rounded-lg border border-primary/25 bg-background p-3">
+                  <Label className="text-xs font-semibold text-primary">Data prevista</Label>
                   <Input
                     type="date"
                     value={headerDate}
                     onChange={(e) => setHeaderDate(e.target.value)}
-                    className="h-8 text-sm"
+                    className="h-10 border-primary/30 text-sm font-semibold"
                   />
                 </div>
               </div>
@@ -471,20 +605,10 @@ function RecommendationCard({
                 </Button>
               </div>
             </div>
-          ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setEditingHeader(true)}
-              className="h-7 w-fit gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Pencil className="h-3 w-3" />
-              Editar nome / data prevista
-            </Button>
-          )}
+          ) : null}
 
-          <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Produtos recomendados
             </p>
             {rec.items.length > 0 ? (
@@ -523,8 +647,8 @@ function RecommendationCard({
             </div>
           </div>
 
-          <div className="border-t pt-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Execução
             </p>
 
@@ -550,75 +674,59 @@ function RecommendationCard({
               </div>
             )}
 
-            {registering || isPending ? (
-              registering || isPending ? (
-                registering ? (
-                  <div className="rounded-xl border bg-muted/20 p-3">
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">Data de execução</Label>
-                        <Input
-                          type="date"
-                          value={executedDate}
-                          onChange={(e) => setExecutedDate(e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs">Observações (opcional)</Label>
-                        <Input
-                          value={execNotes}
-                          onChange={(e) => setExecNotes(e.target.value)}
-                          placeholder="Ex: aplicado 10% a menos por chuva"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        onClick={handleApply}
-                        disabled={isBusy || !executedDate}
-                        className="h-8 gap-1.5"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {isBusy ? "Salvando…" : "Marcar como aplicada"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSkip}
-                        disabled={isBusy}
-                        className="h-8 gap-1.5 text-muted-foreground"
-                      >
-                        <SkipForward className="h-3.5 w-3.5" />
-                        Pular etapa
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setRegistering(false)}
-                        className="ml-auto h-8"
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
+            {registering ? (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5 rounded-lg border border-primary/25 bg-background p-3">
+                    <Label className="text-xs font-semibold text-primary">Data de execução</Label>
+                    <Input
+                      type="date"
+                      value={executedDate}
+                      onChange={(e) => setExecutedDate(e.target.value)}
+                      className="h-10 border-primary/30 text-sm font-semibold"
+                    />
                   </div>
-                ) : (
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs">Observações (opcional)</Label>
+                    <Input
+                      value={execNotes}
+                      onChange={(e) => setExecNotes(e.target.value)}
+                      placeholder="Ex: aplicado 10% a menos por chuva"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleApply}
+                    disabled={isBusy || !executedDate}
+                    className="h-8 gap-1.5"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {isBusy ? "Salvando…" : "Marcar como aplicada"}
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setRegistering(true)}
-                    className="h-8 gap-1.5"
+                    onClick={handleSkip}
+                    disabled={isBusy}
+                    className="h-8 gap-1.5 text-muted-foreground"
                   >
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    Registrar execução
+                    <SkipForward className="h-3.5 w-3.5" />
+                    Pular etapa
                   </Button>
-                )
-              ) : null
-            ) : null}
-
-            {isPending && !registering && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setRegistering(false)}
+                    className="ml-auto h-8"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : isPending ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -628,7 +736,7 @@ function RecommendationCard({
                 <CalendarDays className="h-3.5 w-3.5" />
                 Registrar execução
               </Button>
-            )}
+            ) : null}
 
             {(isDone || isSkipped) && !registering && (
               <div className="mt-2 flex gap-2">
@@ -654,13 +762,39 @@ function RecommendationCard({
               </div>
             )}
           </div>
+
+          {!editingHeader ? (
+            <div className="flex justify-end border-t border-border/60 pt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditingHeader(true)}
+                className="h-8 gap-1.5"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Editar etapa
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
     </li>
   );
 }
 
-function RecommendationsTab({ seasonId }: { seasonId: string }) {
+function RecommendationsTab({
+  seasonId,
+  title,
+  plotName,
+  plantingDate,
+  statusLabel,
+}: {
+  seasonId: string;
+  title: string;
+  plotName?: string;
+  plantingDate?: string | null;
+  statusLabel?: string;
+}) {
   const { data, isLoading } = useSeasonTimeline(seasonId);
 
   if (isLoading) return <TimelineCardsSkeleton count={5} />;
@@ -676,22 +810,74 @@ function RecommendationsTab({ seasonId }: { seasonId: string }) {
     (r) => r.status === "APPLIED_ON_TIME" || r.status === "APPLIED_LATE",
   ).length;
   const total = recommendations.length;
+  const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-500"
-            style={{ width: total > 0 ? `${(done / total) * 100}%` : "0%" }}
-          />
-        </div>
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {done}/{total} aplicadas
-        </span>
-      </div>
+    <div className="flex flex-col gap-5">
+      <section className="overflow-hidden rounded-xl border border-primary/20 bg-linear-to-br from-primary/8 to-card shadow-sm">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary shadow-sm ring-1 ring-primary/15">
+              <Leaf className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                Safra em execução
+              </p>
+              <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+                {title}
+              </h1>
+              {plotName ? (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Sprout className="h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    Talhão <strong className="text-foreground">{plotName}</strong>
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          </div>
 
-      <ul className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-3 sm:justify-end">
+            {plantingDate ? (
+              <div className="rounded-lg border border-primary/30 bg-background px-4 py-3 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                  Plantio
+                </p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+                  {fmtDate(plantingDate)}
+                </p>
+              </div>
+            ) : null}
+            {statusLabel ? (
+              <div className="rounded-lg border bg-background px-4 py-3 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Status
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-foreground">{statusLabel}</p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="border-t border-primary/15 bg-primary/4 px-5 py-4">
+          <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+            <span className="font-medium text-foreground">Progresso das aplicações</span>
+            <span className="font-semibold tabular-nums text-primary">
+              {done}/{total} aplicadas
+              <span className="ml-1 text-muted-foreground">({progressPct}%)</span>
+            </span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+      </section>
+
+      <ul className="flex flex-col gap-3">
         {recommendations.map((rec, i) => (
           <RecommendationCard key={rec.id} rec={rec} index={i} seasonId={seasonId} />
         ))}
@@ -728,10 +914,6 @@ export default function SeasonDetailPage() {
       ? `${cropLabel} — ${season.variety}`
       : cropLabel
     : "Safra";
-  const description = season
-    ? `Talhão ${season.plot_name}${season.planting_date ? ` · Plantio em ${new Date(season.planting_date + "T12:00:00").toLocaleDateString("pt-BR")}` : ""}`
-    : "";
-
   const handlePublish = () => {
     publishMutation.mutate([], {
       onSuccess: () => toast.success("Safra publicada com sucesso!"),
@@ -799,9 +981,14 @@ export default function SeasonDetailPage() {
           {loadingSeason ? (
             <PageHeaderSkeleton withAction />
           ) : (
-            <PageHeader title={title} description={description} />
+            <RecommendationsTab
+              seasonId={seasonId}
+              title={title}
+              plotName={season?.plot_name}
+              plantingDate={season?.planting_date}
+              statusLabel={statusLabel}
+            />
           )}
-          <RecommendationsTab seasonId={seasonId} />
         </>
       )}
       {activeTab === "cost-plan" && (
