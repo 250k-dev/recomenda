@@ -9,11 +9,13 @@ import {
   ArrowRight,
   Clock,
   MapPin,
+  Leaf,
+  Wheat,
+  ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
@@ -37,6 +39,7 @@ import {
   FieldError,
   StepFooter,
   StepHeader,
+  ContextBadge,
   SummaryCard,
   fmt,
   extractError,
@@ -305,114 +308,225 @@ function StepCronogram({
     }
   };
 
+  const cropOptions: Array<{ value: Crop; label: string; icon: typeof Sprout }> = [
+    { value: "SOYBEAN", label: "Soja", icon: Sprout },
+    { value: "CORN", label: "Milho", icon: Wheat },
+  ];
+
   return (
     <div className="flex flex-1 flex-col">
-      <StepHeader
-        title="Cronograma da safra"
-        subtitle="Escolha um modelo salvo ou monte o fluxo de aplicações com produtos por etapa. Na próxima etapa você define plantio e variedade por talhão."
-        onBack={onBack}
-        backLabel="Cancelar"
-      />
-
-      {farmName ? (
-        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          <Sprout className="h-4 w-4 text-primary" />
-          Fazenda: <strong className="text-foreground">{farmName}</strong>
-        </div>
-      ) : null}
-
-      <div className="mb-6 max-w-2xl">
-        <Field htmlFor="season-crop" label="Cultura">
-          <NativeSelect
-            id="season-crop"
-            value={crop}
-            onChange={(e) => {
-              setCrop(e.target.value as Crop);
-              setTimingTemplateId("");
-            }}
-            className="w-full"
-          >
-            <option value="SOYBEAN">Soja</option>
-            <option value="CORN">Milho</option>
-          </NativeSelect>
-        </Field>
-      </div>
-
-      <div className="mb-4 max-w-3xl">
-        <SegmentedTabs
-          variant="pill"
-          value={cronogramMode}
-          onValueChange={(v) => setCronogramMode(v as CronogramMode)}
-          items={[
-            { value: "template", label: "Usar modelo salvo" },
-            { value: "custom", label: "Montar aqui" },
-          ]}
-        />
-      </div>
-
-      {cronogramMode === "template" ? (
-        <div className="max-w-2xl">
-          <Field
-            htmlFor="season-template"
-            label="Modelo de cronograma"
-            hint="Modelos criados na tela do produtor, em Modelos de cronograma."
-          >
-            {isLoading ? (
-              <div className="h-9 animate-pulse rounded-md bg-muted" />
-            ) : cropTemplates.length === 0 ? (
-              <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-                Nenhum modelo para {CROP_LABELS[crop] ?? crop}. Use a aba &quot;Montar aqui&quot; para
-                criar o fluxo nesta safra.
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <CalendarDays className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Nova safra
+            </p>
+            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+              Cronograma da safra
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Escolha um modelo salvo ou monte o fluxo de aplicações com produtos por etapa.
+              Na próxima etapa você define plantio e variedade por talhão.
+            </p>
+            {farmName ? (
+              <div className="mt-3">
+                <ContextBadge tone="primary">
+                  <Leaf className="h-3.5 w-3.5" />
+                  {farmName}
+                </ContextBadge>
               </div>
-            ) : (
-              <NativeSelect
-                id="season-template"
-                value={timingTemplateId}
-                onChange={(e) => {
-                  setTimingTemplateId(e.target.value);
+            ) : null}
+          </div>
+        </div>
+        <Button variant="outline" onClick={onBack} className="-mt-0.5 shrink-0 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive">
+          Cancelar
+        </Button>
+      </div>
+
+      <section className="mb-6 overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="border-b bg-muted/30 px-5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Cultura
+          </p>
+        </div>
+        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:max-w-xl">
+          {cropOptions.map((option) => {
+            const selected = crop === option.value;
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  setCrop(option.value);
+                  setTimingTemplateId("");
                   setError(null);
                 }}
-                className="w-full"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all",
+                  selected
+                    ? "border-primary/40 bg-primary/5 ring-1 ring-primary/15"
+                    : "bg-background hover:border-primary/25 hover:bg-muted/30",
+                )}
               >
-                <option value="">Selecione…</option>
-                {cropTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            )}
-          </Field>
-
-          {timingTemplateId ? (
-            <SelectedTemplatePreview
-              template={selectedTemplate}
-              isLoading={loadingSelected}
-              isError={selectedError}
-              crop={crop}
-            />
-          ) : null}
+                <span
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+                    selected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1 font-medium text-foreground">
+                  {option.label}
+                </span>
+                {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
+              </button>
+            );
+          })}
         </div>
-      ) : (
-        <TimingStagesEditor
-          className="max-w-4xl"
-          stages={draftStages}
-          minStages={1}
-          showProducts
-          onChange={(key, patch) =>
-            setDraftStages((prev) => prev.map((s) => (s.key === key ? { ...s, ...patch } : s)))
-          }
-          onAdd={(presetName) =>
-            setDraftStages((prev) => {
-              if (presetName && prev.some((s) => s.name === presetName)) return prev;
-              return [...prev, newTimingStageField(presetName ?? "")];
-            })
-          }
-          onRemove={(key) =>
-            setDraftStages((prev) => prev.filter((s) => s.key !== key))
-          }
-        />
-      )}
+      </section>
+
+      <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b bg-muted/30 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Fluxo de aplicações
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-foreground">
+              {cronogramMode === "template"
+                ? "Reaproveite um modelo de cronograma salvo"
+                : "Monte as etapas desta safra do zero"}
+            </p>
+          </div>
+          <SegmentedTabs
+            variant="pill"
+            value={cronogramMode}
+            onValueChange={(v) => setCronogramMode(v as CronogramMode)}
+            items={[
+              { value: "template", label: "Usar modelo salvo" },
+              { value: "custom", label: "Montar aqui" },
+            ]}
+            className="w-full sm:w-auto"
+          />
+        </div>
+
+        <div className="p-5">
+          {cronogramMode === "template" ? (
+            <>
+              {isLoading ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Skeleton className="h-16 rounded-lg" />
+                  <Skeleton className="h-16 rounded-lg" />
+                </div>
+              ) : cropTemplates.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed bg-muted/20 px-4 py-10 text-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <ListChecks className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Nenhum modelo para {CROP_LABELS[crop] ?? crop}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Modelos são criados na tela do produtor, em Modelos de cronograma.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCronogramMode("custom")}
+                  >
+                    Montar o fluxo aqui
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {cropTemplates.map((t) => {
+                      const selected = timingTemplateId === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setTimingTemplateId(selected ? "" : t.id);
+                            setError(null);
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all",
+                            selected
+                              ? "border-primary/40 bg-primary/5 ring-1 ring-primary/15"
+                              : "bg-background hover:border-primary/25 hover:bg-muted/30",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+                              selected
+                                ? "bg-primary/15 text-primary"
+                                : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            <ListChecks className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-foreground">
+                              {t.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {CROP_LABELS[t.crop] ?? t.crop}
+                            </span>
+                          </span>
+                          {selected ? (
+                            <Check className="h-4 w-4 shrink-0 text-primary" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Modelos criados na tela do produtor, em Modelos de cronograma.
+                  </p>
+                </>
+              )}
+
+              {timingTemplateId ? (
+                <SelectedTemplatePreview
+                  template={selectedTemplate}
+                  isLoading={loadingSelected}
+                  isError={selectedError}
+                  crop={crop}
+                />
+              ) : null}
+            </>
+          ) : (
+            <TimingStagesEditor
+              stages={draftStages}
+              minStages={1}
+              showProducts
+              onChange={(key, patch) =>
+                setDraftStages((prev) =>
+                  prev.map((s) => (s.key === key ? { ...s, ...patch } : s)),
+                )
+              }
+              onAdd={(presetName) =>
+                setDraftStages((prev) => {
+                  if (presetName && prev.some((s) => s.name === presetName)) return prev;
+                  return [...prev, newTimingStageField(presetName ?? "")];
+                })
+              }
+              onRemove={(key) =>
+                setDraftStages((prev) => prev.filter((s) => s.key !== key))
+              }
+            />
+          )}
+        </div>
+      </section>
 
       {error ? (
         <div className="mt-4 max-w-xl">
@@ -955,7 +1069,7 @@ function StepFinalize({
 
       <StepFooter
         primary={
-          <Button size="lg" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
             <Check className="h-4 w-4" />
             {mutation.isPending ? "Criando…" : "Concluir"}
           </Button>

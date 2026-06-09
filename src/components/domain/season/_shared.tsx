@@ -133,13 +133,11 @@ export function StepFooter({
   secondary?: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 mt-10 -mx-4 border-t bg-background/95 px-4 py-4 backdrop-blur sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12">
-      <div className="flex flex-wrap items-center gap-2">
-        {back}
-        <div className="flex-1" />
-        {secondary}
-        {primary}
-      </div>
+    <div className="mt-8 flex flex-wrap items-center gap-2 border-t pt-4">
+      {back}
+      <div className="flex-1" />
+      {secondary}
+      {primary}
     </div>
   );
 }
