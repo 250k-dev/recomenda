@@ -169,9 +169,13 @@ export default function OnboardingPage() {
             plots={allPlots.filter((p) => p.farmId === currentFarm.id)}
             onAddPlot={(p) => setAllPlots((prev) => [...prev, p])}
             onUpdatePlot={(p) =>
-              setAllPlots((prev) => prev.map((item) => (item.id === p.id ? p : item)))
+              setAllPlots((prev) =>
+                prev.map((item) => (item.id === p.id ? p : item)),
+              )
             }
-            onRemovePlot={(id) => setAllPlots((prev) => prev.filter((item) => item.id !== id))}
+            onRemovePlot={(id) =>
+              setAllPlots((prev) => prev.filter((item) => item.id !== id))
+            }
             onBack={() => setStep(2)}
             onAnotherFarm={() => setStep(2)}
             onFinish={() => router.push(`/producers/${producer.id}`)}
@@ -391,7 +395,7 @@ function StepFarm({
     () =>
       BRAZIL_STATES.map((state) => ({
         value: state.uf,
-        label: `${state.name} (${state.uf})`,
+        label: `${state.name}`,
         keywords: `${state.name} ${state.uf}`,
       })),
     [],
@@ -409,7 +413,9 @@ function StepFarm({
   const mutation = useMutation({
     mutationFn: async () => {
       const location =
-        city.trim() && stateUf ? formatFarmLocation(city.trim(), stateUf) : undefined;
+        city.trim() && stateUf
+          ? formatFarmLocation(city.trim(), stateUf)
+          : undefined;
       const created = await createFarm({
         name: name.trim(),
         location,
@@ -452,13 +458,13 @@ function StepFarm({
           />
         </Field>
 
-        <Field
-          label="Localização (opcional)"
-          hint="Usado nos relatórios e na visualização da fazenda."
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="farm-state" className="text-xs text-muted-foreground">
+        <Field label="Localização (opcional)">
+          <div className="flex items-center gap-4">
+            <div className="space-y-1.5 min-w-48">
+              <Label
+                htmlFor="farm-state"
+                className="text-xs text-muted-foreground"
+              >
                 Estado
               </Label>
               <SearchableSelect
@@ -473,8 +479,11 @@ function StepFarm({
                 searchPlaceholder="Buscar estado…"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="farm-city" className="text-xs text-muted-foreground">
+            <div className="space-y-1.5 flex-1">
+              <Label
+                htmlFor="farm-city"
+                className="text-xs text-muted-foreground"
+              >
                 Cidade
               </Label>
               <SearchableSelect
@@ -490,7 +499,9 @@ function StepFarm({
                       : "Selecione…"
                 }
                 searchPlaceholder="Buscar cidade…"
-                disabled={!stateUf || citiesQuery.isLoading || citiesQuery.isError}
+                disabled={
+                  !stateUf || citiesQuery.isLoading || citiesQuery.isError
+                }
                 loading={Boolean(stateUf) && citiesQuery.isLoading}
                 loadingMessage="Carregando cidades…"
                 emptyMessage="Nenhuma cidade encontrada."
@@ -501,7 +512,8 @@ function StepFarm({
 
         {citiesQuery.isError ? (
           <p className="text-xs text-destructive">
-            Não foi possível carregar as cidades. Verifique a conexão e selecione o estado novamente.
+            Não foi possível carregar as cidades. Verifique a conexão e
+            selecione o estado novamente.
           </p>
         ) : null}
 
@@ -653,67 +665,77 @@ function StepPlot({
         </ContextBadge>
       </div>
 
-      <div className="max-w-xl space-y-5">
+      <div className="space-y-5">
         {editingPlotId ? (
-          <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm text-primary">
+          <div className="px-3 py-2 text-sm border rounded-lg border-primary/25 bg-primary/5 text-primary">
             Editando talhão — ajuste os campos e salve, ou cancele.
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
-          <Field htmlFor="plot-name" label="Nome do talhão">
-            <Input
-              id="plot-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Talhão 1"
-              autoFocus
-            />
-          </Field>
-          <Field htmlFor="plot-area" label="Hectares">
-            <Input
-              id="plot-area"
-              type="number"
-              step="0.01"
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              placeholder="0"
-            />
-          </Field>
+        <div className="flex items-end gap-4">
+          <div className="flex flex-1 gap-4">
+            <div className="flex-1">
+              <Field htmlFor="plot-name" label="Nome do talhão">
+                <Input
+                  id="plot-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: Talhão 1"
+                  autoFocus
+                />
+              </Field>
+            </div>
+            <div className="">
+              <Field htmlFor="plot-area" label="Hectares">
+                <Input
+                  id="plot-area"
+                  type="number"
+                  step="0.01"
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+            </div>
+          </div>
+          <div className="flex items-end gap-2">
+            <Button
+              variant="default"
+              onClick={submit}
+              disabled={isSaving}
+              className="gap-2"
+            >
+              {editingPlotId ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  {isSaving ? "Salvando…" : "Salvar alterações"}
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  {isSaving ? "Adicionando…" : "Adicionar talhão"}
+                </>
+              )}
+            </Button>
+            {editingPlotId ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetForm}
+                className="gap-2"
+              >
+                <X className="w-4 h-4" />
+                Cancelar edição
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <FieldError message={error ?? undefined} />
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={editingPlotId ? "default" : "outline"}
-            onClick={submit}
-            disabled={isSaving}
-            className="gap-2"
-          >
-            {editingPlotId ? (
-              <>
-                <Check className="w-4 h-4" />
-                {isSaving ? "Salvando…" : "Salvar alterações"}
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                {isSaving ? "Adicionando…" : "Adicionar talhão"}
-              </>
-            )}
-          </Button>
-          {editingPlotId ? (
-            <Button type="button" variant="ghost" onClick={resetForm} className="gap-2">
-              <X className="w-4 h-4" />
-              Cancelar edição
-            </Button>
-          ) : null}
-        </div>
       </div>
 
       {plots.length > 0 && (
-        <div className="max-w-xl mt-8">
+        <div className="mt-24">
           <div className="flex items-center justify-between mb-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
             <span>
               {farm.name} · {plots.length}{" "}
@@ -738,37 +760,45 @@ function StepPlot({
                   <span
                     className={cn(
                       "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                      isEditing ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+                      isEditing
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-primary/10 text-primary",
                     )}
                   >
-                    {isEditing ? <Pencil className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+                    {isEditing ? (
+                      <Pencil className="w-4 h-4" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
                   </span>
                   <span className="flex-1 min-w-0 font-medium truncate text-foreground">
                     {p.name}
                   </span>
-                  <span className="shrink-0 tabular-nums text-foreground">{fmt(p.area)} ha</span>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <span className="shrink-0 tabular-nums text-foreground">
+                    {fmt(p.area)} ha
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="w-8 h-8"
                       aria-label={`Editar ${p.name}`}
                       onClick={() => startEdit(p)}
                       disabled={deleteMutation.isPending || isSaving}
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="w-4 h-4" />
                     </Button>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      className="w-8 h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       aria-label={`Remover ${p.name}`}
                       onClick={() => deleteMutation.mutate(p.id)}
                       disabled={deleteMutation.isPending || isSaving}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
