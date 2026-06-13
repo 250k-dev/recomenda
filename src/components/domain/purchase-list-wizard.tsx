@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import {
   createPurchaseList,
@@ -199,15 +199,16 @@ function StepList({
             <Label htmlFor="list-crop" className="text-sm font-medium text-muted-foreground">
               Cultura
             </Label>
-            <NativeSelect
+            <Select
               id="list-crop"
               value={crop}
-              onChange={(e) => setCrop(e.target.value)}
-              className="w-full"
-            >
-              <option value="SOYBEAN">{CROP_LABELS.SOYBEAN}</option>
-              <option value="CORN">{CROP_LABELS.CORN}</option>
-            </NativeSelect>
+              onValueChange={setCrop}
+              options={[
+                { value: "SOYBEAN", label: CROP_LABELS.SOYBEAN },
+                { value: "CORN", label: CROP_LABELS.CORN },
+              ]}
+              filterLabel="Cultura"
+            />
             <p className="text-xs text-muted-foreground">
               A cultura orienta relatórios e vínculos futuros com a safra.
             </p>
@@ -241,7 +242,12 @@ function StepList({
           </div>
         </div>
         <div className="p-5">
-          <PurchaseListItemsEditor items={items} setItems={setItems} totalHa={totalHa} />
+          <PurchaseListItemsEditor
+            items={items}
+            setItems={setItems}
+            totalHa={totalHa}
+            crop={crop === "SOYBEAN" || crop === "CORN" ? crop : null}
+          />
         </div>
       </section>
 
@@ -400,9 +406,6 @@ function StepReview({
                 key={it.key}
                 className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40"
               >
-                <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  {it.stage}
-                </span>
                 <span className="font-medium text-foreground">{it.productName}</span>
                 <div className="flex-1" />
                 <span className="tabular-nums text-muted-foreground">

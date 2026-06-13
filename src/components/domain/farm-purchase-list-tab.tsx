@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useCallback, useMemo, useState } from "react";
-import { Eye, Leaf, MapPin, Pencil, Sprout, X, Check, Loader2 } from "lucide-react";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Eye, Leaf, MapPin, Pencil, Plus, Sprout, X, Check, Loader2 } from "lucide-react";
+import { Select } from "@/components/ui/select";
 import { StatCard } from "@/components/domain/stat-card";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -17,6 +17,7 @@ import {
 import type { ListItem } from "@/components/domain/season/_shared";
 import type { PurchaseListDetail, PurchaseListItemInput } from "@/lib/api/client";
 import { CROP_LABELS } from "@/lib/season-constants";
+import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -123,8 +124,15 @@ export function FarmPurchaseListTab({
     setDraftItems((list.items ?? []).map(detailItemToListItem));
   }, [list]);
 
+  useEffect(() => {
+    setEditing(false);
+    setError(null);
+    setDraftItems([]);
+  }, [list?.id]);
+
   const startEditing = () => {
-    resetDraft();
+    if (!list) return;
+    setDraftItems((list.items ?? []).map(detailItemToListItem));
     setError(null);
     setEditing(true);
   };
@@ -203,24 +211,42 @@ export function FarmPurchaseListTab({
   if (isLoading) return <TableRowsSkeleton rows={6} columns={4} />;
 
   if (!list) {
-    if (fallbackSeasonIds.length > 0) {
-      return (
-        <FarmSeasonShoppingFallback
-          seasonIds={fallbackSeasonIds}
-          newPurchaseListHref={newPurchaseListHref}
-        />
-      );
-    }
-
     return (
-      <EmptyState
-        title="Nenhuma lista de compra para esta fazenda."
-        action={
-          <Button asChild size="sm">
-            <Link href={newPurchaseListHref}>Montar lista de compra</Link>
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+              <Leaf className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Lista de compra
+              </p>
+              <h2 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">
+                Nenhuma lista cadastrada
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Monte uma lista fixa para esta fazenda ou use as safras ativas abaixo.
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" variant="outline" className="gap-1.5">
+            <Link href={newPurchaseListHref}>
+              <Plus className="h-4 w-4" />
+              Montar lista
+            </Link>
           </Button>
-        }
-      />
+        </div>
+
+        {fallbackSeasonIds.length > 0 ? (
+          <FarmSeasonShoppingFallback seasonIds={fallbackSeasonIds} />
+        ) : (
+          <EmptyState
+            variant="inline"
+            title="Nenhuma lista de compra para esta fazenda."
+          />
+        )}
+      </div>
     );
   }
 
@@ -231,19 +257,16 @@ export function FarmPurchaseListTab({
       {purchaseLists.length > 1 ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Lista</span>
-          <NativeSelect
+          <Select
             value={selectedListId}
-            onChange={(e) => onSelectList(e.target.value)}
-            className="h-9 min-w-[220px]"
+            onValueChange={onSelectList}
+            className="min-w-[220px]"
             disabled={editing}
-          >
-            {purchaseLists.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-                {l.variety ? ` — ${l.variety}` : ""}
-              </option>
-            ))}
-          </NativeSelect>
+            options={purchaseLists.map((l) => ({
+              value: l.id,
+              label: `${l.name}${l.variety ? ` — ${l.variety}` : ""}`,
+            }))}
+          />
         </div>
       ) : null}
 
@@ -356,6 +379,7 @@ export function FarmPurchaseListTab({
             items={draftItems}
             setItems={setDraftItems}
             totalHa={totalHa}
+            crop={list.crop === "SOYBEAN" || list.crop === "CORN" ? list.crop : null}
           />
           {error ? (
             <div className="max-w-xl">
@@ -398,7 +422,8 @@ export function FarmPurchaseListTab({
                       <td colSpan={6} className="px-3 py-1.5">
                         <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                           <span className="h-2 w-2 rounded-full bg-primary" />
-                          {CROP_LABELS[category] ?? category}
+                          {PRODUCT_CATEGORY_LABELS[category as keyof typeof PRODUCT_CATEGORY_LABELS] ??
+                            category}
                           <span className="font-normal text-muted-foreground/70">
                             · {groupItems.length}{" "}
                             {groupItems.length === 1 ? "insumo" : "insumos"}
@@ -447,10 +472,8 @@ export function FarmPurchaseListTab({
 
 function FarmSeasonShoppingFallback({
   seasonIds,
-  newPurchaseListHref,
 }: {
   seasonIds: string[];
-  newPurchaseListHref: string;
 }) {
   const { items, isLoading } = useFarmAggregatedShoppingList(seasonIds);
 
@@ -459,12 +482,8 @@ function FarmSeasonShoppingFallback({
   if (items.length === 0) {
     return (
       <EmptyState
+        variant="inline"
         title="Nenhum produto pendente nas safras ativas desta fazenda."
-        action={
-          <Button asChild size="sm">
-            <Link href={newPurchaseListHref}>Montar lista de compra</Link>
-          </Button>
-        }
       />
     );
   }
@@ -472,8 +491,6 @@ function FarmSeasonShoppingFallback({
   const totalToBuy = items.reduce((s, it) => s + it.quantity_to_buy, 0);
   const rows = items.map((item) => [
     item.product_name,
-    "—",
-    "—",
     `${fmtQty(item.total_quantity)} ${item.dose_unit}`,
     `${fmtQty(item.quantity_to_buy)} ${item.dose_unit}`,
   ]);
@@ -487,7 +504,7 @@ function FarmSeasonShoppingFallback({
         </CardContent>
       </Card>
       <DataTable
-        headers={["Produto", "Etapa", "Dose", "Necessário", "A comprar"]}
+        headers={["Produto", "Necessário", "A comprar"]}
         rows={rows}
       />
       <div className="flex items-baseline justify-between rounded-lg border bg-card px-4 py-3 text-sm">

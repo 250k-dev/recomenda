@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { useSeasonCostPlan, useUpdatePurchaseList, useLocalCatalog } from "@/lib/api/hooks";
 import {
   calculateSummary,
@@ -34,7 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const CATEGORY_LABELS: Record<string, string> = {
-  SEED: "Cultivares",
+  SEED: "Variedade / Híbrido",
   FERTILIZER: "Adubação",
   HERBICIDE: "Herbicida",
   FUNGICIDE: "Fungicida",
@@ -858,30 +859,33 @@ function Toolbar({
       </div>
       <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2 pr-1 text-xs">
         <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-        <select
+        <Select
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="h-8 border-0 bg-transparent pr-2 text-xs outline-none"
-        >
-          <option value="all">Categoria: Todas</option>
-          {allCategories.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABELS[c] ?? c}
-            </option>
-          ))}
-        </select>
+          onValueChange={setCategoryFilter}
+          size="sm"
+          className="h-8 min-w-[10rem] border-0 bg-transparent pr-2 text-xs shadow-none"
+          options={[
+            { value: "all", label: "Categoria: Todas" },
+            ...allCategories.map((c) => ({
+              value: c,
+              label: CATEGORY_LABELS[c] ?? c,
+            })),
+          ]}
+        />
       </div>
       <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2 pr-1 text-xs">
         <ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground" />
-        <select
+        <Select
           value={sortMode}
-          onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
-          className="h-8 border-0 bg-transparent pr-2 text-xs outline-none"
-        >
-          <option value="cost-desc">Ordenar: Custo ↓</option>
-          <option value="cost-asc">Ordenar: Custo ↑</option>
-          <option value="name">Ordenar: Nome</option>
-        </select>
+          onValueChange={(value) => setSortMode(value as typeof sortMode)}
+          size="sm"
+          className="h-8 min-w-[10rem] border-0 bg-transparent pr-2 text-xs shadow-none"
+          options={[
+            { value: "cost-desc", label: "Ordenar: Custo ↓" },
+            { value: "cost-asc", label: "Ordenar: Custo ↑" },
+            { value: "name", label: "Ordenar: Nome" },
+          ]}
+        />
       </div>
       <span className="ml-auto text-xs text-muted-foreground">
         {totalItems} insumos · {totalCategories} categorias

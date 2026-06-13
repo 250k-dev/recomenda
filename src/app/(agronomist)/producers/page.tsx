@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
@@ -228,15 +229,17 @@ export default function ProducersPage() {
           </div>
           <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2.5 pr-1">
             <ArrowDownUp className="h-4 w-4 text-muted-foreground" />
-            <select
+            <Select
               value={sort}
-              onChange={(e) => setSort(e.target.value as SortMode)}
-              className="h-10 border-0 bg-transparent pr-2 text-sm outline-none"
-            >
-              <option value="name">Ordenar: Nome</option>
-              <option value="hectares-desc">Ordenar: Hectares ↓</option>
-              <option value="hectares-asc">Ordenar: Hectares ↑</option>
-            </select>
+              onValueChange={(value) => setSort(value as SortMode)}
+              size="sm"
+              className="h-10 min-w-[12rem] border-0 bg-transparent pr-2 text-sm shadow-none"
+              options={[
+                { value: "name", label: "Ordenar: Nome" },
+                { value: "hectares-desc", label: "Ordenar: Hectares ↓" },
+                { value: "hectares-asc", label: "Ordenar: Hectares ↑" },
+              ]}
+            />
           </div>
         </div>
 

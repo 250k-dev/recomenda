@@ -34,6 +34,7 @@ import {
   newTimingStageField,
   type TimingStageField,
 } from "@/components/domain/timing/timing-stages-editor";
+import { formatTimingPreviewDate, recommendedYmdToWindow, windowToRecommendedYmd } from "@/lib/timing/window-days";
 import {
   Field,
   FieldError,
@@ -291,13 +292,17 @@ function StepCronogram({
           defaultMixTemplateId = mix.id;
         }
 
+        const { window_start_days, window_end_days } = recommendedYmdToWindow(
+          stage.recommended_date,
+        );
         await createTimingStage(template.id, {
           order_index: i,
           name: stage.name.trim(),
           trigger_type: stage.trigger_type,
-          window_start_days: Number(stage.window_start_days) || 0,
-          window_end_days: Number(stage.window_end_days) || 0,
+          window_start_days,
+          window_end_days,
           default_mix_template_id: defaultMixTemplateId,
+          notes: stage.notes.trim() || null,
         });
       }
       onNext(template.id);
@@ -432,7 +437,7 @@ function StepCronogram({
                       Nenhum modelo para {CROP_LABELS[crop] ?? crop}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Modelos são criados na tela do produtor, em Modelos de cronograma.
+                      Modelos são criados na tela do produtor, em Modelos de Recomendação.
                     </p>
                   </div>
                   <Button
@@ -490,7 +495,7 @@ function StepCronogram({
                     })}
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    Modelos criados na tela do produtor, em Modelos de cronograma.
+                    Modelos criados na tela do produtor, em Modelos de Recomendação.
                   </p>
                 </>
               )}
@@ -509,6 +514,8 @@ function StepCronogram({
               stages={draftStages}
               minStages={1}
               showProducts
+              producerId={producerId}
+              crop={crop}
               onChange={(key, patch) =>
                 setDraftStages((prev) =>
                   prev.map((s) => (s.key === key ? { ...s, ...patch } : s)),
@@ -631,7 +638,7 @@ function SelectedTemplatePreview({
               <span className="text-xs text-muted-foreground">
                 {TIMING_TRIGGER_LABELS[stage.trigger_type] ?? stage.trigger_type}
                 {" · "}
-                {stage.window_start_days}–{stage.window_end_days} dias
+                dia {formatTimingPreviewDate(windowToRecommendedYmd(stage.window_start_days, stage.window_end_days))} (±2)
               </span>
             </li>
           ))}

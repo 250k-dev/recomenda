@@ -1,4 +1,4 @@
-import { NativeSelect } from "./native-select";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export const DOSE_UNITS = ["L", "KG", "G", "ML", "DOSE"] as const;
@@ -13,17 +13,15 @@ interface DoseUnitSelectProps {
 
 export function DoseUnitSelect({ value, onChange, className, disabled }: DoseUnitSelectProps) {
   return (
-    <NativeSelect
+    <Select
       value={value}
-      onChange={(e) => onChange(e.target.value as DoseUnit)}
-      className={cn("w-[72px] shrink-0", className)}
+      onValueChange={(next) => onChange(next as DoseUnit)}
       disabled={disabled}
-    >
-      {DOSE_UNITS.map((u) => (
-        <option key={u} value={u}>
-          {u.toLowerCase()}
-        </option>
-      ))}
-    </NativeSelect>
+      options={DOSE_UNITS.map((unit) => ({
+        value: unit,
+        label: unit,
+      }))}
+      className={cn("min-w-[96px] w-[96px] shrink-0", className)}
+    />
   );
 }

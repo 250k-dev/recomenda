@@ -24,15 +24,20 @@ import {
   mapMixItemsToStageProducts,
   syncStageProducts,
 } from "@/lib/timing/sync-stage-products";
+import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@/lib/timing/window-days";
 
 const FIELD_DEBOUNCE_MS = 450;
 const PRODUCT_DEBOUNCE_MS = 700;
 
 type TimingTemplateStagesPanelProps = {
   template: TimingTemplate & { stages: TimingStage[] };
+  producerId?: string;
 };
 
-export function TimingTemplateStagesPanel({ template }: TimingTemplateStagesPanelProps) {
+export function TimingTemplateStagesPanel({
+  template,
+  producerId,
+}: TimingTemplateStagesPanelProps) {
   const templateId = template.id;
   const createStage = useCreateTimingStage(templateId);
   const updateStage = useUpdateTimingStage(templateId);
@@ -110,8 +115,11 @@ export function TimingTemplateStagesPanel({ template }: TimingTemplateStagesPane
           key: stage.id,
           name: stage.name,
           trigger_type: stage.trigger_type,
-          window_start_days: String(stage.window_start_days),
-          window_end_days: String(stage.window_end_days),
+          recommended_date: windowToRecommendedYmd(
+            stage.window_start_days,
+            stage.window_end_days,
+          ),
+          notes: stage.notes ?? "",
           products: mix?.items
             ? mapMixItemsToStageProducts(mix.items, catalogProducts)
             : [],
@@ -141,13 +149,18 @@ export function TimingTemplateStagesPanel({ template }: TimingTemplateStagesPane
         setTimeout(() => {
           fieldDebounceTimers.current.delete(stageId);
           const payload: Record<string, unknown> = { id: stageId };
-          if (patch.name !== undefined) payload.name = patch.name;
           if (patch.trigger_type !== undefined) payload.trigger_type = patch.trigger_type;
-          if (patch.window_start_days !== undefined) {
-            payload.window_start_days = Number(patch.window_start_days) || 0;
+          if (patch.recommended_date !== undefined) {
+            const { window_start_days, window_end_days } = recommendedYmdToWindow(
+              patch.recommended_date,
+            );
+            payload.window_start_days = window_start_days;
+            payload.window_end_days = window_end_days;
           }
-          if (patch.window_end_days !== undefined) {
-            payload.window_end_days = Number(patch.window_end_days) || 0;
+          if (patch.name !== undefined) payload.name = patch.name;
+          if (patch.notes !== undefined) {
+            const trimmed = patch.notes.trim();
+            payload.notes = trimmed.length > 0 ? trimmed : null;
           }
           updateStage.mutate(payload as Parameters<typeof updateStage.mutate>[0], {
             onError: () => toast.error("Não foi possível salvar a etapa."),
@@ -232,9 +245,8 @@ export function TimingTemplateStagesPanel({ template }: TimingTemplateStagesPane
         {
           order_index: nextOrderIndex,
           name: presetName ?? "",
-          trigger_type: "DAYS_AFTER_PLANTING",
-          window_start_days: 0,
-          window_end_days: 7,
+          trigger_type: "POST_PLANTING",
+          ...recommendedYmdToWindow(todayLocalYmd()),
           default_mix_template_id: null,
         },
         {
@@ -283,6 +295,8 @@ export function TimingTemplateStagesPanel({ template }: TimingTemplateStagesPane
       stages={editorStages}
       minStages={0}
       showProducts
+      producerId={producerId ?? template.producer_id ?? undefined}
+      crop={template.crop}
       isAdding={createStage.isPending}
       onChange={handleStageChange}
       onAdd={handleAddStage}

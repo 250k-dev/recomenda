@@ -26,6 +26,7 @@ export type PlatformCatalogEntry = {
   name: string;
   category: string;
   dose_unit: string;
+  equivalence_group?: string | null;
   label_url?: string | null;
   price_brl?: string | null;
   owner_name?: string | null;

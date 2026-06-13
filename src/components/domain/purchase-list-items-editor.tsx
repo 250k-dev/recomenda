@@ -1,41 +1,66 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLocalCatalog } from "@/lib/api/hooks";
-import type { Product } from "@/lib/api/catalog";
+import { Select, SearchableSelect } from "@/components/ui/select";
+import {
+  useCloneGlobalProduct,
+  useGlobalCatalog,
+  usePlatformCatalog,
+} from "@/lib/api/hooks";
 import {
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
 } from "@/lib/catalog-global-options";
+import {
+  buildPurchaseListCatalog,
+  productsForPurchaseListCategory,
+  purchaseListProductLabel,
+  type PurchaseListCatalogProduct,
+  type PurchaseListCrop,
+} from "@/lib/catalog/purchase-list-catalog";
 import { cn } from "@/lib/utils";
-import { Field, STAGES, fmt, type ListItem } from "@/components/domain/season/_shared";
+import { Field, fmt, type ListItem } from "@/components/domain/season/_shared";
+
+const DEFAULT_ITEM_STAGE = "Outra";
 
 type PurchaseListItemsEditorProps = {
   items: ListItem[];
   setItems: React.Dispatch<React.SetStateAction<ListItem[]>>;
   totalHa: number;
+  /** Cultura da lista — filtra variedades/híbridos por soja ou milho. */
+  crop?: PurchaseListCrop | null;
   className?: string;
 };
 
-const selectClass =
-  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
-function productsForCategory(products: Product[], category: string): Product[] {
-  if (!category) return [];
-  return products.filter((product) => (product.category ?? "OTHER") === category);
+function toProductOptionValue(item: ListItem): string {
+  return item.productId;
 }
 
 export function PurchaseListItemsEditor({
   items,
   setItems,
   totalHa,
+  crop,
   className,
 }: PurchaseListItemsEditorProps) {
-  const catalog = useLocalCatalog();
-  const products = catalog.data?.data ?? [];
+  const platformCatalog = usePlatformCatalog();
+  const globalCatalog = useGlobalCatalog();
+  const cloneGlobal = useCloneGlobalProduct();
+  const [resolvingProductKey, setResolvingProductKey] = useState<string | null>(null);
+
+  const products = useMemo(
+    () =>
+      buildPurchaseListCatalog(
+        platformCatalog.data?.data ?? [],
+        globalCatalog.data?.data ?? [],
+      ),
+    [platformCatalog.data?.data, globalCatalog.data?.data],
+  );
 
   const addItem = () => {
     setItems((prev) => [
@@ -45,7 +70,7 @@ export function PurchaseListItemsEditor({
         category: "",
         productId: "",
         productName: "",
-        stage: STAGES[0],
+        stage: DEFAULT_ITEM_STAGE,
         dose: "",
         unit: "L",
         nApps: "1",
@@ -63,31 +88,89 @@ export function PurchaseListItemsEditor({
     setItems((prev) => prev.filter((it) => it.key !== key));
   };
 
-  const handleCategoryChange = (key: string, category: string, currentProductId: string) => {
+  const handleCategoryChange = (key: string, category: string, previousCategory: string) => {
     const patch: Partial<ListItem> = { category };
-    const currentProduct = products.find((product) => product.id === currentProductId);
-    if (
-      currentProductId &&
-      currentProduct &&
-      (currentProduct.category ?? "OTHER") !== category
-    ) {
+    if (category !== previousCategory) {
       patch.productId = "";
       patch.productName = "";
     }
     updateItem(key, patch);
   };
 
+  const resolveProductSelection = async (
+    itemKey: string,
+    optionValue: string,
+    rowProducts: PurchaseListCatalogProduct[],
+  ) => {
+    const product = rowProducts.find((entry) => entry.optionValue === optionValue);
+    if (!product) return;
+
+    if (!product.globalId || !product.isGlobalOnly) {
+      updateItem(itemKey, {
+        productId: product.optionValue,
+        productName: product.name,
+        unit: product.dose_unit,
+      });
+      return;
+    }
+
+    setResolvingProductKey(itemKey);
+    try {
+      const cloned = await cloneGlobal.mutateAsync(product.globalId);
+      updateItem(itemKey, {
+        productId: cloned.id,
+        productName: cloned.name ?? product.name,
+        unit: cloned.dose_unit ?? product.dose_unit,
+      });
+    } catch {
+      toast.error("Não foi possível adicionar o produto da plataforma global.");
+    } finally {
+      setResolvingProductKey(null);
+    }
+  };
+
+  const renderProductField = (
+    it: ListItem,
+    rowProducts: PurchaseListCatalogProduct[],
+    minWidth?: string,
+  ) => {
+    const optionValue = toProductOptionValue(it);
+    const productOptions = rowProducts.map((product) => ({
+      value: product.optionValue,
+      label: purchaseListProductLabel(product),
+      keywords: `${product.name} ${product.crop === "SOYBEAN" ? "soja" : product.crop === "CORN" ? "milho" : ""}`,
+    }));
+
+    return (
+      <SearchableSelect
+        key={`${it.key}-${it.category}`}
+        value={optionValue}
+        onValueChange={(nextValue) => {
+          void resolveProductSelection(it.key, nextValue, rowProducts);
+        }}
+        options={productOptions}
+        placeholder={it.category ? "Selecione…" : "Escolha a categoria"}
+        filterLabel="Buscar produto"
+        searchPlaceholder="Buscar produto…"
+        selectedLabel={it.productId ? it.productName || undefined : undefined}
+        disabled={!it.category || resolvingProductKey === it.key}
+        loading={resolvingProductKey === it.key}
+        loadingMessage="Vinculando…"
+        className={minWidth}
+      />
+    );
+  };
+
   return (
     <div className={cn("flex flex-col", className)}>
       <div className="hidden overflow-x-auto rounded-xl border bg-card shadow-sm lg:block">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-3 py-2.5 text-left">Categoria</th>
               <th className="px-3 py-2.5 text-left">Produto</th>
-              <th className="px-3 py-2.5 text-left">Etapa</th>
               <th className="px-3 py-2.5 text-left">Dose/ha</th>
-              <th className="px-3 py-2.5 text-left">Un.</th>
+              <th className="min-w-[108px] px-3 py-2.5 text-left">Un.</th>
               <th className="px-3 py-2.5 text-left">Nº apl.</th>
               <th className="px-3 py-2.5 text-left">Estoque</th>
               <th className="px-3 py-2.5 text-left">Preço R$/un.</th>
@@ -100,68 +183,41 @@ export function PurchaseListItemsEditor({
           <tbody className="divide-y">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={11} className="px-3 py-10 text-center text-sm text-muted-foreground">
                   Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
                 </td>
               </tr>
             ) : (
               items.map((it) => {
-                const rowProducts = productsForCategory(products, it.category);
+                const rowProducts = productsForPurchaseListCategory(
+                  products,
+                  it.category,
+                  toProductOptionValue(it),
+                  it.productName,
+                  crop,
+                );
                 const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
                 const toBuy = Math.max(0, required - Number(it.stock || 0));
                 const totalValue = toBuy * Number(it.price || 0);
                 return (
                   <tr key={it.key} className="align-middle">
                     <td className="px-3 py-2">
-                      <select
+                      <Select
                         value={it.category}
-                        onChange={(e) => handleCategoryChange(it.key, e.target.value, it.productId)}
-                        className={cn(selectClass, "min-w-[140px]")}
-                      >
-                        <option value="">Selecione…</option>
-                        {GLOBAL_PRODUCT_CATEGORIES.map((category) => (
-                          <option key={category} value={category}>
-                            {PRODUCT_CATEGORY_LABELS[category]}
-                          </option>
-                        ))}
-                      </select>
+                        onValueChange={(category) =>
+                          handleCategoryChange(it.key, category, it.category)
+                        }
+                        placeholder="Selecione…"
+                        filterLabel="Categoria"
+                        options={GLOBAL_PRODUCT_CATEGORIES.map((category) => ({
+                          value: category,
+                          label: PRODUCT_CATEGORY_LABELS[category],
+                        }))}
+                        className="min-w-[140px]"
+                      />
                     </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={it.productId}
-                        onChange={(e) => {
-                          const prod = rowProducts.find((product) => product.id === e.target.value);
-                          updateItem(it.key, {
-                            productId: e.target.value,
-                            productName: prod?.name ?? "",
-                            unit: prod?.dose_unit ?? it.unit,
-                          });
-                        }}
-                        disabled={!it.category}
-                        className={cn(selectClass, "min-w-[180px]")}
-                      >
-                        <option value="">
-                          {it.category ? "Selecione…" : "Escolha a categoria"}
-                        </option>
-                        {rowProducts.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={it.stage}
-                        onChange={(e) => updateItem(it.key, { stage: e.target.value })}
-                        className={cn(selectClass, "min-w-[150px]")}
-                      >
-                        {STAGES.map((stage) => (
-                          <option key={stage} value={stage}>
-                            {stage}
-                          </option>
-                        ))}
-                      </select>
+                    <td className="px-3 py-2 min-w-[220px]">
+                      {renderProductField(it, rowProducts, "min-w-[200px]")}
                     </td>
                     <td className="px-3 py-2">
                       <Input
@@ -172,7 +228,7 @@ export function PurchaseListItemsEditor({
                         className="w-24"
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="min-w-[108px] px-3 py-2">
                       <DoseUnitSelect
                         value={it.unit}
                         onChange={(val) => updateItem(it.key, { unit: val })}
@@ -245,7 +301,13 @@ export function PurchaseListItemsEditor({
           </div>
         ) : (
           items.map((it) => {
-            const rowProducts = productsForCategory(products, it.category);
+            const rowProducts = productsForPurchaseListCategory(
+              products,
+              it.category,
+              toProductOptionValue(it),
+              it.productName,
+              crop,
+            );
             const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
             const toBuy = Math.max(0, required - Number(it.stock || 0));
             return (
@@ -266,59 +328,25 @@ export function PurchaseListItemsEditor({
 
                 <div className="space-y-3">
                   <Field label="Categoria">
-                    <select
+                    <Select
                       value={it.category}
-                      onChange={(e) => handleCategoryChange(it.key, e.target.value, it.productId)}
-                      className={selectClass}
-                    >
-                      <option value="">Selecione…</option>
-                      {GLOBAL_PRODUCT_CATEGORIES.map((category) => (
-                        <option key={category} value={category}>
-                          {PRODUCT_CATEGORY_LABELS[category]}
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={(category) =>
+                        handleCategoryChange(it.key, category, it.category)
+                      }
+                      placeholder="Selecione…"
+                      filterLabel="Categoria"
+                      options={GLOBAL_PRODUCT_CATEGORIES.map((category) => ({
+                        value: category,
+                        label: PRODUCT_CATEGORY_LABELS[category],
+                      }))}
+                    />
                   </Field>
                   <Field label="Produto">
-                    <select
-                      value={it.productId}
-                      onChange={(e) => {
-                        const prod = rowProducts.find((product) => product.id === e.target.value);
-                        updateItem(it.key, {
-                          productId: e.target.value,
-                          productName: prod?.name ?? "",
-                          unit: prod?.dose_unit ?? it.unit,
-                        });
-                      }}
-                      disabled={!it.category}
-                      className={selectClass}
-                    >
-                      <option value="">
-                        {it.category ? "Selecione…" : "Escolha a categoria"}
-                      </option>
-                      {rowProducts.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.name}
-                        </option>
-                      ))}
-                    </select>
+                    {renderProductField(it, rowProducts)}
                   </Field>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Field label="Etapa">
-                    <select
-                      value={it.stage}
-                      onChange={(e) => updateItem(it.key, { stage: e.target.value })}
-                      className={selectClass}
-                    >
-                      {STAGES.map((stage) => (
-                        <option key={stage} value={stage}>
-                          {stage}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
                   <Field label="Dose/ha">
                     <Input
                       type="number"

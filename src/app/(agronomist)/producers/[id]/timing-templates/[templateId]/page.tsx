@@ -54,7 +54,7 @@ export default function ProducerTimingTemplateDetailPage() {
         items={[
           { label: "Produtores", href: "/producers" },
           { label: producer?.name ?? "Produtor", href: producerHref },
-          { label: "Modelos de cronograma", href: `${producerHref}#timing-templates` },
+          { label: "Modelos de Recomendação", href: `${producerHref}#timing-templates` },
           { label: template.name },
         ]}
       />
@@ -63,7 +63,7 @@ export default function ProducerTimingTemplateDetailPage() {
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-              Modelo de cronograma
+              Modelo de Recomendação
             </p>
             {editingName ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -118,7 +118,7 @@ export default function ProducerTimingTemplateDetailPage() {
         </div>
       </section>
 
-      <TimingTemplateStagesPanel template={template} />
+      <TimingTemplateStagesPanel template={template} producerId={producerId} />
     </div>
   );
 }

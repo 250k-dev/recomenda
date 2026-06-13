@@ -8,8 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PageHeader } from "@/components/domain/page-header";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { NativeSelect } from "@/components/ui/native-select";
-import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { StatCard } from "@/components/domain/stat-card";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/data-table";
@@ -46,6 +44,7 @@ import type { PurchaseListDetail } from "@/lib/api/client";
 import { activeAgronomistProducerAccounts } from "@/lib/api/client";
 import { toast } from "sonner";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
+import { cn } from "@/lib/utils";
 import {
   ChevronRight,
   Eye,
@@ -87,8 +86,6 @@ type FarmFormValues = z.infer<typeof farmSchema>;
 type PlotFormValues = z.infer<typeof plotSchema>;
 
 type FarmViewTab = "seasons" | "purchase" | "plots";
-
-const FARM_VIEW_TABS: FarmViewTab[] = ["seasons", "purchase", "plots"];
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -411,8 +408,22 @@ export default function FarmDetailPage() {
         />
       </div>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2">
-        <Card className="border-primary/20 bg-linear-to-br from-primary/5 to-card">
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setFarmViewWithUrl("seasons")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setFarmViewWithUrl("seasons");
+            }
+          }}
+          className={cn(
+            "cursor-pointer border-primary/20 bg-linear-to-br from-primary/5 to-card transition-shadow hover:shadow-md",
+            farmView === "seasons" && "ring-2 ring-primary",
+          )}
+        >
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -440,27 +451,24 @@ export default function FarmDetailPage() {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setFarmViewWithUrl("seasons")}
-              >
-                Ver safras
-              </Button>
-              {resolvedProducerId ? (
-                <Button asChild size="sm" variant="outline" className="gap-1.5">
-                  <Link href={newSeasonHref}>
-                    <Plus className="h-4 w-4" />
-                    Nova safra
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-sky-500/20 bg-linear-to-br from-sky-500/5 to-card">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setFarmViewWithUrl("purchase")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setFarmViewWithUrl("purchase");
+            }
+          }}
+          className={cn(
+            "cursor-pointer border-sky-500/20 bg-linear-to-br from-sky-500/5 to-card transition-shadow hover:shadow-md",
+            farmView === "purchase" && "ring-2 ring-sky-500",
+          )}
+        >
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
@@ -488,42 +496,57 @@ export default function FarmDetailPage() {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setFarmViewWithUrl("purchase")}
-              >
-                Abrir lista
-              </Button>
-              {resolvedProducerId ? (
-                <Button asChild size="sm" variant="outline" className="gap-1.5">
-                  <Link href={newPurchaseListHref}>
-                    <Plus className="h-4 w-4" />
-                    Montar lista
-                  </Link>
-                </Button>
-              ) : null}
+          </CardContent>
+        </Card>
+
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setFarmViewWithUrl("plots")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setFarmViewWithUrl("plots");
+            }
+          }}
+          className={cn(
+            "cursor-pointer border-emerald-500/20 bg-linear-to-br from-emerald-500/5 to-card transition-shadow hover:shadow-md",
+            farmView === "plots" && "ring-2 ring-emerald-500",
+          )}
+        >
+          <CardContent className="flex flex-col gap-3 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                <MapPin className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Talhões
+                </p>
+                {sortedPlots.length > 0 ? (
+                  <>
+                    <p className="mt-0.5 font-semibold text-foreground">
+                      {sortedPlots.length}{" "}
+                      {sortedPlots.length === 1 ? "talhão" : "talhões"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {totalHectares.toFixed(2)} ha ·{" "}
+                      {sortedPlots
+                        .slice(0, 2)
+                        .map((plot) => plot.name)
+                        .join(", ")}
+                      {sortedPlots.length > 2 ? "…" : ""}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Nenhum talhão cadastrado nesta fazenda.
+                  </p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="mb-5">
-        <SegmentedTabs
-          variant="pill"
-          value={farmView}
-          onValueChange={(v) => {
-            if (FARM_VIEW_TABS.includes(v as FarmViewTab)) {
-              setFarmViewWithUrl(v as FarmViewTab);
-            }
-          }}
-          items={[
-            { value: "seasons", label: "Safras" },
-            { value: "purchase", label: "Lista de compra" },
-            { value: "plots", label: "Talhões" },
-          ]}
-        />
       </div>
 
       <div className="grid gap-6">

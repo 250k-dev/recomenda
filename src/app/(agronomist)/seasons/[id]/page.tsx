@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SearchableSelect } from "@/components/ui/select";
 import {
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
@@ -323,42 +323,40 @@ function AddProductRow({
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Categoria</Label>
-            <NativeSelect
+            <Select
               value={category}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-              className="h-8 w-full text-sm"
-            >
-              <option value="">Selecione…</option>
-              {GLOBAL_PRODUCT_CATEGORIES.map((item) => (
-                <option key={item} value={item}>
-                  {PRODUCT_CATEGORY_LABELS[item]}
-                </option>
-              ))}
-            </NativeSelect>
+              onValueChange={handleCategoryChange}
+              placeholder="Selecione…"
+              filterLabel="Categoria"
+              options={GLOBAL_PRODUCT_CATEGORIES.map((item) => ({
+                value: item,
+                label: PRODUCT_CATEGORY_LABELS[item],
+              }))}
+              className="w-full"
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Produto</Label>
-            <NativeSelect
+            <SearchableSelect
               value={selectedId}
-              onChange={(e) => {
+              onValueChange={(productId) => {
                 const product = rowProducts.find(
-                  (item) => item.local_product_id === e.target.value,
+                  (item) => item.local_product_id === productId,
                 );
-                setSelectedId(e.target.value);
+                setSelectedId(productId);
                 setUnit(product?.dose_unit ?? "L");
               }}
               disabled={!category}
-              className="h-8 w-full text-sm"
-            >
-              <option value="">
-                {category ? "Selecione…" : "Escolha a categoria"}
-              </option>
-              {rowProducts.map((product) => (
-                <option key={product.local_product_id} value={product.local_product_id ?? ""}>
-                  {product.name}
-                </option>
-              ))}
-            </NativeSelect>
+              placeholder={category ? "Selecione…" : "Escolha a categoria"}
+              filterLabel="Buscar produto"
+              searchPlaceholder="Buscar produto…"
+              options={rowProducts.map((product) => ({
+                value: product.local_product_id ?? "",
+                label: product.name,
+                keywords: product.name,
+              }))}
+              className="w-full"
+            />
           </div>
         </div>
 

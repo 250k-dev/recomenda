@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useAllLocalProducts, useAllInactiveLocalProducts } from "@/lib/api/hooks";
 
 const CATEGORIES: Record<string, string> = {
+  SEED: "Variedade / Híbrido",
   HERBICIDE: "Herbicida",
   FUNGICIDE: "Fungicida",
   INSECTICIDE: "Inseticida",

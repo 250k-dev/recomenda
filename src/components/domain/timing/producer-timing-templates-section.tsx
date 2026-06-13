@@ -22,7 +22,7 @@ import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -107,7 +107,7 @@ export function ProducerTimingTemplatesSection({
                 Planejamento
               </p>
               <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                Modelos de cronograma
+                Modelos de Recomendação
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
                 Modelos reutilizáveis de {producerName} — dessecação, fungicidas e janelas
@@ -150,7 +150,7 @@ export function ProducerTimingTemplatesSection({
               <EmptyState
                 icon={Clock}
                 title="Nenhum modelo para este produtor"
-                description="Crie modelos de cronograma para reutilizar nas safras deste produtor."
+                description="Crie modelos de recomendação para reutilizar nas safras deste produtor."
                 variant="inline"
                 action={
                   <Button size="sm" className="gap-1.5" onClick={() => setSheetOpen(true)}>
@@ -234,7 +234,7 @@ export function ProducerTimingTemplatesSection({
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
           <SheetHeader className="border-b px-4 py-4 pr-12">
-            <SheetTitle>Novo modelo de cronograma</SheetTitle>
+            <SheetTitle>Novo modelo de recomendação</SheetTitle>
             <SheetDescription>
               O modelo ficará disponível apenas para este produtor nas próximas safras.
             </SheetDescription>
@@ -256,14 +256,17 @@ export function ProducerTimingTemplatesSection({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="timing-create-crop">Cultura</Label>
-              <NativeSelect
+              <Select
                 id="timing-create-crop"
                 className="w-full"
                 {...form.register("crop")}
-              >
-                <option value="SOYBEAN">Soja</option>
-                <option value="CORN">Milho</option>
-              </NativeSelect>
+                value={form.watch("crop") ?? ""}
+                filterLabel="Cultura"
+                options={[
+                  { value: "SOYBEAN", label: "Soja" },
+                  { value: "CORN", label: "Milho" },
+                ]}
+              />
             </div>
             <div className="flex gap-2 pt-2">
               <Button

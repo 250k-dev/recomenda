@@ -1,35 +1,45 @@
 "use client";
 
-import { ArrowDown, ArrowUp, FlaskConical, Plus, Trash2 } from "lucide-react";
+import { useMemo } from "react";
+import { ArrowDown, ArrowUp, FlaskConical, Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrazilianDateInput } from "@/components/ui/brazilian-date-input";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SearchableSelect } from "@/components/ui/select";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Field } from "@/components/domain/season/_shared";
-import { useLocalCatalog } from "@/lib/api/hooks";
+import { useLocalCatalog, useProducerPurchaseLists } from "@/lib/api/hooks";
 import {
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
 } from "@/lib/catalog-global-options";
 import type { Product } from "@/lib/api/catalog";
+import { CROP_LABELS } from "@/lib/season-constants";
+import {
+  formatTimingPreviewDate,
+  recommendedYmdToWindow,
+  todayLocalYmd,
+  windowDatesFromRecommendedYmd,
+  windowToRecommendedYmd,
+} from "@/lib/timing/window-days";
 import { cn } from "@/lib/utils";
 
-export const TIMING_STAGE_PRESETS = [
-  "Dessecação",
-  "Pós-emergência",
-  "Fungicida V4",
-  "Fungicida V6",
-  "Fungicida VT",
-  "Inseticida",
-  "Foliar",
-  "Outra",
+export const TIMING_TRIGGER_TYPES = [
+  { value: "PRE_PLANTING", label: "Pré-plantio" },
+  { value: "PLANTING", label: "Plantio" },
+  { value: "POST_PLANTING", label: "Pós-plantio" },
 ] as const;
 
 export const TIMING_TRIGGER_LABELS: Record<string, string> = {
-  DAYS_AFTER_PLANTING: "Dias após plantio",
-  DAYS_AFTER_DESICCATION: "Dias após dessecação",
-  DAYS_AFTER_TASSELING: "Dias após pendoamento",
-  FIXED_DATE_OFFSET: "Offset de data fixa",
+  PRE_PLANTING: "Pré-plantio",
+  PLANTING: "Plantio",
+  POST_PLANTING: "Pós-plantio",
+  DAYS_AFTER_PLANTING: "Pós-plantio",
+  DAYS_AFTER_DESICCATION: "Pré-plantio",
+  DAYS_AFTER_TASSELING: "Pós-plantio",
+  FIXED_DATE_OFFSET: "Pós-plantio",
 };
 
 export type StageProductDraft = {
@@ -47,12 +57,35 @@ function productsForCategory(products: Product[], category: string): Product[] {
   return products.filter((product) => (product.category ?? "OTHER") === category);
 }
 
+function usePurchaseListCatalogProducts(producerId?: string, crop?: string) {
+  const { data: catalogData, isLoading: catalogLoading } = useLocalCatalog();
+  const { data: purchaseLists, isLoading: listsLoading } = useProducerPurchaseLists(
+    producerId ?? "",
+  );
+
+  const productList = useMemo(() => {
+    const catalog = catalogData?.data ?? [];
+    if (!producerId) return catalog;
+
+    const lists = (purchaseLists ?? []).filter((list) => !crop || list.crop === crop);
+    const allowedIds = new Set(
+      lists.flatMap((list) => list.items.map((item) => item.local_product_id)),
+    );
+    return catalog.filter((product) => allowedIds.has(product.id));
+  }, [catalogData, crop, producerId, purchaseLists]);
+
+  return {
+    productList,
+    isLoading: catalogLoading || (Boolean(producerId) && listsLoading),
+  };
+}
+
 export type TimingStageField = {
   key: string;
   name: string;
   trigger_type: string;
-  window_start_days: string;
-  window_end_days: string;
+  recommended_date: string;
+  notes: string;
   products: StageProductDraft[];
 };
 
@@ -71,22 +104,68 @@ export function newTimingStageField(name = ""): TimingStageField {
   return {
     key: crypto.randomUUID(),
     name,
-    trigger_type: "DAYS_AFTER_PLANTING",
-    window_start_days: "0",
-    window_end_days: "7",
+    trigger_type: "POST_PLANTING",
+    recommended_date: todayLocalYmd(),
+    notes: "",
     products: [],
   };
+}
+
+function StageWindowDateFields({
+  recommendedDate,
+  onRecommendedDateChange,
+}: {
+  recommendedDate: string;
+  onRecommendedDateChange: (recommendedDate: string) => void;
+}) {
+  const { startYmd, centerYmd, endYmd } = windowDatesFromRecommendedYmd(recommendedDate);
+
+  return (
+    <div className="grid gap-3 sm:col-span-2 sm:grid-cols-3">
+      <Field
+        label="Data recomendada"
+        hint="Na safra, calculada a partir do marco da fase."
+      >
+        <BrazilianDateInput
+          value={centerYmd}
+          onChange={onRecommendedDateChange}
+        />
+      </Field>
+      <Field label="Início da janela">
+        <BrazilianDateInput
+          value={startYmd}
+          readOnly
+          aria-label={`Início da janela: ${formatTimingPreviewDate(startYmd)}`}
+        />
+      </Field>
+      <Field label="Fim da janela">
+        <BrazilianDateInput
+          value={endYmd}
+          readOnly
+          aria-label={`Fim da janela: ${formatTimingPreviewDate(endYmd)}`}
+        />
+      </Field>
+    </div>
+  );
 }
 
 function StageProductsEditor({
   products,
   onChange,
+  producerId,
+  crop,
 }: {
   products: StageProductDraft[];
   onChange: (products: StageProductDraft[]) => void;
+  producerId?: string;
+  crop?: string;
 }) {
-  const { data: catalogData, isLoading } = useLocalCatalog();
-  const productList = catalogData?.data ?? [];
+  const { productList, isLoading } = usePurchaseListCatalogProducts(producerId, crop);
+
+  const availableCategories = useMemo(() => {
+    const categories = new Set(productList.map((product) => product.category ?? "OTHER"));
+    return GLOBAL_PRODUCT_CATEGORIES.filter((category) => categories.has(category));
+  }, [productList]);
 
   const updateProduct = (key: string, patch: Partial<StageProductDraft>) => {
     onChange(products.map((item) => (item.key === key ? { ...item, ...patch } : item)));
@@ -102,12 +181,28 @@ function StageProductsEditor({
         <div className="flex items-center gap-2">
           <FlaskConical className="h-4 w-4 text-primary" />
           <p className="text-sm font-medium text-foreground">Produtos da etapa</p>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Como funcionam os produtos desta etapa"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent sideOffset={6} className="max-w-xs text-left leading-relaxed">
+              Só aparecem aqui os insumos já incluídos na lista de compra deste produtor. Para
+              usar outros produtos, adicione-os primeiro na lista de compra da fazenda.
+            </TooltipContent>
+          </Tooltip>
         </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
           className="h-7 gap-1 text-xs"
+          disabled={isLoading || productList.length === 0}
           onClick={() => onChange([...products, newStageProductDraft()])}
         >
           <Plus className="h-3.5 w-3.5" />
@@ -116,10 +211,12 @@ function StageProductsEditor({
       </div>
 
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Carregando catálogo…</p>
+        <p className="text-xs text-muted-foreground">Carregando produtos da lista de compra…</p>
       ) : productList.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
-          Cadastre produtos no catálogo antes de montar a receita desta etapa.
+          Nenhum produto na lista de compra deste produtor
+          {crop ? ` para ${(CROP_LABELS[crop] ?? crop).toLowerCase()}` : ""}. Volte à fazenda e
+          adicione insumos na lista de compra antes de montar a receita desta etapa.
         </p>
       ) : products.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
@@ -135,10 +232,9 @@ function StageProductsEditor({
               className="grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_120px_88px_auto]"
             >
               <Field label="Categoria">
-                <NativeSelect
+                <Select
                   value={item.category}
-                  onChange={(e) => {
-                    const nextCategory = e.target.value;
+                  onValueChange={(nextCategory) => {
                     const patch: Partial<StageProductDraft> = { category: nextCategory };
                     const currentProduct = productList.find((product) => product.id === item.productId);
                     if (
@@ -151,40 +247,39 @@ function StageProductsEditor({
                     }
                     updateProduct(item.key, patch);
                   }}
+                  placeholder="Selecione…"
+                  filterLabel="Categoria"
+                  options={availableCategories.map((category) => ({
+                    value: category,
+                    label: PRODUCT_CATEGORY_LABELS[category],
+                  }))}
                   className="w-full"
-                >
-                  <option value="">Selecione…</option>
-                  {GLOBAL_PRODUCT_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>
-                      {PRODUCT_CATEGORY_LABELS[category]}
-                    </option>
-                  ))}
-                </NativeSelect>
+                />
               </Field>
               <div className="min-w-0">
                 <Field label="Produto">
-                <NativeSelect
+                <SearchableSelect
                   value={item.productId}
-                  onChange={(e) => {
-                    const selected = rowProducts.find((product) => product.id === e.target.value);
+                  onValueChange={(productId) => {
+                    const selected = rowProducts.find((product) => product.id === productId);
                     updateProduct(item.key, {
-                      productId: e.target.value,
+                      productId,
                       productName: selected?.name ?? "",
                       unit: selected?.dose_unit ?? item.unit,
                     });
                   }}
                   disabled={!item.category}
+                  placeholder={item.category ? "Selecione…" : "Escolha a categoria"}
+                  filterLabel="Buscar produto"
+                  searchPlaceholder="Buscar produto…"
+                  selectedLabel={item.productName || undefined}
+                  options={rowProducts.map((product) => ({
+                    value: product.id,
+                    label: product.name,
+                    keywords: product.name,
+                  }))}
                   className="w-full"
-                >
-                  <option value="">
-                    {item.category ? "Selecione…" : "Escolha a categoria"}
-                  </option>
-                  {rowProducts.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </NativeSelect>
+                />
                 </Field>
               </div>
               <Field label="Dose/ha">
@@ -235,6 +330,8 @@ export function TimingStagesEditor({
   isAdding = false,
   minStages = 1,
   showProducts = false,
+  producerId,
+  crop,
   className,
 }: {
   stages: TimingStageField[];
@@ -246,6 +343,8 @@ export function TimingStagesEditor({
   isAdding?: boolean;
   minStages?: number;
   showProducts?: boolean;
+  producerId?: string;
+  crop?: string;
   className?: string;
 }) {
   return (
@@ -270,25 +369,9 @@ export function TimingStagesEditor({
         </Button>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {TIMING_STAGE_PRESETS.map((preset) => (
-          <Button
-            key={preset}
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            disabled={isAdding}
-            onClick={() => onAdd(preset)}
-          >
-            + {preset}
-          </Button>
-        ))}
-      </div>
-
       {stages.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
-          Nenhuma etapa cadastrada. Use os atalhos acima ou adicione a primeira etapa.
+          Nenhuma etapa cadastrada. Adicione a primeira etapa.
         </p>
       ) : (
         <div className="flex flex-col gap-3">
@@ -342,37 +425,39 @@ export function TimingStagesEditor({
                     placeholder="Ex: 1ª Fungicida"
                   />
                 </Field>
-                <Field label="Gatilho">
-                  <NativeSelect
+                <Field label="Fase">
+                  <Select
                     value={stage.trigger_type}
-                    onChange={(e) => onChange(stage.key, { trigger_type: e.target.value })}
-                  >
-                    {Object.entries(TIMING_TRIGGER_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </Field>
-                <Field label="Início (dias)">
-                  <Input
-                    type="number"
-                    value={stage.window_start_days}
-                    onChange={(e) => onChange(stage.key, { window_start_days: e.target.value })}
+                    onValueChange={(trigger_type) => onChange(stage.key, { trigger_type })}
+                    options={TIMING_TRIGGER_TYPES.map(({ value, label }) => ({
+                      value,
+                      label,
+                    }))}
                   />
                 </Field>
-                <Field label="Fim (dias)">
-                  <Input
-                    type="number"
-                    value={stage.window_end_days}
-                    onChange={(e) => onChange(stage.key, { window_end_days: e.target.value })}
-                  />
-                </Field>
+                <StageWindowDateFields
+                  recommendedDate={stage.recommended_date}
+                  onRecommendedDateChange={(recommended_date) =>
+                    onChange(stage.key, { recommended_date })
+                  }
+                />
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Field label="Observações">
+                    <Textarea
+                      value={stage.notes}
+                      onChange={(e) => onChange(stage.key, { notes: e.target.value })}
+                      placeholder="Instruções, condições de aplicação ou observações desta etapa…"
+                      rows={3}
+                    />
+                  </Field>
+                </div>
               </div>
               {showProducts ? (
                 <StageProductsEditor
                   products={stage.products}
                   onChange={(products) => onChange(stage.key, { products })}
+                  producerId={producerId}
+                  crop={crop}
                 />
               ) : null}
             </div>

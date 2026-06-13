@@ -266,7 +266,7 @@ export function ProducerDetailView({
                 </span>
               </summary>
               <div className="border-t border-primary/10 px-4 pb-5 pt-4 sm:px-6">
-                <MonthCalendar producerId={producerId} focusNearestEvent />
+                <MonthCalendar producerId={producerId} showHeader={false} focusNearestEvent />
               </div>
             </details>
           </section>

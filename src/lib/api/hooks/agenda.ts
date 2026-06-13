@@ -10,6 +10,7 @@ import {
   startOfMonth,
 } from "date-fns";
 import { getSeasons, getTimeline, type Recommendation } from "@/lib/api/seasons";
+import { recommendationWindowSpanDays } from "@/lib/timing/window-days";
 import { queryKeys } from "./queryKeys";
 
 const BATCH_SIZE = 10;
@@ -35,6 +36,8 @@ export type AgendaEvent = {
   seasonId: string;
   isLate: boolean;
   pillLabel: string;
+  windowEndYmd: string;
+  isCenterDay: boolean;
 };
 
 export type AgronomistAgendaResult = {
@@ -85,15 +88,47 @@ function recommendationStatus(raw: unknown): string | null {
   return typeof status === "string" ? status : null;
 }
 
-function pillLabelFor(ymd: string, today: string): { label: string; isLate: boolean } {
-  const isLate = ymd < today;
-  if (isLate) {
-    const days = differenceInCalendarDays(localYmdToDate(today), localYmdToDate(ymd));
-    return { label: days === 1 ? "Atraso 1 dia" : `Atraso ${days} dias`, isLate: true };
+function recommendationWindowDays(raw: unknown): {
+  startYmd: string;
+  endYmd: string;
+  centerYmd: string;
+  days: string[];
+} | null {
+  const startYmd = recommendationYmd(raw);
+  if (!startYmd || !raw || typeof raw !== "object") return null;
+
+  const r = raw as Recommendation;
+  const span = recommendationWindowSpanDays(r.window_start_days ?? 0, r.window_end_days ?? 0);
+  const endYmd = ymdFromDate(addDays(localYmdToDate(startYmd), span));
+  const centerYmd = ymdFromDate(
+    addDays(localYmdToDate(startYmd), Math.round(span / 2)),
+  );
+  const days = Array.from({ length: span + 1 }, (_, index) =>
+    ymdFromDate(addDays(localYmdToDate(startYmd), index)),
+  );
+
+  return { startYmd, endYmd, centerYmd, days };
+}
+
+function pillLabelForWindowDay(
+  ymd: string,
+  today: string,
+  windowEndYmd: string,
+  isCenterDay: boolean,
+): { label: string; isLate: boolean } {
+  if (windowEndYmd < today) {
+    const days = differenceInCalendarDays(localYmdToDate(today), localYmdToDate(windowEndYmd));
+    return {
+      label: days === 1 ? "Atraso 1 dia" : `Atraso ${days} dias`,
+      isLate: true,
+    };
   }
   if (ymd === today) return { label: "Hoje", isLate: false };
-  const days = differenceInCalendarDays(localYmdToDate(ymd), localYmdToDate(today));
-  return { label: days === 1 ? "Amanhã" : `Em ${days} dias`, isLate: false };
+  if (isCenterDay) {
+    const days = differenceInCalendarDays(localYmdToDate(ymd), localYmdToDate(today));
+    if (days > 0) return { label: days === 1 ? "Amanhã" : `Em ${days} dias`, isLate: false };
+  }
+  return { label: "Na janela", isLate: false };
 }
 
 async function fetchAgendaEvents(
@@ -114,7 +149,7 @@ async function fetchAgendaEvents(
   const pendingCandidates: {
     season: AgendaSeasonRow;
     r: Recommendation;
-    ymd: string;
+    window: NonNullable<ReturnType<typeof recommendationWindowDays>>;
   }[] = [];
 
   for (let i = 0; i < seasons.length; i += BATCH_SIZE) {
@@ -126,40 +161,64 @@ async function fetchAgendaEvents(
     for (const { season, rows } of timelines) {
       for (const raw of rows) {
         if (recommendationStatus(raw) !== "PENDING") continue;
-        const ymd = recommendationYmd(raw);
-        if (!ymd) continue;
-        pendingCandidates.push({ season, r: raw as Recommendation, ymd });
+        const window = recommendationWindowDays(raw);
+        if (!window) continue;
+        pendingCandidates.push({ season, r: raw as Recommendation, window });
       }
     }
   }
 
   const ordered = pendingCandidates
-    .sort((a, b) => a.ymd.localeCompare(b.ymd))
+    .sort((a, b) => a.window.startYmd.localeCompare(b.window.startYmd))
     .slice(0, MAX_EVENTS);
 
   const eventsByDay: Record<string, AgendaEvent[]> = {};
   let totalEventCount = 0;
   let todayCount = 0;
   let lateCount = 0;
+  const countedToday = new Set<string>();
+  const countedLate = new Set<string>();
 
-  for (const { season, r, ymd } of ordered) {
-    const { label, isLate } = pillLabelFor(ymd, today);
-    const event: AgendaEvent = {
-      id: `${season.id}-${r.id}`,
-      ymd,
-      applicationTitle: recommendationTitle(r),
-      farmName: season.farm_name?.trim() || "Fazenda",
-      producerName: season.producer_name?.trim() || "Produtor",
-      plotName: season.plot_name?.trim() || "Talhão",
-      seasonId: season.id,
-      isLate,
-      pillLabel: label,
-    };
-    if (!eventsByDay[ymd]) eventsByDay[ymd] = [];
-    eventsByDay[ymd].push(event);
-    totalEventCount += 1;
-    if (ymd === today) todayCount += 1;
-    if (isLate) lateCount += 1;
+  for (const { season, r, window } of ordered) {
+    const recommendationKey = `${season.id}-${r.id}`;
+
+    if (window.endYmd < today && !countedLate.has(recommendationKey)) {
+      lateCount += 1;
+      countedLate.add(recommendationKey);
+    }
+    if (
+      today >= window.startYmd &&
+      today <= window.endYmd &&
+      !countedToday.has(recommendationKey)
+    ) {
+      todayCount += 1;
+      countedToday.add(recommendationKey);
+    }
+
+    for (const ymd of window.days) {
+      const { label, isLate } = pillLabelForWindowDay(
+        ymd,
+        today,
+        window.endYmd,
+        ymd === window.centerYmd,
+      );
+      const event: AgendaEvent = {
+        id: `${recommendationKey}-${ymd}`,
+        ymd,
+        applicationTitle: recommendationTitle(r),
+        farmName: season.farm_name?.trim() || "Fazenda",
+        producerName: season.producer_name?.trim() || "Produtor",
+        plotName: season.plot_name?.trim() || "Talhão",
+        seasonId: season.id,
+        isLate,
+        pillLabel: label,
+        windowEndYmd: window.endYmd,
+        isCenterDay: ymd === window.centerYmd,
+      };
+      if (!eventsByDay[ymd]) eventsByDay[ymd] = [];
+      eventsByDay[ymd].push(event);
+      totalEventCount += 1;
+    }
   }
 
   return { eventsByDay, totalEventCount, todayCount, lateCount };

@@ -15,6 +15,7 @@ import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminCatalogNameCell, DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalCatalogImportResult, GlobalProduct } from "@/lib/api/client";
 import {
@@ -574,8 +575,6 @@ export default function AdminGlobalCatalogPage() {
     </div>,
   ]);
 
-  const selectClass =
-    "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
   const hasActiveListFilters = Boolean(filterName.trim() || filterCategory || filterDoseUnit || filterOrigin);
 
   return (
@@ -618,48 +617,41 @@ export default function AdminGlobalCatalogPage() {
             </div>
             <div className="w-full min-w-[10rem] sm:w-44">
               <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
-              <select
-                className={selectClass}
+              <Select
                 value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-              >
-                <option value="">Todas</option>
-                {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {PRODUCT_CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setFilterCategory}
+                placeholder="Todas"
+                options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+                  value: c,
+                  label: PRODUCT_CATEGORY_LABELS[c],
+                }))}
+              />
             </div>
             <div className="w-full min-w-[10rem] sm:w-44">
               <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
-              <select
-                className={selectClass}
+              <Select
                 value={filterDoseUnit}
-                onChange={(e) => setFilterDoseUnit(e.target.value)}
-              >
-                <option value="">Todas</option>
-                {GLOBAL_DOSE_UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {DOSE_UNIT_LABELS[u]}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setFilterDoseUnit}
+                placeholder="Todas"
+                options={GLOBAL_DOSE_UNITS.map((u) => ({
+                  value: u,
+                  label: DOSE_UNIT_LABELS[u],
+                }))}
+              />
             </div>
             <div className="w-full min-w-[10rem] sm:w-44">
               <label className="mb-1 block text-xs font-medium text-foreground">Origem</label>
-              <select
-                className={selectClass}
+              <Select
                 value={filterOrigin}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setFilterOrigin(v === "platform" || v === "custom" ? v : "");
+                onValueChange={(value) => {
+                  setFilterOrigin(value === "platform" || value === "custom" ? value : "");
                 }}
-              >
-                <option value="">Todas</option>
-                <option value="platform">Plataforma</option>
-                <option value="custom">Customizado</option>
-              </select>
+                placeholder="Todas"
+                options={[
+                  { value: "platform", label: "Plataforma" },
+                  { value: "custom", label: "Customizado" },
+                ]}
+              />
             </div>
             {hasActiveListFilters ? (
               <Button
@@ -788,23 +780,27 @@ export default function AdminGlobalCatalogPage() {
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
-                    <select {...createForm.register("category")} className={selectClass}>
-                      {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {PRODUCT_CATEGORY_LABELS[c]}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      {...createForm.register("category")}
+                      value={createForm.watch("category") ?? ""}
+                      filterLabel="Categoria"
+                      options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+                        value: c,
+                        label: PRODUCT_CATEGORY_LABELS[c],
+                      }))}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
-                    <select {...createForm.register("dose_unit")} className={selectClass}>
-                      {GLOBAL_DOSE_UNITS.map((u) => (
-                        <option key={u} value={u}>
-                          {DOSE_UNIT_LABELS[u]}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      {...createForm.register("dose_unit")}
+                      value={createForm.watch("dose_unit") ?? ""}
+                      filterLabel="Unidade de dose"
+                      options={GLOBAL_DOSE_UNITS.map((u) => ({
+                        value: u,
+                        label: DOSE_UNIT_LABELS[u],
+                      }))}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-foreground">URL do rótulo (opcional)</label>
@@ -955,23 +951,27 @@ export default function AdminGlobalCatalogPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
-              <select {...editForm.register("category")} className={selectClass}>
-                {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {PRODUCT_CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
+              <Select
+                {...editForm.register("category")}
+                value={editForm.watch("category") ?? ""}
+                filterLabel="Categoria"
+                options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+                  value: c,
+                  label: PRODUCT_CATEGORY_LABELS[c],
+                }))}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
-              <select {...editForm.register("dose_unit")} className={selectClass}>
-                {GLOBAL_DOSE_UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {DOSE_UNIT_LABELS[u]}
-                  </option>
-                ))}
-              </select>
+              <Select
+                {...editForm.register("dose_unit")}
+                value={editForm.watch("dose_unit") ?? ""}
+                filterLabel="Unidade de dose"
+                options={GLOBAL_DOSE_UNITS.map((u) => ({
+                  value: u,
+                  label: DOSE_UNIT_LABELS[u],
+                }))}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">URL do rótulo (opcional)</label>
@@ -1022,23 +1022,27 @@ export default function AdminGlobalCatalogPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
-              <select {...customEditForm.register("category")} className={selectClass}>
-                {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {PRODUCT_CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
+              <Select
+                {...customEditForm.register("category")}
+                value={customEditForm.watch("category") ?? ""}
+                filterLabel="Categoria"
+                options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+                  value: c,
+                  label: PRODUCT_CATEGORY_LABELS[c],
+                }))}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
-              <select {...customEditForm.register("dose_unit")} className={selectClass}>
-                {GLOBAL_DOSE_UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {DOSE_UNIT_LABELS[u]}
-                  </option>
-                ))}
-              </select>
+              <Select
+                {...customEditForm.register("dose_unit")}
+                value={customEditForm.watch("dose_unit") ?? ""}
+                filterLabel="Unidade de dose"
+                options={GLOBAL_DOSE_UNITS.map((u) => ({
+                  value: u,
+                  label: DOSE_UNIT_LABELS[u],
+                }))}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">Preço (BRL)</label>

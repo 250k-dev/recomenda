@@ -15,6 +15,7 @@ import { AdminCatalogNameCell, DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -57,9 +58,6 @@ const editSchema = z.object({
 
 type CreateFormValues = z.infer<typeof createSchema>;
 type EditFormValues = z.infer<typeof editSchema>;
-
-const selectClass =
-  "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function matchesFilters(
   row: { name: string; category: string; dose_unit: string },
@@ -427,18 +425,17 @@ export default function CatalogPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="catalog-category">Categoria</Label>
-                  <select
+                  <Select
                     id="catalog-category"
                     {...createForm.register("category")}
-                    className={selectClass}
-                  >
-                    <option value="">Selecionar…</option>
-                    {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {PRODUCT_CATEGORY_LABELS[c]}
-                      </option>
-                    ))}
-                  </select>
+                    value={createForm.watch("category") ?? ""}
+                    placeholder="Selecionar…"
+                    filterLabel="Categoria"
+                    options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+                      value: c,
+                      label: PRODUCT_CATEGORY_LABELS[c],
+                    }))}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="catalog-label">Bulário (opcional)</Label>
@@ -506,35 +503,29 @@ export default function CatalogPage() {
           <label className="mb-1 block text-xs font-medium text-foreground">
             Categoria
           </label>
-          <select
-            className={selectClass}
+          <Select
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            <option value="">Todas</option>
-            {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {PRODUCT_CATEGORY_LABELS[c]}
-              </option>
-            ))}
-          </select>
+            onValueChange={setFilterCategory}
+            placeholder="Todas"
+            options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+              value: c,
+              label: PRODUCT_CATEGORY_LABELS[c],
+            }))}
+          />
         </div>
         <div className="w-full min-w-[10rem] sm:w-44">
           <label className="mb-1 block text-xs font-medium text-foreground">
             Unidade de dose
           </label>
-          <select
-            className={selectClass}
+          <Select
             value={filterDoseUnit}
-            onChange={(e) => setFilterDoseUnit(e.target.value)}
-          >
-            <option value="">Todas</option>
-            {GLOBAL_DOSE_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {DOSE_UNIT_LABELS[u]}
-              </option>
-            ))}
-          </select>
+            onValueChange={setFilterDoseUnit}
+            placeholder="Todas"
+            options={GLOBAL_DOSE_UNITS.map((u) => ({
+              value: u,
+              label: DOSE_UNIT_LABELS[u],
+            }))}
+          />
         </div>
         {hasActiveFilters ? (
           <Button
@@ -695,34 +686,32 @@ export default function CatalogPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="catalog-edit-category">Categoria</Label>
-                <select
+                <Select
                   id="catalog-edit-category"
                   {...editForm.register("category")}
-                  className={selectClass}
-                >
-                  <option value="">Selecionar…</option>
-                  {GLOBAL_PRODUCT_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {PRODUCT_CATEGORY_LABELS[c]}
-                    </option>
-                  ))}
-                </select>
+                  value={editForm.watch("category") ?? ""}
+                  placeholder="Selecionar…"
+                  filterLabel="Categoria"
+                  options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+                    value: c,
+                    label: PRODUCT_CATEGORY_LABELS[c],
+                  }))}
+                />
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="catalog-edit-unit">Unidade de dose</Label>
-                <select
+                <Select
                   id="catalog-edit-unit"
                   {...editForm.register("dose_unit")}
-                  className={selectClass}
-                >
-                  <option value="">Selecionar…</option>
-                  {GLOBAL_DOSE_UNITS.map((u) => (
-                    <option key={u} value={u}>
-                      {DOSE_UNIT_LABELS[u]}
-                    </option>
-                  ))}
-                </select>
+                  value={editForm.watch("dose_unit") ?? ""}
+                  placeholder="Selecionar…"
+                  filterLabel="Unidade de dose"
+                  options={GLOBAL_DOSE_UNITS.map((u) => ({
+                    value: u,
+                    label: DOSE_UNIT_LABELS[u],
+                  }))}
+                />
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2">

@@ -15,7 +15,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
@@ -289,14 +289,17 @@ export default function AdminAgronomistsPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="agro-create-plan">Plano</Label>
-                    <NativeSelect id="agro-create-plan" {...createForm.register("plan_id")}>
-                      <option value="">Selecione…</option>
-                      {plans?.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                    <Select
+                      id="agro-create-plan"
+                      {...createForm.register("plan_id")}
+                      value={createForm.watch("plan_id") ?? ""}
+                      placeholder="Selecione…"
+                      filterLabel="Plano"
+                      options={(plans ?? []).map((p) => ({
+                        value: p.id,
+                        label: p.name,
+                      }))}
+                    />
                     {createForm.formState.errors.plan_id && (
                       <p className="text-xs text-destructive">{createForm.formState.errors.plan_id.message}</p>
                     )}
@@ -360,13 +363,16 @@ export default function AdminAgronomistsPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="agro-edit-plan">Plano</Label>
-              <NativeSelect id="agro-edit-plan" {...editForm.register("plan_id")}>
-                {plans?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </NativeSelect>
+              <Select
+                id="agro-edit-plan"
+                {...editForm.register("plan_id")}
+                value={editForm.watch("plan_id") ?? ""}
+                filterLabel="Plano"
+                options={(plans ?? []).map((p) => ({
+                  value: p.id,
+                  label: p.name,
+                }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="agro-edit-start">Início do plano</Label>

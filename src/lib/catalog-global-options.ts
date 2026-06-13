@@ -1,5 +1,6 @@
 /** Alinhado ao enum `ProductCategory` do servidor. */
 export const GLOBAL_PRODUCT_CATEGORIES = [
+  "SEED",
   "HERBICIDE",
   "FUNGICIDE",
   "INSECTICIDE",
@@ -18,6 +19,7 @@ export type GlobalProductCategory = (typeof GLOBAL_PRODUCT_CATEGORIES)[number];
 export type GlobalDoseUnit = (typeof GLOBAL_DOSE_UNITS)[number];
 
 export const PRODUCT_CATEGORY_LABELS: Record<GlobalProductCategory, string> = {
+  SEED: "Variedade / Híbrido",
   HERBICIDE: "Herbicida",
   FUNGICIDE: "Fungicida",
   INSECTICIDE: "Inseticida",
