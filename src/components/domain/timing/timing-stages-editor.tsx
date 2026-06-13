@@ -111,12 +111,14 @@ export function newTimingStageField(name = ""): TimingStageField {
   };
 }
 
-function StageWindowDateFields({
+export function StageWindowDateFields({
   recommendedDate,
   onRecommendedDateChange,
+  readOnly = false,
 }: {
   recommendedDate: string;
   onRecommendedDateChange: (recommendedDate: string) => void;
+  readOnly?: boolean;
 }) {
   const { startYmd, centerYmd, endYmd } = windowDatesFromRecommendedYmd(recommendedDate);
 
@@ -129,6 +131,7 @@ function StageWindowDateFields({
         <BrazilianDateInput
           value={centerYmd}
           onChange={onRecommendedDateChange}
+          readOnly={readOnly}
         />
       </Field>
       <Field label="Início da janela">

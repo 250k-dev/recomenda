@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import {
@@ -24,6 +25,8 @@ import {
   usePublishSeason,
   useSeason,
   useSeasonTimeline,
+  useCreateRecommendation,
+  useReorderRecommendations,
   useApplyRecommendation,
   useSkipRecommendation,
   useUndoRecommendation,
@@ -51,10 +54,19 @@ import {
   CalendarDays,
   Leaf,
   Sprout,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+import {
+  RecommendationStageFields,
+  recommendationToStageDraft,
+  type RecommendationStageDraft,
+} from "@/components/domain/recommendation-stage-fields";
+import { todayLocalYmd } from "@/lib/timing/window-days";
 import { cn } from "@/lib/utils";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
+import { extractError } from "@/components/domain/season/_shared";
 
 type TabValue = "recommendations" | "cost-plan";
 
@@ -398,22 +410,105 @@ function AddProductRow({
   );
 }
 
+function AddStagePanel({
+  seasonId,
+  onClose,
+  onCreated,
+}: {
+  seasonId: string;
+  onClose: () => void;
+  onCreated?: () => void;
+}) {
+  const [draft, setDraft] = useState<RecommendationStageDraft>({
+    name: "",
+    trigger_type: "POST_PLANTING",
+    recommended_date: todayLocalYmd(),
+    notes: "",
+  });
+  const createMut = useCreateRecommendation(seasonId);
+
+  const handleSubmit = () => {
+    const trimmed = draft.name.trim();
+    if (!trimmed) {
+      toast.error("Informe o nome da etapa.");
+      return;
+    }
+    createMut.mutate(
+      {
+        name: trimmed,
+        trigger_type: draft.trigger_type,
+        predicted_date_current: draft.recommended_date || undefined,
+        notes: draft.notes.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Etapa adicionada.");
+          setDraft({
+            name: "",
+            trigger_type: "POST_PLANTING",
+            recommended_date: todayLocalYmd(),
+            notes: "",
+          });
+          onCreated?.();
+          onClose();
+        },
+        onError: (error: unknown) => {
+          toast.error(extractError(error));
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+      <p className="mb-3 text-sm font-semibold text-foreground">Nova etapa</p>
+      <RecommendationStageFields
+        draft={draft}
+        onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+      />
+      <div className="mt-3 flex gap-2">
+        <Button
+          size="sm"
+          onClick={handleSubmit}
+          disabled={createMut.isPending}
+          className="h-8 gap-1.5"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {createMut.isPending ? "Adicionando…" : "Adicionar etapa"}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onClose} className="h-8">
+          Cancelar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function RecommendationCard({
   rec,
   index,
   seasonId,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+  isReordering,
+  canReorder,
 }: {
   rec: Recommendation;
   index: number;
   seasonId: string;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  isReordering: boolean;
+  canReorder: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
-
-  const [editingHeader, setEditingHeader] = useState(false);
-  const [headerName, setHeaderName] = useState(rec.name);
-  const [headerDate, setHeaderDate] = useState(
-    rec.predicted_date_current ? rec.predicted_date_current.slice(0, 10) : "",
+  const [stageDraft, setStageDraft] = useState<RecommendationStageDraft>(() =>
+    recommendationToStageDraft(rec),
   );
 
   const [registering, setRegistering] = useState(false);
@@ -440,15 +535,22 @@ function RecommendationCard({
   const isDone = rec.status === "APPLIED_ON_TIME" || rec.status === "APPLIED_LATE";
   const isSkipped = rec.status === "SKIPPED";
 
-  const handleSaveHeader = () => {
+  const handleSaveStage = () => {
+    const trimmed = stageDraft.name.trim();
+    if (!trimmed) {
+      toast.error("Informe o nome da etapa.");
+      return;
+    }
     patchMut.mutate(
       {
         id: rec.id,
-        name: headerName.trim() || rec.name,
-        predicted_date_current: headerDate || null,
+        name: trimmed,
+        trigger_type: stageDraft.trigger_type,
+        predicted_date_current: stageDraft.recommended_date || null,
+        notes: isPending ? stageDraft.notes.trim() || null : rec.notes,
       },
       {
-        onSuccess: () => { toast.success("Etapa atualizada."); setEditingHeader(false); },
+        onSuccess: () => toast.success("Etapa atualizada."),
         onError: () => toast.error("Não foi possível salvar."),
       },
     );
@@ -504,18 +606,46 @@ function RecommendationCard({
           isPending ? "hover:bg-primary/5" : "hover:bg-accent/40",
         )}
       >
-        <span
-          className={cn(
-            "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-            isDone
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : isSkipped
-                ? "bg-orange-100 text-orange-700"
-                : "bg-primary/15 text-primary ring-1 ring-primary/20",
-          )}
-        >
-          {index + 1}
-        </span>
+        <div className="flex shrink-0 items-start gap-1">
+          {canReorder ? (
+            <div
+              className="flex flex-col gap-0.5 pt-0.5"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={onMoveUp}
+                disabled={!canMoveUp || isReordering}
+                aria-label="Mover etapa para cima"
+                className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={onMoveDown}
+                disabled={!canMoveDown || isReordering}
+                aria-label="Mover etapa para baixo"
+                className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+              >
+                <ArrowDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : null}
+          <span
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+              isDone
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : isSkipped
+                  ? "bg-orange-100 text-orange-700"
+                  : "bg-primary/15 text-primary ring-1 ring-primary/20",
+            )}
+          >
+            {index + 1}
+          </span>
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -561,49 +691,31 @@ function RecommendationCard({
 
       {open && (
         <div className="flex flex-col gap-4 border-t px-4 pb-4 pt-3">
-          {editingHeader ? (
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <p className="mb-3 text-sm font-semibold text-foreground">Editar etapa</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-medium text-foreground">Nome da etapa</Label>
-                  <Input
-                    value={headerName}
-                    onChange={(e) => setHeaderName(e.target.value)}
-                    className="h-10 text-sm"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5 rounded-lg border border-primary/25 bg-background p-3">
-                  <Label className="text-xs font-semibold text-primary">Data prevista</Label>
-                  <Input
-                    type="date"
-                    value={headerDate}
-                    onChange={(e) => setHeaderDate(e.target.value)}
-                    className="h-10 border-primary/30 text-sm font-semibold"
-                  />
-                </div>
-              </div>
-              <div className="mt-2 flex gap-2">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+            <p className="mb-3 text-sm font-semibold text-foreground">Dados da etapa</p>
+            <RecommendationStageFields
+              draft={stageDraft}
+              onChange={(patch) => setStageDraft((prev) => ({ ...prev, ...patch }))}
+              readOnly={!isPending}
+            />
+            {isPending ? (
+              <div className="mt-3 flex gap-2">
                 <Button
                   size="sm"
-                  onClick={handleSaveHeader}
+                  onClick={handleSaveStage}
                   disabled={isBusy}
                   className="h-8 gap-1.5"
                 >
                   <Save className="h-3.5 w-3.5" />
-                  Salvar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setEditingHeader(false)}
-                  className="h-8"
-                >
-                  Cancelar
+                  Salvar etapa
                 </Button>
               </div>
-            </div>
-          ) : null}
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Etapas aplicadas ou puladas não podem ter nome e data alterados.
+              </p>
+            )}
+          </div>
 
           <div className="rounded-xl border bg-card p-4 shadow-sm">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -760,20 +872,6 @@ function RecommendationCard({
               </div>
             )}
           </div>
-
-          {!editingHeader ? (
-            <div className="flex justify-end border-t border-border/60 pt-3">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEditingHeader(true)}
-                className="h-8 gap-1.5"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Editar etapa
-              </Button>
-            </div>
-          ) : null}
         </div>
       )}
     </li>
@@ -786,14 +884,24 @@ function RecommendationsTab({
   plotName,
   plantingDate,
   statusLabel,
+  seasonStatus,
+  producerId,
+  onPublish,
+  isPublishing,
 }: {
   seasonId: string;
   title: string;
   plotName?: string;
   plantingDate?: string | null;
   statusLabel?: string;
+  seasonStatus?: string;
+  producerId?: string;
+  onPublish?: () => void;
+  isPublishing?: boolean;
 }) {
   const { data, isLoading } = useSeasonTimeline(seasonId);
+  const [addingStage, setAddingStage] = useState(false);
+  const reorderMut = useReorderRecommendations(seasonId);
 
   if (isLoading) return <TimelineCardsSkeleton count={5} />;
 
@@ -801,8 +909,64 @@ function RecommendationsTab({
     Array.isArray(data) ? data : (data as { data?: unknown[] } | undefined)?.data ?? []
   ) as Recommendation[];
 
-  if (!recommendations.length)
-    return <EmptyState variant="inline" title="Nenhuma recomendação encontrada para esta safra." />;
+  const canManageStages =
+    seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS";
+
+  const moveStage = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= recommendations.length) return;
+    const reordered = [...recommendations];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    reorderMut.mutate(reordered.map((rec) => rec.id), {
+      onError: () => toast.error("Não foi possível reordenar as etapas."),
+    });
+  };
+
+  if (!recommendations.length) {
+    const emptyAction =
+      seasonStatus === "DRAFT" && onPublish ? (
+        <Button size="sm" className="gap-2" onClick={onPublish} disabled={isPublishing}>
+          <Send className="h-4 w-4" />
+          {isPublishing ? "Publicando…" : "Publicar safra"}
+        </Button>
+      ) : canManageStages ? (
+        <Button
+          size="icon"
+          variant="outline"
+          className="h-9 w-9"
+          aria-label="Adicionar etapa"
+          onClick={() => setAddingStage(true)}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      ) : producerId ? (
+        <Button asChild size="sm" variant="outline">
+          <Link href={`/producers/${producerId}#timing-templates`}>
+            Configurar modelo de timing
+          </Link>
+        </Button>
+      ) : undefined;
+
+    return (
+      <div className="flex flex-col gap-4">
+        <EmptyState
+          variant="inline"
+          title="Nenhuma recomendação encontrada para esta safra."
+          description={
+            seasonStatus === "DRAFT"
+              ? "Publique a safra para gerar o cronograma de aplicações a partir do modelo de timing."
+              : canManageStages
+                ? "Adicione etapas manualmente ou configure o modelo de timing do produtor."
+                : "O cronograma é gerado ao publicar a safra com um modelo de timing que tenha etapas configuradas."
+          }
+          action={emptyAction}
+        />
+        {addingStage && canManageStages ? (
+          <AddStagePanel seasonId={seasonId} onClose={() => setAddingStage(false)} />
+        ) : null}
+      </div>
+    );
+  }
 
   const done = recommendations.filter(
     (r) => r.status === "APPLIED_ON_TIME" || r.status === "APPLIED_LATE",
@@ -875,9 +1039,39 @@ function RecommendationsTab({
         </div>
       </section>
 
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-foreground">Etapas do cronograma</h2>
+        {canManageStages ? (
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-8 w-8 shrink-0"
+            aria-label="Adicionar etapa"
+            onClick={() => setAddingStage((v) => !v)}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </div>
+
+      {addingStage ? (
+        <AddStagePanel seasonId={seasonId} onClose={() => setAddingStage(false)} />
+      ) : null}
+
       <ul className="flex flex-col gap-3">
         {recommendations.map((rec, i) => (
-          <RecommendationCard key={rec.id} rec={rec} index={i} seasonId={seasonId} />
+          <RecommendationCard
+            key={rec.id}
+            rec={rec}
+            index={i}
+            seasonId={seasonId}
+            canMoveUp={canManageStages && i > 0}
+            canMoveDown={canManageStages && i < recommendations.length - 1}
+            onMoveUp={() => moveStage(i, "up")}
+            onMoveDown={() => moveStage(i, "down")}
+            isReordering={reorderMut.isPending}
+            canReorder={canManageStages}
+          />
         ))}
       </ul>
     </div>
@@ -985,6 +1179,10 @@ export default function SeasonDetailPage() {
               plotName={season?.plot_name}
               plantingDate={season?.planting_date}
               statusLabel={statusLabel}
+              seasonStatus={season?.status}
+              producerId={producerId || undefined}
+              onPublish={season?.status === "DRAFT" ? handlePublish : undefined}
+              isPublishing={publishMutation.isPending}
             />
           )}
         </>

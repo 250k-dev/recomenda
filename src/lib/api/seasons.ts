@@ -42,6 +42,7 @@ export interface Recommendation {
   season_id: string;
   order_index: number;
   name: string;
+  trigger_type?: string;
   status: "PENDING" | "APPLIED_ON_TIME" | "APPLIED_LATE" | "SKIPPED";
   predicted_date_current: string | null;
   predicted_date_original: string | null;
@@ -102,11 +103,34 @@ export async function getSeasonShoppingList(seasonId: string) {
   return data;
 }
 
+export async function createRecommendation(
+  seasonId: string,
+  payload: {
+    name: string;
+    predicted_date_current?: string | null;
+    trigger_type?: string;
+    notes?: string | null;
+  },
+) {
+  const { data } = await api.post(`/seasons/${seasonId}/recommendations`, payload);
+  return data;
+}
+
+export async function reorderRecommendations(
+  seasonId: string,
+  recommendationIdsInOrder: string[],
+) {
+  await api.post(`/seasons/${seasonId}/recommendations/reorder`, {
+    recommendation_ids_in_order: recommendationIdsInOrder,
+  });
+}
+
 export async function patchRecommendation(
   id: string,
   payload: {
     name?: string;
     predicted_date_current?: string | null;
+    trigger_type?: string;
     window_start_days?: number;
     window_end_days?: number;
     notes?: string | null;

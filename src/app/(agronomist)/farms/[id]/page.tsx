@@ -38,12 +38,14 @@ import {
   useProducers,
   useRevokeFarmAccess,
   useUpdateFarm,
+  useArchiveSeason,
 } from "@/lib/api/hooks";
 import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
 import type { PurchaseListDetail } from "@/lib/api/client";
 import { activeAgronomistProducerAccounts } from "@/lib/api/client";
 import { toast } from "sonner";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
+import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 import { cn } from "@/lib/utils";
 import {
   ChevronRight,
@@ -807,6 +809,12 @@ function FarmSeasonsTab({
   producerId: string | null;
   newSeasonHref: string;
 }) {
+  const archiveMutation = useArchiveSeason();
+  const [archiveConfirm, setArchiveConfirm] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   if (isLoading) return <ListCardsSkeleton count={3} />;
 
   if (seasons.length === 0) {
@@ -826,51 +834,94 @@ function FarmSeasonsTab({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-foreground">Safras</h2>
-        {producerId ? (
-          <Button asChild size="sm" className="gap-1.5">
-            <Link href={newSeasonHref}>
-              <Plus className="h-4 w-4" />
-              Nova safra
-            </Link>
-          </Button>
-        ) : null}
+    <>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Safras</h2>
+          {producerId ? (
+            <Button asChild size="sm" className="gap-1.5">
+              <Link href={newSeasonHref}>
+                <Plus className="h-4 w-4" />
+                Nova safra
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+        <div className="space-y-3">
+          {seasons.map((season) => {
+            const href = producerId
+              ? `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
+              : `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}`;
+            const displayName = `${CROP_LABELS[season.crop] ?? season.crop}${
+              season.variety ? ` — ${season.variety}` : ""
+            }`;
+            return (
+              <Card key={season.id}>
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{season.plot_name}</p>
+                    <p className="font-semibold text-foreground">{displayName}</p>
+                    <Badge
+                      className="mt-2"
+                      variant={STATUS_VARIANTS[season.status] ?? "default"}
+                    >
+                      {STATUS_LABELS[season.status] ?? season.status}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button asChild variant="outline" size="sm" className="gap-1.5">
+                      <Link href={href}>
+                        <Eye className="h-4 w-4" />
+                        Ver cronograma
+                      </Link>
+                    </Button>
+                    {season.status !== "ARCHIVED" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(deactivateOutlineButtonClass)}
+                        onClick={() =>
+                          setArchiveConfirm({ id: season.id, name: displayName })
+                        }
+                      >
+                        Remover
+                      </Button>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
-      <div className="space-y-3">
-        {seasons.map((season) => {
-          const href = producerId
-            ? `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
-            : `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}`;
-          return (
-            <Card key={season.id}>
-              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{season.plot_name}</p>
-                  <p className="font-semibold text-foreground">
-                    {CROP_LABELS[season.crop] ?? season.crop}
-                    {season.variety ? ` — ${season.variety}` : ""}
-                  </p>
-                  <Badge
-                    className="mt-2"
-                    variant={STATUS_VARIANTS[season.status] ?? "default"}
-                  >
-                    {STATUS_LABELS[season.status] ?? season.status}
-                  </Badge>
-                </div>
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href={href}>
-                    <Eye className="h-4 w-4" />
-                    Ver cronograma
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+
+      <ConfirmDialog
+        open={!!archiveConfirm}
+        onOpenChange={(open) => !open && setArchiveConfirm(null)}
+        title="Remover safra"
+        description={
+          archiveConfirm
+            ? `A safra "${archiveConfirm.name}" será movida para Removidas.`
+            : undefined
+        }
+        confirmLabel="Remover"
+        tone="destructive"
+        loading={archiveMutation.isPending}
+        onConfirm={async () => {
+          if (!archiveConfirm) return;
+          await new Promise<void>((resolve, reject) =>
+            archiveMutation.mutate(archiveConfirm.id, {
+              onSuccess: () => {
+                setArchiveConfirm(null);
+                toast.success("Safra removida.");
+                resolve();
+              },
+              onError: (err) => reject(err),
+            }),
           );
-        })}
-      </div>
-    </div>
+        }}
+      />
+    </>
   );
 }
 
