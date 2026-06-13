@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { Eye, Leaf, MapPin, Pencil, Plus, Sprout, X, Check, Loader2 } from "lucide-react";
+import { Eye, Leaf, MapPin, Pencil, Plus, Sprout, Store, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { StatCard } from "@/components/domain/stat-card";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -21,6 +21,8 @@ import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
+import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -113,6 +115,7 @@ export function FarmPurchaseListTab({
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
 
   const updateMutation = useUpdatePurchaseList(list?.id ?? "", { farmId });
 
@@ -128,6 +131,7 @@ export function FarmPurchaseListTab({
     setEditing(false);
     setError(null);
     setDraftItems([]);
+    setShowComparison(false);
   }, [list?.id]);
 
   const startEditing = () => {
@@ -321,6 +325,16 @@ export function FarmPurchaseListTab({
                 <Pencil className="h-4 w-4" />
                 Editar lista
               </Button>
+              <ShareQuoteSheet listId={list.id} listName={list.name} />
+              <Button
+                variant={showComparison ? "default" : "outline"}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setShowComparison((v) => !v)}
+              >
+                <Store className="h-4 w-4" />
+                Cotações das lojas
+              </Button>
               {list.season_id ? (
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={`/seasons/${list.season_id}?tab=cost-plan`}>
@@ -466,6 +480,21 @@ export function FarmPurchaseListTab({
           </table>
         </div>
       )}
+
+      {!editing && showComparison ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Store className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">
+              Cotações das lojas
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              · preços por loja (somente você vê esta comparação)
+            </span>
+          </div>
+          <QuoteComparisonSection listId={list.id} />
+        </div>
+      ) : null}
     </div>
   );
 }
