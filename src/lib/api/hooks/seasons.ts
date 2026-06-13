@@ -11,6 +11,8 @@ import {
   getArchivedSeasons,
   getSeasonShoppingList,
   getTimeline,
+  createRecommendation,
+  reorderRecommendations,
   patchRecommendation,
   applyRecommendation,
   skipRecommendation,
@@ -54,6 +56,10 @@ export function useArchiveSeason() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonsArchived });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) && query.queryKey[0] === "farm-seasons",
+      });
     },
   });
 }
@@ -94,6 +100,32 @@ export function useSeasonShoppingList(seasonId: string) {
     queryKey: queryKeys.seasonShoppingList(seasonId),
     queryFn: () => getSeasonShoppingList(seasonId),
     enabled: Boolean(seasonId),
+  });
+}
+
+export function useCreateRecommendation(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      name: string;
+      predicted_date_current?: string | null;
+      trigger_type?: string;
+      notes?: string | null;
+    }) => createRecommendation(seasonId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useReorderRecommendations(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (recommendationIdsInOrder: string[]) =>
+      reorderRecommendations(seasonId, recommendationIdsInOrder),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
   });
 }
 
