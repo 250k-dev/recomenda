@@ -82,7 +82,7 @@ export function StepHeader({
           {backLabel}
         </button>
       ) : null}
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+      <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong sm:text-3xl">
         {title}
       </h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -153,8 +153,8 @@ export function ContextBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-        tone === "primary" && "bg-primary/10 text-primary",
-        tone === "sky" && "bg-sky-100 text-sky-600",
+        tone === "primary" && "bg-primary-soft text-primary-strong",
+        tone === "sky" && "bg-tb-soft text-tb",
       )}
     >
       {children}
@@ -164,9 +164,13 @@ export function ContextBadge({
 
 export function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-card px-4 py-3 shadow-sm">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">{value}</p>
+    <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+      <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 font-display text-lg font-semibold tracking-[-0.01em] text-text-strong">
+        {value}
+      </p>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
 import { PaginationBar } from "@/components/ui/pagination-bar";
-import { Package } from "lucide-react";
+import { Package, Plus } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -764,7 +764,10 @@ export default function AdminGlobalCatalogPage() {
               }}
             >
               <SheetTrigger asChild>
-                <Button type="button">Novo produto</Button>
+                <Button type="button" variant="clay">
+                  <Plus className="h-4 w-4" />
+                  Novo produto
+                </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full sm:max-w-md">
                 <SheetHeader>

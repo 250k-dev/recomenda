@@ -7,8 +7,9 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
 import { apiErrorMessage } from "@/lib/api-error";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Plus } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { StatusBadge } from "@/components/domain/status-badge";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
@@ -185,7 +186,7 @@ export default function AdminPlansPage() {
       p.name,
       String(p.plot_quota),
       `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
-      "Ativo",
+      <StatusBadge key={`st-a-${p.id}`} tone="success">Ativo</StatusBadge>,
       <div key={`a-${p.id}`} className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={() => openEdit(p)} disabled={mutationPending}>
           Editar
@@ -208,7 +209,7 @@ export default function AdminPlansPage() {
       p.name,
       String(p.plot_quota),
       `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
-      "Removido",
+      <StatusBadge key={`st-r-${p.id}`} tone="neutral">Removido</StatusBadge>,
       <div key={`r-${p.id}`} className="flex flex-wrap justify-end gap-2">
       <Button type="button" variant="outline" size="sm" onClick={() => openEdit(p)} disabled={mutationPending}>
           Editar
@@ -252,7 +253,10 @@ export default function AdminPlansPage() {
         {activeTab === "ativos" ? (
           <Sheet open={createOpen} onOpenChange={setCreateOpen}>
             <SheetTrigger asChild>
-              <Button type="button">Novo plano</Button>
+              <Button type="button" variant="clay">
+                <Plus className="h-4 w-4" />
+                Novo plano
+              </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-full sm:max-w-md">
               <SheetHeader>

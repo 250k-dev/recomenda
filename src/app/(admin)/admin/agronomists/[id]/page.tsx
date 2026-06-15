@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
+import { Building2, MailPlus, Sprout, UserRound, Users as UsersIcon } from "lucide-react";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHeader } from "@/components/domain/page-header";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { StatusBadge } from "@/components/domain/status-badge";
 import { SectionTitle } from "@/components/ui/section-title";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { useAdminAgronomistDetail, usePlans } from "@/lib/api/hooks";
@@ -63,7 +65,11 @@ export default function AdminAgronomistDetailPage() {
       {p.name || "—"}
     </Link>,
     p.email,
-    p.is_active ? <Badge variant="default">Ativo</Badge> : <Badge variant="secondary">Inativo</Badge>,
+    p.is_active ? (
+      <StatusBadge key={`st-${p.producer_id}`} tone="success">Ativo</StatusBadge>
+    ) : (
+      <StatusBadge key={`st-${p.producer_id}`} tone="neutral">Inativo</StatusBadge>
+    ),
   ]);
 
   return (
@@ -73,43 +79,41 @@ export default function AdminAgronomistDetailPage() {
       />
 
       <PageHeader
+        icon={<UserRound className="h-5 w-5" />}
+        section="Agrônomo"
         title={data.name}
         description={data.email}
         action={
           data.is_active ? (
-            <Badge variant="default">Conta ativa</Badge>
+            <StatusBadge tone="success">Conta ativa</StatusBadge>
           ) : (
-            <Badge variant="secondary">Conta inativa</Badge>
+            <StatusBadge tone="neutral">Conta inativa</StatusBadge>
           )
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Fazendas</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{data.counts.farms}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Produtores</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{data.counts.producers}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Safras</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{data.counts.seasons}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Convites pendentes</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{data.counts.pending_invitations}</CardContent>
-        </Card>
-      </div>
+      <KpiStrip>
+        <KpiCell
+          icon={<Building2 className="h-4 w-4" />}
+          label="Fazendas"
+          value={data.counts.farms}
+        />
+        <KpiCell
+          icon={<UsersIcon className="h-4 w-4" />}
+          label="Produtores"
+          value={data.counts.producers}
+        />
+        <KpiCell
+          icon={<Sprout className="h-4 w-4" />}
+          label="Safras"
+          value={data.counts.seasons}
+        />
+        <KpiCell
+          icon={<MailPlus className="h-4 w-4" />}
+          label="Convites pendentes"
+          value={data.counts.pending_invitations}
+        />
+      </KpiStrip>
 
       <Card>
         <CardHeader>

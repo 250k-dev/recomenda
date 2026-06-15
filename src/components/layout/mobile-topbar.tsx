@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Menu } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ export function MobileTopbar() {
   const { toggleSidebar } = useSidebar();
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/85 px-3 backdrop-blur md:hidden">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface/95 px-3 backdrop-blur md:hidden">
       <Button
         variant="ghost"
         size="icon"
@@ -20,10 +19,12 @@ export function MobileTopbar() {
         <Menu className="h-5 w-5" />
       </Button>
       <div className="flex items-center gap-2">
-        <div className="bg-primary rounded-md p-1.5">
+        <div className="bg-primary rounded-lg p-1.5 shadow-(--brand-shadow)">
           <Logo className="size-4.5" />
         </div>
-        <span className="text-sm font-semibold text-foreground">Recomenda</span>
+        <span className="font-display text-sm font-bold tracking-[-0.02em] text-text-strong">
+          Recomenda
+        </span>
       </div>
     </header>
   );

@@ -10,6 +10,7 @@ import {
 } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,10 +84,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
-  PENDING: "bg-muted text-muted-foreground",
-  APPLIED_ON_TIME: "bg-primary/10 text-primary",
-  APPLIED_LATE: "bg-amber-100 text-amber-600",
-  SKIPPED: "bg-orange-100 text-orange-600",
+  PENDING: "bg-surface-2 text-muted-foreground border border-border",
+  APPLIED_ON_TIME: "bg-success-soft text-success-strong border border-success-border",
+  APPLIED_LATE: "bg-warning-soft text-warning-strong border border-warning-border",
+  SKIPPED: "bg-clay-soft text-clay-strong border border-clay-border",
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -115,15 +116,15 @@ function StageDateBadge({
   tone?: "primary" | "neutral" | "success";
 }) {
   const toneClasses = {
-    primary: "border-primary/35 bg-primary/10 shadow-sm",
-    neutral: "border-border bg-muted/50",
-    success: "border-emerald-500/30 bg-emerald-500/10",
+    primary: "border-border bg-surface-2 shadow-sm",
+    neutral: "border-border bg-surface-2",
+    success: "border-success-border bg-success-soft",
   } as const;
 
   const labelClasses = {
-    primary: "text-primary",
+    primary: "text-muted-foreground",
     neutral: "text-muted-foreground",
-    success: "text-emerald-700",
+    success: "text-success-strong",
   } as const;
 
   const showOriginal =
@@ -193,7 +194,7 @@ function ProductRow({
       <span className="min-w-0 flex-1 font-medium text-foreground">
         {item.product_name}
         {item.is_substitution && (
-          <span className="ml-1.5 text-[10px] text-amber-600">(substituído)</span>
+          <span className="ml-1.5 text-[10px] text-warning-strong">(substituído)</span>
         )}
       </span>
 
@@ -460,7 +461,7 @@ function AddStagePanel({
   };
 
   return (
-    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+    <div className="rounded-xl border border-border bg-surface-2 p-4">
       <p className="mb-3 text-sm font-semibold text-foreground">Nova etapa</p>
       <RecommendationStageFields
         draft={draft}
@@ -639,8 +640,8 @@ function RecommendationCard({
               isDone
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : isSkipped
-                  ? "bg-orange-100 text-orange-700"
-                  : "bg-primary/15 text-primary ring-1 ring-primary/20",
+                  ? "bg-clay-soft text-clay-strong"
+                  : "bg-primary-soft text-primary-strong",
             )}
           >
             {index + 1}
@@ -691,7 +692,7 @@ function RecommendationCard({
 
       {open && (
         <div className="flex flex-col gap-4 border-t px-4 pb-4 pt-3">
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="rounded-xl border border-border bg-surface-2 p-4">
             <p className="mb-3 text-sm font-semibold text-foreground">Dados da etapa</p>
             <RecommendationStageFields
               draft={stageDraft}
@@ -785,9 +786,9 @@ function RecommendationCard({
             )}
 
             {registering ? (
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="rounded-xl border border-border bg-surface-2 p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5 rounded-lg border border-primary/25 bg-background p-3">
+                  <div className="flex flex-col gap-1.5 rounded-lg border border-primary/25 bg-surface p-3">
                     <Label className="text-xs font-semibold text-primary">Data de execução</Label>
                     <Input
                       type="date"
@@ -976,24 +977,24 @@ function RecommendationsTab({
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="overflow-hidden rounded-xl border border-primary/20 bg-linear-to-br from-primary/8 to-card shadow-sm">
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary shadow-sm ring-1 ring-primary/15">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
               <Leaf className="h-6 w-6" />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
                 Safra em execução
               </p>
-              <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+              <h1 className="mt-0.5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
                 {title}
               </h1>
               {plotName ? (
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Sprout className="h-4 w-4 shrink-0 text-primary" />
+                  <Sprout className="h-4 w-4 shrink-0 text-primary-strong" />
                   <span>
-                    Talhão <strong className="text-foreground">{plotName}</strong>
+                    Talhão <strong className="text-text-strong">{plotName}</strong>
                   </span>
                 </p>
               ) : null}
@@ -1002,45 +1003,40 @@ function RecommendationsTab({
 
           <div className="flex flex-wrap gap-3 sm:justify-end">
             {plantingDate ? (
-              <div className="rounded-lg border border-primary/30 bg-background px-4 py-3 shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+              <div className="rounded-lg border border-border bg-surface-2 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Plantio
                 </p>
-                <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+                <p className="mt-0.5 font-display text-lg font-semibold tabular-nums text-text-strong">
                   {fmtDate(plantingDate)}
                 </p>
               </div>
             ) : null}
             {statusLabel ? (
-              <div className="rounded-lg border bg-background px-4 py-3 shadow-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="rounded-lg border border-border bg-surface-2 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                   Status
                 </p>
-                <p className="mt-0.5 text-sm font-semibold text-foreground">{statusLabel}</p>
+                <p className="mt-0.5 text-sm font-semibold text-text-strong">{statusLabel}</p>
               </div>
             ) : null}
           </div>
         </div>
 
-        <div className="border-t border-primary/15 bg-primary/4 px-5 py-4">
+        <div className="border-t border-border bg-rail px-5 py-4">
           <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-foreground">Progresso das aplicações</span>
-            <span className="font-semibold tabular-nums text-primary">
+            <span className="font-medium text-text-strong">Progresso das aplicações</span>
+            <span className="font-semibold tabular-nums text-primary-strong">
               {done}/{total} aplicadas
               <span className="ml-1 text-muted-foreground">({progressPct}%)</span>
             </span>
           </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
+          <ProgressBar value={progressPct} />
         </div>
       </section>
 
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-foreground">Etapas do cronograma</h2>
+        <h2 className="font-display text-base font-semibold text-text-strong">Etapas do cronograma</h2>
         {canManageStages ? (
           <Button
             size="icon"

@@ -38,13 +38,13 @@ export function TableRowsSkeleton({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-border bg-card shadow-sm",
+        "overflow-hidden rounded-xl border border-border bg-card shadow-sm",
         className,
       )}
       aria-hidden
     >
       <div
-        className="grid gap-3 border-b border-border bg-muted/40 px-4 py-3"
+        className="grid gap-3 border-b border-border bg-surface-2 px-4 py-3"
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: columns }).map((_, i) => (

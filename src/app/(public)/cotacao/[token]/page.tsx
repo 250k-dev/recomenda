@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreateQuoteResponse, useQuoteByToken } from "@/lib/api/hooks";
+import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
 import { CROP_LABELS } from "@/lib/season-constants";
 import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
 import { toast } from "sonner";
@@ -85,16 +86,18 @@ export default function QuoteEntryPage() {
   const closed = data.status === "CLOSED";
 
   return (
-    <div className="mx-auto w-full max-w-2xl p-4 py-8 sm:py-12">
+    <>
+      <PublicQuoteHeader />
+      <div className="mx-auto w-full max-w-2xl p-4 py-8 sm:py-12">
       <header className="mb-6 flex items-center gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong">
           <Leaf className="h-6 w-6" />
         </span>
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
             Cotação de preços
           </p>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          <h1 className="font-display text-xl font-semibold tracking-[-0.02em] text-text-strong">
             {data.list.name}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -106,10 +109,10 @@ export default function QuoteEntryPage() {
         </div>
       </header>
 
-      <Card className="mb-6 shadow-sm ring-1 ring-foreground/5">
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Store className="h-5 w-5 text-primary" />
+            <Store className="h-5 w-5 text-primary-strong" />
             Identifique sua loja
           </CardTitle>
           <CardDescription>
@@ -177,22 +180,22 @@ export default function QuoteEntryPage() {
       </Card>
 
       <section>
-        <h2 className="mb-2 px-1 text-sm font-semibold text-foreground">
+        <h2 className="mb-2 px-1 font-display text-base font-semibold text-text-strong">
           Produtos a cotar ({data.items.length})
         </h2>
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           <table className="w-full min-w-[420px] text-sm">
             <thead>
-              <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5">Produto</th>
-                <th className="px-3 py-2.5">Categoria</th>
-                <th className="px-3 py-2.5 text-right">Quantidade</th>
+              <tr className="border-b border-border bg-surface-2 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                <th className="px-4 py-3">Produto</th>
+                <th className="px-3 py-3">Categoria</th>
+                <th className="px-4 py-3 text-right">Quantidade</th>
               </tr>
             </thead>
             <tbody>
               {data.items.map((it) => (
-                <tr key={it.purchase_list_item_id} className="border-b last:border-b-0">
-                  <td className="px-3 py-2.5 font-medium text-foreground">
+                <tr key={it.purchase_list_item_id} className="border-b border-border last:border-b-0">
+                  <td className="px-4 py-2.5 font-semibold text-text-strong">
                     {it.product_name}
                   </td>
                   <td className="px-3 py-2.5 text-muted-foreground">
@@ -200,7 +203,7 @@ export default function QuoteEntryPage() {
                       it.category as keyof typeof PRODUCT_CATEGORY_LABELS
                     ] ?? it.category}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground">
+                  <td className="px-4 py-2.5 text-right tabular-nums text-text-strong">
                     {fmtQty(it.quantity_to_buy)} {it.dose_unit}
                   </td>
                 </tr>
@@ -209,6 +212,7 @@ export default function QuoteEntryPage() {
           </table>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }

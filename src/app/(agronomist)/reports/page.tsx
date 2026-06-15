@@ -5,7 +5,7 @@ import { BarChart3, Sprout } from "lucide-react";
 
 import { PageHeader } from "@/components/domain/page-header";
 import { ReportPageSkeleton } from "@/components/domain/page-skeletons";
-import { StatCard } from "@/components/domain/stat-card";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { SectionTitle } from "@/components/ui/section-title";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -112,20 +112,20 @@ export default function ReportsPage() {
 
       {showContent && report && (
         <div className="space-y-6 animate-fade-in">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Total de safras" value={String(report.summary.total_seasons)} accent="primary" />
-            <StatCard label="Colhidas" value={String(report.summary.harvested_seasons)} accent="sky" />
-            <StatCard label="Em andamento" value={String(report.summary.in_progress_seasons)} accent="sun" />
-            <StatCard
+          <KpiStrip>
+            <KpiCell label="Total de safras" value={String(report.summary.total_seasons)} />
+            <KpiCell label="Colhidas" value={String(report.summary.harvested_seasons)} />
+            <KpiCell label="Em andamento" value={String(report.summary.in_progress_seasons)} />
+            <KpiCell
               label="Conformidade"
               value={
                 report.summary.compliance_rate_pct !== null
                   ? `${report.summary.compliance_rate_pct}%`
                   : "—"
               }
-              accent="primary"
+              alert
             />
-          </div>
+          </KpiStrip>
 
           {chartData.length > 0 && (
             <div className="grid gap-4 lg:grid-cols-2">
@@ -138,15 +138,15 @@ export default function ReportsPage() {
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
                       <Tooltip
-                        cursor={{ fill: "var(--accent)" }}
+                        cursor={{ fill: "var(--hover)" }}
                         contentStyle={{
                           background: "var(--popover)",
                           border: "1px solid var(--border)",
-                          borderRadius: 8,
+                          borderRadius: 12,
                           color: "var(--popover-foreground)",
                         }}
                       />
-                      <Bar dataKey="custo_ha" fill="var(--primary)" name="R$/ha" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="custo_ha" fill="var(--clay)" name="R$/ha" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -160,15 +160,15 @@ export default function ReportsPage() {
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
                       <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
                       <Tooltip
-                        cursor={{ fill: "var(--accent)" }}
+                        cursor={{ fill: "var(--hover)" }}
                         contentStyle={{
                           background: "var(--popover)",
                           border: "1px solid var(--border)",
-                          borderRadius: 8,
+                          borderRadius: 12,
                           color: "var(--popover-foreground)",
                         }}
                       />
-                      <Bar dataKey="sacas_ha" fill="var(--sky)" name="sc/ha" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="sacas_ha" fill="var(--primary)" name="sc/ha" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

@@ -776,7 +776,7 @@ function StepPlantation({
 
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-tb-soft text-tb">
             <MapPin className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">

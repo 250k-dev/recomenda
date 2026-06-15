@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useMe, useUpdateProfile, useChangePassword } from "@/lib/api/hooks";
@@ -117,8 +118,8 @@ export function AccountSettingsPanel() {
     <div className="space-y-6">
       <Card>
         <CardHeader className="border-b border-border pb-4">
-          <CardTitle>Meu perfil</CardTitle>
-          <CardDescription>Atualize suas informações pessoais</CardDescription>
+          <CardTitle>Dados pessoais</CardTitle>
+          <CardDescription>Atualize suas informações de contato.</CardDescription>
         </CardHeader>
         <CardContent className="px-0">
           <form onSubmit={onUpdateProfile} className="space-y-4">
@@ -199,9 +200,8 @@ export function AccountSettingsPanel() {
               <div className="space-y-4 px-6">
                 <div className="space-y-2">
                   <Label htmlFor="account-old-pass">Senha atual</Label>
-                  <Input
+                  <PasswordInput
                     id="account-old-pass"
-                    type="password"
                     placeholder="Digite sua senha atual"
                     {...passwordForm.register("old_password")}
                   />
@@ -213,9 +213,8 @@ export function AccountSettingsPanel() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="account-new-pass">Nova senha</Label>
-                  <Input
+                  <PasswordInput
                     id="account-new-pass"
-                    type="password"
                     placeholder="Digite uma nova senha"
                     {...passwordForm.register("new_password")}
                   />
@@ -229,9 +228,8 @@ export function AccountSettingsPanel() {
                   <Label htmlFor="account-confirm-pass">
                     Confirmar nova senha
                   </Label>
-                  <Input
+                  <PasswordInput
                     id="account-confirm-pass"
-                    type="password"
                     placeholder="Confirme a nova senha"
                     {...passwordForm.register("confirm_password")}
                   />

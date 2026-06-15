@@ -8,18 +8,18 @@ import { UserMenu } from "./user-menu";
 
 export function AppHeader() {
   return (
-    <header className="sticky top-0 z-40 flex h-18 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur md:gap-4 md:px-6">
+    <header className="sticky top-0 z-40 flex h-18 items-center gap-3 border-b border-border bg-surface/95 px-4 backdrop-blur md:gap-4 md:px-6">
       {/* Logo / app name — same fixed width as the right section on lg+ */}
       <div className="flex shrink-0 items-center lg:w-64">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2.5"
           aria-label="Recomenda — início"
         >
-          <div className="rounded-lg bg-primary p-2">
+          <div className="rounded-xl bg-primary p-2 shadow-(--brand-shadow)">
             <Logo className="size-6" />
           </div>
-          <span className="hidden text-base font-semibold text-foreground sm:inline">
+          <span className="hidden font-display text-lg font-bold tracking-[-0.02em] text-text-strong sm:inline">
             Recomenda
           </span>
         </Link>

@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PageHeader } from "@/components/domain/page-header";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { StatCard } from "@/components/domain/stat-card";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent } from "@/components/ui/card";
@@ -389,26 +389,29 @@ export default function FarmDetailPage() {
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <StatCard
+      <KpiStrip className="mb-6">
+        <KpiCell
           label="Talhões"
           value={plots?.length ?? 0}
-          icon={<MapPin className="h-4 w-4" />}
-          accent="primary"
+          icon={<MapPin className="size-4" />}
         />
-        <StatCard
+        <KpiCell
           label="Área total"
           value={`${totalHectares.toFixed(2)} ha`}
-          icon={<Sprout className="h-4 w-4" />}
-          accent="sun"
+          icon={<Sprout className="size-4" />}
         />
-        <StatCard
+        <KpiCell
           label="Safras ativas"
           value={activeSeasonsCount}
-          icon={<Leaf className="h-4 w-4" />}
-          accent="sky"
+          icon={<Leaf className="size-4" />}
         />
-      </div>
+        <KpiCell
+          label="Lista de compra"
+          value={selectedList ? (selectedList.items ?? []).length : 0}
+          sub="produtos"
+          icon={<ShoppingCart className="size-4" />}
+        />
+      </KpiStrip>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <Card
@@ -422,13 +425,13 @@ export default function FarmDetailPage() {
             }
           }}
           className={cn(
-            "cursor-pointer border-primary/20 bg-linear-to-br from-primary/5 to-card transition-shadow hover:shadow-md",
+            "cursor-pointer transition-shadow hover:shadow-md",
             farmView === "seasons" && "ring-2 ring-primary",
           )}
         >
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
                 <CalendarDays className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
@@ -467,13 +470,13 @@ export default function FarmDetailPage() {
             }
           }}
           className={cn(
-            "cursor-pointer border-sky-500/20 bg-linear-to-br from-sky-500/5 to-card transition-shadow hover:shadow-md",
-            farmView === "purchase" && "ring-2 ring-sky-500",
+            "cursor-pointer transition-shadow hover:shadow-md",
+            farmView === "purchase" && "ring-2 ring-primary",
           )}
         >
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-clay-soft text-clay-strong">
                 <ShoppingCart className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
@@ -512,13 +515,13 @@ export default function FarmDetailPage() {
             }
           }}
           className={cn(
-            "cursor-pointer border-emerald-500/20 bg-linear-to-br from-emerald-500/5 to-card transition-shadow hover:shadow-md",
-            farmView === "plots" && "ring-2 ring-emerald-500",
+            "cursor-pointer transition-shadow hover:shadow-md",
+            farmView === "plots" && "ring-2 ring-primary",
           )}
         >
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-tb-soft text-tb">
                 <MapPin className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
@@ -567,7 +570,7 @@ export default function FarmDetailPage() {
         {farmView === "plots" ? (
         <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="font-display text-lg font-semibold text-text-strong">
               Talhões
             </h2>
             <Sheet open={plotSheetOpen} onOpenChange={setPlotSheetOpen}>
@@ -668,13 +671,13 @@ export default function FarmDetailPage() {
                           {plot.name}
                         </h3>
                         {season ? (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-strong">
                             <Sprout className="h-3 w-3" />
                             {CROP_LABELS[season.crop] ?? season.crop}
                             {season.variety ? ` · ${season.variety}` : ""}
                           </span>
                         ) : (
-                          <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                          <span className="inline-flex shrink-0 items-center rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                             sem safra
                           </span>
                         )}
@@ -837,7 +840,7 @@ function FarmSeasonsTab({
     <>
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Safras</h2>
+          <h2 className="font-display text-lg font-semibold text-text-strong">Safras</h2>
           {producerId ? (
             <Button asChild size="sm" className="gap-1.5">
               <Link href={newSeasonHref}>
@@ -1073,7 +1076,7 @@ function FarmRecommendationTab({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Datas por talhão</h2>
+        <h2 className="font-display text-lg font-semibold text-text-strong">Datas por talhão</h2>
         <div className="mt-3 flex flex-col gap-3">
           {plotRows.map((plot) => (
             <Card key={plot.id}>
@@ -1116,7 +1119,7 @@ function FarmRecommendationTab({
 
       {listItems.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Produtos por etapa</h2>
+          <h2 className="font-display text-lg font-semibold text-text-strong">Produtos por etapa</h2>
           <div className="mt-3 flex flex-col gap-4">
             {Array.from(itemsByStage.entries()).map(([stage, stageItems]) => (
               <Card key={stage}>

@@ -24,12 +24,12 @@ export function SegmentedTabs<T extends string>({
   variant = "default",
   className,
 }: SegmentedTabsProps<T>) {
-  const isPill = false;
+  const isPill = variant === "pill";
   return (
     <div
       role="tablist"
       className={cn(
-        "inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg border bg-card p-1",
+        "inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-surface-2 p-1",
         className,
       )}
     >
@@ -43,12 +43,14 @@ export function SegmentedTabs<T extends string>({
             aria-selected={isActive}
             onClick={() => onValueChange(item.value)}
             className={cn(
-              "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 outline-none",
+              "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold transition-all duration-200 outline-none",
               "focus-visible:ring-[3px] focus-visible:ring-ring/40",
-              "rounded-md px-4 py-2 text-sm",
+              "rounded-lg px-4 py-2 text-sm",
               isActive
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                ? isPill
+                  ? "bg-surface text-text-strong shadow-sm"
+                  : "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-text-strong",
             )}
           >
             <span>{item.label}</span>

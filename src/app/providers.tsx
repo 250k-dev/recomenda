@@ -25,7 +25,19 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>{children}</TooltipProvider>
-      <Toaster richColors position="top-right" closeButton theme="light" />
+      <Toaster
+        richColors
+        position="top-right"
+        closeButton
+        theme="light"
+        toastOptions={{
+          style: {
+            fontFamily: "var(--font-inter)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-lg)",
+          },
+        }}
+      />
     </QueryClientProvider>
   );
 }

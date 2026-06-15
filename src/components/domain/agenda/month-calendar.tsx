@@ -179,10 +179,10 @@ export function MonthCalendar({
           <div className="min-w-0">
             {showHeader ? (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
                   {format(month, "MMMM yyyy", { locale: ptBR })}
                 </p>
-                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                <h2 className="font-display text-xl font-semibold tracking-[-0.02em] text-text-strong sm:text-2xl">
                   {headerTitle}
                 </h2>
               </>
@@ -240,8 +240,8 @@ export function MonthCalendar({
             <StatusSummaryCard
               label="Atrasadas"
               value={lateCount}
-              dotClass="bg-red-500"
-              valueClass="text-red-600"
+              dotClass="bg-danger"
+              valueClass="text-danger-strong"
               selected={panelMode === "filter" && statusFilter === "late"}
               onClick={() => applyStatusFilter("late")}
             />
@@ -256,8 +256,8 @@ export function MonthCalendar({
             <StatusSummaryCard
               label="Pendentes"
               value={totalEventCount}
-              dotClass="bg-amber-400"
-              valueClass="text-emerald-700"
+              dotClass="bg-warning"
+              valueClass="text-success-strong"
               selected={panelMode === "filter" && statusFilter === "pending"}
               onClick={() => applyStatusFilter("pending")}
             />
@@ -416,9 +416,9 @@ function getDayDotColor(
   ymd: string,
 ): string | null {
   if (events.length === 0) return null;
-  if (events.some((event) => event.isLate)) return "bg-red-500";
+  if (events.some((event) => event.isLate)) return "bg-danger";
   if (ymd === todayYmd) return "bg-primary";
-  return "bg-amber-400";
+  return "bg-warning";
 }
 
 function ViewModeToggle({
@@ -694,7 +694,7 @@ function ProducerFilterToggle({
           <Users className="h-4 w-4" />
           <span className="hidden sm:inline">Produtor</span>
           {producerId ? (
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-card" />
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-warning ring-2 ring-card" />
           ) : null}
         </button>
       </PopoverTrigger>
@@ -783,8 +783,8 @@ function getEventStatusPresentation(event: AgendaEvent, todayYmd: string) {
   if (event.isLate) {
     return {
       label: "Atrasada",
-      borderClass: "bg-red-500",
-      badgeClass: "border-red-200 bg-red-50 text-red-700",
+      borderClass: "bg-danger",
+      badgeClass: "border-danger-border bg-danger-soft text-danger-strong",
       showWarning: true,
     };
   }
@@ -792,14 +792,14 @@ function getEventStatusPresentation(event: AgendaEvent, todayYmd: string) {
     return {
       label: "Hoje",
       borderClass: "bg-primary",
-      badgeClass: "border-primary/30 bg-primary/10 text-primary",
+      badgeClass: "border-primary-border bg-primary-soft text-primary-strong",
       showWarning: false,
     };
   }
   return {
     label: "Pendente",
-    borderClass: "bg-amber-400",
-    badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+    borderClass: "bg-warning",
+    badgeClass: "border-warning-border bg-warning-soft text-warning-strong",
     showWarning: false,
   };
 }

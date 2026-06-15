@@ -17,16 +17,16 @@ export function PageHeader({ icon, section, title, description, action, classNam
     return (
       <div className={cn("flex flex-wrap items-start justify-between gap-4 mb-6", className)}>
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
             {icon}
           </span>
           <div className="min-w-0">
             {section && (
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
                 {section}
               </p>
             )}
-            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+            <h1 className="mt-0.5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
               {title}
             </h1>
             {description && (
@@ -49,7 +49,7 @@ export function PageHeader({ icon, section, title, description, action, classNam
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong md:text-3xl">
           {title}
         </h1>
         {description ? (

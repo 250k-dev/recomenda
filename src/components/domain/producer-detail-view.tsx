@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
 import { ProducerTimingTemplatesSection } from "@/components/domain/timing/producer-timing-templates-section";
 import { Card, CardContent } from "@/components/ui/card";
@@ -164,17 +165,17 @@ export function ProducerDetailView({
       <BreadcrumbBack items={breadcrumbs} />
 
       {/* Hero / identidade do produtor */}
-      <section className="p-5 mb-6 border shadow-sm rounded-2xl bg-linear-to-br from-card to-muted/40 sm:p-6">
+      <section className="p-5 mb-6 border border-border shadow-sm rounded-xl bg-card sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start min-w-0 gap-4">
-            <div className="flex items-center justify-center w-16 h-16 text-2xl font-semibold shrink-0 rounded-2xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+            <div className="flex items-center justify-center w-14 h-14 text-2xl font-bold shrink-0 rounded-xl bg-primary-soft text-primary-strong">
               {initial}
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
                 Produtor
               </p>
-              <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-foreground">
+              <h1 className="mt-0.5 truncate font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
                 {producer.name}
               </h1>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -204,38 +205,32 @@ export function ProducerDetailView({
         </div>
       </section>
 
-      {/* KPIs — card único com os indicadores do produtor */}
+      {/* KPIs — indicadores do produtor */}
       {loadingFarms ? (
         <Skeleton className="w-full h-24 mb-6 border rounded-xl border-border" />
       ) : (
-        <div className="mb-6 border shadow-sm rounded-xl bg-card">
-          <div className="grid grid-cols-2 divide-x divide-y sm:grid-cols-4 sm:divide-y-0">
-            <StatCell
-              icon={<Tractor className="w-5 h-5" />}
-              accent="primary"
-              label="Fazendas"
-              value={String(stats.farms)}
-            />
-            <StatCell
-              icon={<MapPin className="w-5 h-5" />}
-              accent="sky"
-              label="Talhões"
-              value={String(stats.plots)}
-            />
-            <StatCell
-              icon={<Sprout className="w-5 h-5" />}
-              accent="sun"
-              label="Hectares totais"
-              value={`${fmtHa(stats.hectares)} ha`}
-            />
-            <StatCell
-              icon={<Leaf className="w-5 h-5" />}
-              accent="clay"
-              label="Safras ativas"
-              value={String(stats.activeSeasons)}
-            />
-          </div>
-        </div>
+        <KpiStrip className="mb-6">
+          <KpiCell
+            icon={<Tractor className="size-4" />}
+            label="Fazendas"
+            value={String(stats.farms)}
+          />
+          <KpiCell
+            icon={<MapPin className="size-4" />}
+            label="Talhões"
+            value={String(stats.plots)}
+          />
+          <KpiCell
+            icon={<Sprout className="size-4" />}
+            label="Hectares totais"
+            value={`${fmtHa(stats.hectares)} ha`}
+          />
+          <KpiCell
+            icon={<Leaf className="size-4" />}
+            label="Safras ativas"
+            value={String(stats.activeSeasons)}
+          />
+        </KpiStrip>
       )}
 
       {showSeasonActions ? (
@@ -362,7 +357,7 @@ export function ProducerDetailView({
                             {farm.name}
                           </h3>
                           {activeSeasonsCount > 0 ? (
-                            <Badge variant="default" className="shrink-0">
+                            <Badge variant="success" className="shrink-0">
                               {activeSeasonsCount}{" "}
                               {activeSeasonsCount === 1 ? "safra" : "safras"}
                             </Badge>
@@ -542,44 +537,6 @@ export function ProducerDetailView({
   );
 }
 
-const cellAccent: Record<"primary" | "sun" | "clay" | "sky", string> = {
-  primary: "bg-primary/10 text-primary",
-  sun: "bg-amber-100 text-amber-600",
-  clay: "bg-orange-100 text-orange-600",
-  sky: "bg-sky-100 text-sky-600",
-};
-
-function StatCell({
-  icon,
-  accent,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  accent: "primary" | "sun" | "clay" | "sky";
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 p-4">
-      <span
-        className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-          cellAccent[accent],
-        )}
-      >
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <p className="mt-0.5 text-xl font-semibold tabular-nums tracking-tight text-foreground">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function ContactChip({
   icon,
   value,
@@ -594,8 +551,8 @@ function ContactChip({
     <span
       className={
         hasValue
-          ? "inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground"
-          : "inline-flex items-center gap-1.5 rounded-full border border-dashed px-2.5 py-1 text-xs text-muted-foreground"
+          ? "inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-foreground"
+          : "inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground"
       }
     >
       {icon}

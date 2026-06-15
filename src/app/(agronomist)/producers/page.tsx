@@ -10,6 +10,9 @@ import { toast } from "sonner";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { PageHeader } from "@/components/domain/page-header";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { ProducerAccountStatusBadge } from "@/components/domain/producer-account-status-badge";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -151,65 +154,42 @@ export default function ProducersPage() {
         <BreadcrumbBack
           items={[{ label: "Início", href: "/dashboard" }, { label: "Produtores" }]}
         />
-
-        {/* Header: título à esquerda, ação à direita na mesma linha */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <UsersRound className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                Produtores
-              </h1>
-              <p className="max-w-2xl text-xs text-muted-foreground">
-                Contas vinculadas a você e convites pendentes. O status indica conta ativa,
-                inativa ou convite enviado/expirado.
-              </p>
-            </div>
-          </div>
-          <Link href="/producers/new" className="shrink-0">
-            <Button size="lg" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Adicionar produtor
+        <PageHeader
+          icon={<UsersRound className="h-5 w-5" />}
+          section="Carteira"
+          title="Produtores"
+          description={`${fmt(totalProducers)} produtor${totalProducers === 1 ? "" : "es"} cadastrado${totalProducers === 1 ? "" : "s"}. Acompanhe fazendas, safras e o status de cada um.`}
+          action={
+            <Button asChild variant="clay">
+              <Link href="/producers/new">
+                <Plus className="h-4 w-4" />
+                Cadastrar produtor
+              </Link>
             </Button>
-          </Link>
-        </div>
+          }
+        />
       </div>
 
-      {/* KPI — card único com os dois indicadores */}
-      <div className="rounded-xl border bg-card shadow-sm">
-        <div className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <div className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <UsersIcon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-muted-foreground">Total de produtores</p>
-              <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                {fmt(totalProducers)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-              <Sprout className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-muted-foreground">Hectares totais</p>
-              <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                {fmtHa(totalHectares)} ha
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">soma da carteira</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* KPI strip */}
+      <KpiStrip>
+        <KpiCell
+          label="Produtores"
+          value={fmt(totalProducers)}
+          sub="na carteira"
+          icon={<UsersIcon className="size-4" />}
+        />
+        <KpiCell
+          label="Hectares totais"
+          value={`${fmtHa(totalHectares)} ha`}
+          sub="soma da carteira"
+          icon={<Sprout className="size-4" />}
+        />
+      </KpiStrip>
 
       {/* Lista */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         {/* Toolbar: abas + filtros na mesma linha */}
-        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-3 py-3">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-2 px-3 py-3">
           <SegmentedTabs
             value={tab}
             onValueChange={(v) => { setTab(v); setFilter(""); }}
@@ -269,11 +249,11 @@ export default function ProducersPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2.5">Produtor</th>
-                  <th className="px-2 py-2.5">E-mail</th>
-                  <th className="px-2 py-2.5 text-right">Hectares</th>
-                  <th className="w-12 px-2 py-2.5" />
+                <tr className="border-b border-border bg-surface-2 text-left text-[0.72rem] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+                  <th className="px-4 py-3.5">Produtor</th>
+                  <th className="px-2 py-3.5">Status</th>
+                  <th className="px-2 py-3.5 text-right">Hectares</th>
+                  <th className="w-12 px-2 py-3.5" />
                 </tr>
               </thead>
               <tbody>
@@ -362,27 +342,38 @@ function ProducerRow({
   return (
     <tr
       className={cn(
-        "border-b transition-colors last:border-b-0 hover:bg-accent/40",
+        "border-b border-border transition-colors last:border-b-0 hover:bg-hover",
         canOpen && "cursor-pointer",
       )}
       onClick={canOpen ? onOpen : undefined}
     >
-      <td className="px-3 py-3">
+      <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <div
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+              "flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
               isInvitation
-                ? "bg-muted text-muted-foreground"
-                : "bg-primary/10 text-primary",
+                ? "bg-surface-2 text-muted-foreground"
+                : "bg-primary-soft text-primary-strong",
             )}
           >
             {initial}
           </div>
-          <span className="text-base font-medium text-foreground">{producer.name}</span>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-text-strong">
+              {producer.name}
+            </div>
+            {producer.email ? (
+              <div className="truncate text-xs text-muted-foreground">
+                {producer.email}
+              </div>
+            ) : null}
+          </div>
         </div>
       </td>
-      <td className="px-2 py-3 text-muted-foreground">{producer.email}</td>
+      <td className="px-2 py-3">
+        <ProducerAccountStatusBadge status={producer.account_status} />
+      </td>
       <td className="px-2 py-3 text-right tabular-nums text-muted-foreground">
         {producer.total_hectares != null ? `${fmtHa(producer.total_hectares)} ha` : "—"}
       </td>

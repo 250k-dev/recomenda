@@ -73,6 +73,8 @@ export default function CustomCatalogPage() {
   return (
     <>
       <PageHeader
+        icon={<Package className="h-5 w-5" />}
+        section="Catálogo"
         title="Produtos Customizados"
         description="Produtos criados pelos agrônomos. Veja aqui todos os produtos customizados do sistema."
       />

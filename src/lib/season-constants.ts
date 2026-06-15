@@ -14,12 +14,12 @@ export const STATUS_LABELS: Record<string, string> = {
 
 export const STATUS_VARIANTS: Record<
   string,
-  "default" | "secondary" | "outline" | "destructive"
+  "default" | "neutral" | "info" | "success"
 > = {
-  DRAFT: "secondary",
-  PUBLISHED: "default",
+  DRAFT: "neutral",
+  PUBLISHED: "info",
   IN_PROGRESS: "default",
-  COMPLETED: "outline",
-  HARVESTED: "outline",
-  ARCHIVED: "secondary",
+  COMPLETED: "success",
+  HARVESTED: "success",
+  ARCHIVED: "neutral",
 };

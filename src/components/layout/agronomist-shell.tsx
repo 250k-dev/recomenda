@@ -4,7 +4,7 @@ import { AppHeader } from "./app-header";
 
 export function AgronomistShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-svh flex-col bg-muted">
+    <div className="flex min-h-svh flex-col bg-canvas">
       <AppHeader />
       <ImpersonationBanner />
       <main className="flex-1 px-4 py-6 md:px-8">
