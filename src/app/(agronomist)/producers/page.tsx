@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useState, useEffect, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -10,6 +10,10 @@ import { toast } from "sonner";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { PageHeader } from "@/components/domain/page-header";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { ProducerAttentionBadge } from "@/components/domain/producer-attention-badge";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -25,13 +29,14 @@ import {
   Archive,
   RotateCcw,
   Trash2,
-  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 
 type Tab = "active" | "archived";
 type SortMode = "name" | "hectares-desc" | "hectares-asc";
+
+const PRODUCERS_PAGE_SIZE = 5;
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 const fmtHa = (n: number) =>
@@ -56,7 +61,12 @@ export default function ProducersPage() {
   const [tab, setTab] = useState<Tab>("active");
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortMode>("name");
+  const [page, setPage] = useState(1);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, filter, sort]);
 
   const onArchive = (id: string, name: string) =>
     setPendingAction({ kind: "archive", id, name });
@@ -137,6 +147,13 @@ export default function ProducersPage() {
     });
   }, [sourceList, filter, sort]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PRODUCERS_PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const paginated = filtered.slice(
+    (safePage - 1) * PRODUCERS_PAGE_SIZE,
+    safePage * PRODUCERS_PAGE_SIZE,
+  );
+
   // KPIs derivados das listas (visão geral, independente do tab).
   const producersOnly = list.filter((p) => p.row_type === "producer");
   const totalProducers = producersOnly.length;
@@ -151,65 +168,42 @@ export default function ProducersPage() {
         <BreadcrumbBack
           items={[{ label: "Início", href: "/dashboard" }, { label: "Produtores" }]}
         />
-
-        {/* Header: título à esquerda, ação à direita na mesma linha */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <UsersRound className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                Produtores
-              </h1>
-              <p className="max-w-2xl text-xs text-muted-foreground">
-                Contas vinculadas a você e convites pendentes. O status indica conta ativa,
-                inativa ou convite enviado/expirado.
-              </p>
-            </div>
-          </div>
-          <Link href="/producers/new" className="shrink-0">
-            <Button size="lg" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Adicionar produtor
+        <PageHeader
+          icon={<UsersRound className="h-5 w-5" />}
+          section="Carteira"
+          title="Produtores"
+          description={`${fmt(totalProducers)} produtor${totalProducers === 1 ? "" : "es"} cadastrado${totalProducers === 1 ? "" : "s"}. Acompanhe fazendas, safras e aplicações de cada um.`}
+          action={
+            <Button asChild variant="clay">
+              <Link href="/producers/new">
+                <Plus className="h-4 w-4" />
+                Cadastrar produtor
+              </Link>
             </Button>
-          </Link>
-        </div>
+          }
+        />
       </div>
 
-      {/* KPI — card único com os dois indicadores */}
-      <div className="rounded-xl border bg-card shadow-sm">
-        <div className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <div className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <UsersIcon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-muted-foreground">Total de produtores</p>
-              <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                {fmt(totalProducers)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-              <Sprout className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-muted-foreground">Hectares totais</p>
-              <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                {fmtHa(totalHectares)} ha
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">soma da carteira</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* KPI strip */}
+      <KpiStrip>
+        <KpiCell
+          label="Produtores"
+          value={fmt(totalProducers)}
+          sub="na carteira"
+          icon={<UsersIcon className="size-4" />}
+        />
+        <KpiCell
+          label="Hectares totais"
+          value={`${fmtHa(totalHectares)} ha`}
+          sub="soma da carteira"
+          icon={<Sprout className="size-4" />}
+        />
+      </KpiStrip>
 
       {/* Lista */}
-      <div className="rounded-xl border bg-card shadow-sm">
-        {/* Toolbar: abas + filtros na mesma linha */}
-        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-3 py-3">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        {/* Toolbar: abas + filtros */}
+        <div className="flex flex-col gap-3 border-b border-border bg-surface-2 px-3 py-3 md:flex-row md:items-center">
           <SegmentedTabs
             value={tab}
             onValueChange={(v) => { setTab(v); setFilter(""); }}
@@ -217,35 +211,38 @@ export default function ProducersPage() {
               { value: "active", label: "Ativos" },
               { value: "archived", label: "Removidos", badgeCount: archivedList.length },
             ]}
+            className="shrink-0"
           />
-          <div className="relative min-w-0 flex-1 sm:max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filtrar por nome, e-mail ou ID…"
-              className="pl-9"
-            />
-          </div>
-          <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2.5 pr-1">
-            <ArrowDownUp className="h-4 w-4 text-muted-foreground" />
-            <Select
-              value={sort}
-              onValueChange={(value) => setSort(value as SortMode)}
-              size="sm"
-              className="h-10 min-w-[12rem] border-0 bg-transparent pr-2 text-sm shadow-none"
-              options={[
-                { value: "name", label: "Ordenar: Nome" },
-                { value: "hectares-desc", label: "Ordenar: Hectares ↓" },
-                { value: "hectares-asc", label: "Ordenar: Hectares ↑" },
-              ]}
-            />
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Filtrar por nome, e-mail ou ID…"
+                className="h-10 pl-9"
+              />
+            </div>
+            <div className="flex h-10 w-full shrink-0 items-center gap-1.5 rounded-lg border border-input bg-card pl-2.5 pr-1 sm:w-auto">
+              <ArrowDownUp className="size-4 shrink-0 text-muted-foreground" />
+              <Select
+                value={sort}
+                onValueChange={(value) => setSort(value as SortMode)}
+                size="sm"
+                className="w-auto min-w-44 shrink-0 [&>button]:h-8 [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-1 [&>button]:shadow-none [&>button_span]:whitespace-nowrap"
+                options={[
+                  { value: "name", label: "Ordenar: Nome" },
+                  { value: "hectares-desc", label: "Ordenar: Hectares ↓" },
+                  { value: "hectares-asc", label: "Ordenar: Hectares ↑" },
+                ]}
+              />
+            </div>
           </div>
         </div>
 
         {isLoading ? (
           <div className="p-3">
-            <TableRowsSkeleton rows={8} columns={5} />
+            <TableRowsSkeleton rows={5} columns={6} />
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
@@ -266,35 +263,45 @@ export default function ProducersPage() {
             className="px-4 py-10"
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2.5">Produtor</th>
-                  <th className="px-2 py-2.5">E-mail</th>
-                  <th className="px-2 py-2.5 text-right">Hectares</th>
-                  <th className="w-12 px-2 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => (
-                  <ProducerRow
-                    key={rowKey(p)}
-                    producer={p}
-                    tab={tab}
-                    actionPending={actionPending}
-                    onOpen={() =>
-                      p.producer_id ? router.push(`/producers/${p.producer_id}`) : null
-                    }
-                    onArchive={() => p.producer_id && onArchive(p.producer_id, p.name)}
-                    onReactivate={() => p.producer_id && onReactivate(p.producer_id)}
-                    onDelete={() => p.producer_id && onDelete(p.producer_id, p.name)}
-                    onRevokeInvitation={() => p.invitation_id && onRevokeInvitation(p.invitation_id, p.name)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[920px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surface-2 text-left text-[0.72rem] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+                    <th className="px-4 py-3.5">Produtor</th>
+                    <th className="px-2 py-3.5 text-center">Fazendas</th>
+                    <th className="px-2 py-3.5 text-center">Talhões</th>
+                    <th className="px-2 py-3.5 text-center">Safras ativas</th>
+                    <th className="px-2 py-3.5">Atenção</th>
+                    <th className="w-24 px-2 py-3.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map((p) => (
+                    <ProducerRow
+                      key={rowKey(p)}
+                      producer={p}
+                      tab={tab}
+                      actionPending={actionPending}
+                      onOpen={() =>
+                        p.producer_id ? router.push(`/producers/${p.producer_id}`) : null
+                      }
+                      onArchive={() => p.producer_id && onArchive(p.producer_id, p.name)}
+                      onReactivate={() => p.producer_id && onReactivate(p.producer_id)}
+                      onDelete={() => p.producer_id && onDelete(p.producer_id, p.name)}
+                      onRevokeInvitation={() => p.invitation_id && onRevokeInvitation(p.invitation_id, p.name)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              page={safePage}
+              pageSize={PRODUCERS_PAGE_SIZE}
+              total={filtered.length}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </div>
 
@@ -362,29 +369,53 @@ function ProducerRow({
   return (
     <tr
       className={cn(
-        "border-b transition-colors last:border-b-0 hover:bg-accent/40",
+        "border-b border-border transition-colors last:border-b-0 hover:bg-hover",
         canOpen && "cursor-pointer",
       )}
       onClick={canOpen ? onOpen : undefined}
     >
-      <td className="px-3 py-3">
+      <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <div
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+              "flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
               isInvitation
-                ? "bg-muted text-muted-foreground"
-                : "bg-primary/10 text-primary",
+                ? "bg-surface-2 text-muted-foreground"
+                : "bg-primary-soft text-primary-strong",
             )}
           >
             {initial}
           </div>
-          <span className="text-base font-medium text-foreground">{producer.name}</span>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-text-strong">
+              {producer.name}
+            </div>
+            {producer.email ? (
+              <div className="truncate text-xs text-muted-foreground">
+                {producer.email}
+              </div>
+            ) : null}
+          </div>
         </div>
       </td>
-      <td className="px-2 py-3 text-muted-foreground">{producer.email}</td>
-      <td className="px-2 py-3 text-right tabular-nums text-muted-foreground">
-        {producer.total_hectares != null ? `${fmtHa(producer.total_hectares)} ha` : "—"}
+      <td className="px-2 py-3 text-center tabular-nums text-text-strong">
+        {producer.farms_count ?? "—"}
+      </td>
+      <td className="px-2 py-3 text-center tabular-nums text-text-strong">
+        {producer.plots_count ?? "—"}
+      </td>
+      <td className="px-2 py-3 text-center tabular-nums text-text-strong">
+        {producer.active_seasons_count ?? "—"}
+      </td>
+      <td className="px-2 py-3">
+        {producer.row_type === "producer" ? (
+          <ProducerAttentionBadge
+            lateCount={producer.attention_late_count ?? 0}
+            todayCount={producer.attention_today_count ?? 0}
+          />
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        )}
       </td>
       <td className="px-2 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
@@ -435,11 +466,6 @@ function ProducerRow({
               <Trash2 className="h-4 w-4" />
               <span className="hidden sm:inline">Cancelar convite</span>
             </Button>
-          ) : null}
-          {canOpen ? (
-            <ChevronRight className="ml-1 h-5 w-5 shrink-0 text-muted-foreground" />
-          ) : !canManage && !isInvitation ? (
-            <span className="text-sm text-muted-foreground">—</span>
           ) : null}
         </div>
       </td>

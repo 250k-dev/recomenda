@@ -7,11 +7,14 @@ import {
   Sprout,
   CalendarDays,
   ArrowRight,
+  ArrowLeft,
   Clock,
   MapPin,
   Leaf,
   Wheat,
   ListChecks,
+  Save,
+  CircleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
-import { useTimingTemplate, useTimingTemplates, queryKeys } from "@/lib/api/hooks";
+import { useTimingTemplate, useTimingTemplates, usePlanQuota, queryKeys } from "@/lib/api/hooks";
 import {
   createMixTemplate,
   createMixTemplateItem,
@@ -52,6 +55,7 @@ export type SeasonWizardProps = {
   producerId: string;
   producerName: string;
   plots: WizardPlot[];
+  farmId?: string;
   farmName?: string;
   onComplete: () => void;
   onViewSeason?: (seasonId: string) => void;
@@ -67,6 +71,7 @@ export function SeasonWizard({
   producerId,
   producerName,
   plots,
+  farmId,
   farmName,
   onComplete,
   onViewSeason,
@@ -123,6 +128,7 @@ export function SeasonWizard({
       {step === 1 && (
         <StepCronogram
           producerId={producerId}
+          farmId={farmId}
           crop={crop}
           setCrop={setCrop}
           cronogramMode={cronogramMode}
@@ -172,6 +178,7 @@ export function SeasonWizard({
 
 function StepCronogram({
   producerId,
+  farmId,
   crop,
   setCrop,
   cronogramMode,
@@ -185,6 +192,7 @@ function StepCronogram({
   onNext,
 }: {
   producerId: string;
+  farmId?: string;
   crop: Crop;
   setCrop: (v: Crop) => void;
   cronogramMode: CronogramMode;
@@ -357,7 +365,7 @@ function StepCronogram({
             Cultura
           </p>
         </div>
-        <div className="grid gap-3 p-5 sm:grid-cols-2 lg:max-w-xl">
+        <div className="grid gap-4 p-5 sm:grid-cols-2">
           {cropOptions.map((option) => {
             const selected = crop === option.value;
             const Icon = option.icon;
@@ -371,24 +379,28 @@ function StepCronogram({
                   setError(null);
                 }}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all",
+                  "flex w-full items-center gap-3.5 rounded-[14px] border px-5 py-[18px] text-left transition-all",
                   selected
-                    ? "border-primary/40 bg-primary/5 ring-1 ring-primary/15"
-                    : "bg-background hover:border-primary/25 hover:bg-muted/30",
+                    ? "border-primary bg-primary-soft ring-1 ring-primary/20"
+                    : "border-border bg-surface-2 hover:border-primary/25 hover:bg-muted/30",
                 )}
               >
                 <span
                   className={cn(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-                    selected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+                    "flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[11px] transition-colors",
+                    selected
+                      ? "bg-surface text-primary-strong"
+                      : "bg-surface text-muted-foreground",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                 </span>
-                <span className="min-w-0 flex-1 font-medium text-foreground">
+                <span className="min-w-0 flex-1 text-base font-semibold text-text-strong">
                   {option.label}
                 </span>
-                {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
+                {selected ? (
+                  <Check className="h-5 w-5 shrink-0 text-primary" />
+                ) : null}
               </button>
             );
           })}
@@ -515,6 +527,7 @@ function StepCronogram({
               minStages={1}
               showProducts
               producerId={producerId}
+              farmId={farmId}
               crop={crop}
               onChange={(key, patch) =>
                 setDraftStages((prev) =>
@@ -776,7 +789,7 @@ function StepPlantation({
 
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-tb-soft text-tb">
             <MapPin className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
@@ -937,12 +950,24 @@ function StepFinalize({
   const [error, setError] = useState<string | null>(null);
   const [publishNow, setPublishNow] = useState(true);
   const [createdIds, setCreatedIds] = useState<string[] | null>(null);
+  const [savedAsDraft, setSavedAsDraft] = useState(false);
   const queryClient = useQueryClient();
+  const { data: planData } = usePlanQuota();
+
+  const quotaCurrent = planData?.quota_usage?.current ?? 0;
+  const quotaLimit =
+    planData?.quota_usage?.limit ?? planData?.plan?.plot_quota ?? 0;
+  const quotaWouldExceed =
+    publishNow &&
+    quotaLimit > 0 &&
+    quotaCurrent + plots.length > quotaLimit;
 
   const farmId = plots[0]?.farmId;
+  const cropLabel = CROP_LABELS[crop] ?? crop;
 
   const mutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (forceDraft: boolean) => {
+      const shouldPublish = !forceDraft && publishNow;
       const created: string[] = [];
       for (const p of plots) {
         const sch = schedules.find((s) => s.plotId === p.id);
@@ -954,16 +979,20 @@ function StepFinalize({
           cycle_days: sch?.cycleDays ? Number(sch.cycleDays) : undefined,
           timing_template_id: timingTemplateId,
           planting_date: sch?.plantingDate || undefined,
-          publish_now: publishNow,
+          publish_now: shouldPublish,
         })) as { id: string };
         created.push(season.id);
       }
-      return created;
+      return { ids: created, asDraft: !shouldPublish };
     },
-    onSuccess: (ids) => {
+    onSuccess: ({ ids, asDraft }) => {
       setCreatedIds(ids);
+      setSavedAsDraft(asDraft);
       void queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplates(producerId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.quota });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.timingTemplates(producerId),
+      });
       if (farmId) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.farmSeasons(farmId) });
       }
@@ -972,23 +1001,40 @@ function StepFinalize({
     onError: (e: unknown) => setError(extractError(e)),
   });
 
+  const handleSaveDraft = () => {
+    setError(null);
+    mutation.mutate(true);
+  };
+
+  const handleFinish = () => {
+    setError(null);
+    if (publishNow && quotaWouldExceed) return;
+    mutation.mutate(false);
+  };
+
+  const formatPlantingDate = (value?: string) => {
+    if (!value) return "—";
+    return new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR");
+  };
+
   if (createdIds) {
     const firstId = createdIds[0] ?? null;
+    const didPublish = !savedAsDraft;
     return (
       <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Check className="h-8 w-8" />
         </span>
-        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="mt-5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong sm:text-3xl">
           {createdIds.length === 1 ? "Safra criada" : `${createdIds.length} safras criadas`}
         </h1>
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          {publishNow
+          {didPublish
             ? "As recomendações foram geradas a partir do cronograma."
             : "As safras foram salvas como rascunho. Publique para gerar as recomendações."}
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-          <Button variant="outline" onClick={onComplete}>
+          <Button variant="outline" onClick={onComplete} className="bg-surface">
             Ir para o produtor
           </Button>
           {firstId && onViewSeason ? (
@@ -999,89 +1045,144 @@ function StepFinalize({
     );
   }
 
+  const subtitle =
+    plots.length === allPlotsCount
+      ? "Confira os dados antes de concluir. Uma safra será criada para cada talhão selecionado."
+      : `Confira os dados antes de concluir. ${plots.length} de ${allPlotsCount} talhões entrarão nesta safra; os demais podem ser configurados depois.`;
+
   return (
     <div className="flex flex-1 flex-col">
       <StepHeader
         title="Revisão da safra"
-        subtitle={
-          plots.length === allPlotsCount
-            ? "Confira os dados antes de concluir. Uma safra será criada para cada talhão selecionado."
-            : `Confira os dados antes de concluir. ${plots.length} de ${allPlotsCount} talhões entrarão nesta safra; os demais podem ser configurados depois.`
-        }
+        subtitle={subtitle}
         onBack={onBack}
         backLabel="Voltar à plantação"
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard label="Produtor" value={producerName} />
-        <SummaryCard label="Cultura" value={CROP_LABELS[crop] ?? crop} />
+        <SummaryCard label="Cultura" value={cropLabel} />
         <SummaryCard label="Área total" value={`${fmt(totalHa)} ha`} />
       </div>
 
-      <div className="mt-6 rounded-xl border bg-card p-5 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 border-b pb-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Clock className="h-3.5 w-3.5" />
+      <section className="mt-[18px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex items-center gap-2.5 border-b border-border px-5 py-4">
+          <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-strong">
+            <Clock className="h-4 w-4" />
           </span>
-          <p className="text-sm font-semibold text-foreground">
+          <p className="text-[15px] font-semibold text-text-strong">
             {plots.length} {plots.length === 1 ? "talhão" : "talhões"}
           </p>
         </div>
-        <ul className="flex flex-col gap-1.5">
-          {plots.map((p) => {
+        <ul>
+          {plots.map((p, index) => {
             const sch = schedules.find((s) => s.plotId === p.id);
             return (
               <li
                 key={p.id}
-                className="flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40"
+                className={cn(
+                  "flex flex-wrap items-center justify-between gap-3 px-5 py-3.5",
+                  index < plots.length - 1 && "border-b border-border",
+                )}
               >
-                <span className="font-medium text-foreground">{p.name}</span>
-                <span className="text-xs text-muted-foreground">· {fmt(p.area)} ha</span>
-                {sch?.variety ? (
-                  <span className="text-xs text-muted-foreground">· {sch.variety}</span>
-                ) : null}
-                <div className="flex-1" />
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  plantio{" "}
-                  {sch?.plantingDate
-                    ? new Date(sch.plantingDate).toLocaleDateString("pt-BR")
-                    : "—"}
+                <p className="text-sm">
+                  <span className="font-semibold text-text-strong">{p.name}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {fmt(p.area)} ha · {cropLabel.toUpperCase()}
+                    {sch?.variety ? ` · ${sch.variety}` : ""}
+                  </span>
+                </p>
+                <span className="text-[12.5px] tabular-nums text-muted-foreground">
+                  plantio {formatPlantingDate(sch?.plantingDate)}
                 </span>
               </li>
             );
           })}
         </ul>
-      </div>
+      </section>
 
-      <label className="mt-6 flex max-w-xl cursor-pointer items-start gap-3 rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">
+      <label className="mt-[18px] flex cursor-pointer items-start gap-3 rounded-[14px] border border-border bg-card p-4 shadow-sm">
+        <span
+          className={cn(
+            "mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md transition-colors",
+            publishNow
+              ? "bg-primary text-primary-foreground"
+              : "border border-border bg-surface text-transparent",
+          )}
+        >
+          {publishNow ? <Check className="h-3.5 w-3.5" /> : null}
+        </span>
         <input
           type="checkbox"
           checked={publishNow}
-          onChange={(e) => setPublishNow(e.target.checked)}
-          className="mt-0.5 h-4 w-4"
+          onChange={(e) => {
+            setPublishNow(e.target.checked);
+            setError(null);
+          }}
+          className="sr-only"
         />
         <span>
-          <span className="font-medium text-foreground">Publicar agora</span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">
-            Gera as recomendações do cronograma imediatamente. Desmarque para salvar como rascunho.
+          <span className="text-sm font-semibold text-text-strong">Publicar agora</span>
+          <span className="mt-0.5 block text-[13px] leading-relaxed text-muted-foreground">
+            Gera as recomendações do cronograma imediatamente. Desmarque para salvar como
+            rascunho.
           </span>
         </span>
       </label>
 
+      {quotaWouldExceed ? (
+        <div className="mt-3.5 flex items-start gap-2.5 rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-[13.5px] font-medium text-danger-strong">
+          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Limite do plano atingido: {quotaCurrent} de {quotaLimit} talhões ativos. Salve
+            como rascunho ou amplie a quota para publicar.
+          </p>
+        </div>
+      ) : null}
+
       {error ? (
-        <div className="mt-4 max-w-xl">
+        <div className="mt-3.5">
           <FieldError message={error} />
         </div>
       ) : null}
 
-      <StepFooter
-        primary={
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
-            <Check className="h-4 w-4" />
-            {mutation.isPending ? "Criando…" : "Concluir"}
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-[18px]">
+        <Button
+          variant="ghost"
+          onClick={onBack}
+          className="h-11 gap-2 px-4 text-text-strong"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
+        </Button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={mutation.isPending}
+            className="h-11 gap-2 bg-surface px-[18px] text-[14.5px]"
+          >
+            <Save className="h-4 w-4" />
+            {mutation.isPending ? "Salvando…" : "Salvar rascunho"}
           </Button>
-        }
-      />
+          <Button
+            onClick={handleFinish}
+            disabled={mutation.isPending || (publishNow && quotaWouldExceed)}
+            className={cn(
+              "h-11 gap-2 px-5 text-[14.5px]",
+              publishNow && quotaWouldExceed && "opacity-45",
+            )}
+          >
+            <Check className="h-4 w-4" />
+            {mutation.isPending
+              ? "Criando…"
+              : publishNow
+                ? "Concluir e publicar"
+                : "Concluir"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

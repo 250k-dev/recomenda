@@ -38,13 +38,13 @@ export function TableRowsSkeleton({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-border bg-card shadow-sm",
+        "overflow-hidden rounded-xl border border-border bg-card shadow-sm",
         className,
       )}
       aria-hidden
     >
       <div
-        className="grid gap-3 border-b border-border bg-muted/40 px-4 py-3"
+        className="grid gap-3 border-b border-border bg-surface-2 px-4 py-3"
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: columns }).map((_, i) => (
@@ -253,16 +253,18 @@ export function TemplateEditorSkeleton() {
   );
 }
 
-/** Relatórios: KPIs + gráficos + tabela. */
+/** Relatórios: KPIs + painel principal + rail direito. */
 export function ReportPageSkeleton() {
   return (
-    <div className="space-y-6 animate-in fade-in duration-200" aria-hidden>
+    <div className="space-y-5 animate-in fade-in duration-200" aria-hidden>
       <DashboardKpiSkeleton cards={4} />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Skeleton className="h-64 w-full rounded-xl border border-border" />
-        <Skeleton className="h-64 w-full rounded-xl border border-border" />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Skeleton className="h-[360px] w-full rounded-xl border border-border" />
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-56 w-full rounded-xl border border-border" />
+          <Skeleton className="h-40 w-full rounded-xl border border-border" />
+        </div>
       </div>
-      <TableRowsSkeleton rows={6} columns={5} />
     </div>
   );
 }

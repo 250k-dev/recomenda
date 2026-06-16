@@ -59,15 +59,15 @@ export function AppSidebar({ role }: { role: UserRole }) {
     <Sidebar collapsible="icon">
       {/* Logo */}
       <SidebarHeader>
-        <div className="flex h-10 items-center gap-2 rounded-md px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <div className="bg-primary rounded-lg p-2">
+        <div className="flex h-10 items-center gap-2.5 rounded-md px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          <div className="rounded-lg bg-sidebar-primary p-2">
             <Logo className="size-6" />
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-semibold text-sidebar-foreground">
+            <span className="font-display text-base font-bold tracking-[-0.02em] text-sidebar-foreground">
               Recomenda
             </span>
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px] text-sidebar-foreground/70">
               {role === "ADMIN" ? "Administrador" : "Agronomista"}
             </span>
           </div>
@@ -130,7 +130,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
               }}
             >
               <Link href={profileHref}>
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-base font-bold text-sidebar-primary-foreground">
                   {userInitial}
                 </div>
                 <div className="flex-1 flex items-center">

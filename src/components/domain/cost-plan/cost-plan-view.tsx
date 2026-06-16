@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { useSeasonCostPlan, useUpdatePurchaseList, useLocalCatalog } from "@/lib/api/hooks";
 import {
   calculateSummary,
@@ -456,14 +457,14 @@ function PlanHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
           <Wheat className="h-5 w-5" />
         </span>
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
             Plano de custo · {planTitle}
           </p>
-          <h2 className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-foreground">
+          <h2 className="mt-0.5 truncate font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
             {title}
           </h2>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
@@ -611,7 +612,7 @@ function CropToggle({ crop }: { crop: string }) {
       <span
         className={cn(
           "flex items-center gap-1.5 rounded-full px-3 py-1",
-          !isSoy ? "bg-amber-100 text-amber-600" : "text-muted-foreground",
+          !isSoy ? "bg-warning-soft text-warning-strong" : "text-muted-foreground",
         )}
       >
         <span className="h-2 w-2 rounded-full bg-amber-500" />
@@ -679,7 +680,7 @@ function ParamsBar({
             soma dos {plotsCount} talhões
           </span>
         </div>
-        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-600">
+        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-clay-soft px-2.5 py-1 text-xs text-clay-strong">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
           {saving ? "Salvando…" : "Recalcula em tempo real"}
         </div>
@@ -752,76 +753,33 @@ function KpiCards({
   totalCategories: number;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <KpiCard
-        icon={<DollarSign className="h-4 w-4" />}
-        accent="primary"
+    <KpiStrip>
+      <KpiCell
+        icon={<DollarSign className="size-4" />}
         label="Custo total"
         value={brl(summary.grand_total_brl)}
         sub={`${num(summary.grand_total_brl / 1_000_000, 1)} mi · ${totalCategories} categorias`}
       />
-      <KpiCard
-        icon={<Scale className="h-4 w-4" />}
-        accent="sky"
+      <KpiCell
+        icon={<Scale className="size-4" />}
         label="Custo / hectare"
         value={brl(summary.cost_per_ha_brl)}
         sub={`base ${num(area)} ha`}
       />
-      <KpiCard
-        icon={<PackageCheck className="h-4 w-4" />}
-        accent="sun"
+      <KpiCell
+        icon={<PackageCheck className="size-4" />}
         label="Sacas totais"
         value={`${num(summary.total_sacks, 0)}`}
         sub={grainPrice > 0 ? `÷ ${brlSmall(grainPrice)}/saca` : "informe preço da saca"}
       />
-      <KpiCard
-        icon={<TrendingUp className="h-4 w-4" />}
-        accent="clay"
-        label="Sacas / hectare"
+      <KpiCell
+        icon={<TrendingUp className="size-4" />}
+        label="Ponto de equilíbrio"
         value={num(summary.sacks_per_ha, 2)}
-        sub="ponto de equilíbrio"
+        sub="sacas/ha"
+        alert
       />
-    </div>
-  );
-}
-
-function KpiCard({
-  icon,
-  accent,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ReactNode;
-  accent: "primary" | "sky" | "sun" | "clay";
-  label: string;
-  value: string;
-  sub: string;
-}) {
-  const accentClasses = {
-    primary: "bg-primary/10 text-primary",
-    sky: "bg-sky-100 text-sky-600",
-    sun: "bg-amber-100 text-amber-600",
-    clay: "bg-orange-100 text-orange-600",
-  } as const;
-  return (
-    <div className="rounded-xl border bg-card px-4 py-3.5 shadow-sm">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <span
-          className={cn(
-            "flex h-6 w-6 items-center justify-center rounded-md",
-            accentClasses[accent],
-          )}
-        >
-          {icon}
-        </span>
-        {label}
-      </div>
-      <p className="mt-1.5 text-[26px] font-semibold leading-tight tabular-nums tracking-tight text-foreground">
-        {value}
-      </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
-    </div>
+    </KpiStrip>
   );
 }
 
@@ -978,7 +936,7 @@ function CategoryGroup({
   const color = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.OTHER;
   return (
     <>
-      <tr className="bg-muted/40">
+      <tr className="bg-rail">
         <td colSpan={8} className="px-3 py-1.5">
           <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />

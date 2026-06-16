@@ -8,8 +8,9 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
 import { apiErrorMessage } from "@/lib/api-error";
-import { Users } from "lucide-react";
+import { Users, Plus } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
+import { StatusBadge } from "@/components/domain/status-badge";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -187,7 +188,9 @@ export default function AdminAgronomistsPage() {
       {a.name}
     </Link>,
     a.email,
-    plans?.find((p) => p.id === a.plan_id)?.name ?? a.plan_id,
+    <StatusBadge key={`pl-${a.user_id}`} tone="primary">
+      {plans?.find((p) => p.id === a.plan_id)?.name ?? a.plan_id}
+    </StatusBadge>,
     new Date(a.plan_started_at).toLocaleDateString("pt-BR"),
     String(a.active_plots_count),
     <div key={`act-${a.user_id}`} className="flex flex-wrap justify-end gap-2">
@@ -212,7 +215,9 @@ export default function AdminAgronomistsPage() {
       {a.name}
     </Link>,
     a.email,
-    plans?.find((p) => p.id === a.plan_id)?.name ?? a.plan_id,
+    <StatusBadge key={`pl-${a.user_id}`} tone="neutral">
+      {plans?.find((p) => p.id === a.plan_id)?.name ?? a.plan_id}
+    </StatusBadge>,
     new Date(a.plan_started_at).toLocaleDateString("pt-BR"),
     String(a.active_plots_count),
     <div key={`ina-${a.user_id}`} className="flex flex-wrap justify-end gap-2">
@@ -257,7 +262,8 @@ export default function AdminAgronomistsPage() {
           {tab === "active" && (
             <Sheet open={createOpen} onOpenChange={setCreateOpen}>
               <SheetTrigger asChild>
-                <Button type="button" className="shrink-0">
+                <Button type="button" variant="clay" className="shrink-0">
+                  <Plus className="h-4 w-4" />
                   Novo agrônomo
                 </Button>
               </SheetTrigger>

@@ -405,7 +405,7 @@ export default function CatalogPage() {
         action={
           <Sheet open={openCreate} onOpenChange={setOpenCreate}>
             <SheetTrigger asChild>
-              <Button type="button">
+              <Button type="button" variant="clay">
                 <Plus className="h-4 w-4" />
                 Novo produto
               </Button>
@@ -488,7 +488,7 @@ export default function CatalogPage() {
         />
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1 sm:min-w-[12rem] sm:max-w-xs">
           <label className="mb-1 block text-xs font-medium text-foreground">
             Nome

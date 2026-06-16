@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   ArrowRight,
-  ChevronDown,
   Clock,
   Leaf,
   Plus,
@@ -49,15 +48,15 @@ const createSchema = z.object({
 
 type CreateFormValues = z.infer<typeof createSchema>;
 
-type ProducerTimingTemplatesSectionProps = {
+type ProducerTimingTemplatesPanelProps = {
   producerId: string;
   producerName: string;
 };
 
-export function ProducerTimingTemplatesSection({
+export function ProducerTimingTemplatesPanel({
   producerId,
   producerName,
-}: ProducerTimingTemplatesSectionProps) {
+}: ProducerTimingTemplatesPanelProps) {
   const router = useRouter();
   const { data: templates, isLoading } = useTimingTemplates(producerId);
   const { data: archived, isLoading: isLoadingArchived } =
@@ -95,34 +94,12 @@ export function ProducerTimingTemplatesSection({
   const baseHref = `/producers/${producerId}/timing-templates`;
 
   return (
-    <section className="mb-8">
-      <details className="group overflow-hidden rounded-xl border border-primary/15 bg-card shadow-sm open:shadow-md">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors marker:content-none hover:bg-primary/3 group-open:border-b group-open:bg-primary/4 [&::-webkit-details-marker]:hidden sm:px-6 sm:py-5">
-          <div className="flex min-w-0 items-center gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/10">
-              <Clock className="h-6 w-6" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-                Planejamento
-              </p>
-              <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                Modelos de Recomendação
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Modelos reutilizáveis de {producerName} — dessecação, fungicidas e janelas
-              </p>
-            </div>
-          </div>
-          <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted-foreground">
-            <span className="group-open:hidden">Expandir</span>
-            <span className="hidden group-open:inline">Recolher</span>
-            <ChevronDown className="h-5 w-5 transition-transform duration-200 group-open:rotate-180" />
-          </span>
-        </summary>
+    <>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Modelos reutilizáveis de {producerName} — dessecação, fungicidas e janelas
+      </p>
 
-        <div className="border-t border-primary/10 px-4 pb-5 pt-4 sm:px-6">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <SegmentedTabs
               value={tab}
               onValueChange={setTab}
@@ -228,9 +205,6 @@ export function ProducerTimingTemplatesSection({
               ))}
             </div>
           )}
-        </div>
-      </details>
-
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
           <SheetHeader className="border-b px-4 py-4 pr-12">
@@ -339,6 +313,11 @@ export function ProducerTimingTemplatesSection({
           );
         }}
       />
-    </section>
+    </>
   );
+}
+
+/** @deprecated Use ProducerTimingTemplatesPanel inside a modal. */
+export function ProducerTimingTemplatesSection(props: ProducerTimingTemplatesPanelProps) {
+  return <ProducerTimingTemplatesPanel {...props} />;
 }

@@ -52,8 +52,8 @@ export default function AdminHomePage() {
         <Link href="/admin/agronomists" className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Agrônomos</CardTitle>
-              <span className="text-2xl font-bold tabular-nums text-[var(--brand)]">
+              <CardTitle className="text-base">Agrônomos</CardTitle>
+              <span className="font-display text-3xl font-semibold tabular-nums text-text-strong">
                 {counts.agronomists}
               </span>
             </CardHeader>
@@ -67,8 +67,8 @@ export default function AdminHomePage() {
         <Link href="/admin/producers" className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Produtores</CardTitle>
-              <span className="text-2xl font-bold tabular-nums text-[var(--brand)]">
+              <CardTitle className="text-base">Produtores</CardTitle>
+              <span className="font-display text-3xl font-semibold tabular-nums text-text-strong">
                 {counts.producers}
               </span>
             </CardHeader>
@@ -82,8 +82,8 @@ export default function AdminHomePage() {
         <Link href="/admin/plans" className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Planos</CardTitle>
-              <span className="text-2xl font-bold tabular-nums text-[var(--brand)]">
+              <CardTitle className="text-base">Planos</CardTitle>
+              <span className="font-display text-3xl font-semibold tabular-nums text-text-strong">
                 {counts.plans}
               </span>
             </CardHeader>
@@ -95,8 +95,8 @@ export default function AdminHomePage() {
         <Link href="/admin/global-catalog" className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-medium">Produtos</CardTitle>
-              <span className="text-2xl font-bold tabular-nums text-[var(--brand)]">
+              <CardTitle className="text-base">Produtos</CardTitle>
+              <span className="font-display text-3xl font-semibold tabular-nums text-text-strong">
                 {counts.catalogProducts}
               </span>
             </CardHeader>

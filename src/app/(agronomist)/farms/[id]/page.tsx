@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { PageHeader } from "@/components/domain/page-header";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { StatCard } from "@/components/domain/stat-card";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { DataTable } from "@/components/ui/data-table";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,8 +40,11 @@ import {
   useRevokeFarmAccess,
   useUpdateFarm,
   useArchiveSeason,
+  queryKeys,
 } from "@/lib/api/hooks";
+import { getTimeline, type Recommendation } from "@/lib/api/seasons";
 import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
+import { FarmPurchaseListSummaryPanel } from "@/components/domain/farm-purchase-list-summary-panel";
 import type { PurchaseListDetail } from "@/lib/api/client";
 import { activeAgronomistProducerAccounts } from "@/lib/api/client";
 import { toast } from "sonner";
@@ -61,8 +65,8 @@ import {
   Leaf,
   ShoppingCart,
   CalendarDays,
+  Calculator,
 } from "lucide-react";
-
 
 const SEASON_PRIORITY: Record<string, number> = {
   IN_PROGRESS: 0,
@@ -91,6 +95,25 @@ type FarmViewTab = "seasons" | "purchase" | "plots";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+
+const fmtHa = (n: number) =>
+  n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+
+function seasonProgressFromTimeline(rows: Recommendation[] | undefined): {
+  done: number;
+  total: number;
+  pct: number;
+} | null {
+  if (!rows?.length) return null;
+  const done = rows.filter(
+    (rec) => rec.status === "APPLIED_ON_TIME" || rec.status === "APPLIED_LATE",
+  ).length;
+  return {
+    done,
+    total: rows.length,
+    pct: Math.round((done / rows.length) * 100),
+  };
+}
 
 function parseFarmViewTab(value: string | null): FarmViewTab {
   if (value === "purchase" || value === "plots" || value === "seasons") return value;
@@ -134,8 +157,6 @@ export default function FarmDetailPage() {
   const [revokeAccessConfirm, setRevokeAccessConfirm] = useState<
     { producerId: string; name: string } | null
   >(null);
-  const farmView = tabFromUrl;
-
   const setFarmViewWithUrl = useCallback(
     (tab: FarmViewTab) => {
       const next = new URLSearchParams(searchParams.toString());
@@ -230,6 +251,7 @@ export default function FarmDetailPage() {
   );
 
   const [selectedListId, setSelectedListId] = useState<string>("");
+  const [plotsPanelOpen, setPlotsPanelOpen] = useState(false);
 
   const effectiveSelectedListId = useMemo(() => {
     if (sortedPurchaseLists.length === 0) return "";
@@ -289,11 +311,6 @@ export default function FarmDetailPage() {
     });
   }, [seasons]);
 
-  const primaryActiveSeason = useMemo(() => {
-    const active = sortedSeasons.filter((s) => ACTIVE_SEASON_STATUSES.has(s.status));
-    return active[0] ?? null;
-  }, [sortedSeasons]);
-
   const totalHectares = useMemo(
     () =>
       (plots ?? []).reduce(
@@ -307,6 +324,61 @@ export default function FarmDetailPage() {
     () => (seasons ?? []).filter((s) => ACTIVE_SEASON_STATUSES.has(s.status)).length,
     [seasons],
   );
+
+  const purchaseListBySeasonId = useMemo(() => {
+    const map = new Map<string, PurchaseListDetail>();
+    for (const list of farmPurchaseListsResolved) {
+      if (list.season_id) map.set(list.season_id, list);
+    }
+    return map;
+  }, [farmPurchaseListsResolved]);
+
+  const openPlotsPanel = useCallback(() => {
+    setPlotsPanelOpen(true);
+    setFarmViewWithUrl("plots");
+  }, [setFarmViewWithUrl]);
+
+  const openPurchaseView = useCallback(
+    (listId?: string) => {
+      if (listId) setSelectedListId(listId);
+      setFarmViewWithUrl("purchase");
+    },
+    [setFarmViewWithUrl],
+  );
+
+  const openPurchaseForSeason = useCallback(
+    (seasonId: string) => {
+      const list = purchaseListBySeasonId.get(seasonId);
+      openPurchaseView(list?.id);
+    },
+    [purchaseListBySeasonId, openPurchaseView],
+  );
+
+  const summaryCostPlanHref = useMemo(() => {
+    const seasonId =
+      selectedList?.season_id ??
+      sortedSeasons.find((season) => ACTIVE_SEASON_STATUSES.has(season.status))?.id;
+    if (!seasonId) return null;
+    return resolvedProducerId
+      ? `/seasons/${seasonId}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(resolvedProducerId)}`
+      : `/seasons/${seasonId}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}`;
+  }, [selectedList?.season_id, sortedSeasons, farmId, resolvedProducerId]);
+
+  const handlePlotsPanelChange = useCallback(
+    (open: boolean) => {
+      setPlotsPanelOpen(open);
+      if (!open && tabFromUrl === "plots") {
+        const next = new URLSearchParams(searchParams.toString());
+        next.set("tab", "seasons");
+        router.replace(`?${next.toString()}`, { scroll: false });
+      }
+    },
+    [router, searchParams, tabFromUrl],
+  );
+
+  useEffect(() => {
+    if (tabFromUrl === "plots") setPlotsPanelOpen(true);
+  }, [tabFromUrl]);
 
   const breadcrumbs = [
     { label: "Produtores", href: "/producers" },
@@ -328,231 +400,132 @@ export default function FarmDetailPage() {
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <PageHeader
-        title={farm?.name ?? "Detalhes da fazenda"}
-        description={farm?.location ?? "Sem localização cadastrada"}
-        action={
-          <Sheet open={editOpen} onOpenChange={setEditOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Pencil className="h-4 w-4" />
-                Editar
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="sm:max-w-md">
-              <SheetHeader>
-                <SheetTitle>Editar fazenda</SheetTitle>
-              </SheetHeader>
-              <form onSubmit={onUpdateFarm} className="mt-4 space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-foreground">
-                    Nome
-                  </label>
-                  <Input
-                    {...farmForm.register("name")}
-                    placeholder="Nome da fazenda"
-                  />
-                  {farmForm.formState.errors.name && (
-                    <p className="mt-1 text-xs text-destructive">
-                      {farmForm.formState.errors.name.message}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-foreground">
-                    Endereço
-                  </label>
-                  <Input
-                    {...farmForm.register("location")}
-                    placeholder="Ex: Município, Estado"
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    type="submit"
-                    disabled={updateFarm.isPending}
-                    className="flex-1"
-                  >
-                    {updateFarm.isPending ? "Salvando..." : "Salvar"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </form>
-            </SheetContent>
-          </Sheet>
-        }
-      />
-
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Talhões"
-          value={plots?.length ?? 0}
-          icon={<MapPin className="h-4 w-4" />}
-          accent="primary"
-        />
-        <StatCard
-          label="Área total"
-          value={`${totalHectares.toFixed(2)} ha`}
-          icon={<Sprout className="h-4 w-4" />}
-          accent="sun"
-        />
-        <StatCard
-          label="Safras ativas"
-          value={activeSeasonsCount}
-          icon={<Leaf className="h-4 w-4" />}
-          accent="sky"
-        />
-      </div>
-
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Card
-          role="button"
-          tabIndex={0}
-          onClick={() => setFarmViewWithUrl("seasons")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setFarmViewWithUrl("seasons");
-            }
-          }}
-          className={cn(
-            "cursor-pointer border-primary/20 bg-linear-to-br from-primary/5 to-card transition-shadow hover:shadow-md",
-            farmView === "seasons" && "ring-2 ring-primary",
-          )}
-        >
-          <CardContent className="flex flex-col gap-3 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <CalendarDays className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Safra
-                </p>
-                {primaryActiveSeason ? (
-                  <>
-                    <p className="mt-0.5 font-semibold text-foreground">
-                      {CROP_LABELS[primaryActiveSeason.crop] ?? primaryActiveSeason.crop}
-                      {primaryActiveSeason.variety ? ` · ${primaryActiveSeason.variety}` : ""}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {primaryActiveSeason.plot_name} · {activeSeasonsCount}{" "}
-                      {activeSeasonsCount === 1 ? "safra ativa" : "safras ativas"}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    Nenhuma safra ativa nesta fazenda.
+      <section className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold text-text-strong">
+            {farm?.name ?? "Detalhes da fazenda"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {[
+              farm?.location?.trim(),
+              `${plots?.length ?? 0} ${(plots?.length ?? 0) === 1 ? "talhão" : "talhões"}`,
+              `${fmtHa(totalHectares)} ha`,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Sem localização cadastrada"}
+          </p>
+        </div>
+        <Sheet open={editOpen} onOpenChange={setEditOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Pencil className="h-4 w-4" />
+              Editar
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>Editar fazenda</SheetTitle>
+            </SheetHeader>
+            <form onSubmit={onUpdateFarm} className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Nome
+                </label>
+                <Input
+                  {...farmForm.register("name")}
+                  placeholder="Nome da fazenda"
+                />
+                {farmForm.formState.errors.name && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {farmForm.formState.errors.name.message}
                   </p>
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          role="button"
-          tabIndex={0}
-          onClick={() => setFarmViewWithUrl("purchase")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setFarmViewWithUrl("purchase");
-            }
-          }}
-          className={cn(
-            "cursor-pointer border-sky-500/20 bg-linear-to-br from-sky-500/5 to-card transition-shadow hover:shadow-md",
-            farmView === "purchase" && "ring-2 ring-sky-500",
-          )}
-        >
-          <CardContent className="flex flex-col gap-3 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
-                <ShoppingCart className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Lista de compra
-                </p>
-                {selectedList ? (
-                  <>
-                    <p className="mt-0.5 font-semibold text-foreground">{selectedList.name}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {CROP_LABELS[selectedList.crop] ?? selectedList.crop}
-                      {selectedList.variety ? ` · ${selectedList.variety}` : ""}
-                      {" · "}
-                      {(selectedList.items ?? []).length}{" "}
-                      {(selectedList.items ?? []).length === 1 ? "item" : "itens"}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    Nenhuma lista cadastrada para esta fazenda.
-                  </p>
-                )}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Endereço
+                </label>
+                <Input
+                  {...farmForm.register("location")}
+                  placeholder="Ex: Município, Estado"
+                />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          role="button"
-          tabIndex={0}
-          onClick={() => setFarmViewWithUrl("plots")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setFarmViewWithUrl("plots");
-            }
-          }}
-          className={cn(
-            "cursor-pointer border-emerald-500/20 bg-linear-to-br from-emerald-500/5 to-card transition-shadow hover:shadow-md",
-            farmView === "plots" && "ring-2 ring-emerald-500",
-          )}
-        >
-          <CardContent className="flex flex-col gap-3 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                <MapPin className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Talhões
-                </p>
-                {sortedPlots.length > 0 ? (
-                  <>
-                    <p className="mt-0.5 font-semibold text-foreground">
-                      {sortedPlots.length}{" "}
-                      {sortedPlots.length === 1 ? "talhão" : "talhões"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {totalHectares.toFixed(2)} ha ·{" "}
-                      {sortedPlots
-                        .slice(0, 2)
-                        .map((plot) => plot.name)
-                        .join(", ")}
-                      {sortedPlots.length > 2 ? "…" : ""}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    Nenhum talhão cadastrado nesta fazenda.
-                  </p>
-                )}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="submit"
+                  disabled={updateFarm.isPending}
+                  className="flex-1"
+                >
+                  {updateFarm.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditOpen(false)}
+                >
+                  Cancelar
+                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </form>
+          </SheetContent>
+        </Sheet>
+      </section>
 
-      <div className="grid gap-6">
-        {farmView === "seasons" ? (
+      {tabFromUrl !== "purchase" ? (
+        <KpiStrip className="mb-8">
+          <KpiCell
+            label="Talhões"
+            value={plots?.length ?? 0}
+            icon={<MapPin className="size-4" />}
+            onClick={openPlotsPanel}
+          />
+          <KpiCell
+            label="Área total"
+            value={`${fmtHa(totalHectares)} ha`}
+            icon={<Sprout className="size-4" />}
+          />
+          <KpiCell
+            label="Safras ativas"
+            value={activeSeasonsCount}
+            icon={<Leaf className="size-4" />}
+          />
+          <KpiCell
+            label={selectedList?.name ?? "Lista de compra"}
+            value={selectedList ? (selectedList.items ?? []).length : 0}
+            sub="produtos"
+            icon={<ShoppingCart className="size-4" />}
+            onClick={() => openPurchaseView()}
+          />
+        </KpiStrip>
+      ) : null}
+
+      {tabFromUrl === "purchase" ? (
+        <section>
+          <div className="mb-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground"
+              onClick={() => setFarmViewWithUrl("seasons")}
+            >
+              ← Voltar às safras
+            </Button>
+          </div>
+          <FarmPurchaseListTab
+            farmId={farmId}
+            list={selectedList}
+            purchaseLists={sortedPurchaseLists}
+            selectedListId={effectiveSelectedListId}
+            onSelectList={setSelectedListId}
+            isLoading={loadingPurchaseLists}
+            producerId={resolvedProducerId}
+            newPurchaseListHref={newPurchaseListHref}
+            fallbackSeasonIds={activeSeasonIds}
+          />
+        </section>
+      ) : (
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
           <section>
             <FarmSeasonsTab
               seasons={sortedSeasons}
@@ -560,180 +533,175 @@ export default function FarmDetailPage() {
               farmId={farmId}
               producerId={resolvedProducerId}
               newSeasonHref={newSeasonHref}
+              onOpenPurchaseList={openPurchaseForSeason}
             />
           </section>
-        ) : null}
 
-        {farmView === "plots" ? (
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              Talhões
-            </h2>
-            <Sheet open={plotSheetOpen} onOpenChange={setPlotSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  <Plus className="h-4 w-4" />
-                  Adicionar talhão
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="sm:max-w-md">
-                <SheetHeader>
-                  <SheetTitle>Novo talhão</SheetTitle>
-                </SheetHeader>
-                <form onSubmit={onAddPlot} className="mt-4 space-y-4">
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-foreground">
-                      Nome
-                    </label>
-                    <Input
-                      {...plotForm.register("name")}
-                      placeholder="Ex: Talhão 1"
-                    />
-                    {plotForm.formState.errors.name && (
-                      <p className="mt-1 text-xs text-destructive">
-                        {plotForm.formState.errors.name.message}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-foreground">
-                      Área (hectares)
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...plotForm.register("area_hectares", {
-                        valueAsNumber: true,
-                      })}
-                      placeholder="0.00"
-                    />
-                    {plotForm.formState.errors.area_hectares && (
-                      <p className="mt-1 text-xs text-destructive">
-                        {plotForm.formState.errors.area_hectares.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      type="submit"
-                      disabled={createPlot.isPending}
-                      className="flex-1"
-                    >
-                      {createPlot.isPending ? "Adicionando..." : "Adicionar"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setPlotSheetOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </form>
-              </SheetContent>
-            </Sheet>
-          </div>
-
-          {loadingPlots ? (
-            <ListCardsSkeleton count={4} />
-          ) : sortedPlots.length === 0 ? (
-            <EmptyState
-              icon={MapPin}
-              title="Nenhum talhão cadastrado"
-              description="Cadastre talhões para começar a planejar safras."
-              action={
-                <Button size="sm" className="gap-1.5" onClick={() => setPlotSheetOpen(true)}>
-                  <Plus className="h-4 w-4" />
-                  Adicionar primeiro talhão
-                </Button>
-              }
-            />
-          ) : (
-            <div className="max-h-[calc(100vh-280px)] space-y-3 overflow-y-auto pr-1">
-              {sortedPlots.map((plot) => {
-                const plotHref = producerId
-                  ? `/farms/${farmId}/plots/${plot.id}?producer_id=${encodeURIComponent(producerId)}`
-                  : `/farms/${farmId}/plots/${plot.id}`;
-
-                const season = seasonByPlot.get(plot.id);
-                return (
-                  <Card key={plot.id} className="overflow-hidden">
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <MapPin className="h-5 w-5" />
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold text-foreground">
-                          {plot.name}
-                        </h3>
-                        {season ? (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                            <Sprout className="h-3 w-3" />
-                            {CROP_LABELS[season.crop] ?? season.crop}
-                            {season.variety ? ` · ${season.variety}` : ""}
-                          </span>
-                        ) : (
-                          <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                            sem safra
-                          </span>
-                        )}
-                        <span className="ml-auto shrink-0 text-sm font-medium tabular-nums text-muted-foreground">
-                          {Number(plot.area_hectares).toFixed(2)} ha
-                        </span>
-                      </div>
-                      <Button
-                        asChild
-                        variant="ghost"
-                        size="sm"
-                        title="Ver detalhes do talhão"
-                        className="gap-1.5 text-muted-foreground hover:text-primary"
-                      >
-                        <Link href={plotHref} aria-label={`Ver talhão ${plot.name}`}>
-                          <Eye className="h-4 w-4" />
-                          <span className="hidden sm:inline">Ver</span>
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="Remover talhão"
-                        className="gap-1.5 text-muted-foreground hover:text-destructive"
-                        disabled={deletePlot.isPending}
-                        onClick={() =>
-                          setDeletePlotConfirm({ id: plot.id, name: plot.name })
-                        }
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="hidden sm:inline">Remover</span>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-
-        </section>
-        ) : null}
-
-        {farmView === "purchase" ? (
-          <section>
-            <FarmPurchaseListTab
-              farmId={farmId}
+          <aside className="min-w-0 xl:sticky xl:top-24">
+            <FarmPurchaseListSummaryPanel
               list={selectedList}
-              purchaseLists={sortedPurchaseLists}
-              selectedListId={effectiveSelectedListId}
-              onSelectList={setSelectedListId}
               isLoading={loadingPurchaseLists}
-              producerId={resolvedProducerId}
-              newPurchaseListHref={newPurchaseListHref}
-              fallbackSeasonIds={activeSeasonIds}
+              producerName={producer?.name}
+              onOpenFull={() => openPurchaseView()}
+              costPlanHref={summaryCostPlanHref}
             />
-          </section>
-        ) : null}
+          </aside>
+        </div>
+      )}
 
-      </div>
+      <Sheet open={plotsPanelOpen} onOpenChange={handlePlotsPanelChange}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Talhões</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <div className="mb-4 flex items-center justify-end">
+              <Sheet open={plotSheetOpen} onOpenChange={setPlotSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <Plus className="h-4 w-4" />
+                    Adicionar talhão
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle>Novo talhão</SheetTitle>
+                  </SheetHeader>
+                  <form onSubmit={onAddPlot} className="mt-4 space-y-4">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-foreground">
+                        Nome
+                      </label>
+                      <Input
+                        {...plotForm.register("name")}
+                        placeholder="Ex: Talhão 1"
+                      />
+                      {plotForm.formState.errors.name && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {plotForm.formState.errors.name.message}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-foreground">
+                        Área (hectares)
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...plotForm.register("area_hectares", {
+                          valueAsNumber: true,
+                        })}
+                        placeholder="0.00"
+                      />
+                      {plotForm.formState.errors.area_hectares && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {plotForm.formState.errors.area_hectares.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        type="submit"
+                        disabled={createPlot.isPending}
+                        className="flex-1"
+                      >
+                        {createPlot.isPending ? "Adicionando..." : "Adicionar"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPlotSheetOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </form>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            {loadingPlots ? (
+              <ListCardsSkeleton count={4} />
+            ) : sortedPlots.length === 0 ? (
+              <EmptyState
+                icon={MapPin}
+                title="Nenhum talhão cadastrado"
+                description="Cadastre talhões para começar a planejar safras."
+                action={
+                  <Button size="sm" className="gap-1.5" onClick={() => setPlotSheetOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Adicionar primeiro talhão
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="space-y-3">
+                {sortedPlots.map((plot) => {
+                  const plotHref = producerId
+                    ? `/farms/${farmId}/plots/${plot.id}?producer_id=${encodeURIComponent(producerId)}`
+                    : `/farms/${farmId}/plots/${plot.id}`;
+
+                  const season = seasonByPlot.get(plot.id);
+                  return (
+                    <Card key={plot.id} className="overflow-hidden">
+                      <CardContent className="flex items-center gap-3 p-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <MapPin className="h-5 w-5" />
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                          <h3 className="truncate text-base font-semibold text-foreground">
+                            {plot.name}
+                          </h3>
+                          {season ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-strong">
+                              <Sprout className="h-3 w-3" />
+                              {CROP_LABELS[season.crop] ?? season.crop}
+                              {season.variety ? ` · ${season.variety}` : ""}
+                            </span>
+                          ) : (
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                              sem safra
+                            </span>
+                          )}
+                          <span className="ml-auto shrink-0 text-sm font-medium tabular-nums text-muted-foreground">
+                            {Number(plot.area_hectares).toFixed(2)} ha
+                          </span>
+                        </div>
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="sm"
+                          title="Ver detalhes do talhão"
+                          className="gap-1.5 text-muted-foreground hover:text-primary"
+                        >
+                          <Link href={plotHref} aria-label={`Ver talhão ${plot.name}`}>
+                            <Eye className="h-4 w-4" />
+                            <span className="hidden sm:inline">Ver</span>
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Remover talhão"
+                          className="gap-1.5 text-muted-foreground hover:text-destructive"
+                          disabled={deletePlot.isPending}
+                          onClick={() =>
+                            setDeletePlotConfirm({ id: plot.id, name: plot.name })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="hidden sm:inline">Remover</span>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmDialog
         open={!!deletePlotConfirm}
@@ -796,6 +764,7 @@ function FarmSeasonsTab({
   farmId,
   producerId,
   newSeasonHref,
+  onOpenPurchaseList,
 }: {
   seasons: Array<{
     id: string;
@@ -808,6 +777,7 @@ function FarmSeasonsTab({
   farmId: string;
   producerId: string | null;
   newSeasonHref: string;
+  onOpenPurchaseList: (seasonId: string) => void;
 }) {
   const archiveMutation = useArchiveSeason();
   const [archiveConfirm, setArchiveConfirm] = useState<{
@@ -815,9 +785,37 @@ function FarmSeasonsTab({
     name: string;
   } | null>(null);
 
+  const displaySeasons = useMemo(
+    () => seasons.filter((season) => season.status !== "ARCHIVED"),
+    [seasons],
+  );
+
+  const timelineQueries = useQueries({
+    queries: displaySeasons.map((season) => ({
+      queryKey: queryKeys.seasonTimeline(season.id),
+      queryFn: () => getTimeline(season.id),
+      staleTime: 60_000,
+    })),
+  });
+
+  const progressBySeasonId = useMemo(() => {
+    const map = new Map<string, { done: number; total: number; pct: number }>();
+    displaySeasons.forEach((season, index) => {
+      const raw = timelineQueries[index]?.data;
+      const rows = (
+        Array.isArray(raw)
+          ? raw
+          : ((raw as { data?: Recommendation[] } | undefined)?.data ?? [])
+      ) as Recommendation[];
+      const progress = seasonProgressFromTimeline(rows);
+      if (progress) map.set(season.id, progress);
+    });
+    return map;
+  }, [displaySeasons, timelineQueries]);
+
   if (isLoading) return <ListCardsSkeleton count={3} />;
 
-  if (seasons.length === 0) {
+  if (displaySeasons.length === 0) {
     return (
       <EmptyState
         title="Nenhuma safra nesta fazenda."
@@ -837,7 +835,9 @@ function FarmSeasonsTab({
     <>
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Safras</h2>
+          <h2 className="font-display text-lg font-semibold text-text-strong">
+            Safras desta fazenda
+          </h2>
           {producerId ? (
             <Button asChild size="sm" className="gap-1.5">
               <Link href={newSeasonHref}>
@@ -847,39 +847,84 @@ function FarmSeasonsTab({
             </Button>
           ) : null}
         </div>
-        <div className="space-y-3">
-          {seasons.map((season) => {
-            const href = producerId
-              ? `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
-              : `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}`;
+
+        <div className="space-y-4">
+          {displaySeasons.map((season) => {
+            const recommendationHref = producerId
+              ? `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
+              : `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}`;
+            const costPlanHref = producerId
+              ? `/seasons/${season.id}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
+              : `/seasons/${season.id}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}`;
             const displayName = `${CROP_LABELS[season.crop] ?? season.crop}${
               season.variety ? ` — ${season.variety}` : ""
             }`;
+            const progress = progressBySeasonId.get(season.id);
+
             return (
-              <Card key={season.id}>
-                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{season.plot_name}</p>
-                    <p className="font-semibold text-foreground">{displayName}</p>
-                    <Badge
-                      className="mt-2"
-                      variant={STATUS_VARIANTS[season.status] ?? "default"}
-                    >
-                      {STATUS_LABELS[season.status] ?? season.status}
-                    </Badge>
+              <Card key={season.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex items-start gap-3 px-4 py-4">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
+                      <Leaf className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="font-semibold text-foreground">{displayName}</p>
+                        <Badge
+                          className="shrink-0"
+                          variant={STATUS_VARIANTS[season.status] ?? "default"}
+                        >
+                          {STATUS_LABELS[season.status] ?? season.status}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        Talhão {season.plot_name}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+
+                  {progress ? (
+                    <div className="border-t border-border bg-rail px-4 py-3">
+                      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                        <span className="text-muted-foreground">
+                          {progress.done}/{progress.total} aplicadas
+                        </span>
+                        <span className="font-semibold tabular-nums text-primary-strong">
+                          {progress.pct}%
+                        </span>
+                      </div>
+                      <ProgressBar value={progress.pct} />
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
                     <Button asChild variant="outline" size="sm" className="gap-1.5">
-                      <Link href={href}>
-                        <Eye className="h-4 w-4" />
-                        Ver cronograma
+                      <Link href={recommendationHref}>
+                        <CalendarDays className="size-3.5" />
+                        Ver Recomendação
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => onOpenPurchaseList(season.id)}
+                    >
+                      <ShoppingCart className="size-3.5" />
+                      Lista de compra
+                    </Button>
+                    <Button asChild variant="outline" size="sm" className="gap-1.5">
+                      <Link href={costPlanHref}>
+                        <Calculator className="size-3.5" />
+                        Plano de custo
                       </Link>
                     </Button>
                     {season.status !== "ARCHIVED" ? (
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className={cn(deactivateOutlineButtonClass)}
+                        className={cn("ml-auto text-muted-foreground", deactivateOutlineButtonClass)}
                         onClick={() =>
                           setArchiveConfirm({ id: season.id, name: displayName })
                         }
@@ -955,8 +1000,8 @@ function ActiveSeasonsRecommendationFallback({
       <div className="space-y-3">
         {activeSeasons.map((season) => {
           const href = producerId
-            ? `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
-            : `/seasons/${season.id}?farm_id=${encodeURIComponent(farmId)}`;
+            ? `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
+            : `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}`;
           return (
             <Card key={season.id}>
               <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -976,7 +1021,7 @@ function ActiveSeasonsRecommendationFallback({
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={href}>
                     <Eye className="h-4 w-4" />
-                    Ver recomendação
+                    Ver Recomendação
                   </Link>
                 </Button>
               </CardContent>
@@ -1073,7 +1118,7 @@ function FarmRecommendationTab({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Datas por talhão</h2>
+        <h2 className="font-display text-lg font-semibold text-text-strong">Datas por talhão</h2>
         <div className="mt-3 flex flex-col gap-3">
           {plotRows.map((plot) => (
             <Card key={plot.id}>
@@ -1116,7 +1161,7 @@ function FarmRecommendationTab({
 
       {listItems.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Produtos por etapa</h2>
+          <h2 className="font-display text-lg font-semibold text-text-strong">Produtos por etapa</h2>
           <div className="mt-3 flex flex-col gap-4">
             {Array.from(itemsByStage.entries()).map(([stage, stageItems]) => (
               <Card key={stage}>

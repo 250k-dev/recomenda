@@ -73,6 +73,7 @@ export function RecommendationStageFields({
         recommendedDate={draft.recommended_date}
         onRecommendedDateChange={(recommended_date) => onChange({ recommended_date })}
         readOnly={readOnly}
+        mode="date"
       />
       <div className="space-y-1.5 sm:col-span-2">
         <Field label="Observações">

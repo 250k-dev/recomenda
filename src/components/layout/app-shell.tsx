@@ -15,7 +15,7 @@ export function AppShell({
   return (
     <SidebarProvider>
       <AppSidebar role={role} />
-      <div className="relative flex min-h-svh flex-1 flex-col min-w-0 bg-muted">
+      <div className="relative flex min-h-svh flex-1 flex-col min-w-0 bg-canvas">
         <MobileTopbar />
         <ImpersonationBanner />
         <main className="flex-1 px-4 py-6 md:px-8">

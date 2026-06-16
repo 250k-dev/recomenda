@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { Eye, Leaf, MapPin, Pencil, Plus, Sprout, Store, X, Check, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Eye, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
-import { StatCard } from "@/components/domain/stat-card";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import {
 import type { ListItem } from "@/components/domain/season/_shared";
 import type { PurchaseListDetail, PurchaseListItemInput } from "@/lib/api/client";
 import { CROP_LABELS } from "@/lib/season-constants";
-import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -99,6 +98,8 @@ export type FarmPurchaseListTabProps = {
   producerId: string | null;
   newPurchaseListHref: string;
   fallbackSeasonIds: string[];
+  /** Hide edit affordances (used by the standalone read-only list page). */
+  readOnly?: boolean;
 };
 
 export function FarmPurchaseListTab({
@@ -111,11 +112,25 @@ export function FarmPurchaseListTab({
   producerId,
   newPurchaseListHref,
   fallbackSeasonIds,
+  readOnly = false,
 }: FarmPurchaseListTabProps) {
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  const quotesSectionRef = useRef<HTMLDivElement>(null);
+
+  const toggleQuotesComparison = useCallback(() => {
+    setShowComparison((prev) => {
+      const next = !prev;
+      if (next) {
+        requestAnimationFrame(() => {
+          quotesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+      return next;
+    });
+  }, []);
 
   const updateMutation = useUpdatePurchaseList(list?.id ?? "", { farmId });
 
@@ -128,10 +143,15 @@ export function FarmPurchaseListTab({
   }, [list]);
 
   useEffect(() => {
-    setEditing(false);
     setError(null);
-    setDraftItems([]);
     setShowComparison(false);
+    if (list) {
+      setDraftItems((list.items ?? []).map(detailItemToListItem));
+      setEditing(false);
+    } else {
+      setDraftItems([]);
+      setEditing(false);
+    }
   }, [list?.id]);
 
   const startEditing = () => {
@@ -143,8 +163,8 @@ export function FarmPurchaseListTab({
 
   const cancelEditing = () => {
     setError(null);
-    setEditing(false);
     resetDraft();
+    setEditing(false);
   };
 
   const saveItems = async () => {
@@ -174,6 +194,10 @@ export function FarmPurchaseListTab({
   };
 
   const savedItems = useMemo(() => list?.items ?? [], [list?.items]);
+  const viewItems = useMemo(
+    () => (list?.items ?? []).map(detailItemToListItem),
+    [list?.items],
+  );
   const totalHa = list?.total_hectares ?? 0;
 
   const kpis = useMemo(() => {
@@ -192,17 +216,6 @@ export function FarmPurchaseListTab({
     };
   }, [editing, draftItems, savedItems, totalHa]);
 
-  const grouped = useMemo(
-    () =>
-      [...new Set(savedItems.map((it) => it.category || "OTHER"))]
-        .sort()
-        .map((cat) => ({
-          category: cat,
-          items: savedItems.filter((it) => (it.category || "OTHER") === cat),
-        })),
-    [savedItems],
-  );
-
   if (!producerId) {
     return (
       <EmptyState
@@ -219,14 +232,14 @@ export function FarmPurchaseListTab({
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-clay-soft text-clay-strong">
               <Leaf className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
                 Lista de compra
               </p>
-              <h2 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">
+              <h2 className="mt-0.5 font-display text-xl font-semibold tracking-[-0.02em] text-text-strong">
                 Nenhuma lista cadastrada
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -254,7 +267,7 @@ export function FarmPurchaseListTab({
     );
   }
 
-  const displayItems = editing ? draftItems : savedItems;
+  const hasItems = (list.items ?? []).length > 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -276,14 +289,14 @@ export function FarmPurchaseListTab({
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
             <Leaf className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
               Lista de compra · {list.name}
             </p>
-            <h2 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">
+            <h2 className="mt-0.5 font-display text-xl font-semibold tracking-[-0.02em] text-text-strong">
               {CROP_LABELS[list.crop] ?? list.crop}
               {list.variety ? ` · ${list.variety}` : ""}
             </h2>
@@ -321,16 +334,18 @@ export function FarmPurchaseListTab({
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
-                <Pencil className="h-4 w-4" />
-                Editar lista
-              </Button>
+              {!readOnly ? (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
+                  <Pencil className="h-4 w-4" />
+                  Editar lista
+                </Button>
+              ) : null}
               <ShareQuoteSheet listId={list.id} listName={list.name} />
               <Button
-                variant={showComparison ? "default" : "outline"}
+                variant={showComparison ? "clay" : "outline"}
                 size="sm"
                 className="gap-1.5"
-                onClick={() => setShowComparison((v) => !v)}
+                onClick={toggleQuotesComparison}
               >
                 <Store className="h-4 w-4" />
                 Cotações das lojas
@@ -348,50 +363,46 @@ export function FarmPurchaseListTab({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+      <KpiStrip>
+        <KpiCell
           label="Valor total a gastar"
           value={kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—"}
           sub={kpis.totalValue > 0 ? "soma dos itens com preço" : "informe preços para calcular"}
-          accent="primary"
-          icon={<Leaf className="h-4 w-4" />}
+          icon={<Leaf className="size-4" />}
         />
-        <StatCard
+        <KpiCell
           label="Produtos"
           value={String(kpis.productsCount)}
-          sub={
-            editing
-              ? "em edição"
-              : `${kpis.categoriesCount} categorias`
-          }
-          accent="sky"
-          icon={<MapPin className="h-4 w-4" />}
+          sub={editing ? "em edição" : `${kpis.categoriesCount} categorias`}
+          icon={<Package className="size-4" />}
         />
-        <StatCard
+        <KpiCell
           label="Hectares"
           value={`${fmtQty(totalHa)} ha`}
           sub={`${(list.plots ?? []).length} talhões`}
-          accent="sun"
-          icon={<Sprout className="h-4 w-4" />}
+          icon={<Sprout className="size-4" />}
         />
-        <StatCard
+        <KpiCell
           label="Itens com preço"
           value={`${kpis.pricedCount}/${kpis.productsCount || 0}`}
           sub="cobertura de preços"
-          accent="clay"
-          icon={<Pencil className="h-4 w-4" />}
+          icon={<Tag className="size-4" />}
+          alert
         />
-      </div>
+      </KpiStrip>
 
-      {editing ? (
+      {hasItems || editing ? (
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Adicione, edite ou remova produtos. As quantidades são calculadas por dose/ha ×{" "}
-            {fmtQty(totalHa)} ha × nº de aplicações.
-          </p>
+          {editing ? (
+            <p className="text-sm text-muted-foreground">
+              Adicione, edite ou remova produtos. As quantidades são calculadas por dose/ha ×{" "}
+              {fmtQty(totalHa)} ha × nº de aplicações.
+            </p>
+          ) : null}
           <PurchaseListItemsEditor
-            items={draftItems}
+            items={editing ? draftItems : viewItems}
             setItems={setDraftItems}
+            readOnly={!editing}
             totalHa={totalHa}
             crop={list.crop === "SOYBEAN" || list.crop === "CORN" ? list.crop : null}
           />
@@ -401,91 +412,25 @@ export function FarmPurchaseListTab({
             </div>
           ) : null}
         </div>
-      ) : displayItems.length === 0 ? (
+      ) : (
         <EmptyState
           title={`A lista "${list.name}" ainda não tem produtos cadastrados.`}
           action={
-            <Button size="sm" className="gap-1.5" onClick={startEditing}>
-              <Pencil className="h-4 w-4" />
-              Adicionar produtos
-            </Button>
+            !readOnly ? (
+              <Button size="sm" className="gap-1.5" onClick={startEditing}>
+                <Pencil className="h-4 w-4" />
+                Adicionar produtos
+              </Button>
+            ) : undefined
           }
         />
-      ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5">Produto</th>
-                <th className="px-2 py-2.5">Dose</th>
-                <th className="px-2 py-2.5 text-right">Necessário</th>
-                <th className="px-2 py-2.5 text-right">A comprar</th>
-                <th className="px-2 py-2.5 text-right">Preço R$/un.</th>
-                <th className="px-2 py-2.5 text-right">Valor total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grouped.map(({ category, items: groupItems }) => {
-                const subtotal = groupItems.reduce((s, it) => {
-                  const p = it.price_brl_fixed ?? 0;
-                  return s + it.quantity_to_buy * p;
-                }, 0);
-                return (
-                  <Fragment key={category}>
-                    <tr className="bg-muted/40">
-                      <td colSpan={6} className="px-3 py-1.5">
-                        <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          <span className="h-2 w-2 rounded-full bg-primary" />
-                          {PRODUCT_CATEGORY_LABELS[category as keyof typeof PRODUCT_CATEGORY_LABELS] ??
-                            category}
-                          <span className="font-normal text-muted-foreground/70">
-                            · {groupItems.length}{" "}
-                            {groupItems.length === 1 ? "insumo" : "insumos"}
-                            {subtotal > 0 ? ` · ${fmtBrl(subtotal)}` : ""}
-                          </span>
-                        </span>
-                      </td>
-                    </tr>
-                    {groupItems.map((item) => {
-                      const price = item.price_brl_fixed ?? null;
-                      const lineTotal = price != null ? item.quantity_to_buy * price : null;
-                      return (
-                        <tr key={item.id} className="border-b last:border-b-0">
-                          <td className="px-3 py-2 font-medium text-foreground">
-                            {item.product_name}
-                          </td>
-                          <td className="px-2 py-2 tabular-nums text-muted-foreground">
-                            {fmtQty(item.dose_per_hectare)} {item.dose_unit}/ha ·{" "}
-                            {item.n_applications}×
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
-                            {fmtQty(item.required_quantity)} {item.dose_unit}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums text-foreground">
-                            {fmtQty(item.quantity_to_buy)} {item.dose_unit}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
-                            {price != null ? fmtBrl(price) : "—"}
-                          </td>
-                          <td className="px-2 py-2 text-right font-semibold tabular-nums text-foreground">
-                            {lineTotal != null ? fmtBrl(lineTotal) : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
       )}
 
       {!editing && showComparison ? (
-        <div className="space-y-3">
+        <div ref={quotesSectionRef} className="scroll-mt-24 space-y-3">
           <div className="flex items-center gap-2">
-            <Store className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">
+            <Store className="h-4 w-4 text-primary-strong" />
+            <h3 className="font-display text-base font-semibold text-text-strong">
               Cotações das lojas
             </h3>
             <span className="text-xs text-muted-foreground">

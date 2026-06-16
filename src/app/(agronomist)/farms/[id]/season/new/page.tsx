@@ -85,6 +85,7 @@ export default function FarmSeasonNewPage() {
         producerId={producerId}
         producerName={producer?.name ?? "Produtor"}
         plots={plots}
+        farmId={farmId}
         farmName={farm?.name}
         onComplete={() => router.push(producerHref)}
         onViewSeason={(seasonId) =>

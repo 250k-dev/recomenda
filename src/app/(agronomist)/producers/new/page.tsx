@@ -7,7 +7,6 @@ import {
   Check,
   User,
   Building2,
-  Sprout,
   ArrowLeft,
   ArrowRight,
   Plus,
@@ -44,10 +43,10 @@ type WizPlot = {
   farmName: string;
 };
 const STEPS = [
-  { n: 1, label: "Produtor", icon: User },
-  { n: 2, label: "Fazenda", icon: Building2 },
-  { n: 3, label: "Talhão", icon: Sprout },
-];
+  { n: 1, label: "Produtor" },
+  { n: 2, label: "Fazenda" },
+  { n: 3, label: "Talhão" },
+] as const;
 
 const fmt = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -76,72 +75,107 @@ export default function OnboardingPage() {
   // }, []);
 
   return (
-    <div className="-mx-4 -my-6 flex min-h-[calc(100vh-1px)] md:-mx-8 bg-background">
-      <aside className="flex-col hidden w-64 gap-8 px-6 py-8 border-r shrink-0 bg-muted/40 lg:flex">
-        <div>
-          <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+      <div className="grid min-h-[540px] grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="hidden border-b border-border bg-surface-2 px-5 py-6 lg:block lg:border-b-0 lg:border-r">
+          <p className="font-display text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
             Onboarding
           </p>
-          <h2 className="mt-2 text-base font-semibold leading-snug tracking-tight text-foreground">
+          <h2 className="mt-1 font-display text-[17px] font-semibold leading-snug text-text-strong">
             Cadastro do produtor
           </h2>
-        </div>
-        <ol className="flex flex-col">
-          {STEPS.map((s) => {
-            const state =
-              s.n < step ? "done" : s.n === step ? "current" : "todo";
-            const Icon = s.icon;
-            return (
-              <li
-                key={s.n}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors",
-                  state === "current" && "bg-card",
-                )}
-              >
-                <span
+          <ol className="mt-5 flex flex-col gap-2">
+            {STEPS.map((s) => {
+              const state =
+                s.n < step ? "done" : s.n === step ? "current" : "todo";
+              return (
+                <li
+                  key={s.n}
                   className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                    state === "done" && "bg-primary text-primary-foreground",
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors",
                     state === "current" &&
-                      "border-2 border-primary bg-background text-primary",
-                    state === "todo" && "bg-muted text-muted-foreground",
+                      "border border-primary bg-surface shadow-sm",
                   )}
                 >
-                  {state === "done" ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <Icon className="w-4 h-4" />
-                  )}
-                </span>
-                <p
-                  className={cn(
-                    "text-sm font-medium",
-                    state === "todo" && "text-muted-foreground",
-                    state === "current" && "text-foreground",
-                    state === "done" && "text-foreground",
-                  )}
-                >
-                  {s.label}
-                </p>
-              </li>
-            );
-          })}
-        </ol>
-      </aside>
+                  <span
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold",
+                      state === "done" && "bg-primary text-primary-foreground",
+                      state === "current" && "bg-primary text-primary-foreground",
+                      state === "todo" &&
+                        "border border-border bg-surface text-muted-foreground",
+                    )}
+                  >
+                    {state === "done" ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      s.n
+                    )}
+                  </span>
+                  <p
+                    className={cn(
+                      "text-sm",
+                      state === "todo" && "font-medium text-muted-foreground",
+                      state === "current" && "font-semibold text-text-strong",
+                      state === "done" && "font-semibold text-text-strong",
+                    )}
+                  >
+                    {s.label}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+        </aside>
 
-      <section className="flex flex-col flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 lg:px-12">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full transition-all rounded-full bg-primary"
-              style={{ width: `${(step / STEPS.length) * 100}%` }}
-            />
+        <section className="flex min-w-0 flex-1 flex-col px-6 py-6 sm:px-8">
+          <div className="mb-6 flex items-center gap-4">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${(step / STEPS.length) * 100}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-muted-foreground">
+              Passo {step} de {STEPS.length}
+            </span>
           </div>
-          <span className="text-xs font-medium shrink-0 tabular-nums text-muted-foreground">
-            Passo {step} de {STEPS.length}
-          </span>
-        </div>
+
+          <div className="mb-5 flex gap-2 lg:hidden">
+            {STEPS.map((s) => {
+              const state =
+                s.n < step ? "done" : s.n === step ? "current" : "todo";
+              return (
+                <div
+                  key={s.n}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold",
+                    state === "current" &&
+                      "border border-primary bg-primary-soft text-primary-strong",
+                    state === "done" && "bg-primary/10 text-primary-strong",
+                    state === "todo" &&
+                      "border border-border bg-surface text-muted-foreground",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
+                      state === "current" && "bg-primary text-primary-foreground",
+                      state === "done" && "bg-primary text-primary-foreground",
+                      state === "todo" && "border border-border bg-surface",
+                    )}
+                  >
+                    {state === "done" ? (
+                      <Check className="h-3 w-3" />
+                    ) : (
+                      s.n
+                    )}
+                  </span>
+                  <span className="truncate">{s.label}</span>
+                </div>
+              );
+            })}
+          </div>
 
         {step === 1 && (
           <StepProducer
@@ -181,18 +215,19 @@ export default function OnboardingPage() {
             onFinish={() => router.push(`/producers/${producer.id}`)}
           />
         )}
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
 
 function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="mb-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+    <div className="mb-6">
+      <h1 className="font-display text-[26px] font-semibold tracking-[-0.02em] text-text-strong">
         {title}
       </h1>
-      <p className="max-w-2xl mt-2 text-sm leading-relaxed text-muted-foreground">
+      <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted-foreground">
         {subtitle}
       </p>
     </div>
@@ -203,17 +238,25 @@ function Field({
   htmlFor,
   label,
   hint,
+  required,
   children,
 }: {
   htmlFor?: string;
   label: string;
   hint?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={htmlFor} className="text-foreground">
+      <Label htmlFor={htmlFor} className="text-[13.5px] font-semibold text-text-strong">
         {label}
+        {required ? (
+          <span className="text-destructive" aria-hidden="true">
+            {" "}
+            *
+          </span>
+        ) : null}
       </Label>
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
@@ -240,10 +283,9 @@ function StepFooter({
   secondary?: ReactNode;
 }) {
   return (
-    <div className="sticky bottom-0 px-4 py-4 mt-10 -mx-4 border-t bg-background/95 backdrop-blur sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12">
+    <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-8">
+      <div className="flex items-center">{back}</div>
       <div className="flex flex-wrap items-center gap-2">
-        {back}
-        <div className="flex-1" />
         {secondary}
         {primary}
       </div>
@@ -262,8 +304,8 @@ function ContextBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-        tone === "primary" && "bg-primary/10 text-primary",
-        tone === "sky" && "bg-sky-100 text-sky-600",
+        tone === "primary" && "bg-primary-soft text-primary-strong",
+        tone === "sky" && "bg-tb-soft text-tb",
       )}
     >
       {children}
@@ -306,51 +348,60 @@ function StepProducer({
         subtitle="Você não precisa enviar convite agora. O acesso ao app é opcional e pode ser ativado depois."
       />
 
-      <div className="max-w-xl space-y-5">
-        <Field htmlFor="name" label="Nome completo">
+      <div className="max-w-[560px] space-y-[18px]">
+        <Field htmlFor="name" label="Nome completo" required>
           <Input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex: João da Silva"
             autoFocus
+            className="h-[46px] rounded-xl"
           />
         </Field>
 
-        <Field htmlFor="phone" label="Telefone">
-          <Input
-            id="phone"
-            value={phone}
-            onChange={(e) => {
-              const value = e.target.value.replace(/\D/g, "");
-              if (value.length <= 11) {
-                let formatted = value;
-                if (value.length > 0) formatted = `(${value.slice(0, 2)}`;
-                if (value.length > 2) formatted += `) ${value.slice(2, 7)}`;
-                if (value.length > 7) formatted += `-${value.slice(7)}`;
-                setPhone(formatted);
-              }
-            }}
-            placeholder="(00) 00000-0000"
-          />
-        </Field>
+        <div className="grid gap-[18px] sm:grid-cols-2">
+          <Field htmlFor="phone" label="Telefone">
+            <Input
+              id="phone"
+              value={phone}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, "");
+                if (value.length <= 11) {
+                  let formatted = value;
+                  if (value.length > 0) formatted = `(${value.slice(0, 2)}`;
+                  if (value.length > 2) formatted += `) ${value.slice(2, 7)}`;
+                  if (value.length > 7) formatted += `-${value.slice(7)}`;
+                  setPhone(formatted);
+                }
+              }}
+              placeholder="(00) 00000-0000"
+              className="h-[46px] rounded-xl"
+            />
+          </Field>
 
-        <Field htmlFor="email" label="E-mail (opcional)">
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="produtor@exemplo.com"
-          />
-        </Field>
+          <Field htmlFor="email" label="E-mail (opcional)">
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="produtor@exemplo.com"
+              className="h-[46px] rounded-xl"
+            />
+          </Field>
+        </div>
 
         <FieldError message={error ?? undefined} />
       </div>
 
       <StepFooter
         back={
-          <Button variant="ghost" onClick={onCancel} size="lg">
+          <Button
+            variant="ghost"
+            onClick={onCancel}
+            className="h-11 px-4 text-muted-foreground hover:text-foreground"
+          >
             Cancelar
           </Button>
         }
@@ -358,11 +409,10 @@ function StepProducer({
           <Button
             onClick={submit}
             disabled={mutation.isPending}
-            className="gap-2"
-            size="lg"
+            className="h-11 gap-2 px-5 text-[14.5px]"
           >
             {mutation.isPending ? "Salvando…" : "Próximo"}
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="h-4 w-4" />
           </Button>
         }
       />
@@ -447,23 +497,24 @@ function StepFarm({
         </ContextBadge>
       </div>
 
-      <div className="max-w-xl space-y-5">
-        <Field htmlFor="farm-name" label="Nome da fazenda">
+      <div className="max-w-[560px] space-y-[18px]">
+        <Field htmlFor="farm-name" label="Nome da fazenda" required>
           <Input
             id="farm-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex: Fazenda Santa Rosa"
             autoFocus
+            className="h-[46px] rounded-xl"
           />
         </Field>
 
         <Field label="Localização (opcional)">
-          <div className="flex items-center gap-4">
-            <div className="space-y-1.5 min-w-48">
+          <div className="grid gap-[18px] sm:grid-cols-2">
+            <div className="space-y-1.5">
               <Label
                 htmlFor="farm-state"
-                className="text-xs text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 Estado
               </Label>
@@ -479,10 +530,10 @@ function StepFarm({
                 searchPlaceholder="Buscar estado…"
               />
             </div>
-            <div className="space-y-1.5 flex-1">
+            <div className="space-y-1.5">
               <Label
                 htmlFor="farm-city"
-                className="text-xs text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 Cidade
               </Label>
@@ -522,8 +573,12 @@ function StepFarm({
 
       <StepFooter
         back={
-          <Button variant="ghost" onClick={onBack} className="gap-2" size="lg">
-            <ArrowLeft className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="h-11 gap-2 px-4 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
         }
@@ -531,11 +586,10 @@ function StepFarm({
           <Button
             onClick={submit}
             disabled={mutation.isPending}
-            className="gap-2"
-            size="lg"
+            className="h-11 gap-2 px-5 text-[14.5px]"
           >
             {mutation.isPending ? "Salvando…" : "Próximo"}
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="h-4 w-4" />
           </Button>
         }
       />
@@ -672,38 +726,36 @@ function StepPlot({
           </div>
         ) : null}
 
-        <div className="flex items-end gap-4">
-          <div className="flex flex-1 gap-4">
-            <div className="flex-1">
-              <Field htmlFor="plot-name" label="Nome do talhão">
-                <Input
-                  id="plot-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Talhão 1"
-                  autoFocus
-                />
-              </Field>
-            </div>
-            <div className="">
-              <Field htmlFor="plot-area" label="Hectares">
-                <Input
-                  id="plot-area"
-                  type="number"
-                  step="0.01"
-                  value={area}
-                  onChange={(e) => setArea(e.target.value)}
-                  placeholder="0"
-                />
-              </Field>
-            </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="grid flex-1 gap-4 sm:grid-cols-[1fr_140px]">
+            <Field htmlFor="plot-name" label="Nome do talhão" required>
+              <Input
+                id="plot-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Talhão 1"
+                autoFocus
+                className="h-[46px] rounded-xl"
+              />
+            </Field>
+            <Field htmlFor="plot-area" label="Hectares" required>
+              <Input
+                id="plot-area"
+                type="number"
+                step="0.01"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                placeholder="0"
+                className="h-[46px] rounded-xl"
+              />
+            </Field>
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex shrink-0 items-end gap-2">
             <Button
               variant="default"
               onClick={submit}
               disabled={isSaving}
-              className="gap-2"
+              className="h-11 gap-2"
             >
               {editingPlotId ? (
                 <>
@@ -735,7 +787,7 @@ function StepPlot({
       </div>
 
       {plots.length > 0 && (
-        <div className="mt-24">
+        <div className="mt-8">
           <div className="flex items-center justify-between mb-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
             <span>
               {farm.name} · {plots.length}{" "}
@@ -810,8 +862,12 @@ function StepPlot({
 
       <StepFooter
         back={
-          <Button variant="ghost" onClick={onBack} className="gap-2" size="lg">
-            <ArrowLeft className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="h-11 gap-2 px-4 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
         }
@@ -819,10 +875,9 @@ function StepPlot({
           <Button
             variant="outline"
             onClick={onAnotherFarm}
-            className="gap-2"
-            size="lg"
+            className="h-11 gap-2 bg-surface px-4"
           >
-            <Building2 className="w-4 h-4" />
+            <Building2 className="h-4 w-4" />
             Outra fazenda
           </Button>
         }
@@ -830,10 +885,9 @@ function StepPlot({
           <Button
             onClick={onFinish}
             disabled={plots.length === 0}
-            className="gap-2"
-            size="lg"
+            className="h-11 gap-2 px-5 text-[14.5px]"
           >
-            <Check className="w-4 h-4" />
+            <Check className="h-4 w-4" />
             Concluir cadastro
           </Button>
         }

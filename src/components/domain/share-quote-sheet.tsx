@@ -14,15 +14,18 @@ import {
 } from "@/components/ui/sheet";
 import { useCreateQuoteRequest } from "@/lib/api/hooks";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export function ShareQuoteSheet({
   listId,
   listName,
   producerName,
+  triggerClassName,
 }: {
   listId: string;
   listName: string;
   producerName?: string | null;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -64,7 +67,11 @@ export function ShareQuoteSheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn("gap-1.5", triggerClassName)}
+        >
           <Share2 className="h-4 w-4" />
           Compartilhar cotação
         </Button>
@@ -72,7 +79,7 @@ export function ShareQuoteSheet({
       <SheetContent side="right" className="w-full gap-0 sm:max-w-md">
         <SheetHeader className="border-b">
           <SheetTitle className="flex items-center gap-2 text-lg">
-            <Link2 className="h-5 w-5 text-primary" />
+            <Link2 className="h-5 w-5 text-primary-strong" />
             Link de cotação
           </SheetTitle>
           <SheetDescription className="text-sm">
@@ -82,11 +89,11 @@ export function ShareQuoteSheet({
         </SheetHeader>
 
         <div className="flex flex-col gap-5 p-4">
-          <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-sm">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
               Lista
             </span>
-            <p className="mt-0.5 font-medium text-foreground">{listName}</p>
+            <p className="mt-0.5 font-semibold text-text-strong">{listName}</p>
           </div>
 
           {createRequest.isPending && !token ? (

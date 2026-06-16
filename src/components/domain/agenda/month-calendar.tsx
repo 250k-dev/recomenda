@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
-import { useAgronomistAgenda, useProducers, localYmdToDate, type AgendaEvent } from "@/lib/api/hooks";
+import { useAgronomistAgenda, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 
 const MINI_WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -101,14 +101,14 @@ export function MonthCalendar({
     [producersData],
   );
 
-  const { eventsByDay, totalEventCount, todayCount, lateCount, isLoading, isError } =
+  const { eventsByDay, calendarMarkersByDay, totalEventCount, todayCount, lateCount, isLoading, isError } =
     useAgronomistAgenda(month, producerId);
 
   const today = new Date();
   const todayYmd = format(today, "yyyy-MM-dd");
 
   const allEvents = useMemo(
-    () => Object.values(eventsByDay).flat(),
+    () => dedupeAgendaEvents(Object.values(eventsByDay).flat()),
     [eventsByDay],
   );
 
@@ -125,10 +125,10 @@ export function MonthCalendar({
   }, [producerId]);
 
   const nextEventYmd = useMemo(() => {
-    const ymds = Object.keys(eventsByDay).sort();
+    const ymds = Object.keys(calendarMarkersByDay).sort();
     if (ymds.length === 0) return null;
     return ymds.find((ymd) => ymd >= todayYmd) ?? ymds[ymds.length - 1];
-  }, [eventsByDay, todayYmd]);
+  }, [calendarMarkersByDay, todayYmd]);
 
   useEffect(() => {
     if (!focusNearestEvent || isLoading || didAutoFocus.current || !nextEventYmd) return;
@@ -169,8 +169,9 @@ export function MonthCalendar({
   return (
     <div
       className={cn(
-        "flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6",
+        "flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8",
         showHeader && "rounded-xl border bg-card p-4 shadow-sm sm:p-5",
+        !showHeader && "pt-1",
       )}
     >
       {/* Coluna esquerda: navegação + mini calendário + KPIs */}
@@ -179,10 +180,10 @@ export function MonthCalendar({
           <div className="min-w-0">
             {showHeader ? (
               <>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
                   {format(month, "MMMM yyyy", { locale: ptBR })}
                 </p>
-                <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                <h2 className="font-display text-xl font-semibold tracking-[-0.02em] text-text-strong sm:text-2xl">
                   {headerTitle}
                 </h2>
               </>
@@ -223,7 +224,7 @@ export function MonthCalendar({
           <MiniMonthCalendar
             month={month}
             calendarDays={calendarDays}
-            eventsByDay={eventsByDay}
+            calendarMarkersByDay={calendarMarkersByDay}
             selectedDay={selectedDay}
             today={today}
             todayYmd={todayYmd}
@@ -240,8 +241,8 @@ export function MonthCalendar({
             <StatusSummaryCard
               label="Atrasadas"
               value={lateCount}
-              dotClass="bg-red-500"
-              valueClass="text-red-600"
+              dotClass="bg-danger"
+              valueClass="text-danger-strong"
               selected={panelMode === "filter" && statusFilter === "late"}
               onClick={() => applyStatusFilter("late")}
             />
@@ -256,8 +257,8 @@ export function MonthCalendar({
             <StatusSummaryCard
               label="Pendentes"
               value={totalEventCount}
-              dotClass="bg-amber-400"
-              valueClass="text-emerald-700"
+              dotClass="bg-warning"
+              valueClass="text-success-strong"
               selected={panelMode === "filter" && statusFilter === "pending"}
               onClick={() => applyStatusFilter("pending")}
             />
@@ -339,7 +340,7 @@ export function MonthCalendar({
 function MiniMonthCalendar({
   month,
   calendarDays,
-  eventsByDay,
+  calendarMarkersByDay,
   selectedDay,
   today,
   todayYmd,
@@ -347,7 +348,7 @@ function MiniMonthCalendar({
 }: {
   month: Date;
   calendarDays: Date[];
-  eventsByDay: Record<string, AgendaEvent[]>;
+  calendarMarkersByDay: Record<string, AgendaEvent[]>;
   selectedDay: Date;
   today: Date;
   todayYmd: string;
@@ -368,11 +369,11 @@ function MiniMonthCalendar({
       <div className="grid grid-cols-7 gap-0.5">
         {calendarDays.map((day) => {
           const ymd = format(day, "yyyy-MM-dd");
-          const dayEvents = eventsByDay[ymd] ?? [];
+          const dayMarkers = calendarMarkersByDay[ymd] ?? [];
           const inMonth = isSameMonth(day, month);
           const isToday = isSameDay(day, today);
           const isSelected = isSameDay(day, selectedDay);
-          const dotColor = getDayDotColor(dayEvents, todayYmd, ymd);
+          const dotColor = getDayDotColor(dayMarkers, todayYmd, ymd);
 
           return (
             <button
@@ -416,9 +417,9 @@ function getDayDotColor(
   ymd: string,
 ): string | null {
   if (events.length === 0) return null;
-  if (events.some((event) => event.isLate)) return "bg-red-500";
+  if (events.some((event) => event.isLate)) return "bg-danger";
   if (ymd === todayYmd) return "bg-primary";
-  return "bg-amber-400";
+  return "bg-warning";
 }
 
 function ViewModeToggle({
@@ -694,7 +695,7 @@ function ProducerFilterToggle({
           <Users className="h-4 w-4" />
           <span className="hidden sm:inline">Produtor</span>
           {producerId ? (
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-card" />
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-warning ring-2 ring-card" />
           ) : null}
         </button>
       </PopoverTrigger>
@@ -783,8 +784,8 @@ function getEventStatusPresentation(event: AgendaEvent, todayYmd: string) {
   if (event.isLate) {
     return {
       label: "Atrasada",
-      borderClass: "bg-red-500",
-      badgeClass: "border-red-200 bg-red-50 text-red-700",
+      borderClass: "bg-danger",
+      badgeClass: "border-danger-border bg-danger-soft text-danger-strong",
       showWarning: true,
     };
   }
@@ -792,14 +793,14 @@ function getEventStatusPresentation(event: AgendaEvent, todayYmd: string) {
     return {
       label: "Hoje",
       borderClass: "bg-primary",
-      badgeClass: "border-primary/30 bg-primary/10 text-primary",
+      badgeClass: "border-primary-border bg-primary-soft text-primary-strong",
       showWarning: false,
     };
   }
   return {
     label: "Pendente",
-    borderClass: "bg-amber-400",
-    badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+    borderClass: "bg-warning",
+    badgeClass: "border-warning-border bg-warning-soft text-warning-strong",
     showWarning: false,
   };
 }

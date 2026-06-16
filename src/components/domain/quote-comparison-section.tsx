@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Store } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/domain/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { usePurchaseListQuotes } from "@/lib/api/hooks";
@@ -23,13 +23,9 @@ const AVAILABILITY_LABEL: Record<QuoteAvailability, string> = {
 
 function statusBadge(r: QuoteComparisonResponse) {
   return r.status === "SUBMITTED" ? (
-    <Badge variant="default" className="text-[10px]">
-      Enviada
-    </Badge>
+    <StatusBadge tone="success">Enviada</StatusBadge>
   ) : (
-    <Badge variant="secondary" className="text-[10px]">
-      Em preenchimento
-    </Badge>
+    <StatusBadge tone="warning">Em preenchimento</StatusBadge>
   );
 }
 
@@ -82,18 +78,18 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
   );
 
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+    <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
       <table className="w-full min-w-[760px] border-collapse text-sm">
         <thead>
-          <tr className="border-b text-left align-bottom">
-            <th className="sticky left-0 z-10 bg-card px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <tr className="border-b border-border bg-rail text-left align-bottom">
+            <th className="sticky left-0 z-10 bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
               Produto
             </th>
             {responses.map((r) => (
               <th key={r.id} className="min-w-[150px] px-3 py-3 text-right">
-                <div className="flex flex-col items-end gap-1">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
-                    <Store className="h-3.5 w-3.5 text-muted-foreground" />
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-text-strong">
+                    <Store className="h-3.5 w-3.5 text-primary-strong" />
                     {r.store_name}
                   </span>
                   {statusBadge(r)}
@@ -107,9 +103,9 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
             const unit = itemUnitById.get(it.purchase_list_item_id) ?? it.dose_unit;
             const cheapest = cheapestByItem.get(it.purchase_list_item_id) ?? null;
             return (
-              <tr key={it.purchase_list_item_id} className="border-b last:border-b-0">
-                <td className="sticky left-0 z-10 bg-card px-3 py-2.5">
-                  <div className="font-medium text-foreground">{it.product_name}</div>
+              <tr key={it.purchase_list_item_id} className="border-b border-border last:border-b-0">
+                <td className="sticky left-0 z-10 bg-card px-4 py-2.5">
+                  <div className="font-semibold text-text-strong">{it.product_name}</div>
                   <div className="text-xs text-muted-foreground tabular-nums">
                     {fmtQty(it.quantity_to_buy)} {unit} · {it.stage}
                   </div>
@@ -121,17 +117,23 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
                   const eff = cell?.unit_price_brl ?? cell?.substitute_unit_price_brl ?? null;
                   const isCheapest = eff != null && cheapest != null && eff <= cheapest;
                   return (
-                    <td key={r.id} className="px-3 py-2.5 text-right align-top">
+                    <td
+                      key={r.id}
+                      className={
+                        "px-3 py-2.5 text-right align-top " +
+                        (isCheapest ? "bg-success-soft" : "")
+                      }
+                    >
                       {cell == null || (eff == null && cell.availability == null) ? (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-placeholder">—</span>
                       ) : (
                         <div className="flex flex-col items-end gap-0.5">
                           {cell.unit_price_brl != null ? (
                             <span
                               className={
                                 isCheapest
-                                  ? "font-semibold tabular-nums text-primary"
-                                  : "tabular-nums text-foreground"
+                                  ? "font-bold tabular-nums text-success-strong"
+                                  : "font-semibold tabular-nums text-text-strong"
                               }
                             >
                               {fmtBrl(cell.unit_price_brl)}
@@ -142,8 +144,14 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
                             </span>
                           ) : null}
 
+                          {isCheapest && cell.unit_price_brl != null ? (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-success-strong">
+                              ★ melhor
+                            </span>
+                          ) : null}
+
                           {cell.substitute_product_name ? (
-                            <span className="text-xs text-amber-700">
+                            <span className="text-xs text-clay-strong">
                               ↪ {cell.substitute_product_name}
                               {cell.substitute_unit_price_brl != null
                                 ? ` · ${fmtBrl(cell.substitute_unit_price_brl)}`
@@ -172,8 +180,8 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
           })}
         </tbody>
         <tfoot>
-          <tr className="border-t-2 bg-muted/40">
-            <td className="sticky left-0 z-10 bg-muted/40 px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <tr className="border-t border-border bg-rail">
+            <td className="sticky left-0 z-10 bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-text-strong">
               Total estimado
             </td>
             {responses.map((r) => {
@@ -183,8 +191,8 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
                   key={r.id}
                   className={
                     isCheapest
-                      ? "px-3 py-3 text-right font-bold tabular-nums text-primary"
-                      : "px-3 py-3 text-right font-semibold tabular-nums text-foreground"
+                      ? "px-3 py-3 text-right font-bold tabular-nums text-success-strong"
+                      : "px-3 py-3 text-right font-semibold tabular-nums text-text-strong"
                   }
                 >
                   {r.total_brl > 0 ? fmtBrl(r.total_brl) : "—"}

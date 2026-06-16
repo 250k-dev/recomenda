@@ -1,17 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
-import { ProducerTimingTemplatesSection } from "@/components/domain/timing/producer-timing-templates-section";
-import { Card, CardContent } from "@/components/ui/card";
+import { ProducerTimingTemplatesPanel } from "@/components/domain/timing/producer-timing-templates-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   useProducer,
   useProducerFarms,
@@ -22,27 +20,31 @@ import { createFarm, grantFarmAccess } from "@/lib/api/client";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ProducerDetailSkeleton } from "@/components/domain/page-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  Plus,
   Tractor,
   Mail,
   Phone,
   Pencil,
-  ShoppingCart,
-  CalendarDays,
-  ChevronRight,
-  ChevronDown,
   MapPin,
   Sprout,
   Leaf,
+  CalendarDays,
+  Clock,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const ACTIVE_SEASON_STATUSES = new Set(["DRAFT", "PUBLISHED", "IN_PROGRESS"]);
 
@@ -68,7 +70,6 @@ export function ProducerDetailView({
   backHref,
   showSeasonActions,
 }: ProducerDetailViewProps) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: producer, isLoading } = useProducer(producerId);
   const { data: farms, isLoading: loadingFarms } = useProducerFarms(producerId);
@@ -81,6 +82,8 @@ export function ProducerDetailView({
   const [newFarmOpen, setNewFarmOpen] = useState(false);
   const [newFarmName, setNewFarmName] = useState("");
   const [newFarmLocation, setNewFarmLocation] = useState("");
+  const [cronogramOpen, setCronogramOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const newFarmMutation = useMutation({
     mutationFn: async () => {
@@ -164,17 +167,17 @@ export function ProducerDetailView({
       <BreadcrumbBack items={breadcrumbs} />
 
       {/* Hero / identidade do produtor */}
-      <section className="p-5 mb-6 border shadow-sm rounded-2xl bg-linear-to-br from-card to-muted/40 sm:p-6">
+      <section className="p-5 mb-6 border border-border shadow-sm rounded-xl bg-card sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start min-w-0 gap-4">
-            <div className="flex items-center justify-center w-16 h-16 text-2xl font-semibold shrink-0 rounded-2xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
+            <div className="flex items-center justify-center w-14 h-14 text-2xl font-bold shrink-0 rounded-xl bg-primary-soft text-primary-strong">
               {initial}
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
                 Produtor
               </p>
-              <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-foreground">
+              <h1 className="mt-0.5 truncate font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
                 {producer.name}
               </h1>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -204,229 +207,131 @@ export function ProducerDetailView({
         </div>
       </section>
 
-      {/* KPIs — card único com os indicadores do produtor */}
+      {/* KPIs — indicadores do produtor */}
       {loadingFarms ? (
         <Skeleton className="w-full h-24 mb-6 border rounded-xl border-border" />
       ) : (
-        <div className="mb-6 border shadow-sm rounded-xl bg-card">
-          <div className="grid grid-cols-2 divide-x divide-y sm:grid-cols-4 sm:divide-y-0">
-            <StatCell
-              icon={<Tractor className="w-5 h-5" />}
-              accent="primary"
-              label="Fazendas"
-              value={String(stats.farms)}
-            />
-            <StatCell
-              icon={<MapPin className="w-5 h-5" />}
-              accent="sky"
-              label="Talhões"
-              value={String(stats.plots)}
-            />
-            <StatCell
-              icon={<Sprout className="w-5 h-5" />}
-              accent="sun"
-              label="Hectares totais"
-              value={`${fmtHa(stats.hectares)} ha`}
-            />
-            <StatCell
-              icon={<Leaf className="w-5 h-5" />}
-              accent="clay"
-              label="Safras ativas"
-              value={String(stats.activeSeasons)}
-            />
-          </div>
-        </div>
+        <KpiStrip className="mb-6">
+          <KpiCell
+            icon={<Tractor className="size-4" />}
+            label="Fazendas"
+            value={String(stats.farms)}
+          />
+          <KpiCell
+            icon={<MapPin className="size-4" />}
+            label="Talhões"
+            value={String(stats.plots)}
+          />
+          <KpiCell
+            icon={<Sprout className="size-4" />}
+            label="Hectares totais"
+            value={`${fmtHa(stats.hectares)} ha`}
+          />
+          <KpiCell
+            icon={<Leaf className="size-4" />}
+            label="Safras ativas"
+            value={String(stats.activeSeasons)}
+          />
+        </KpiStrip>
       )}
 
       {showSeasonActions ? (
-        <>
-          <section className="mb-8">
-            <details className="group overflow-hidden rounded-xl border border-primary/15 bg-card shadow-sm open:shadow-md">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors marker:content-none hover:bg-primary/3 group-open:border-b group-open:bg-primary/4 [&::-webkit-details-marker]:hidden sm:px-6 sm:py-5">
-                <div className="flex min-w-0 items-center gap-4">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/10">
-                    <CalendarDays className="h-6 w-6" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">
-                      Planejamento
-                    </p>
-                    <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                      Cronograma
-                    </h2>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      Aplicações pendentes e atrasadas deste produtor
-                    </p>
-                  </div>
-                </div>
-                <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <span className="group-open:hidden">Expandir</span>
-                  <span className="hidden group-open:inline">Recolher</span>
-                  <ChevronDown className="h-5 w-5 transition-transform duration-200 group-open:rotate-180" />
-                </span>
-              </summary>
-              <div className="border-t border-primary/10 px-4 pb-5 pt-4 sm:px-6">
-                <MonthCalendar producerId={producerId} showHeader={false} focusNearestEvent />
-              </div>
-            </details>
-          </section>
-
-          <div id="timing-templates">
-            <ProducerTimingTemplatesSection
-              producerId={producerId}
-              producerName={producer.name}
-            />
-          </div>
-        </>
-      ) : null}
-
-      {/* Fazendas */}
-      <section>
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-lg font-semibold text-foreground">Fazendas</h2>
-          </div>
+        <div className="mb-6 grid gap-3 sm:grid-cols-2">
           <Button
+            type="button"
+            variant="outline"
             size="lg"
-            className="gap-2 shrink-0"
-            onClick={() => setNewFarmOpen(true)}
+            className="h-auto min-h-14 justify-start gap-3 rounded-xl border-primary/15 px-4 py-3 text-left hover:border-primary/30 hover:bg-primary/3"
+            onClick={() => setCronogramOpen(true)}
           >
-            <Plus className="w-4 h-4" />
-            Nova fazenda
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CalendarDays className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
+                Planejamento
+              </span>
+              <span className="mt-0.5 block font-display text-base font-semibold text-text-strong">
+                Cronograma
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Aplicações pendentes e atrasadas
+              </span>
+            </span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-auto min-h-14 justify-start gap-3 rounded-xl border-primary/15 px-4 py-3 text-left hover:border-primary/30 hover:bg-primary/3"
+            onClick={() => setTemplatesOpen(true)}
+          >
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Clock className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
+                Planejamento
+              </span>
+              <span className="mt-0.5 block font-display text-base font-semibold text-text-strong">
+                Modelos de recomendação
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                Dessecação, fungicidas e janelas
+              </span>
+            </span>
           </Button>
         </div>
+      ) : null}
 
-        {loadingFarms ? (
-          <div className="space-y-3" aria-hidden>
-            <Skeleton className="w-full h-24 border rounded-xl border-border" />
-            <Skeleton className="w-full h-24 border rounded-xl border-border" />
-          </div>
-        ) : farmsList.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary">
-                <Tractor className="w-6 h-6" />
+      <ProducerFarmsSection
+        producerId={producerId}
+        farms={farmsList}
+        loadingFarms={loadingFarms}
+        showSeasonActions={showSeasonActions}
+        onNewFarm={() => setNewFarmOpen(true)}
+        onOpenRecommendationModels={() => setTemplatesOpen(true)}
+      />
+
+      {showSeasonActions ? (
+        <>
+          <Dialog open={cronogramOpen} onOpenChange={setCronogramOpen}>
+            <DialogContent className="max-w-7xl">
+              <DialogHeader>
+                <DialogTitle>Cronograma</DialogTitle>
+                <DialogDescription>
+                  Aplicações pendentes e atrasadas deste produtor
+                </DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto px-6 pt-6 pb-8">
+                <MonthCalendar
+                  producerId={producerId}
+                  showHeader={false}
+                  focusNearestEvent
+                />
               </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  Nenhuma fazenda cadastrada
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Cadastre a primeira fazenda para iniciar o acompanhamento das
-                  safras.
-                </p>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+            <DialogContent className="max-w-7xl">
+              <DialogHeader>
+                <DialogTitle>Modelos de recomendação</DialogTitle>
+                <DialogDescription>
+                  Modelos reutilizáveis de {producer.name}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto px-6 pt-6 pb-8">
+                <ProducerTimingTemplatesPanel
+                  producerId={producerId}
+                  producerName={producer.name}
+                />
               </div>
-              <Button
-                size="sm"
-                className="mt-2 gap-1.5"
-                onClick={() => setNewFarmOpen(true)}
-              >
-                <Plus className="w-4 h-4" />
-                Cadastrar primeira fazenda
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {farmsList.map((farm) => {
-              const totalHectares = farm.plots.reduce(
-                (acc, plot) => acc + (parseFloat(plot.area_hectares) || 0),
-                0,
-              );
-              const activeSeasonsCount = farm.seasons.filter((s) =>
-                ACTIVE_SEASON_STATUSES.has(s.status),
-              ).length;
-              const farmBase = `/farms/${farm.id}?producer_id=${encodeURIComponent(producerId)}`;
-              const farmHref = farmBase;
-              const seasonsHref = `${farmBase}&tab=seasons`;
-              const purchaseHref = `${farmBase}&tab=purchase`;
-
-              return (
-                <Card
-                  key={farm.id}
-                  className="overflow-hidden transition-all group hover:border-primary/40 hover:shadow-md"
-                >
-                  <CardContent className="p-4">
-                    <button
-                      type="button"
-                      className="flex w-full cursor-pointer items-center gap-4 text-left"
-                      onClick={() => router.push(farmHref)}
-                    >
-                      <div className="flex items-center justify-center w-12 h-12 transition-transform shrink-0 rounded-xl bg-primary/10 text-primary group-hover:scale-105">
-                        <Tractor className="w-6 h-6" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold truncate text-foreground">
-                            {farm.name}
-                          </h3>
-                          {activeSeasonsCount > 0 ? (
-                            <Badge variant="default" className="shrink-0">
-                              {activeSeasonsCount}{" "}
-                              {activeSeasonsCount === 1 ? "safra" : "safras"}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        {farm.location ? (
-                          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                            <MapPin className="w-3 h-3 shrink-0" />
-                            {farm.location}
-                          </p>
-                        ) : null}
-                        <p className="mt-1.5 text-sm text-muted-foreground">
-                          <span className="font-medium text-foreground">
-                            {farm.plots.length}
-                          </span>{" "}
-                          {farm.plots.length === 1 ? "talhão" : "talhões"}
-                          <span className="mx-1.5 text-muted-foreground/60">
-                            ·
-                          </span>
-                          <span className="font-medium text-foreground">
-                            {fmtHa(totalHectares)}
-                          </span>{" "}
-                          ha
-                        </p>
-                      </div>
-
-                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                    </button>
-
-                    {showSeasonActions ? (
-                      <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Link href={seasonsHref}>
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            Safras
-                          </Link>
-                        </Button>
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Link href={purchaseHref}>
-                            <ShoppingCart className="h-3.5 w-3.5" />
-                            Lista de compra
-                          </Link>
-                        </Button>
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </section>
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : null}
 
       {/* Editar produtor */}
       <Sheet open={editOpen} onOpenChange={setEditOpen}>
@@ -542,44 +447,6 @@ export function ProducerDetailView({
   );
 }
 
-const cellAccent: Record<"primary" | "sun" | "clay" | "sky", string> = {
-  primary: "bg-primary/10 text-primary",
-  sun: "bg-amber-100 text-amber-600",
-  clay: "bg-orange-100 text-orange-600",
-  sky: "bg-sky-100 text-sky-600",
-};
-
-function StatCell({
-  icon,
-  accent,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  accent: "primary" | "sun" | "clay" | "sky";
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 p-4">
-      <span
-        className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-          cellAccent[accent],
-        )}
-      >
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <p className="mt-0.5 text-xl font-semibold tabular-nums tracking-tight text-foreground">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function ContactChip({
   icon,
   value,
@@ -594,8 +461,8 @@ function ContactChip({
     <span
       className={
         hasValue
-          ? "inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground"
-          : "inline-flex items-center gap-1.5 rounded-full border border-dashed px-2.5 py-1 text-xs text-muted-foreground"
+          ? "inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-foreground"
+          : "inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground"
       }
     >
       {icon}

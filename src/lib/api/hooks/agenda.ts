@@ -29,6 +29,8 @@ export type AgendaSeasonRow = {
 export type AgendaEvent = {
   id: string;
   ymd: string;
+  /** Dia único usado no mini calendário (um ponto por recomendação). */
+  displayYmd: string;
   applicationTitle: string;
   farmName: string;
   producerName: string;
@@ -42,6 +44,7 @@ export type AgendaEvent = {
 
 export type AgronomistAgendaResult = {
   eventsByDay: Record<string, AgendaEvent[]>;
+  calendarMarkersByDay: Record<string, AgendaEvent[]>;
   monthEventCount: number;
   totalEventCount: number;
   todayCount: number;
@@ -110,11 +113,31 @@ function recommendationWindowDays(raw: unknown): {
   return { startYmd, endYmd, centerYmd, days };
 }
 
-function pillLabelForWindowDay(
-  ymd: string,
+/** Um único dia de destaque no mini calendário por recomendação pendente. */
+export function recommendationDisplayYmd(
+  window: { startYmd: string; endYmd: string; centerYmd: string },
+  today: string,
+): string {
+  if (window.endYmd < today) return window.endYmd;
+  if (today >= window.startYmd && today <= window.endYmd) return today;
+  return window.centerYmd;
+}
+
+function agendaPanelDays(
+  window: { endYmd: string },
+  displayYmd: string,
+  today: string,
+): string[] {
+  if (window.endYmd < today && displayYmd !== today) {
+    return [displayYmd, today];
+  }
+  return [displayYmd];
+}
+
+function pillLabelForEvent(
+  displayYmd: string,
   today: string,
   windowEndYmd: string,
-  isCenterDay: boolean,
 ): { label: string; isLate: boolean } {
   if (windowEndYmd < today) {
     const days = differenceInCalendarDays(localYmdToDate(today), localYmdToDate(windowEndYmd));
@@ -123,11 +146,9 @@ function pillLabelForWindowDay(
       isLate: true,
     };
   }
-  if (ymd === today) return { label: "Hoje", isLate: false };
-  if (isCenterDay) {
-    const days = differenceInCalendarDays(localYmdToDate(ymd), localYmdToDate(today));
-    if (days > 0) return { label: days === 1 ? "Amanhã" : `Em ${days} dias`, isLate: false };
-  }
+  if (displayYmd === today) return { label: "Hoje", isLate: false };
+  const days = differenceInCalendarDays(localYmdToDate(displayYmd), localYmdToDate(today));
+  if (days > 0) return { label: days === 1 ? "Amanhã" : `Em ${days} dias`, isLate: false };
   return { label: "Na janela", isLate: false };
 }
 
@@ -173,7 +194,7 @@ async function fetchAgendaEvents(
     .slice(0, MAX_EVENTS);
 
   const eventsByDay: Record<string, AgendaEvent[]> = {};
-  let totalEventCount = 0;
+  const calendarMarkersByDay: Record<string, AgendaEvent[]> = {};
   let todayCount = 0;
   let lateCount = 0;
   const countedToday = new Set<string>();
@@ -181,6 +202,8 @@ async function fetchAgendaEvents(
 
   for (const { season, r, window } of ordered) {
     const recommendationKey = `${season.id}-${r.id}`;
+    const displayYmd = recommendationDisplayYmd(window, today);
+    const { label, isLate } = pillLabelForEvent(displayYmd, today, window.endYmd);
 
     if (window.endYmd < today && !countedLate.has(recommendationKey)) {
       lateCount += 1;
@@ -195,33 +218,58 @@ async function fetchAgendaEvents(
       countedToday.add(recommendationKey);
     }
 
-    for (const ymd of window.days) {
-      const { label, isLate } = pillLabelForWindowDay(
-        ymd,
-        today,
-        window.endYmd,
-        ymd === window.centerYmd,
-      );
+    const baseEvent: Omit<AgendaEvent, "id" | "ymd"> = {
+      displayYmd,
+      applicationTitle: recommendationTitle(r),
+      farmName: season.farm_name?.trim() || "Fazenda",
+      producerName: season.producer_name?.trim() || "Produtor",
+      plotName: season.plot_name?.trim() || "Talhão",
+      seasonId: season.id,
+      isLate,
+      pillLabel: label,
+      windowEndYmd: window.endYmd,
+      isCenterDay: displayYmd === window.centerYmd,
+    };
+
+    if (!calendarMarkersByDay[displayYmd]) calendarMarkersByDay[displayYmd] = [];
+    calendarMarkersByDay[displayYmd].push({
+      ...baseEvent,
+      id: `${recommendationKey}-marker`,
+      ymd: displayYmd,
+    });
+
+    for (const ymd of agendaPanelDays(window, displayYmd, today)) {
       const event: AgendaEvent = {
+        ...baseEvent,
         id: `${recommendationKey}-${ymd}`,
         ymd,
-        applicationTitle: recommendationTitle(r),
-        farmName: season.farm_name?.trim() || "Fazenda",
-        producerName: season.producer_name?.trim() || "Produtor",
-        plotName: season.plot_name?.trim() || "Talhão",
-        seasonId: season.id,
-        isLate,
-        pillLabel: label,
-        windowEndYmd: window.endYmd,
-        isCenterDay: ymd === window.centerYmd,
       };
       if (!eventsByDay[ymd]) eventsByDay[ymd] = [];
       eventsByDay[ymd].push(event);
-      totalEventCount += 1;
     }
   }
 
-  return { eventsByDay, totalEventCount, todayCount, lateCount };
+  return {
+    eventsByDay,
+    calendarMarkersByDay,
+    totalEventCount: ordered.length,
+    todayCount,
+    lateCount,
+  };
+}
+
+export function dedupeAgendaEvents(events: AgendaEvent[]): AgendaEvent[] {
+  const byRec = new Map<string, AgendaEvent>();
+  for (const event of events) {
+    const key = event.id.replace(/-(?:\d{4}-\d{2}-\d{2}|marker)$/, "");
+    const existing = byRec.get(key);
+    if (!existing) {
+      byRec.set(key, event);
+      continue;
+    }
+    if (event.ymd === event.displayYmd) byRec.set(key, event);
+  }
+  return [...byRec.values()];
 }
 
 export function useAgronomistAgenda(month: Date, producerId?: string) {
@@ -232,17 +280,18 @@ export function useAgronomistAgenda(month: Date, producerId?: string) {
   });
 
   const monthEventCount = useMemo(() => {
-    const eventsByDay = query.data?.eventsByDay ?? {};
+    const markersByDay = query.data?.calendarMarkersByDay ?? {};
     const monthStart = ymdFromDate(startOfMonth(month));
     const monthEnd = ymdFromDate(endOfMonth(month));
-    return Object.entries(eventsByDay).reduce((sum, [ymd, events]) => {
+    return Object.entries(markersByDay).reduce((sum, [ymd, events]) => {
       if (ymd >= monthStart && ymd <= monthEnd) return sum + events.length;
       return sum;
     }, 0);
-  }, [query.data?.eventsByDay, month]);
+  }, [query.data?.calendarMarkersByDay, month]);
 
   return {
     eventsByDay: query.data?.eventsByDay ?? {},
+    calendarMarkersByDay: query.data?.calendarMarkersByDay ?? {},
     monthEventCount,
     totalEventCount: query.data?.totalEventCount ?? 0,
     todayCount: query.data?.todayCount ?? 0,

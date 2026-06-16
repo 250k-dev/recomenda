@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, LogOut, UserCircle } from "lucide-react";
+import { BadgeCheck, BarChart3, LogOut, UserCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -119,15 +119,21 @@ export function UserMenu() {
 
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/profile" className="mt-2 mb-1">
+          <Link href="/profile" className="mt-2">
             <UserCircle className="size-4" />
             Meu perfil
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/reports">
+            <BarChart3 className="size-4" />
+            Relatórios
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
           onSelect={handleLogout}
-          className="mb-1"
+          className="mb-1 mt-1"
         >
           <LogOut className="size-4" />
           Sair

@@ -1,144 +1,320 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState } from "react";
+import { addDays, format } from "date-fns";
+import { ptBR } from "date-fns/locale/pt-BR";
 import {
+  Users,
   Building2,
   Leaf,
-  Users,
-  ArrowRight,
-  Plus,
-  Package,
-  BarChart3,
-  LayoutDashboard,
+  CircleAlert,
   CalendarDays,
+  Plus,
+  ArrowRight,
+  Sparkles,
+  BellRing,
 } from "lucide-react";
-import { PageHeader } from "@/components/domain/page-header";
-import { StatCard } from "@/components/domain/stat-card";
+import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { RailCard, RailRow } from "@/components/domain/rail-card";
+import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
+import { StatusBadge } from "@/components/domain/status-badge";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DashboardKpiSkeleton } from "@/components/domain/page-skeletons";
-import { useFarms, useProducers, useSeasons } from "@/lib/api/hooks";
+import {
+  useFarms,
+  useProducers,
+  useSeasons,
+  useMe,
+  usePlanQuota,
+  usePortfolioPriceCoverage,
+} from "@/lib/api/hooks";
+import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
+import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
+
+type AttentionTab = "late" | "today" | "week";
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
 
 export default function DashboardPage() {
   const farms = useFarms();
   const producers = useProducers();
   const seasons = useSeasons();
+  const { data: me } = useMe();
+  const { data: planData } = usePlanQuota();
+  const agenda = useAgronomistAgenda(new Date());
 
-  const producerCount = useMemo(
-    () => (producers.data?.data ?? []).filter((p) => p.row_type === "producer").length,
+  const [tab, setTab] = useState<AttentionTab>("late");
+
+  const activeProducers = useMemo(
+    () => activeAgronomistProducerAccounts(producers.data?.data ?? []),
     [producers.data],
   );
 
+  const producerCount = activeProducers.length;
+
+  const plotCount = useMemo(
+    () =>
+      activeProducers.reduce((sum, producer) => sum + (producer.plots_count ?? 0), 0),
+    [activeProducers],
+  );
+
+  const producerIds = useMemo(
+    () => activeProducers.map((producer) => producer.producer_id),
+    [activeProducers],
+  );
+
+  const priceCoverage = usePortfolioPriceCoverage(producerIds);
+
   const loading = farms.isLoading || producers.isLoading || seasons.isLoading;
+
+  // Dedupe agenda events (one per recommendation) and bucket by state.
+  const buckets = useMemo(() => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const weekEnd = format(addDays(new Date(), 7), "yyyy-MM-dd");
+    const byRec = new Map<string, AgendaEvent>();
+    for (const ev of Object.values(agenda.eventsByDay).flat()) {
+      const key = ev.id.replace(/-\d{4}-\d{2}-\d{2}$/, "");
+      const existing = byRec.get(key);
+      if (!existing || ev.ymd < existing.ymd) byRec.set(key, ev);
+    }
+    const recs = [...byRec.values()];
+    return {
+      late: recs
+        .filter((r) => r.windowEndYmd < today)
+        .sort((a, b) => a.windowEndYmd.localeCompare(b.windowEndYmd)),
+      today: recs
+        .filter((r) => r.ymd <= today && r.windowEndYmd >= today)
+        .sort((a, b) => a.ymd.localeCompare(b.ymd)),
+      week: recs
+        .filter((r) => r.ymd > today && r.ymd <= weekEnd)
+        .sort((a, b) => a.ymd.localeCompare(b.ymd)),
+    };
+  }, [agenda.eventsByDay]);
+
+  const list = buckets[tab];
+  const firstName = me?.name?.trim().split(/\s+/)[0] ?? "";
+  const dateLabel = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
 
   return (
     <>
-      <PageHeader
-        icon={<LayoutDashboard className="h-5 w-5" />}
-        title="Dashboard"
-        description="Visão geral dos seus produtores. Cadastre produtores, fazendas e talhões e monte a recomendação da safra."
-      />
+      {/* Greeting + actions */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-ta-soft text-ta">
+            <CalendarDays className="size-5" />
+          </span>
+          <div>
+            <p className="font-display text-xs font-bold uppercase tracking-[0.12em] text-primary-strong">
+              {dateLabel}
+            </p>
+            <h1 className="mt-0.5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong md:text-[1.7rem]">
+              {greeting()}
+              {firstName ? `, ${firstName}` : ""}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Você tem{" "}
+              <b className="text-text-strong">
+                {agenda.lateCount} aplicaç{agenda.lateCount === 1 ? "ão" : "ões"}{" "}
+                atrasada{agenda.lateCount === 1 ? "" : "s"}
+              </b>{" "}
+              e <b className="text-text-strong">{agenda.todayCount} para hoje</b>.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <Button asChild variant="outline">
+            <Link href="/cronograma">
+              <CalendarDays className="size-4" /> Cronograma
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/producers">
+              <Users className="size-4" /> Produtores
+            </Link>
+          </Button>
+          <Button asChild variant="clay">
+            <Link href="/producers/new">
+              <Plus className="size-4" /> Cadastrar produtor
+            </Link>
+          </Button>
+        </div>
+      </div>
 
+      {/* KPI strip */}
       {loading ? (
-        <DashboardKpiSkeleton cards={3} />
+        <DashboardKpiSkeleton cards={4} />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
+        <KpiStrip className="mb-6">
+          <KpiCell
             label="Produtores"
             value={producerCount}
-            sub="cadastrados na sua carteira"
-            icon={<Users className="h-4 w-4" />}
-            accent="primary"
+            sub="na carteira"
+            icon={<Users className="size-4" />}
           />
-          <StatCard
+          <KpiCell
             label="Fazendas"
             value={farms.data?.pagination?.total ?? 0}
-            sub="com talhões mapeados"
-            icon={<Building2 className="h-4 w-4" />}
-            accent="sky"
+            sub="mapeadas"
+            icon={<Building2 className="size-4" />}
           />
-          <StatCard
-            label="Safras"
+          <KpiCell
+            label="Safras ativas"
             value={seasons.data?.pagination?.total ?? 0}
-            sub="em planejamento e andamento"
-            icon={<Leaf className="h-4 w-4" />}
-            accent="sun"
+            sub="em andamento"
+            icon={<Leaf className="size-4" />}
           />
-        </div>
+          <KpiCell
+            label="Atrasadas"
+            value={agenda.lateCount}
+            sub="exigem ação"
+            icon={<CircleAlert className="size-4" />}
+            alert
+          />
+        </KpiStrip>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {/* Cadastrar produtor — destaque */}
-        <Link
-          href="/producers/new"
-          className="group relative overflow-hidden rounded-xl border-2 border-primary/30 bg-linear-to-br from-primary/10 to-primary/5 px-5 py-5 shadow-sm transition-all hover:border-primary/60 hover:from-primary/15 hover:to-primary/10"
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary">
-              <Plus className="h-5 w-5" />
+      {/* Attention panel + rail */}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <BellRing className="size-5 text-clay-strong" />
+              <h3 className="font-display text-[1.05rem] font-semibold text-text-strong">
+                Precisa de atenção
+              </h3>
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-foreground">Cadastrar produtor</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Fluxo guiado: produtor, fazenda, talhão, lista de compra e safra.
+            <SegmentedTabs<AttentionTab>
+              value={tab}
+              onValueChange={setTab}
+              items={[
+                { value: "late", label: "Atrasadas", badgeCount: buckets.late.length },
+                { value: "today", label: "Hoje", badgeCount: buckets.today.length },
+                { value: "week", label: "Semana", badgeCount: buckets.week.length },
+              ]}
+            />
+          </div>
+
+          {agenda.isLoading ? (
+            <div className="space-y-3 p-5">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-16 animate-pulse rounded-lg bg-surface-2"
+                />
+              ))}
+            </div>
+          ) : list.length === 0 ? (
+            <EmptyState
+              variant="inline"
+              icon={Leaf}
+              title="Nada por aqui"
+              description={
+                tab === "late"
+                  ? "Nenhuma aplicação atrasada. Tudo em dia!"
+                  : tab === "today"
+                    ? "Nenhuma aplicação para hoje."
+                    : "Nenhuma aplicação nos próximos 7 dias."
+              }
+            />
+          ) : (
+            <div>
+              {list.slice(0, 6).map((ev) => (
+                <div
+                  key={ev.id}
+                  className="flex items-center gap-3.5 border-t border-border px-5 py-3.5 first:border-t-0"
+                >
+                  <span
+                    className={
+                      "size-2.5 shrink-0 rounded-full " +
+                      (ev.isLate ? "bg-danger" : "bg-warning")
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <b className="text-[0.95rem] font-semibold text-text-strong">
+                      {ev.applicationTitle}
+                    </b>
+                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {ev.farmName} · {ev.plotName} · {ev.producerName}
+                    </div>
+                  </div>
+                  <div className="hidden text-right sm:block">
+                    <StatusBadge tone={ev.isLate ? "danger" : "warning"}>
+                      {ev.isLate ? "Atrasada" : "Na janela"}
+                    </StatusBadge>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {ev.pillLabel}
+                    </div>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/seasons/${ev.seasonId}`}>Abrir</Link>
+                  </Button>
+                </div>
+              ))}
+              <div className="flex items-center justify-center border-t border-border px-5 py-3.5">
+                <Link
+                  href="/cronograma"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-strong hover:underline"
+                >
+                  Ver cronograma completo <ArrowRight className="size-4" />
+                </Link>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <div className="flex flex-col gap-4">
+          <RailCard title="Resumo da carteira">
+            <RailRow label="Produtores" value={producerCount} />
+            <RailRow label="Fazendas" value={farms.data?.pagination?.total ?? 0} />
+            <RailRow label="Talhões" value={plotCount} />
+            <RailRow
+              label="Safras em andamento"
+              value={seasons.data?.pagination?.total ?? 0}
+              last
+            />
+          </RailCard>
+
+          <PriceCoverageRailCard
+            completeLists={priceCoverage.completeLists}
+            totalLists={priceCoverage.totalLists}
+            pendingLists={priceCoverage.pendingLists}
+            pct={priceCoverage.pct}
+            isLoading={priceCoverage.isLoading}
+          />
+
+          {planData?.plan ? (
+            <div className="rounded-xl border border-clay-border bg-clay-soft p-4.5 shadow-sm">
+              <div className="mb-2 flex items-center gap-2.5">
+                <Sparkles className="size-4 text-clay-strong" />
+                <b className="text-[0.95rem] text-text-strong">
+                  Plano {planData.plan.name} ·{" "}
+                  {planData.quota_usage?.current ?? 0}/
+                  {planData.quota_usage?.limit ?? planData.plan.plot_quota}{" "}
+                  talhões
+                </b>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Acompanhe o uso da sua quota em{" "}
+                <Link
+                  href="/profile"
+                  className="font-semibold text-clay-strong hover:underline"
+                >
+                  Meu perfil
+                </Link>
+                .
               </p>
             </div>
-          </div>
-          <ArrowRight className="absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 shrink-0 text-primary/60 transition-all group-hover:translate-x-1 group-hover:text-primary" />
-        </Link>
-
-        <NavCard
-          href="/cronograma"
-          title="Cronograma geral"
-          description="Calendário mensal com aplicações pendentes e atrasadas de todos os produtores."
-          icon={<CalendarDays className="h-5 w-5" />}
-        />
-        <NavCard
-          href="/producers"
-          title="Produtores"
-          description="Acompanhe a carteira, fazendas e o status de cada produtor."
-          icon={<Users className="h-5 w-5" />}
-        />
-        <NavCard
-          href="/catalog"
-          title="Produtos"
-          description="Catálogo global e os seus produtos personalizados."
-          icon={<Package className="h-5 w-5" />}
-        />
-        <NavCard
-          href="/reports"
-          title="Relatórios"
-          description="Comparativos e indicadores das suas safras."
-          icon={<BarChart3 className="h-5 w-5" />}
-        />
+          ) : null}
+        </div>
       </div>
     </>
-  );
-}
-
-function NavCard({
-  href,
-  title,
-  description,
-  icon,
-}: {
-  href: string;
-  title: string;
-  description: string;
-  icon: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-4 rounded-xl border bg-card px-5 py-5 shadow-sm transition-colors hover:bg-accent/50"
-    >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold text-foreground">{title}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-    </Link>
   );
 }
