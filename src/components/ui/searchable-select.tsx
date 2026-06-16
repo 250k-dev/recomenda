@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -12,12 +13,43 @@ export type SearchableSelectOption = {
   disabled?: boolean;
 };
 
+const PANEL_MAX_HEIGHT = 280;
+const PANEL_GAP_PX = 4;
+
+type PanelPosition = {
+  left: number;
+  minWidth: number;
+  top?: number;
+  bottom?: number;
+};
+
 function normalize(value: string): string {
   return value
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
     .toLowerCase()
     .trim();
+}
+
+function computePanelPosition(trigger: HTMLElement): PanelPosition {
+  const rect = trigger.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom - PANEL_GAP_PX;
+  const spaceAbove = rect.top - PANEL_GAP_PX;
+  const openUp = spaceBelow < PANEL_MAX_HEIGHT && spaceAbove > spaceBelow;
+
+  if (openUp) {
+    return {
+      bottom: window.innerHeight - rect.top + PANEL_GAP_PX,
+      left: rect.left,
+      minWidth: rect.width,
+    };
+  }
+
+  return {
+    top: rect.bottom + PANEL_GAP_PX,
+    left: rect.left,
+    minWidth: rect.width,
+  };
 }
 
 export type BaseSelectProps = {
@@ -62,7 +94,10 @@ export function BaseSelect({
 }: BaseSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [panelPosition, setPanelPosition] = useState<PanelPosition | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((option) => option.value === value);
@@ -76,10 +111,37 @@ export function BaseSelect({
     );
   }, [options, query, searchable]);
 
+  const updatePanelPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    setPanelPosition(computePanelPosition(trigger));
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setPanelPosition(null);
+      return;
+    }
+
+    updatePanelPosition();
+
+    const onScrollOrResize = () => updatePanelPosition();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [open, updatePanelPosition]);
+
   useEffect(() => {
     if (!open) return;
     const onMouseDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !containerRef.current?.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
         setOpen(false);
         setQuery("");
       }
@@ -110,9 +172,102 @@ export function BaseSelect({
 
   const showHeader = searchable || Boolean(filterLabel);
 
+  const panel =
+    open && panelPosition ? (
+      <div
+        ref={panelRef}
+        style={{
+          position: "fixed",
+          top: panelPosition.top,
+          bottom: panelPosition.bottom,
+          left: panelPosition.left,
+          minWidth: panelPosition.minWidth,
+          zIndex: 100,
+        }}
+        className="w-max overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md"
+      >
+        {showHeader ? (
+          <div className={cn("px-3 py-2.5", searchable && "border-b")}>
+            {filterLabel ? (
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {filterLabel}
+              </p>
+            ) : null}
+            {searchable ? (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  autoComplete="off"
+                  className="h-9 pl-8"
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setOpen(false);
+                      setQuery("");
+                    } else if (
+                      event.key === "Enter" &&
+                      filtered[0] &&
+                      !filtered[0].disabled
+                    ) {
+                      event.preventDefault();
+                      pick(filtered[0].value);
+                    }
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        <ul
+          role="listbox"
+          className="max-h-56 overflow-y-auto py-1"
+          aria-label={placeholder}
+        >
+          {filtered.length > 0 ? (
+            filtered.map((option) => {
+              const isSelected = option.value === value;
+              return (
+                <li key={option.value} role="none">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={option.disabled}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      if (!option.disabled) pick(option.value);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60",
+                      isSelected && "bg-primary/8",
+                      option.disabled && "cursor-not-allowed opacity-50",
+                    )}
+                  >
+                    <Check
+                      className={cn(
+                        "size-4 shrink-0 text-primary",
+                        isSelected ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <span className="whitespace-nowrap">{option.label}</span>
+                  </button>
+                </li>
+              );
+            })
+          ) : (
+            <li className="px-3 py-2.5 text-sm text-muted-foreground">{emptyMessage}</li>
+          )}
+        </ul>
+      </div>
+    ) : null;
+
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       <button
+        ref={triggerRef}
         id={id}
         name={name}
         type="button"
@@ -143,81 +298,9 @@ export function BaseSelect({
         />
       </button>
 
-      {open ? (
-        <div className="absolute left-0 z-50 mt-1 min-w-full w-max overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md">
-          {showHeader ? (
-            <div className={cn("px-3 py-2.5", searchable && "border-b")}>
-              {filterLabel ? (
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {filterLabel}
-                </p>
-              ) : null}
-              {searchable ? (
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    ref={searchRef}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={searchPlaceholder}
-                    autoComplete="off"
-                    className="h-9 pl-8"
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") {
-                        setOpen(false);
-                        setQuery("");
-                      } else if (event.key === "Enter" && filtered[0] && !filtered[0].disabled) {
-                        event.preventDefault();
-                        pick(filtered[0].value);
-                      }
-                    }}
-                  />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <ul
-            role="listbox"
-            className="max-h-56 overflow-y-auto py-1"
-            aria-label={placeholder}
-          >
-            {filtered.length > 0 ? (
-              filtered.map((option) => {
-                const isSelected = option.value === value;
-                return (
-                  <li key={option.value} role="none">
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      disabled={option.disabled}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        if (!option.disabled) pick(option.value);
-                      }}
-                      className={cn(
-                        "flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60",
-                        isSelected && "bg-primary/8",
-                        option.disabled && "cursor-not-allowed opacity-50",
-                      )}
-                    >
-                      <Check
-                        className={cn(
-                          "size-4 shrink-0 text-primary",
-                          isSelected ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                      <span className="whitespace-nowrap">{option.label}</span>
-                    </button>
-                  </li>
-                );
-              })
-            ) : (
-              <li className="px-3 py-2.5 text-sm text-muted-foreground">{emptyMessage}</li>
-            )}
-          </ul>
-        </div>
-      ) : null}
+      {typeof document !== "undefined" && panel
+        ? createPortal(panel, document.body)
+        : null}
     </div>
   );
 }
