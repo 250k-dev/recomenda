@@ -73,6 +73,14 @@ export default function DashboardPage() {
 
   const priceCoverage = usePortfolioPriceCoverage(producerIds);
 
+  const activeSeasonCount = useMemo(
+    () =>
+      (seasons.data?.data ?? []).filter((season) =>
+        season.status === "PUBLISHED" || season.status === "IN_PROGRESS",
+      ).length,
+    [seasons.data],
+  );
+
   const loading = farms.isLoading || producers.isLoading || seasons.isLoading;
 
   // Dedupe agenda events (one per recommendation) and bucket by state.
@@ -167,7 +175,7 @@ export default function DashboardPage() {
           />
           <KpiCell
             label="Safras ativas"
-            value={seasons.data?.pagination?.total ?? 0}
+            value={activeSeasonCount}
             sub="em andamento"
             icon={<Leaf className="size-4" />}
           />
