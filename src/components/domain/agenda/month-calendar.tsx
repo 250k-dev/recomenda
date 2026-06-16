@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
-import { useAgronomistAgenda, useProducers, localYmdToDate, type AgendaEvent } from "@/lib/api/hooks";
+import { useAgronomistAgenda, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 
 const MINI_WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -101,14 +101,14 @@ export function MonthCalendar({
     [producersData],
   );
 
-  const { eventsByDay, totalEventCount, todayCount, lateCount, isLoading, isError } =
+  const { eventsByDay, calendarMarkersByDay, totalEventCount, todayCount, lateCount, isLoading, isError } =
     useAgronomistAgenda(month, producerId);
 
   const today = new Date();
   const todayYmd = format(today, "yyyy-MM-dd");
 
   const allEvents = useMemo(
-    () => Object.values(eventsByDay).flat(),
+    () => dedupeAgendaEvents(Object.values(eventsByDay).flat()),
     [eventsByDay],
   );
 
@@ -125,10 +125,10 @@ export function MonthCalendar({
   }, [producerId]);
 
   const nextEventYmd = useMemo(() => {
-    const ymds = Object.keys(eventsByDay).sort();
+    const ymds = Object.keys(calendarMarkersByDay).sort();
     if (ymds.length === 0) return null;
     return ymds.find((ymd) => ymd >= todayYmd) ?? ymds[ymds.length - 1];
-  }, [eventsByDay, todayYmd]);
+  }, [calendarMarkersByDay, todayYmd]);
 
   useEffect(() => {
     if (!focusNearestEvent || isLoading || didAutoFocus.current || !nextEventYmd) return;
@@ -169,8 +169,9 @@ export function MonthCalendar({
   return (
     <div
       className={cn(
-        "flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6",
+        "flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8",
         showHeader && "rounded-xl border bg-card p-4 shadow-sm sm:p-5",
+        !showHeader && "pt-1",
       )}
     >
       {/* Coluna esquerda: navegação + mini calendário + KPIs */}
@@ -223,7 +224,7 @@ export function MonthCalendar({
           <MiniMonthCalendar
             month={month}
             calendarDays={calendarDays}
-            eventsByDay={eventsByDay}
+            calendarMarkersByDay={calendarMarkersByDay}
             selectedDay={selectedDay}
             today={today}
             todayYmd={todayYmd}
@@ -339,7 +340,7 @@ export function MonthCalendar({
 function MiniMonthCalendar({
   month,
   calendarDays,
-  eventsByDay,
+  calendarMarkersByDay,
   selectedDay,
   today,
   todayYmd,
@@ -347,7 +348,7 @@ function MiniMonthCalendar({
 }: {
   month: Date;
   calendarDays: Date[];
-  eventsByDay: Record<string, AgendaEvent[]>;
+  calendarMarkersByDay: Record<string, AgendaEvent[]>;
   selectedDay: Date;
   today: Date;
   todayYmd: string;
@@ -368,11 +369,11 @@ function MiniMonthCalendar({
       <div className="grid grid-cols-7 gap-0.5">
         {calendarDays.map((day) => {
           const ymd = format(day, "yyyy-MM-dd");
-          const dayEvents = eventsByDay[ymd] ?? [];
+          const dayMarkers = calendarMarkersByDay[ymd] ?? [];
           const inMonth = isSameMonth(day, month);
           const isToday = isSameDay(day, today);
           const isSelected = isSameDay(day, selectedDay);
-          const dotColor = getDayDotColor(dayEvents, todayYmd, ymd);
+          const dotColor = getDayDotColor(dayMarkers, todayYmd, ymd);
 
           return (
             <button

@@ -164,11 +164,11 @@ export function ContextBadge({
 
 export function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+    <div className="rounded-[14px] border border-border bg-card p-[18px] shadow-sm">
       <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 font-display text-lg font-semibold tracking-[-0.01em] text-text-strong">
+      <p className="mt-1 font-display text-[18px] font-semibold tracking-[-0.01em] text-text-strong">
         {value}
       </p>
     </div>

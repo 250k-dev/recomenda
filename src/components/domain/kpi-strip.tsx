@@ -31,15 +31,23 @@ export function KpiCell({
   sub,
   icon,
   alert = false,
+  onClick,
 }: {
   label: ReactNode;
   value: ReactNode;
   sub?: ReactNode;
   icon?: ReactNode;
   alert?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <div className={cn("px-5 py-4", alert ? "bg-clay-soft" : "bg-card")}>
+  const className = cn(
+    "w-full px-5 py-4 text-left",
+    onClick && "cursor-pointer transition-colors hover:bg-surface-2/80",
+    alert ? "bg-clay-soft" : "bg-card",
+  );
+
+  const content = (
+    <>
       <div
         className={cn(
           "flex items-center gap-1.5 text-xs font-medium",
@@ -71,6 +79,16 @@ export function KpiCell({
           {sub}
         </div>
       ) : null}
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }

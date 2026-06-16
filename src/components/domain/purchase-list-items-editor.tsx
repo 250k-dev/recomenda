@@ -35,6 +35,7 @@ type PurchaseListItemsEditorProps = {
   /** Cultura da lista — filtra variedades/híbridos por soja ou milho. */
   crop?: PurchaseListCrop | null;
   className?: string;
+  readOnly?: boolean;
 };
 
 function toProductOptionValue(item: ListItem): string {
@@ -47,6 +48,7 @@ export function PurchaseListItemsEditor({
   totalHa,
   crop,
   className,
+  readOnly = false,
 }: PurchaseListItemsEditorProps) {
   const platformCatalog = usePlatformCatalog();
   const globalCatalog = useGlobalCatalog();
@@ -156,37 +158,113 @@ export function PurchaseListItemsEditor({
         disabled={!it.category || resolvingProductKey === it.key}
         loading={resolvingProductKey === it.key}
         loadingMessage="Vinculando…"
-        className={minWidth}
+        size="sm"
+        className={cn("max-w-[160px]", minWidth)}
       />
+    );
+  };
+
+  const fmtBrl = (n: number) =>
+    n.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      maximumFractionDigits: 2,
+    });
+
+  const renderReadOnlyRow = (it: ListItem) => {
+    const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+    const toBuy = Math.max(0, required - Number(it.stock || 0));
+    const totalValue = toBuy * Number(it.price || 0);
+    const catLabel =
+      PRODUCT_CATEGORY_LABELS[it.category as keyof typeof PRODUCT_CATEGORY_LABELS] ??
+      it.category ??
+      "—";
+
+    return (
+      <tr key={it.key} className="align-middle">
+        <td className="max-w-[110px] truncate px-2.5 py-2 text-sm text-muted-foreground">
+          {catLabel}
+        </td>
+        <td className="max-w-[160px] truncate px-2.5 py-2 text-sm font-medium text-foreground">
+          {it.productName || "—"}
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
+          {fmt(Number(it.dose || 0))} {it.unit}/ha
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
+          {it.nApps}×
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
+          {fmt(Number(it.stock || 0))}
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
+          {it.price ? fmtBrl(Number(it.price)) : "—"}
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
+          {fmt(required)}
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm font-semibold tabular-nums text-foreground">
+          {fmt(toBuy)}
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-foreground">
+          {it.price ? fmtBrl(totalValue) : "—"}
+        </td>
+      </tr>
     );
   };
 
   return (
     <div className={cn("flex flex-col", className)}>
       <div className="hidden overflow-x-auto rounded-xl border bg-card shadow-sm lg:block">
-        <table className="w-full min-w-[820px] text-sm">
-          <thead className="bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead
+            className={cn(
+              "bg-muted/50 font-semibold uppercase tracking-wide text-muted-foreground",
+              readOnly ? "text-[13px]" : "text-xs",
+            )}
+          >
             <tr>
-              <th className="px-3 py-2.5 text-left">Categoria</th>
-              <th className="px-3 py-2.5 text-left">Produto</th>
-              <th className="px-3 py-2.5 text-left">Dose/ha</th>
-              <th className="min-w-[108px] px-3 py-2.5 text-left">Un.</th>
-              <th className="px-3 py-2.5 text-left">Nº apl.</th>
-              <th className="px-3 py-2.5 text-left">Estoque</th>
-              <th className="px-3 py-2.5 text-left">Preço R$/un.</th>
-              <th className="px-3 py-2.5 text-right">Necessário</th>
-              <th className="px-3 py-2.5 text-right">A comprar</th>
-              <th className="px-3 py-2.5 text-right">Valor total</th>
-              <th className="w-10 px-3 py-2.5" />
+              {readOnly ? (
+                <>
+                  <th className="px-2.5 py-2.5 text-left">Categoria</th>
+                  <th className="px-2.5 py-2.5 text-left">Produto</th>
+                  <th className="px-2.5 py-2.5 text-right">Dose/ha</th>
+                  <th className="px-2.5 py-2.5 text-right">Nº apl.</th>
+                  <th className="px-2.5 py-2.5 text-right">Estoque</th>
+                  <th className="px-2.5 py-2.5 text-right">Preço</th>
+                  <th className="px-2.5 py-2.5 text-right">Necessário</th>
+                  <th className="px-2.5 py-2.5 text-right">A comprar</th>
+                  <th className="px-2.5 py-2.5 text-right">Valor total</th>
+                </>
+              ) : (
+                <>
+                  <th className="px-2 py-2 text-left">Categoria</th>
+                  <th className="max-w-[160px] px-2 py-2 text-left">Produto</th>
+                  <th className="px-2 py-2 text-left">Dose/ha</th>
+                  <th className="min-w-[88px] px-2 py-2 text-left">Un.</th>
+                  <th className="px-2 py-2 text-left">Nº apl.</th>
+                  <th className="px-2 py-2 text-left">Estoque</th>
+                  <th className="px-2 py-2 text-left">Preço R$/un.</th>
+                  <th className="px-2 py-2 text-right">Necessário</th>
+                  <th className="px-2 py-2 text-right">A comprar</th>
+                  <th className="px-2 py-2 text-right">Valor total</th>
+                  <th className="w-10 px-2 py-2" />
+                </>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={readOnly ? 9 : 11}
+                  className="px-3 py-10 text-center text-sm text-muted-foreground"
+                >
                   Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
                 </td>
               </tr>
+            ) : readOnly ? (
+              items.map((it) => renderReadOnlyRow(it))
             ) : (
               items.map((it) => {
                 const rowProducts = productsForPurchaseListCategory(
@@ -201,7 +279,7 @@ export function PurchaseListItemsEditor({
                 const totalValue = toBuy * Number(it.price || 0);
                 return (
                   <tr key={it.key} className="align-middle">
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-1.5">
                       <Select
                         value={it.category}
                         onValueChange={(category) =>
@@ -209,65 +287,66 @@ export function PurchaseListItemsEditor({
                         }
                         placeholder="Selecione…"
                         filterLabel="Categoria"
+                        size="sm"
                         options={GLOBAL_PRODUCT_CATEGORIES.map((category) => ({
                           value: category,
                           label: PRODUCT_CATEGORY_LABELS[category],
                         }))}
-                        className="min-w-[140px]"
+                        className="min-w-[110px] max-w-[130px]"
                       />
                     </td>
-                    <td className="px-3 py-2 min-w-[220px]">
-                      {renderProductField(it, rowProducts, "min-w-[200px]")}
+                    <td className="max-w-[160px] px-2 py-1.5">
+                      {renderProductField(it, rowProducts, "min-w-[140px] max-w-[160px]")}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-1.5">
                       <Input
                         type="number"
                         step="0.01"
                         value={it.dose}
                         onChange={(e) => updateItem(it.key, { dose: e.target.value })}
-                        className="w-24"
+                        className="h-8 w-20"
                       />
                     </td>
-                    <td className="min-w-[108px] px-3 py-2">
+                    <td className="min-w-[88px] px-2 py-1.5">
                       <DoseUnitSelect
                         value={it.unit}
                         onChange={(val) => updateItem(it.key, { unit: val })}
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-1.5">
                       <Input
                         type="number"
                         value={it.nApps}
                         onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
-                        className="w-20"
+                        className="h-8 w-16"
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-1.5">
                       <Input
                         type="number"
                         step="0.01"
                         value={it.stock}
                         onChange={(e) => updateItem(it.key, { stock: e.target.value })}
-                        className="w-24"
+                        className="h-8 w-20"
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-1.5">
                       <Input
                         type="number"
                         step="0.01"
                         placeholder="opcional"
                         value={it.price}
                         onChange={(e) => updateItem(it.key, { price: e.target.value })}
-                        className="w-28"
+                        className="h-8 w-24"
                       />
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
                       {fmt(required)}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
+                    <td className="px-2 py-1.5 text-right text-xs font-semibold tabular-nums text-foreground">
                       {fmt(toBuy)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-foreground">
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums text-foreground">
                       {it.price
                         ? totalValue.toLocaleString("pt-BR", {
                             style: "currency",
@@ -276,14 +355,14 @@ export function PurchaseListItemsEditor({
                           })
                         : "—"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-1.5">
                       <button
                         type="button"
                         onClick={() => removeItem(it.key)}
-                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                         aria-label="Remover"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </td>
                   </tr>
@@ -299,6 +378,50 @@ export function PurchaseListItemsEditor({
           <div className="rounded-xl border border-dashed bg-card px-4 py-8 text-center text-sm text-muted-foreground">
             Nenhum produto adicionado.
           </div>
+        ) : readOnly ? (
+          items.map((it) => {
+            const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+            const toBuy = Math.max(0, required - Number(it.stock || 0));
+            const totalValue = toBuy * Number(it.price || 0);
+            const catLabel =
+              PRODUCT_CATEGORY_LABELS[it.category as keyof typeof PRODUCT_CATEGORY_LABELS] ??
+              it.category ??
+              "—";
+            return (
+              <div key={it.key} className="rounded-xl border bg-card p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {catLabel}
+                </p>
+                <p className="mt-1 text-base font-medium text-foreground">{it.productName || "—"}</p>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Dose/ha</span>
+                    <p className="mt-0.5 tabular-nums">
+                      {fmt(Number(it.dose || 0))} {it.unit}/ha · {it.nApps}×
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">A comprar</span>
+                    <p className="mt-0.5 font-semibold tabular-nums">
+                      {fmt(toBuy)} {it.unit}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Preço</span>
+                    <p className="mt-0.5 tabular-nums">
+                      {it.price ? fmtBrl(Number(it.price)) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Valor total</span>
+                    <p className="mt-0.5 font-semibold tabular-nums">
+                      {it.price ? fmtBrl(totalValue) : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })
         ) : (
           items.map((it) => {
             const rowProducts = productsForPurchaseListCategory(
@@ -403,12 +526,14 @@ export function PurchaseListItemsEditor({
         )}
       </div>
 
-      <div className="mt-4">
-        <Button type="button" variant="outline" onClick={addItem} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Adicionar produto
-        </Button>
-      </div>
+      {!readOnly ? (
+        <div className="mt-4">
+          <Button type="button" variant="outline" onClick={addItem} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Adicionar produto
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

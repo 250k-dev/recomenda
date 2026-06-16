@@ -38,11 +38,11 @@ import {
   usePlatformCatalog,
 } from "@/lib/api/hooks";
 import { CostPlanView } from "@/components/domain/cost-plan/cost-plan-view";
-import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import type { Recommendation, RecommendationItem } from "@/lib/api/client";
 import {
   Send,
   ChevronDown,
+  ChevronUp,
   CheckCircle2,
   Clock,
   SkipForward,
@@ -55,8 +55,6 @@ import {
   CalendarDays,
   Leaf,
   Sprout,
-  ArrowUp,
-  ArrowDown,
 } from "lucide-react";
 import {
   RecommendationStageFields,
@@ -71,10 +69,9 @@ import { extractError } from "@/components/domain/season/_shared";
 
 type TabValue = "recommendations" | "cost-plan";
 
-const TAB_LABELS: Record<TabValue, string> = {
-  recommendations: "Recomendações",
-  "cost-plan": "Plano de custo",
-};
+function parseSeasonTab(value: string | null): TabValue {
+  return value === "cost-plan" ? "cost-plan" : "recommendations";
+}
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
@@ -602,15 +599,18 @@ function RecommendationCard({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className={cn(
-          "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors",
+          "flex w-full items-center gap-3 px-4 py-4 text-left transition-colors",
           isPending ? "hover:bg-primary/5" : "hover:bg-accent/40",
         )}
       >
-        <div className="flex shrink-0 items-start gap-1">
+        <div className="flex shrink-0 items-center gap-2">
           {canReorder ? (
             <div
-              className="flex flex-col gap-0.5 pt-0.5"
+              role="group"
+              aria-label="Reordenar etapa"
+              className="flex shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
@@ -619,24 +619,25 @@ function RecommendationCard({
                 onClick={onMoveUp}
                 disabled={!canMoveUp || isReordering}
                 aria-label="Mover etapa para cima"
-                className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
               >
-                <ArrowUp className="h-3.5 w-3.5" />
+                <ChevronUp className="h-4 w-4" />
               </button>
+              <div className="h-px bg-border" aria-hidden="true" />
               <button
                 type="button"
                 onClick={onMoveDown}
                 disabled={!canMoveDown || isReordering}
                 aria-label="Mover etapa para baixo"
-                className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
               >
-                <ArrowDown className="h-3.5 w-3.5" />
+                <ChevronDown className="h-4 w-4" />
               </button>
             </div>
           ) : null}
           <span
             className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
               isDone
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : isSkipped
@@ -670,7 +671,7 @@ function RecommendationCard({
           )}
         </div>
 
-        <div className="flex shrink-0 items-start gap-2">
+        <div className="flex shrink-0 items-center gap-2.5">
           {isDone && rec.executed_date ? (
             <StageDateBadge label="Aplicado" date={rec.executed_date} tone="success" />
           ) : isSkipped ? null : rec.predicted_date_current ? (
@@ -681,18 +682,26 @@ function RecommendationCard({
               tone="primary"
             />
           ) : null}
-          <ChevronDown
+          <span
+            aria-hidden="true"
             className={cn(
-              "mt-3 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
-              open && "rotate-180",
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-muted-foreground transition-colors",
+              open && "border-primary/30 bg-primary/5 text-primary-strong",
             )}
-          />
+          >
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                open && "rotate-180",
+              )}
+            />
+          </span>
         </div>
       </button>
 
       {open && (
         <div className="flex flex-col gap-4 border-t px-4 pb-4 pt-3">
-          <div className="rounded-xl border border-border bg-surface-2 p-4">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <p className="mb-3 text-sm font-semibold text-foreground">Dados da etapa</p>
             <RecommendationStageFields
               draft={stageDraft}
@@ -758,34 +767,87 @@ function RecommendationCard({
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div
+            className={cn(
+              "rounded-xl border p-4",
+              (isDone || isSkipped) && !registering
+                ? isSkipped
+                  ? "border-clay-border bg-clay-soft"
+                  : rec.status === "APPLIED_LATE"
+                    ? "border-warning-border bg-warning-soft"
+                    : "border-success-border bg-success-soft"
+                : "border-border bg-card shadow-sm",
+            )}
+          >
+            <p
+              className={cn(
+                "mb-3 text-[11px] font-bold uppercase tracking-[0.1em]",
+                (isDone || isSkipped) && !registering
+                  ? isSkipped
+                    ? "text-clay-strong"
+                    : rec.status === "APPLIED_LATE"
+                      ? "text-warning-strong"
+                      : "text-success-strong"
+                  : "text-muted-foreground",
+              )}
+            >
               Execução
             </p>
 
-            {(isDone || isSkipped) && !registering && (
-              <div className="mb-2 flex items-center gap-2 text-sm">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
-                    STATUS_BADGE_CLASS[rec.status],
-                  )}
-                >
-                  {STATUS_ICON[rec.status]}
-                  {STATUS_LABEL[rec.status]}
-                </span>
-                {rec.executed_date && (
-                  <span className="text-xs text-muted-foreground">
-                    em {fmtDate(rec.executed_date)}
+            {(isDone || isSkipped) && !registering ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white",
+                      isSkipped
+                        ? "bg-clay-strong"
+                        : rec.status === "APPLIED_LATE"
+                          ? "bg-warning-strong"
+                          : "bg-success",
+                    )}
+                  >
+                    {STATUS_ICON[rec.status]}
+                    {STATUS_LABEL[rec.status]}
                   </span>
-                )}
-                {rec.notes && (
-                  <span className="text-xs text-muted-foreground">· {rec.notes}</span>
-                )}
+                  {rec.executed_date ? (
+                    <span className="text-sm text-foreground">
+                      em {fmtDate(rec.executed_date)}
+                    </span>
+                  ) : null}
+                  {rec.notes ? (
+                    <span className="text-sm text-muted-foreground">· {rec.notes}</span>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRegistering(true)}
+                    className="h-9 gap-1.5 bg-card"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleUndo}
+                    disabled={isBusy}
+                    className={cn(
+                      "h-9 gap-1.5 px-2 text-sm font-semibold",
+                      isSkipped
+                        ? "text-clay-strong hover:text-clay-strong"
+                        : rec.status === "APPLIED_LATE"
+                          ? "text-warning-strong hover:text-warning-strong"
+                          : "text-success-strong hover:text-success-strong",
+                    )}
+                  >
+                    Reverter para pendente
+                  </Button>
+                </div>
               </div>
-            )}
-
-            {registering ? (
+            ) : registering ? (
               <div className="rounded-xl border border-border bg-surface-2 p-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5 rounded-lg border border-primary/25 bg-surface p-3">
@@ -794,20 +856,20 @@ function RecommendationCard({
                       type="date"
                       value={executedDate}
                       onChange={(e) => setExecutedDate(e.target.value)}
-                      className="h-10 border-primary/30 text-sm font-semibold"
+                      className="h-10 border-primary/30 bg-card text-sm font-semibold"
                     />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1.5">
                     <Label className="text-xs">Observações (opcional)</Label>
                     <Input
                       value={execNotes}
                       onChange={(e) => setExecNotes(e.target.value)}
                       placeholder="Ex: aplicado 10% a menos por chuva"
-                      className="h-8 text-sm"
+                      className="h-10 bg-card text-sm"
                     />
                   </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     onClick={handleApply}
@@ -822,7 +884,7 @@ function RecommendationCard({
                     variant="outline"
                     onClick={handleSkip}
                     disabled={isBusy}
-                    className="h-8 gap-1.5 text-muted-foreground"
+                    className="h-8 gap-1.5 bg-card text-muted-foreground"
                   >
                     <SkipForward className="h-3.5 w-3.5" />
                     Pular etapa
@@ -842,36 +904,12 @@ function RecommendationCard({
                 size="sm"
                 variant="outline"
                 onClick={() => setRegistering(true)}
-                className="h-8 gap-1.5"
+                className="h-8 gap-1.5 bg-card"
               >
                 <CalendarDays className="h-3.5 w-3.5" />
                 Registrar execução
               </Button>
             ) : null}
-
-            {(isDone || isSkipped) && !registering && (
-              <div className="mt-2 flex gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setRegistering(true)}
-                  className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <Pencil className="h-3 w-3" />
-                  Editar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleUndo}
-                  disabled={isBusy}
-                  className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-destructive"
-                >
-                  <X className="h-3 w-3" />
-                  Reverter para pendente
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1075,12 +1113,12 @@ function RecommendationsTab({
 }
 
 export default function SeasonDetailPage() {
-  const [activeTab, setActiveTab] = useState<TabValue>("recommendations");
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const seasonId = params.id;
   const farmIdFromQuery = searchParams.get("farm_id");
   const producerIdFromQuery = searchParams.get("producer_id");
+  const activeTab = parseSeasonTab(searchParams.get("tab"));
 
   const publishMutation = usePublishSeason(seasonId || "");
   const { data: season, isLoading: loadingSeason } = useSeason(seasonId || "");
@@ -1134,38 +1172,27 @@ export default function SeasonDetailPage() {
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <SegmentedTabs
-          variant="pill"
-          value={activeTab}
-          onValueChange={setActiveTab}
-          items={(Object.keys(TAB_LABELS) as TabValue[]).map((key) => ({
-            value: key,
-            label: TAB_LABELS[key],
-          }))}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          {season?.status ? (
-            <Badge variant={STATUS_VARIANTS[season.status] || "default"}>
-              {statusLabel}
-            </Badge>
-          ) : null}
-          {season?.status === "DRAFT" ? (
-            <Button
-              size="sm"
-              className="gap-2"
-              onClick={handlePublish}
-              disabled={publishMutation.isPending}
-            >
-              <Send className="h-4 w-4" />
-              {publishMutation.isPending ? "Publicando..." : "Publicar safra"}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      {activeTab === "recommendations" && (
+      {activeTab === "recommendations" ? (
         <>
+          <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
+            {season?.status ? (
+              <Badge variant={STATUS_VARIANTS[season.status] || "default"}>
+                {statusLabel}
+              </Badge>
+            ) : null}
+            {season?.status === "DRAFT" ? (
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={handlePublish}
+                disabled={publishMutation.isPending}
+              >
+                <Send className="h-4 w-4" />
+                {publishMutation.isPending ? "Publicando..." : "Publicar safra"}
+              </Button>
+            ) : null}
+          </div>
+
           {loadingSeason ? (
             <PageHeaderSkeleton withAction />
           ) : (
@@ -1182,8 +1209,7 @@ export default function SeasonDetailPage() {
             />
           )}
         </>
-      )}
-      {activeTab === "cost-plan" && (
+      ) : (
         <CostPlanView
           seasonId={seasonId}
           crop={season?.crop ?? "SOYBEAN"}

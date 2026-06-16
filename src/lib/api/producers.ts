@@ -30,6 +30,11 @@ export interface AgronomistProducerListRow {
   is_active: boolean;
   account_status: AdminProducerAccountStatus;
   total_hectares?: number;
+  farms_count?: number | null;
+  plots_count?: number | null;
+  active_seasons_count?: number | null;
+  attention_late_count?: number;
+  attention_today_count?: number;
 }
 
 export function activeAgronomistProducerAccounts(

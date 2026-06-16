@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { RailCard, RailRow } from "@/components/domain/rail-card";
+import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,9 @@ import {
   useSeasons,
   useMe,
   usePlanQuota,
+  usePortfolioPriceCoverage,
 } from "@/lib/api/hooks";
+import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
 import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
 
 type AttentionTab = "late" | "today" | "week";
@@ -50,12 +53,25 @@ export default function DashboardPage() {
 
   const [tab, setTab] = useState<AttentionTab>("late");
 
-  const producerCount = useMemo(
-    () =>
-      (producers.data?.data ?? []).filter((p) => p.row_type === "producer")
-        .length,
+  const activeProducers = useMemo(
+    () => activeAgronomistProducerAccounts(producers.data?.data ?? []),
     [producers.data],
   );
+
+  const producerCount = activeProducers.length;
+
+  const plotCount = useMemo(
+    () =>
+      activeProducers.reduce((sum, producer) => sum + (producer.plots_count ?? 0), 0),
+    [activeProducers],
+  );
+
+  const producerIds = useMemo(
+    () => activeProducers.map((producer) => producer.producer_id),
+    [activeProducers],
+  );
+
+  const priceCoverage = usePortfolioPriceCoverage(producerIds);
 
   const loading = farms.isLoading || producers.isLoading || seasons.isLoading;
 
@@ -96,7 +112,7 @@ export default function DashboardPage() {
             <CalendarDays className="size-5" />
           </span>
           <div>
-            <p className="font-display text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
+            <p className="font-display text-xs font-bold uppercase tracking-[0.12em] text-primary-strong">
               {dateLabel}
             </p>
             <h1 className="mt-0.5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong md:text-[1.7rem]">
@@ -117,6 +133,11 @@ export default function DashboardPage() {
           <Button asChild variant="outline">
             <Link href="/cronograma">
               <CalendarDays className="size-4" /> Cronograma
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/producers">
+              <Users className="size-4" /> Produtores
             </Link>
           </Button>
           <Button asChild variant="clay">
@@ -253,12 +274,21 @@ export default function DashboardPage() {
           <RailCard title="Resumo da carteira">
             <RailRow label="Produtores" value={producerCount} />
             <RailRow label="Fazendas" value={farms.data?.pagination?.total ?? 0} />
+            <RailRow label="Talhões" value={plotCount} />
             <RailRow
               label="Safras em andamento"
               value={seasons.data?.pagination?.total ?? 0}
               last
             />
           </RailCard>
+
+          <PriceCoverageRailCard
+            completeLists={priceCoverage.completeLists}
+            totalLists={priceCoverage.totalLists}
+            pendingLists={priceCoverage.pendingLists}
+            pct={priceCoverage.pct}
+            isLoading={priceCoverage.isLoading}
+          />
 
           {planData?.plan ? (
             <div className="rounded-xl border border-clay-border bg-clay-soft p-4.5 shadow-sm">

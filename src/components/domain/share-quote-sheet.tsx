@@ -14,15 +14,18 @@ import {
 } from "@/components/ui/sheet";
 import { useCreateQuoteRequest } from "@/lib/api/hooks";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export function ShareQuoteSheet({
   listId,
   listName,
   producerName,
+  triggerClassName,
 }: {
   listId: string;
   listName: string;
   producerName?: string | null;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -64,7 +67,11 @@ export function ShareQuoteSheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn("gap-1.5", triggerClassName)}
+        >
           <Share2 className="h-4 w-4" />
           Compartilhar cotação
         </Button>

@@ -4,15 +4,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Check, KeyRound } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -115,157 +108,179 @@ export function AccountSettingsPanel() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="border-b border-border pb-4">
-          <CardTitle>Dados pessoais</CardTitle>
-          <CardDescription>Atualize suas informações de contato.</CardDescription>
-        </CardHeader>
-        <CardContent className="px-0">
-          <form onSubmit={onUpdateProfile} className="space-y-4">
-            <div className="space-y-4 px-6">
-              <div className="space-y-2">
-                <Label htmlFor="account-name">Nome</Label>
-                <Input
-                  id="account-name"
-                  placeholder="Seu nome completo"
-                  {...profileForm.register("name")}
-                />
-                {profileForm.formState.errors.name && (
-                  <p className="text-xs text-destructive">
-                    {profileForm.formState.errors.name.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="account-email">Email</Label>
-                <Input
-                  id="account-email"
-                  type="email"
-                  placeholder="seu.email@exemplo.com"
-                  {...profileForm.register("email")}
-                />
-                {profileForm.formState.errors.email && (
-                  <p className="text-xs text-destructive">
-                    {profileForm.formState.errors.email.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="account-phone">Telefone</Label>
-                <Input
-                  id="account-phone"
-                  placeholder="(11) 99999-9999"
-                  {...profileForm.register("phone")}
-                />
-              </div>
+    <div className="space-y-[18px]">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-5 py-5 sm:px-[22px]">
+          <h2 className="font-display text-[17px] font-semibold text-text-strong">
+            Dados pessoais
+          </h2>
+          <p className="mt-1 text-[13.5px] text-muted-foreground">
+            Atualize suas informações de contato.
+          </p>
+        </div>
+        <form onSubmit={onUpdateProfile} className="space-y-4 px-5 py-5 sm:px-[22px] sm:py-[22px]">
+          <div className="space-y-1.5">
+            <Label htmlFor="account-name" className="text-[13.5px] font-semibold text-text-strong">
+              Nome
+            </Label>
+            <Input
+              id="account-name"
+              placeholder="Seu nome completo"
+              className="h-[46px] rounded-xl"
+              {...profileForm.register("name")}
+            />
+            {profileForm.formState.errors.name ? (
+              <p className="text-xs text-destructive">
+                {profileForm.formState.errors.name.message}
+              </p>
+            ) : null}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="account-email" className="text-[13.5px] font-semibold text-text-strong">
+                E-mail
+              </Label>
+              <Input
+                id="account-email"
+                type="email"
+                placeholder="seu.email@exemplo.com"
+                className="h-[46px] rounded-xl"
+                {...profileForm.register("email")}
+              />
+              {profileForm.formState.errors.email ? (
+                <p className="text-xs text-destructive">
+                  {profileForm.formState.errors.email.message}
+                </p>
+              ) : null}
             </div>
-            <CardFooter className="w-full mt-6">
-              <Button
-                type="submit"
-                disabled={updateProfileMutation.isPending}
-                className="w-full"
-              >
-                {updateProfileMutation.isPending ? "Salvando…" : "Salvar"}
-              </Button>
-            </CardFooter>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Segurança</CardTitle>
-          <CardDescription>
-            Altere sua senha para manter sua conta segura
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="px-0">
-          {!showPasswordForm ? (
-            <CardFooter className="w-full">
-              <Button
-                variant="outline"
-                onClick={() => setShowPasswordForm(true)}
-                className="w-full"
-              >
-                Alterar senha
-              </Button>
-            </CardFooter>
-          ) : (
-            <form
-              onSubmit={onChangePassword}
-              className="space-y-4 animate-slide-up"
+            <div className="space-y-1.5">
+              <Label htmlFor="account-phone" className="text-[13.5px] font-semibold text-text-strong">
+                Telefone
+              </Label>
+              <Input
+                id="account-phone"
+                placeholder="(11) 99999-9999"
+                className="h-[46px] rounded-xl"
+                {...profileForm.register("phone")}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end pt-1">
+            <Button
+              type="submit"
+              disabled={updateProfileMutation.isPending}
+              className="h-11 gap-2 px-5 text-[14.5px]"
             >
-              <div className="space-y-4 px-6">
-                <div className="space-y-2">
-                  <Label htmlFor="account-old-pass">Senha atual</Label>
-                  <PasswordInput
-                    id="account-old-pass"
-                    placeholder="Digite sua senha atual"
-                    {...passwordForm.register("old_password")}
-                  />
-                  {passwordForm.formState.errors.old_password && (
-                    <p className="text-xs text-destructive">
-                      {passwordForm.formState.errors.old_password.message}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="account-new-pass">Nova senha</Label>
+              <Check className="h-4 w-4" />
+              {updateProfileMutation.isPending ? "Salvando…" : "Salvar alterações"}
+            </Button>
+          </div>
+        </form>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-[22px] sm:py-5">
+          <div>
+            <h2 className="font-display text-[17px] font-semibold text-text-strong">
+              Segurança
+            </h2>
+            <p className="mt-1 text-[13.5px] text-muted-foreground">
+              Altere sua senha para manter sua conta segura.
+            </p>
+          </div>
+          {!showPasswordForm ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowPasswordForm(true)}
+              className="h-11 shrink-0 gap-2 bg-surface px-[18px]"
+            >
+              <KeyRound className="h-4 w-4" />
+              Alterar senha
+            </Button>
+          ) : null}
+        </div>
+
+        {showPasswordForm ? (
+          <form
+            onSubmit={onChangePassword}
+            className="animate-slide-up border-t border-border px-5 py-5 sm:px-[22px] sm:py-[22px]"
+          >
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="account-old-pass" className="text-[13.5px] font-semibold text-text-strong">
+                  Senha atual
+                </Label>
+                <PasswordInput
+                  id="account-old-pass"
+                  placeholder="Digite sua senha atual"
+                  className="h-[46px] rounded-xl"
+                  {...passwordForm.register("old_password")}
+                />
+                {passwordForm.formState.errors.old_password ? (
+                  <p className="text-xs text-destructive">
+                    {passwordForm.formState.errors.old_password.message}
+                  </p>
+                ) : null}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="account-new-pass" className="text-[13.5px] font-semibold text-text-strong">
+                    Nova senha
+                  </Label>
                   <PasswordInput
                     id="account-new-pass"
                     placeholder="Digite uma nova senha"
+                    className="h-[46px] rounded-xl"
                     {...passwordForm.register("new_password")}
                   />
-                  {passwordForm.formState.errors.new_password && (
+                  {passwordForm.formState.errors.new_password ? (
                     <p className="text-xs text-destructive">
                       {passwordForm.formState.errors.new_password.message}
                     </p>
-                  )}
+                  ) : null}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="account-confirm-pass">
+                <div className="space-y-1.5">
+                  <Label htmlFor="account-confirm-pass" className="text-[13.5px] font-semibold text-text-strong">
                     Confirmar nova senha
                   </Label>
                   <PasswordInput
                     id="account-confirm-pass"
                     placeholder="Confirme a nova senha"
+                    className="h-[46px] rounded-xl"
                     {...passwordForm.register("confirm_password")}
                   />
-                  {passwordForm.formState.errors.confirm_password && (
+                  {passwordForm.formState.errors.confirm_password ? (
                     <p className="text-xs text-destructive">
                       {passwordForm.formState.errors.confirm_password.message}
                     </p>
-                  )}
+                  ) : null}
                 </div>
               </div>
-              <CardFooter className="w-full mt-6 gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setShowPasswordForm(false);
-                    passwordForm.reset();
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={changePasswordMutation.isPending}
-                  className="flex-1"
-                >
-                  {changePasswordMutation.isPending
-                    ? "Alterando…"
-                    : "Alterar senha"}
-                </Button>
-              </CardFooter>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 bg-surface px-4"
+                onClick={() => {
+                  setShowPasswordForm(false);
+                  passwordForm.reset();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={changePasswordMutation.isPending}
+                className="h-11 gap-2 px-5"
+              >
+                {changePasswordMutation.isPending ? "Alterando…" : "Alterar senha"}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </section>
     </div>
   );
 }

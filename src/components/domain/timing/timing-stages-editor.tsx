@@ -1,16 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, FlaskConical, Info, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleAlert, FlaskConical, Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BrazilianDateInput } from "@/components/ui/brazilian-date-input";
 import { Input } from "@/components/ui/input";
+import { BrazilianDateInput } from "@/components/ui/brazilian-date-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SearchableSelect } from "@/components/ui/select";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Field } from "@/components/domain/season/_shared";
-import { useLocalCatalog, useProducerPurchaseLists } from "@/lib/api/hooks";
+import { useLocalCatalog, useProducerPurchaseLists, useFarmPurchaseLists } from "@/lib/api/hooks";
 import {
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
@@ -18,12 +18,13 @@ import {
 import type { Product } from "@/lib/api/catalog";
 import { CROP_LABELS } from "@/lib/season-constants";
 import {
-  formatTimingPreviewDate,
-  recommendedYmdToWindow,
-  todayLocalYmd,
-  windowDatesFromRecommendedYmd,
-  windowToRecommendedYmd,
+  dayOffsetToIsoDate,
+  isoDateToDayOffset,
 } from "@/lib/timing/window-days";
+import {
+  findPurchaseListOverages,
+  formatDosePerHa,
+} from "@/lib/timing/purchase-list-budget";
 import { cn } from "@/lib/utils";
 
 export const TIMING_TRIGGER_TYPES = [
@@ -57,26 +58,44 @@ function productsForCategory(products: Product[], category: string): Product[] {
   return products.filter((product) => (product.category ?? "OTHER") === category);
 }
 
-function usePurchaseListCatalogProducts(producerId?: string, crop?: string) {
+function usePurchaseListCatalogProducts(
+  producerId?: string,
+  crop?: string,
+  farmId?: string,
+) {
   const { data: catalogData, isLoading: catalogLoading } = useLocalCatalog();
-  const { data: purchaseLists, isLoading: listsLoading } = useProducerPurchaseLists(
+  const { data: producerLists, isLoading: listsLoading } = useProducerPurchaseLists(
     producerId ?? "",
   );
+  const { data: farmLists, isLoading: farmListsLoading } = useFarmPurchaseLists(
+    farmId ?? "",
+  );
+
+  const purchaseLists = useMemo(() => {
+    const source =
+      farmId && (farmLists?.length ?? 0) > 0
+        ? (farmLists ?? [])
+        : (producerLists ?? []);
+    return crop ? source.filter((list) => list.crop === crop) : source;
+  }, [crop, farmId, farmLists, producerLists]);
 
   const productList = useMemo(() => {
     const catalog = catalogData?.data ?? [];
     if (!producerId) return catalog;
 
-    const lists = (purchaseLists ?? []).filter((list) => !crop || list.crop === crop);
     const allowedIds = new Set(
-      lists.flatMap((list) => list.items.map((item) => item.local_product_id)),
+      purchaseLists.flatMap((list) => list.items.map((item) => item.local_product_id)),
     );
     return catalog.filter((product) => allowedIds.has(product.id));
-  }, [catalogData, crop, producerId, purchaseLists]);
+  }, [catalogData, producerId, purchaseLists]);
 
   return {
     productList,
-    isLoading: catalogLoading || (Boolean(producerId) && listsLoading),
+    purchaseLists,
+    isLoading:
+      catalogLoading ||
+      (Boolean(producerId) && listsLoading) ||
+      (Boolean(farmId) && farmListsLoading),
   };
 }
 
@@ -105,7 +124,7 @@ export function newTimingStageField(name = ""): TimingStageField {
     key: crypto.randomUUID(),
     name,
     trigger_type: "POST_PLANTING",
-    recommended_date: todayLocalYmd(),
+    recommended_date: dayOffsetToIsoDate(0),
     notes: "",
     products: [],
   };
@@ -115,40 +134,47 @@ export function StageWindowDateFields({
   recommendedDate,
   onRecommendedDateChange,
   readOnly = false,
+  mode = "days",
 }: {
   recommendedDate: string;
   onRecommendedDateChange: (recommendedDate: string) => void;
   readOnly?: boolean;
+  /** `days` = offset from phase milestone (templates); `date` = calendar date on a live season */
+  mode?: "days" | "date";
 }) {
-  const { startYmd, centerYmd, endYmd } = windowDatesFromRecommendedYmd(recommendedDate);
-
-  return (
-    <div className="grid gap-3 sm:col-span-2 sm:grid-cols-3">
-      <Field
-        label="Data recomendada"
-        hint="Na safra, calculada a partir do marco da fase."
-      >
+  if (mode === "date") {
+    return (
+      <Field label="Período">
         <BrazilianDateInput
-          value={centerYmd}
+          value={recommendedDate}
           onChange={onRecommendedDateChange}
           readOnly={readOnly}
         />
       </Field>
-      <Field label="Início da janela">
-        <BrazilianDateInput
-          value={startYmd}
-          readOnly
-          aria-label={`Início da janela: ${formatTimingPreviewDate(startYmd)}`}
-        />
-      </Field>
-      <Field label="Fim da janela">
-        <BrazilianDateInput
-          value={endYmd}
-          readOnly
-          aria-label={`Fim da janela: ${formatTimingPreviewDate(endYmd)}`}
-        />
-      </Field>
-    </div>
+    );
+  }
+
+  const targetDay = isoDateToDayOffset(recommendedDate);
+
+  return (
+    <Field
+      label="Período"
+      hint="Dias a partir do marco da fase. A janela de ±2 dias é calculada automaticamente."
+    >
+      <Input
+        type="number"
+        min={0}
+        step={1}
+        value={Number.isFinite(targetDay) ? String(targetDay) : "0"}
+        onChange={(e) => {
+          const parsed = Number.parseInt(e.target.value, 10);
+          if (Number.isNaN(parsed)) return;
+          onRecommendedDateChange(dayOffsetToIsoDate(parsed));
+        }}
+        readOnly={readOnly}
+        disabled={readOnly}
+      />
+    </Field>
   );
 }
 
@@ -157,13 +183,21 @@ function StageProductsEditor({
   onChange,
   producerId,
   crop,
+  farmId,
+  overBudgetProductIds,
 }: {
   products: StageProductDraft[];
   onChange: (products: StageProductDraft[]) => void;
   producerId?: string;
   crop?: string;
+  farmId?: string;
+  overBudgetProductIds: Set<string>;
 }) {
-  const { productList, isLoading } = usePurchaseListCatalogProducts(producerId, crop);
+  const { productList, isLoading } = usePurchaseListCatalogProducts(
+    producerId,
+    crop,
+    farmId,
+  );
 
   const availableCategories = useMemo(() => {
     const categories = new Set(productList.map((product) => product.category ?? "OTHER"));
@@ -232,7 +266,12 @@ function StageProductsEditor({
             return (
             <div
               key={item.key}
-              className="grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_120px_88px_auto]"
+              className={cn(
+                "grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_120px_88px_auto]",
+                item.productId &&
+                  overBudgetProductIds.has(item.productId) &&
+                  "border-destructive/40 bg-destructive/5",
+              )}
             >
               <Field label="Categoria">
                 <Select
@@ -293,6 +332,12 @@ function StageProductsEditor({
                   value={item.dose}
                   onChange={(e) => updateProduct(item.key, { dose: e.target.value })}
                   placeholder="0"
+                  aria-invalid={item.productId ? overBudgetProductIds.has(item.productId) : undefined}
+                  className={cn(
+                    item.productId &&
+                      overBudgetProductIds.has(item.productId) &&
+                      "border-destructive/50 focus-visible:ring-destructive/20",
+                  )}
                 />
               </Field>
               <Field label="Un.">
@@ -335,6 +380,7 @@ export function TimingStagesEditor({
   showProducts = false,
   producerId,
   crop,
+  farmId,
   className,
 }: {
   stages: TimingStageField[];
@@ -348,8 +394,24 @@ export function TimingStagesEditor({
   showProducts?: boolean;
   producerId?: string;
   crop?: string;
+  farmId?: string;
   className?: string;
 }) {
+  const { purchaseLists } = usePurchaseListCatalogProducts(producerId, crop, farmId);
+
+  const overages = useMemo(
+    () =>
+      showProducts && purchaseLists.length > 0
+        ? findPurchaseListOverages(stages, purchaseLists, crop)
+        : [],
+    [crop, purchaseLists, showProducts, stages],
+  );
+
+  const overBudgetProductIds = useMemo(
+    () => new Set(overages.map((item) => item.productId)),
+    [overages],
+  );
+
   return (
     <section className={cn("rounded-xl border bg-card p-5 shadow-sm", className)}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -371,6 +433,30 @@ export function TimingStagesEditor({
           {isAdding ? "Adicionando…" : "Adicionar etapa"}
         </Button>
       </div>
+
+      {overages.length > 0 ? (
+        <div
+          role="alert"
+          className="mb-4 flex gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          <CircleAlert className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-semibold">Produtos acima da lista de compra</p>
+            <p className="mt-1 text-destructive/90">
+              Os produtos indicados superam a quantidade prevista na lista de compra:
+            </p>
+            <ul className="mt-2 space-y-1 text-[13px]">
+              {overages.map((item) => (
+                <li key={item.productId}>
+                  <span className="font-medium">{item.productName}</span>{" "}
+                  — previsto {formatDosePerHa(item.plannedDosePerHa, item.unit)}, indicado{" "}
+                  {formatDosePerHa(item.recommendedDosePerHa, item.unit)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
 
       {stages.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -461,6 +547,8 @@ export function TimingStagesEditor({
                   onChange={(products) => onChange(stage.key, { products })}
                   producerId={producerId}
                   crop={crop}
+                  farmId={farmId}
+                  overBudgetProductIds={overBudgetProductIds}
                 />
               ) : null}
             </div>

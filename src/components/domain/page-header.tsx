@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 interface PageHeaderProps {
   /** Ícone exibido à esquerda — se passado, ativa o layout estilo "plano de custo" */
   icon?: ReactNode;
+  /** Classes do container do ícone (ex.: fundo terracota no mock de relatórios) */
+  iconClassName?: string;
   /** Rótulo pequeno acima do título (ex: "Carteira", "Admin") */
   section?: string;
   title: string;
@@ -12,12 +14,17 @@ interface PageHeaderProps {
   className?: string;
 }
 
-export function PageHeader({ icon, section, title, description, action, className }: PageHeaderProps) {
+export function PageHeader({ icon, iconClassName, section, title, description, action, className }: PageHeaderProps) {
   if (icon) {
     return (
       <div className={cn("flex flex-wrap items-start justify-between gap-4 mb-6", className)}>
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
+          <span
+            className={cn(
+              "flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[13px] bg-primary-soft text-primary-strong",
+              iconClassName,
+            )}
+          >
             {icon}
           </span>
           <div className="min-w-0">
@@ -26,11 +33,11 @@ export function PageHeader({ icon, section, title, description, action, classNam
                 {section}
               </p>
             )}
-            <h1 className="mt-0.5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
+            <h1 className="mt-0.5 font-display text-[28px] font-semibold tracking-[-0.02em] text-text-strong">
               {title}
             </h1>
             {description && (
-              <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">
+              <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
                 {description}
               </p>
             )}

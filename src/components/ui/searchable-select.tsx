@@ -144,7 +144,7 @@ export function BaseSelect({
       </button>
 
       {open ? (
-        <div className="absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md">
+        <div className="absolute left-0 z-50 mt-1 min-w-full w-max overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md">
           {showHeader ? (
             <div className={cn("px-3 py-2.5", searchable && "border-b")}>
               {filterLabel ? (
@@ -207,7 +207,7 @@ export function BaseSelect({
                           isSelected ? "opacity-100" : "opacity-0",
                         )}
                       />
-                      <span className="truncate">{option.label}</span>
+                      <span className="whitespace-nowrap">{option.label}</span>
                     </button>
                   </li>
                 );
