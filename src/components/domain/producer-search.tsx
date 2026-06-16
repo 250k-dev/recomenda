@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Users, Plus } from "lucide-react";
+import { Search, Users, Plus, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useProducers } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
@@ -259,6 +259,21 @@ export function ProducerSearch() {
             >
               <Users className="size-4 shrink-0 text-muted-foreground" />
               Ver todos os produtores
+            </button>
+            <button
+              type="button"
+              role="option"
+              data-option
+              aria-selected={activeKey === "catalog"}
+              onFocus={() => setActiveKey("catalog")}
+              onMouseEnter={() => setActiveKey("catalog")}
+              onKeyDown={onOptionKeyDown}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => go("/catalog")}
+              className={optionClass("catalog")}
+            >
+              <Package className="size-4 shrink-0 text-muted-foreground" />
+              Ver todos os produtos
             </button>
             <button
               type="button"

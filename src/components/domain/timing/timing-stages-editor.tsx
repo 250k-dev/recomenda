@@ -382,6 +382,10 @@ export function TimingStagesEditor({
   crop,
   farmId,
   className,
+  onSave,
+  isSaving = false,
+  saveDisabled = false,
+  showSaveButton = false,
 }: {
   stages: TimingStageField[];
   onChange: (key: string, patch: Partial<TimingStageField>) => void;
@@ -396,6 +400,10 @@ export function TimingStagesEditor({
   crop?: string;
   farmId?: string;
   className?: string;
+  onSave?: () => void;
+  isSaving?: boolean;
+  saveDisabled?: boolean;
+  showSaveButton?: boolean;
 }) {
   const { purchaseLists } = usePurchaseListCatalogProducts(producerId, crop, farmId);
 
@@ -421,17 +429,30 @@ export function TimingStagesEditor({
             Defina a ordem e as janelas de cada aplicação. Dessecação entra como estágio.
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          disabled={isAdding}
-          onClick={() => onAdd()}
-        >
-          <Plus className="h-4 w-4" />
-          {isAdding ? "Adicionando…" : "Adicionar etapa"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {showSaveButton && onSave ? (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1.5"
+              disabled={isSaving || saveDisabled}
+              onClick={onSave}
+            >
+              {isSaving ? "Salvando…" : "Salvar"}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={isAdding || isSaving}
+            onClick={() => onAdd()}
+          >
+            <Plus className="h-4 w-4" />
+            {isAdding ? "Adicionando…" : "Adicionar etapa"}
+          </Button>
+        </div>
       </div>
 
       {overages.length > 0 ? (

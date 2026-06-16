@@ -9,6 +9,7 @@ import {
 } from "@/components/domain/timing/timing-stages-editor";
 import {
   getMixTemplate,
+  updateTimingStage,
   type TimingStage,
   type TimingTemplate,
 } from "@/lib/api/templates";
@@ -17,7 +18,6 @@ import {
   useDeleteTimingStage,
   useLocalCatalog,
   useReorderTimingStages,
-  useUpdateTimingStage,
   queryKeys,
 } from "@/lib/api/hooks";
 import {
@@ -25,9 +25,6 @@ import {
   syncStageProducts,
 } from "@/lib/timing/sync-stage-products";
 import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@/lib/timing/window-days";
-
-const FIELD_DEBOUNCE_MS = 450;
-const PRODUCT_DEBOUNCE_MS = 700;
 
 type TimingTemplateStagesPanelProps = {
   template: TimingTemplate & { stages: TimingStage[] };
@@ -40,7 +37,6 @@ export function TimingTemplateStagesPanel({
 }: TimingTemplateStagesPanelProps) {
   const templateId = template.id;
   const createStage = useCreateTimingStage(templateId);
-  const updateStage = useUpdateTimingStage(templateId);
   const deleteStage = useDeleteTimingStage(templateId);
   const reorder = useReorderTimingStages(templateId);
   const queryClient = useQueryClient();
@@ -90,17 +86,12 @@ export function TimingTemplateStagesPanel({
   );
 
   const [editorStages, setEditorStages] = useState<TimingStageField[]>([]);
-  const editorStagesRef = useRef(editorStages);
-  useEffect(() => {
-    editorStagesRef.current = editorStages;
-  }, [editorStages]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const hydratedSignatureRef = useRef<string | null>(null);
-  const fieldDebounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const productDebounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const syncingProductsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (mixesLoading) return;
+    if (mixesLoading || isDirty) return;
 
     if (hydratedSignatureRef.current === stageSignature && editorStages.length > 0) {
       return;
@@ -126,7 +117,15 @@ export function TimingTemplateStagesPanel({
         };
       }),
     );
-  }, [catalogProducts, editorStages.length, mixesById, mixesLoading, sortedStages, stageSignature]);
+  }, [
+    catalogProducts,
+    editorStages.length,
+    isDirty,
+    mixesById,
+    mixesLoading,
+    sortedStages,
+    stageSignature,
+  ]);
 
   const invalidateTemplateData = useCallback(
     async (mixId?: string | null) => {
@@ -139,103 +138,71 @@ export function TimingTemplateStagesPanel({
     [queryClient, templateId],
   );
 
-  const scheduleFieldUpdate = useCallback(
-    (stageId: string, patch: Partial<TimingStageField>) => {
-      const existing = fieldDebounceTimers.current.get(stageId);
-      if (existing) clearTimeout(existing);
+  const saveAll = useCallback(async () => {
+    if (editorStages.length === 0) {
+      setIsDirty(false);
+      return;
+    }
 
-      fieldDebounceTimers.current.set(
-        stageId,
-        setTimeout(() => {
-          fieldDebounceTimers.current.delete(stageId);
-          const payload: Record<string, unknown> = { id: stageId };
-          if (patch.trigger_type !== undefined) payload.trigger_type = patch.trigger_type;
-          if (patch.recommended_date !== undefined) {
-            const { window_start_days, window_end_days } = recommendedYmdToWindow(
-              patch.recommended_date,
-            );
-            payload.window_start_days = window_start_days;
-            payload.window_end_days = window_end_days;
-          }
-          if (patch.name !== undefined) payload.name = patch.name;
-          if (patch.notes !== undefined) {
-            const trimmed = patch.notes.trim();
-            payload.notes = trimmed.length > 0 ? trimmed : null;
-          }
-          updateStage.mutate(payload as Parameters<typeof updateStage.mutate>[0], {
-            onError: () => toast.error("Não foi possível salvar a etapa."),
-          });
-        }, FIELD_DEBOUNCE_MS),
-      );
-    },
-    [updateStage],
-  );
+    setIsSaving(true);
+    try {
+      for (const editorStage of editorStages) {
+        const stage = sortedStages.find((item) => item.id === editorStage.key);
+        if (!stage) continue;
 
-  const scheduleProductSync = useCallback(
-    (stageId: string, products: TimingStageField["products"]) => {
-      const existing = productDebounceTimers.current.get(stageId);
-      if (existing) clearTimeout(existing);
+        const { window_start_days, window_end_days } = recommendedYmdToWindow(
+          editorStage.recommended_date,
+        );
+        const trimmedNotes = editorStage.notes.trim();
 
-      productDebounceTimers.current.set(
-        stageId,
-        setTimeout(() => {
-          productDebounceTimers.current.delete(stageId);
-          if (syncingProductsRef.current.has(stageId)) return;
+        await updateTimingStage(stage.id, {
+          name: editorStage.name.trim() || stage.name,
+          trigger_type: editorStage.trigger_type,
+          window_start_days,
+          window_end_days,
+          notes: trimmedNotes.length > 0 ? trimmedNotes : null,
+        });
 
-          const stage = sortedStages.find((item) => item.id === stageId);
-          const editorStage = editorStagesRef.current.find((item) => item.key === stageId);
-          if (!stage || !editorStage) return;
+        await syncStageProducts({
+          stageId: stage.id,
+          stageName: editorStage.name.trim() || stage.name,
+          templateName: template.name,
+          crop: template.crop,
+          currentMixId: stage.default_mix_template_id,
+          products: editorStage.products,
+        });
+      }
 
-          syncingProductsRef.current.add(stageId);
-          void syncStageProducts({
-            stageId,
-            stageName: editorStage.name.trim() || stage.name,
-            templateName: template.name,
-            crop: template.crop,
-            currentMixId: stage.default_mix_template_id,
-            products,
-          })
-            .then(async (mixId) => {
-              await invalidateTemplateData(mixId ?? stage.default_mix_template_id);
-            })
-            .catch(() => {
-              toast.error("Não foi possível salvar os produtos da etapa.");
-            })
-            .finally(() => {
-              syncingProductsRef.current.delete(stageId);
-            });
-        }, PRODUCT_DEBOUNCE_MS),
-      );
-    },
-    [invalidateTemplateData, sortedStages, template.crop, template.name],
-  );
+      hydratedSignatureRef.current = null;
+      await invalidateTemplateData();
+      setIsDirty(false);
+      toast.success("Modelo salvo.");
+    } catch {
+      toast.error("Não foi possível salvar o modelo.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [editorStages, invalidateTemplateData, sortedStages, template.crop, template.name]);
+
+  const ensureSavedBeforeStructureChange = useCallback(async () => {
+    if (!isDirty) return;
+    await saveAll();
+  }, [isDirty, saveAll]);
 
   const handleStageChange = useCallback(
     (key: string, patch: Partial<TimingStageField>) => {
       setEditorStages((prev) =>
         prev.map((stage) => (stage.key === key ? { ...stage, ...patch } : stage)),
       );
-
-      if (patch.products !== undefined) {
-        scheduleProductSync(key, patch.products);
-        return;
-      }
-
-      if (patch.trigger_type !== undefined) {
-        updateStage.mutate(
-          { id: key, trigger_type: patch.trigger_type },
-          { onError: () => toast.error("Não foi possível salvar a etapa.") },
-        );
-        return;
-      }
-
-      scheduleFieldUpdate(key, patch);
+      setIsDirty(true);
     },
-    [scheduleFieldUpdate, scheduleProductSync, updateStage],
+    [],
   );
 
   const handleAddStage = useCallback(
-    (presetName?: string) => {
+    async (presetName?: string) => {
+      await ensureSavedBeforeStructureChange();
+
       const nextOrderIndex =
         sortedStages.length > 0
           ? Math.max(...sortedStages.map((stage) => stage.order_index)) + 1
@@ -256,21 +223,25 @@ export function TimingTemplateStagesPanel({
         },
       );
     },
-    [createStage, sortedStages],
+    [createStage, ensureSavedBeforeStructureChange, sortedStages],
   );
 
   const handleRemoveStage = useCallback(
-    (key: string) => {
+    async (key: string) => {
+      await ensureSavedBeforeStructureChange();
+
       deleteStage.mutate(key, {
         onSuccess: () => toast.success("Etapa removida."),
         onError: () => toast.error("Não foi possível remover a etapa."),
       });
     },
-    [deleteStage],
+    [deleteStage, ensureSavedBeforeStructureChange],
   );
 
   const moveStage = useCallback(
-    (key: string, direction: "up" | "down") => {
+    async (key: string, direction: "up" | "down") => {
+      await ensureSavedBeforeStructureChange();
+
       const index = sortedStages.findIndex((stage) => stage.id === key);
       if (index < 0) return;
       const targetIndex = direction === "up" ? index - 1 : index + 1;
@@ -279,7 +250,7 @@ export function TimingTemplateStagesPanel({
       [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
       reorder.mutate(reordered.map((stage) => stage.id));
     },
-    [reorder, sortedStages],
+    [ensureSavedBeforeStructureChange, reorder, sortedStages],
   );
 
   if (mixesLoading && editorStages.length === 0) {
@@ -298,11 +269,15 @@ export function TimingTemplateStagesPanel({
       producerId={producerId ?? template.producer_id ?? undefined}
       crop={template.crop}
       isAdding={createStage.isPending}
+      showSaveButton
+      isSaving={isSaving}
+      saveDisabled={!isDirty}
+      onSave={() => void saveAll()}
       onChange={handleStageChange}
-      onAdd={handleAddStage}
-      onRemove={handleRemoveStage}
-      onMoveUp={(key) => moveStage(key, "up")}
-      onMoveDown={(key) => moveStage(key, "down")}
+      onAdd={(presetName) => void handleAddStage(presetName)}
+      onRemove={(key) => void handleRemoveStage(key)}
+      onMoveUp={(key) => void moveStage(key, "up")}
+      onMoveDown={(key) => void moveStage(key, "down")}
     />
   );
 }
