@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Clock, Pencil } from "lucide-react";
+import { ArrowRight, Clock, Pencil } from "lucide-react";
 
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { TemplateEditorSkeleton } from "@/components/domain/page-skeletons";
@@ -18,6 +18,10 @@ export default function ProducerTimingTemplateDetailPage() {
   const params = useParams<{ id: string; templateId: string }>();
   const producerId = params.id;
   const templateId = params.templateId;
+
+  const searchParams = useSearchParams();
+  const onboardingSeason = searchParams.get("onboarding") === "season";
+  const onbFarmId = searchParams.get("farm_id") ?? "";
 
   const { data: producer } = useProducer(producerId);
   const { data: template, isLoading } = useTimingTemplate(templateId);
@@ -46,7 +50,9 @@ export default function ProducerTimingTemplateDetailPage() {
     (a, b) => a.order_index - b.order_index,
   );
   const cropLabel = CROP_LABELS[template.crop] ?? template.crop;
-  const producerHref = `/producers/${producerId}`;
+  const producerHref = onboardingSeason
+    ? `/producers/${producerId}?onboarding=season&farm_id=${encodeURIComponent(onbFarmId)}`
+    : `/producers/${producerId}`;
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -119,6 +125,25 @@ export default function ProducerTimingTemplateDetailPage() {
       </section>
 
       <TimingTemplateStagesPanel template={template} producerId={producerId} />
+
+      {onboardingSeason ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="font-display text-base font-semibold text-text-strong">
+              Modelo configurado?
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Você pode ajustar os estágios depois. Vamos seguir para a configuração da safra.
+            </p>
+          </div>
+          <Button asChild size="lg" className="shrink-0 gap-2">
+            <Link href={producerHref}>
+              Concluir e configurar safra
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

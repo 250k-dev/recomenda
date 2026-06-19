@@ -45,19 +45,29 @@ export default function LoginPage() {
         <CardContent className="px-0">
           <form onSubmit={onSubmit} className="space-y-5">
             {loginMutation.isError ? (
-              <Alert variant="destructive">
-                <AlertCircle />
-                <AlertTitle>
-                  {loginMutation.error?.message?.includes("Produtores")
-                    ? "Acesso restrito"
-                    : "Não foi possível entrar"}
-                </AlertTitle>
-                <AlertDescription>
-                  {loginMutation.error?.message?.includes("Produtores")
-                    ? "Produtores devem acessar o Recomenda App, não este painel."
-                    : "Verifique e-mail e senha ou tente novamente em instantes."}
-                </AlertDescription>
-              </Alert>
+              (() => {
+                const isProducer = loginMutation.error?.message?.includes("Produtores");
+                const isDisabled =
+                  (loginMutation.error as { code?: string } | null)?.code ===
+                  "ACCOUNT_DISABLED";
+                const title = isProducer
+                  ? "Acesso restrito"
+                  : isDisabled
+                    ? "Conta desativada"
+                    : "Não foi possível entrar";
+                const description = isProducer
+                  ? "Produtores devem acessar o Recomenda App, não este painel."
+                  : isDisabled
+                    ? "Sua conta foi desativada. Contate o suporte."
+                    : "Verifique e-mail e senha ou tente novamente em instantes.";
+                return (
+                  <Alert variant="destructive">
+                    <AlertCircle />
+                    <AlertTitle>{title}</AlertTitle>
+                    <AlertDescription>{description}</AlertDescription>
+                  </Alert>
+                );
+              })()
             ) : null}
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>

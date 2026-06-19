@@ -24,7 +24,13 @@ import {
   type PurchaseListCrop,
 } from "@/lib/catalog/purchase-list-catalog";
 import { cn } from "@/lib/utils";
-import { Field, fmt, type ListItem } from "@/components/domain/season/_shared";
+import {
+  Field,
+  fmt,
+  isSeedItem,
+  listItemRequired,
+  type ListItem,
+} from "@/components/domain/season/_shared";
 
 const DEFAULT_ITEM_STAGE = "Outra";
 
@@ -78,6 +84,8 @@ export function PurchaseListItemsEditor({
         nApps: "1",
         stock: "0",
         price: "",
+        thousandPlants: "",
+        seedingArea: "",
       },
     ]);
   };
@@ -95,6 +103,14 @@ export function PurchaseListItemsEditor({
     if (category !== previousCategory) {
       patch.productId = "";
       patch.productName = "";
+      // Alterna entre campos de dose e campos de semente conforme a categoria.
+      if (category === "SEED") {
+        patch.dose = "";
+        patch.nApps = "1";
+      } else {
+        patch.thousandPlants = "";
+        patch.seedingArea = "";
+      }
     }
     updateItem(key, patch);
   };
@@ -172,7 +188,8 @@ export function PurchaseListItemsEditor({
     });
 
   const renderReadOnlyRow = (it: ListItem) => {
-    const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+    const seed = isSeedItem(it);
+    const required = listItemRequired(it, totalHa);
     const toBuy = Math.max(0, required - Number(it.stock || 0));
     const totalValue = toBuy * Number(it.price || 0);
     const catLabel =
@@ -189,10 +206,16 @@ export function PurchaseListItemsEditor({
           {it.productName || "—"}
         </td>
         <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
-          {fmt(Number(it.dose || 0))} {it.unit}/ha
+          {seed ? "—" : `${fmt(Number(it.dose || 0))} ${it.unit}/ha`}
         </td>
         <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
-          {it.nApps}×
+          {seed ? "—" : `${it.nApps}×`}
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
+          {seed ? fmt(Number(it.thousandPlants || 0)) : "—"}
+        </td>
+        <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
+          {seed ? fmt(Number(it.seedingArea || 0)) : "—"}
         </td>
         <td className="whitespace-nowrap px-2.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
           {fmt(Number(it.stock || 0))}
@@ -230,6 +253,8 @@ export function PurchaseListItemsEditor({
                   <th className="px-2.5 py-2.5 text-left">Produto</th>
                   <th className="px-2.5 py-2.5 text-right">Dose/ha</th>
                   <th className="px-2.5 py-2.5 text-right">Nº apl.</th>
+                  <th className="px-2.5 py-2.5 text-right">mil pl/ha</th>
+                  <th className="px-2.5 py-2.5 text-right">área sem. (ha)</th>
                   <th className="px-2.5 py-2.5 text-right">Estoque</th>
                   <th className="px-2.5 py-2.5 text-right">Preço</th>
                   <th className="px-2.5 py-2.5 text-right">Necessário</th>
@@ -243,6 +268,8 @@ export function PurchaseListItemsEditor({
                   <th className="px-2 py-2 text-left">Dose/ha</th>
                   <th className="min-w-[88px] px-2 py-2 text-left">Un.</th>
                   <th className="px-2 py-2 text-left">Nº apl.</th>
+                  <th className="px-2 py-2 text-left">mil pl/ha</th>
+                  <th className="px-2 py-2 text-left">área sem. (ha)</th>
                   <th className="px-2 py-2 text-left">Estoque</th>
                   <th className="px-2 py-2 text-left">Preço R$/un.</th>
                   <th className="px-2 py-2 text-right">Necessário</th>
@@ -257,7 +284,7 @@ export function PurchaseListItemsEditor({
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={readOnly ? 9 : 11}
+                  colSpan={readOnly ? 11 : 13}
                   className="px-3 py-10 text-center text-sm text-muted-foreground"
                 >
                   Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
@@ -274,7 +301,8 @@ export function PurchaseListItemsEditor({
                   it.productName,
                   crop,
                 );
-                const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+                const seed = isSeedItem(it);
+                const required = listItemRequired(it, totalHa);
                 const toBuy = Math.max(0, required - Number(it.stock || 0));
                 const totalValue = toBuy * Number(it.price || 0);
                 return (
@@ -302,7 +330,8 @@ export function PurchaseListItemsEditor({
                       <Input
                         type="number"
                         step="0.01"
-                        value={it.dose}
+                        value={seed ? "" : it.dose}
+                        disabled={seed}
                         onChange={(e) => updateItem(it.key, { dose: e.target.value })}
                         className="h-8 w-20"
                       />
@@ -310,15 +339,43 @@ export function PurchaseListItemsEditor({
                     <td className="min-w-[88px] px-2 py-1.5">
                       <DoseUnitSelect
                         value={it.unit}
+                        disabled={seed}
                         onChange={(val) => updateItem(it.key, { unit: val })}
                       />
                     </td>
                     <td className="px-2 py-1.5">
                       <Input
                         type="number"
-                        value={it.nApps}
+                        value={seed ? "" : it.nApps}
+                        disabled={seed}
                         onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
                         className="h-8 w-16"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={seed ? it.thousandPlants : ""}
+                        disabled={!seed}
+                        placeholder={seed ? "" : "—"}
+                        onChange={(e) =>
+                          updateItem(it.key, { thousandPlants: e.target.value })
+                        }
+                        className="h-8 w-20"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={seed ? it.seedingArea : ""}
+                        disabled={!seed}
+                        placeholder={seed ? "" : "—"}
+                        onChange={(e) =>
+                          updateItem(it.key, { seedingArea: e.target.value })
+                        }
+                        className="h-8 w-20"
                       />
                     </td>
                     <td className="px-2 py-1.5">
@@ -380,7 +437,8 @@ export function PurchaseListItemsEditor({
           </div>
         ) : readOnly ? (
           items.map((it) => {
-            const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+            const seed = isSeedItem(it);
+            const required = listItemRequired(it, totalHa);
             const toBuy = Math.max(0, required - Number(it.stock || 0));
             const totalValue = toBuy * Number(it.price || 0);
             const catLabel =
@@ -395,15 +453,19 @@ export function PurchaseListItemsEditor({
                 <p className="mt-1 text-base font-medium text-foreground">{it.productName || "—"}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-xs font-medium text-muted-foreground">Dose/ha</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {seed ? "População" : "Dose/ha"}
+                    </span>
                     <p className="mt-0.5 tabular-nums">
-                      {fmt(Number(it.dose || 0))} {it.unit}/ha · {it.nApps}×
+                      {seed
+                        ? `${fmt(Number(it.thousandPlants || 0))} mil pl/ha · ${fmt(Number(it.seedingArea || 0))} ha`
+                        : `${fmt(Number(it.dose || 0))} ${it.unit}/ha · ${it.nApps}×`}
                     </p>
                   </div>
                   <div>
                     <span className="text-xs font-medium text-muted-foreground">A comprar</span>
                     <p className="mt-0.5 font-semibold tabular-nums">
-                      {fmt(toBuy)} {it.unit}
+                      {fmt(toBuy)} {seed ? "mil pl" : it.unit}
                     </p>
                   </div>
                   <div>
@@ -431,7 +493,8 @@ export function PurchaseListItemsEditor({
               it.productName,
               crop,
             );
-            const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+            const seed = isSeedItem(it);
+            const required = listItemRequired(it, totalHa);
             const toBuy = Math.max(0, required - Number(it.stock || 0));
             return (
               <div key={it.key} className="rounded-xl border bg-card p-4 shadow-sm">
@@ -470,27 +533,54 @@ export function PurchaseListItemsEditor({
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Field label="Dose/ha">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={it.dose}
-                      onChange={(e) => updateItem(it.key, { dose: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Unidade">
-                    <DoseUnitSelect
-                      value={it.unit}
-                      onChange={(val) => updateItem(it.key, { unit: val })}
-                    />
-                  </Field>
-                  <Field label="Nº aplicações">
-                    <Input
-                      type="number"
-                      value={it.nApps}
-                      onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
-                    />
-                  </Field>
+                  {seed ? (
+                    <>
+                      <Field label="mil pl/ha">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={it.thousandPlants}
+                          onChange={(e) =>
+                            updateItem(it.key, { thousandPlants: e.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="área sem. (ha)">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={it.seedingArea}
+                          onChange={(e) =>
+                            updateItem(it.key, { seedingArea: e.target.value })
+                          }
+                        />
+                      </Field>
+                    </>
+                  ) : (
+                    <>
+                      <Field label="Dose/ha">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={it.dose}
+                          onChange={(e) => updateItem(it.key, { dose: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Unidade">
+                        <DoseUnitSelect
+                          value={it.unit}
+                          onChange={(val) => updateItem(it.key, { unit: val })}
+                        />
+                      </Field>
+                      <Field label="Nº aplicações">
+                        <Input
+                          type="number"
+                          value={it.nApps}
+                          onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
+                        />
+                      </Field>
+                    </>
+                  )}
                   <Field label="Estoque atual">
                     <Input
                       type="number"

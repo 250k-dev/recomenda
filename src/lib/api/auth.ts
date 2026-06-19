@@ -11,7 +11,12 @@ export async function login(email: string, password: string) {
   });
 
   if (!response.ok) {
-    throw new Error("Login failed");
+    const body = await response.json().catch(() => null);
+    // O backend envelopa o erro em `error: { code, message }`; aceita também o formato plano.
+    const err = body?.error ?? body;
+    const e = new Error(err?.message ?? "Login failed") as Error & { code?: string };
+    e.code = err?.code;
+    throw e;
   }
 
   return (await response.json()) as LoginResponse;

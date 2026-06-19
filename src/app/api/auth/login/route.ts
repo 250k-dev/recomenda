@@ -11,7 +11,10 @@ export async function POST(request: NextRequest) {
   });
 
   if (!response.ok) {
-    return NextResponse.json({ message: "Invalid credentials" }, { status: response.status });
+    const err = await response
+      .json()
+      .catch(() => ({ message: "Invalid credentials" }));
+    return NextResponse.json(err, { status: response.status });
   }
 
   const payload = await response.json();

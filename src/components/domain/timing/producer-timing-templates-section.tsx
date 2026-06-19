@@ -51,11 +51,14 @@ type CreateFormValues = z.infer<typeof createSchema>;
 type ProducerTimingTemplatesPanelProps = {
   producerId: string;
   producerName: string;
+  /** Quando definido, indica fluxo de onboarding: após criar, segue para a safra. */
+  onboardingFarmId?: string;
 };
 
 export function ProducerTimingTemplatesPanel({
   producerId,
   producerName,
+  onboardingFarmId,
 }: ProducerTimingTemplatesPanelProps) {
   const router = useRouter();
   const { data: templates, isLoading } = useTimingTemplates(producerId);
@@ -84,7 +87,12 @@ export function ProducerTimingTemplatesPanel({
       onSuccess: (created) => {
         setSheetOpen(false);
         form.reset();
-        router.push(`/producers/${producerId}/timing-templates/${created.id}`);
+        const qs = onboardingFarmId
+          ? `?onboarding=season&farm_id=${encodeURIComponent(onboardingFarmId)}`
+          : "";
+        router.push(
+          `/producers/${producerId}/timing-templates/${created.id}${qs}`,
+        );
       },
     });
   });

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import type { PurchaseListItemInput } from "@/lib/api/purchase-lists";
 
 /** Talhão usado nos fluxos de lista de compra e safra. */
 export type WizardPlot = {
@@ -26,7 +27,56 @@ export type ListItem = {
   nApps: string;
   stock: string;
   price: string;
+  /** Variedade/Híbrido: população em mil plantas/ha. */
+  thousandPlants: string;
+  /** Variedade/Híbrido: área a ser semeada (ha). */
+  seedingArea: string;
 };
+
+/** Itens de Variedade/Híbrido (semente) calculam por população, não por dose. */
+export const isSeedItem = (it: ListItem) => it.category === "SEED";
+
+/** Quantidade necessária: população×área (semente) ou dose×área×aplicações. */
+export function listItemRequired(it: ListItem, totalHa: number): number {
+  return isSeedItem(it)
+    ? Number(it.thousandPlants || 0) * Number(it.seedingArea || 0)
+    : Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+}
+
+/** Converte um item do formulário no payload da API (lógica única e compartilhada). */
+export function listItemToPayload(it: ListItem): PurchaseListItemInput {
+  const seed = isSeedItem(it);
+  return {
+    local_product_id: it.productId,
+    stage: it.stage,
+    dose_per_hectare: seed ? 0 : Number(it.dose),
+    dose_unit: it.unit,
+    n_applications: seed ? 1 : Number(it.nApps) || 1,
+    current_stock: Number(it.stock) || 0,
+    price_brl_fixed: it.price ? Number(it.price) : null,
+    calc_rule: seed ? "SEED_POPULATION" : null,
+    thousand_plants_per_ha: seed ? Number(it.thousandPlants) || 0 : null,
+    seeding_area_ha: seed ? Number(it.seedingArea) || 0 : null,
+  };
+}
+
+/** Valida itens da lista (categoria, produto e dose/população). */
+export function validateListItems(items: ListItem[]): string | null {
+  if (items.length === 0) return "Adicione pelo menos um produto.";
+  for (const it of items) {
+    if (!it.category) return "Selecione a categoria em todos os itens.";
+    if (!it.productId) return "Selecione o produto em todos os itens.";
+    if (isSeedItem(it)) {
+      if (!Number(it.thousandPlants))
+        return "Informe a população (mil pl/ha) nas variedades/híbridos.";
+      if (!Number(it.seedingArea))
+        return "Informe a área de semeadura (ha) nas variedades/híbridos.";
+    } else if (!Number(it.dose)) {
+      return "Informe a dose/ha em todos os itens.";
+    }
+  }
+  return null;
+}
 
 /** Configuração por talhão no wizard de safra. */
 export type PlotSchedule = {

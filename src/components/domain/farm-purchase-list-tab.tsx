@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Eye, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
@@ -15,6 +15,11 @@ import {
   useUpdatePurchaseList,
 } from "@/lib/api/hooks";
 import type { ListItem } from "@/components/domain/season/_shared";
+import {
+  listItemRequired,
+  listItemToPayload,
+  validateListItems,
+} from "@/components/domain/season/_shared";
 import type { PurchaseListDetail, PurchaseListItemInput } from "@/lib/api/client";
 import { CROP_LABELS } from "@/lib/season-constants";
 import { toast } from "sonner";
@@ -41,29 +46,18 @@ function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem
     nApps: String(it.n_applications),
     stock: String(it.current_stock),
     price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
+    thousandPlants:
+      it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
+    seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
   };
 }
 
 function listItemsToPayload(items: ListItem[]): PurchaseListItemInput[] {
-  return items.map((it) => ({
-    local_product_id: it.productId,
-    stage: it.stage,
-    dose_per_hectare: Number(it.dose),
-    dose_unit: it.unit,
-    n_applications: Number(it.nApps) || 1,
-    current_stock: Number(it.stock) || 0,
-    price_brl_fixed: it.price ? Number(it.price) : null,
-  }));
+  return items.map(listItemToPayload);
 }
 
 function validateItems(items: ListItem[]): string | null {
-  if (items.length === 0) return "Adicione pelo menos um produto.";
-  for (const it of items) {
-    if (!it.category) return "Selecione a categoria em todos os itens.";
-    if (!it.productId) return "Selecione o produto em todos os itens.";
-    if (!Number(it.dose)) return "Informe a dose/ha em todos os itens.";
-  }
-  return null;
+  return validateListItems(items);
 }
 
 function computeItemMetrics(
@@ -73,7 +67,7 @@ function computeItemMetrics(
   let totalValue = 0;
   let pricedCount = 0;
   for (const it of items) {
-    const required = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+    const required = listItemRequired(it, totalHa);
     const toBuy = Math.max(0, required - Number(it.stock || 0));
     if (it.price) {
       totalValue += toBuy * Number(it.price);
@@ -142,17 +136,17 @@ export function FarmPurchaseListTab({
     setDraftItems((list.items ?? []).map(detailItemToListItem));
   }, [list]);
 
-  useEffect(() => {
+  // Reseta o estado local quando a lista selecionada muda — padrão recomendado
+  // pelo React (https://react.dev/learn/you-might-not-need-an-effect) em vez de
+  // setState dentro de useEffect.
+  const [trackedListId, setTrackedListId] = useState(list?.id);
+  if (list?.id !== trackedListId) {
+    setTrackedListId(list?.id);
     setError(null);
     setShowComparison(false);
-    if (list) {
-      setDraftItems((list.items ?? []).map(detailItemToListItem));
-      setEditing(false);
-    } else {
-      setDraftItems([]);
-      setEditing(false);
-    }
-  }, [list?.id]);
+    setEditing(false);
+    setDraftItems(list ? (list.items ?? []).map(detailItemToListItem) : []);
+  }
 
   const startEditing = () => {
     if (!list) return;

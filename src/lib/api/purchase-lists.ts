@@ -14,6 +14,10 @@ export interface PurchaseListItemInput {
   cost_per_ha_mode?: "DOSE_PRICE" | "TOTAL_OVER_AREA";
   deduct_stock?: boolean;
   calc_rule?: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
+  /** Variedade/Híbrido: população em mil plantas/ha. */
+  thousand_plants_per_ha?: number | null;
+  /** Variedade/Híbrido: área a ser semeada (ha). */
+  seeding_area_ha?: number | null;
 }
 
 export interface PurchaseListPlotInput {
@@ -90,6 +94,8 @@ export interface PurchaseListDetail {
     cost_per_ha_mode: "DOSE_PRICE" | "TOTAL_OVER_AREA";
     deduct_stock: boolean;
     calc_rule: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
+    thousand_plants_per_ha: number | null;
+    seeding_area_ha: number | null;
     quantity_final: number;
     unit_price_brl: number;
     total_brl: number;

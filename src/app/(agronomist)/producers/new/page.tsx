@@ -212,7 +212,11 @@ export default function OnboardingPage() {
             }
             onBack={() => setStep(2)}
             onAnotherFarm={() => setStep(2)}
-            onFinish={() => router.push(`/producers/${producer.id}`)}
+            onFinish={() =>
+              router.push(
+                `/producers/${producer.id}?onboarding=purchase-list&farm_id=${encodeURIComponent(currentFarm.id)}`,
+              )
+            }
           />
         )}
         </section>

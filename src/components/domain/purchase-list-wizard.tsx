@@ -27,6 +27,8 @@ import {
   SummaryCard,
   fmt,
   extractError,
+  listItemToPayload,
+  validateListItems,
   type ListItem,
   type WizardPlot,
 } from "@/components/domain/season/_shared";
@@ -133,12 +135,8 @@ function StepList({
   const next = () => {
     setError(null);
     if (!listName.trim()) return setError("Dê um nome para a lista de compra.");
-    if (items.length === 0) return setError("Adicione pelo menos um produto.");
-    for (const it of items) {
-      if (!it.category) return setError("Selecione a categoria em todos os itens.");
-      if (!it.productId) return setError("Selecione o produto em todos os itens.");
-      if (!Number(it.dose)) return setError("Informe a dose/ha em todos os itens.");
-    }
+    const itemsError = validateListItems(items);
+    if (itemsError) return setError(itemsError);
     onNext();
   };
 
@@ -298,15 +296,7 @@ function StepReview({
 
   const mutation = useMutation({
     mutationFn: () => {
-      const itemsPayload: PurchaseListItemInput[] = items.map((it) => ({
-        local_product_id: it.productId,
-        stage: it.stage,
-        dose_per_hectare: Number(it.dose),
-        dose_unit: it.unit,
-        n_applications: Number(it.nApps) || 1,
-        current_stock: Number(it.stock) || 0,
-        price_brl_fixed: it.price ? Number(it.price) : null,
-      }));
+      const itemsPayload: PurchaseListItemInput[] = items.map(listItemToPayload);
       return createPurchaseList({
         producer_id: producerId,
         crop,

@@ -172,7 +172,7 @@ export default function AdminAgronomistsPage() {
   const removeHard = (a: AdminAgronomist) => {
     if (
       !globalThis.confirm(
-        `Excluir permanentemente "${a.name}"? Esta ação não pode ser desfeita. Só é permitido se não houver fazendas, produtores ou safras vinculados.`,
+        `Excluir permanentemente "${a.name}"? Esta ação apaga em cascata o agrônomo e TUDO vinculado a ele — produtores (e seus logins), fazendas, talhões, safras, listas de compra, cotações, estoque e mais. Não pode ser desfeita.`,
       )
     ) {
       return;

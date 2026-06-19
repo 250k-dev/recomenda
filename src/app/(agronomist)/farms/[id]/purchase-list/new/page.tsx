@@ -14,6 +14,7 @@ export default function FarmPurchaseListNewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const producerId = searchParams.get("producer_id") ?? "";
+  const onboarding = searchParams.get("onboarding");
 
   const { data: farm } = useFarm(farmId);
   const { data: producer } = useProducer(producerId);
@@ -87,7 +88,13 @@ export default function FarmPurchaseListNewPage() {
         plots={plots}
         farmName={farm?.name}
         successRedirectLabel="Ir para o produtor"
-        onComplete={() => router.push(producerHref)}
+        onComplete={() =>
+          router.push(
+            onboarding === "recommendation"
+              ? `/producers/${producerId}?onboarding=recommendation&farm_id=${encodeURIComponent(farmId)}`
+              : producerHref,
+          )
+        }
         onCancel={() => router.push(producerHref)}
       />
     </>

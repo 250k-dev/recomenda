@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
@@ -44,6 +46,7 @@ import {
   Leaf,
   CalendarDays,
   Clock,
+  ShoppingCart,
 } from "lucide-react";
 
 const ACTIVE_SEASON_STATUSES = new Set(["DRAFT", "PUBLISHED", "IN_PROGRESS"]);
@@ -84,6 +87,19 @@ export function ProducerDetailView({
   const [newFarmLocation, setNewFarmLocation] = useState("");
   const [cronogramOpen, setCronogramOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+
+  
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const onbFarmId = searchParams.get("farm_id") ?? "";
+  const [onbStage, setOnbStage] = useState<
+    "purchase-list" | "recommendation" | "season" | null
+  >(() => {
+    const s = searchParams.get("onboarding");
+    return s === "purchase-list" || s === "recommendation" || s === "season"
+      ? s
+      : null;
+  });
 
   const newFarmMutation = useMutation({
     mutationFn: async () => {
@@ -314,7 +330,13 @@ export function ProducerDetailView({
             </DialogContent>
           </Dialog>
 
-          <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+          <Dialog
+            open={templatesOpen}
+            onOpenChange={(open) => {
+              setTemplatesOpen(open);
+              if (!open && onbStage === "recommendation") setOnbStage("season");
+            }}
+          >
             <DialogContent className="max-w-7xl">
               <DialogHeader>
                 <DialogTitle>Modelos de recomendação</DialogTitle>
@@ -326,10 +348,60 @@ export function ProducerDetailView({
                 <ProducerTimingTemplatesPanel
                   producerId={producerId}
                   producerName={producer.name}
+                  onboardingFarmId={
+                    onbStage === "recommendation" ? onbFarmId : undefined
+                  }
                 />
               </div>
             </DialogContent>
           </Dialog>
+
+          <OnboardingPromptDialog
+            open={onbStage === "purchase-list"}
+            onOpenChange={(open) => {
+              if (!open) setOnbStage("recommendation");
+            }}
+            icon={ShoppingCart}
+            eyebrow="Próximo passo"
+            title="Vamos montar a primeira lista de compra?"
+            description="Com os talhões cadastrados, você já pode gerar a lista de produtos e doses recomendadas para este produtor. Quer fazer isso agora?"
+            confirmLabel="Sim, criar lista"
+            onConfirm={() =>
+              router.push(
+                `/farms/${onbFarmId}/purchase-list/new?producer_id=${encodeURIComponent(producerId)}&onboarding=recommendation`,
+              )
+            }
+          />
+
+          <OnboardingPromptDialog
+            open={onbStage === "recommendation" && !templatesOpen}
+            onOpenChange={(open) => {
+              if (!open) setOnbStage("season");
+            }}
+            icon={Clock}
+            eyebrow="Próximo passo"
+            title="Quer criar um modelo de recomendação?"
+            description="Modelos reutilizáveis de dessecação, fungicidas e janelas agilizam a montagem das próximas safras deste produtor. Vamos criar o primeiro?"
+            confirmLabel="Sim, criar modelo"
+            onConfirm={() => setTemplatesOpen(true)}
+          />
+
+          <OnboardingPromptDialog
+            open={onbStage === "season" && !templatesOpen}
+            onOpenChange={(open) => {
+              if (!open) setOnbStage(null);
+            }}
+            icon={Sprout}
+            eyebrow="Próximo passo"
+            title="Quer configurar a safra agora?"
+            description="Defina cultura, cronograma e talhões para acompanhar as aplicações ao longo da safra. Podemos configurar agora ou depois."
+            confirmLabel="Sim, configurar safra"
+            onConfirm={() =>
+              router.push(
+                `/farms/${onbFarmId}/season/new?producer_id=${encodeURIComponent(producerId)}`,
+              )
+            }
+          />
         </>
       ) : null}
 

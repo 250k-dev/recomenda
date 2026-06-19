@@ -86,6 +86,7 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
   if (item.calc_rule === "SEED_POPULATION") {
     // População de sementes: usa population_base como "G_pop" (caso vier preenchido).
     G = item.population_base ?? 0;
+    if (item.deduct_stock) G = G - stock;
   } else if (item.calc_rule === "SEED_BAGS") {
     G = (item.population_base ?? 0) * 25;
   } else if (!item.deduct_stock) {
@@ -111,7 +112,10 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
 
   // J — Custo por hectare
   let J: number;
-  if (item.cost_per_ha_mode === "DOSE_PRICE") {
+  if (item.calc_rule === "SEED_POPULATION" || item.calc_rule === "SEED_BAGS") {
+    // Sementes: custo/ha é o total rateado pela área (dose não se aplica).
+    J = area > 0 ? K / area : 0;
+  } else if (item.cost_per_ha_mode === "DOSE_PRICE") {
     J = I * dose * nApps;
   } else {
     J = area > 0 ? K / area : 0;
