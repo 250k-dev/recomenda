@@ -267,11 +267,11 @@ export default function AdminAgronomistsPage() {
                   Novo agrônomo
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-md">
-                <SheetHeader>
+              <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+                <SheetHeader className="border-b px-4 py-4 pr-12">
                   <SheetTitle>Novo agrônomo</SheetTitle>
                 </SheetHeader>
-                <form onSubmit={onCreate} className="mt-6 space-y-4">
+                <form onSubmit={onCreate} className="space-y-4 px-4 py-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="agro-create-name">Nome</Label>
                     <Input id="agro-create-name" {...createForm.register("name")} placeholder="Nome completo" />
@@ -335,11 +335,11 @@ export default function AdminAgronomistsPage() {
       )}
 
       <Sheet open={Boolean(editRow)} onOpenChange={(o) => !o && setEditRow(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
-          <SheetHeader>
+        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+          <SheetHeader className="border-b px-4 py-4 pr-12">
             <SheetTitle>Editar agrônomo</SheetTitle>
           </SheetHeader>
-          <form onSubmit={onEdit} className="mt-6 space-y-4">
+          <form onSubmit={onEdit} className="space-y-4 px-4 py-4">
             <div className="space-y-1.5">
               <Label htmlFor="agro-edit-name">Nome</Label>
               <Input id="agro-edit-name" {...editForm.register("name")} />

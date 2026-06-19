@@ -183,6 +183,9 @@ export function BaseSelect({
           left: panelPosition.left,
           minWidth: panelPosition.minWidth,
           zIndex: 100,
+          // Garante cliques no painel mesmo dentro de modais (Radix Dialog/Sheet
+          // aplica pointer-events:none no body).
+          pointerEvents: "auto",
         }}
         className="w-max overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md"
       >

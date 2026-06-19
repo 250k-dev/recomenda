@@ -426,7 +426,7 @@ export default function FarmDetailPage() {
             <SheetHeader>
               <SheetTitle>Editar fazenda</SheetTitle>
             </SheetHeader>
-            <form onSubmit={onUpdateFarm} className="mt-4 space-y-4">
+            <form onSubmit={onUpdateFarm} className="space-y-4 px-4 pb-4">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-foreground">
                   Nome
@@ -554,7 +554,7 @@ export default function FarmDetailPage() {
           <SheetHeader>
             <SheetTitle>Talhões</SheetTitle>
           </SheetHeader>
-          <div className="mt-4">
+          <div className="px-4 pb-4">
             <div className="mb-4 flex items-center justify-end">
               <Sheet open={plotSheetOpen} onOpenChange={setPlotSheetOpen}>
                 <SheetTrigger asChild>
@@ -567,7 +567,7 @@ export default function FarmDetailPage() {
                   <SheetHeader>
                     <SheetTitle>Novo talhão</SheetTitle>
                   </SheetHeader>
-                  <form onSubmit={onAddPlot} className="mt-4 space-y-4">
+                  <form onSubmit={onAddPlot} className="space-y-4 px-4 pb-4">
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-foreground">
                         Nome

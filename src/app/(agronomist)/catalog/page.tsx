@@ -414,7 +414,7 @@ export default function CatalogPage() {
               <SheetHeader>
                 <SheetTitle>Novo produto</SheetTitle>
               </SheetHeader>
-              <form onSubmit={onCreateSubmit} className="mt-6 space-y-4">
+              <form onSubmit={onCreateSubmit} className="space-y-4 px-4 pb-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="catalog-name">Nome</Label>
                   <Input
@@ -669,7 +669,7 @@ export default function CatalogPage() {
             <SheetHeader>
               <SheetTitle>Editar produto</SheetTitle>
             </SheetHeader>
-            <form onSubmit={onEditSubmit} className="mt-6 space-y-4 pb-6">
+            <form onSubmit={onEditSubmit} className="space-y-4 px-4 pb-6">
               <div className="space-y-1.5">
                 <Label htmlFor="catalog-edit-name">Nome</Label>
                 <Input

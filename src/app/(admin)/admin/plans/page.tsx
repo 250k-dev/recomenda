@@ -262,7 +262,7 @@ export default function AdminPlansPage() {
               <SheetHeader>
                 <SheetTitle>Novo plano</SheetTitle>
               </SheetHeader>
-              <form onSubmit={onCreateSubmit} className="mt-4 space-y-4">
+              <form onSubmit={onCreateSubmit} className="space-y-4 px-4 pb-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="plan-create-name">Nome</Label>
                   <Input id="plan-create-name" {...createForm.register("name")} />
@@ -325,7 +325,7 @@ export default function AdminPlansPage() {
           <SheetHeader>
             <SheetTitle>Editar plano</SheetTitle>
           </SheetHeader>
-          <form onSubmit={onEditSubmit} className="mt-4 space-y-4">
+          <form onSubmit={onEditSubmit} className="space-y-4 px-4 pb-4">
             <div className="space-y-1.5">
               <Label htmlFor="plan-edit-name">Nome</Label>
               <Input id="plan-edit-name" {...editForm.register("name")} />

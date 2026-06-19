@@ -688,7 +688,7 @@ export default function AdminGlobalCatalogPage() {
                 <SheetHeader>
                   <SheetTitle>Importar produtos da plataforma</SheetTitle>
                 </SheetHeader>
-                <div className="mt-4 space-y-4 text-sm">
+                <div className="space-y-4 px-4 pb-4 text-sm">
                   <p className="text-muted-foreground">
                     O arquivo deve conter as colunas: <strong>MARCA</strong>, <strong>DOSAGEM</strong>,{" "}
                     <strong>TIPO</strong>, <strong>CLASSE</strong> (primeira linha = cabeçalho).
@@ -773,7 +773,7 @@ export default function AdminGlobalCatalogPage() {
                 <SheetHeader>
                   <SheetTitle>Novo produto global</SheetTitle>
                 </SheetHeader>
-                <form onSubmit={onCreate} className="mt-6 space-y-4">
+                <form onSubmit={onCreate} className="space-y-4 px-4 pb-4">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
                     <Input {...createForm.register("name")} />
@@ -944,7 +944,7 @@ export default function AdminGlobalCatalogPage() {
           <SheetHeader>
             <SheetTitle>Editar produto global</SheetTitle>
           </SheetHeader>
-          <form onSubmit={onEditGlobal} className="mt-6 space-y-4">
+          <form onSubmit={onEditGlobal} className="space-y-4 px-4 pb-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
               <Input {...editForm.register("name")} />
@@ -1015,7 +1015,7 @@ export default function AdminGlobalCatalogPage() {
               <p className="text-sm text-muted-foreground">Agrônomo: {editCustomRow.owner_name}</p>
             ) : null}
           </SheetHeader>
-          <form onSubmit={onEditCustom} className="mt-6 space-y-4">
+          <form onSubmit={onEditCustom} className="space-y-4 px-4 pb-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
               <Input {...customEditForm.register("name")} />
