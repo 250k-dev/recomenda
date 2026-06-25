@@ -13,6 +13,8 @@ import {
   createLocalProduct,
   updateLocalProduct,
   deleteLocalProduct,
+  resolveCustomLink,
+  promoteCustomToGlobal,
   cloneGlobalProduct,
   clonePeerLocalProduct,
   createGlobalProduct,
@@ -69,7 +71,7 @@ export function useCreateLocalProduct() {
 export function useUpdateLocalProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean }) =>
+    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean; global_product_id?: string | null }) =>
       updateLocalProduct(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
@@ -78,6 +80,39 @@ export function useUpdateLocalProduct() {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
       queryClient.invalidateQueries({ queryKey: queryKeys.inactiveLocalCatalog });
     },
+  });
+}
+
+/** Invalida os caches afetados quando um customizado vira/aponta para global. */
+function invalidateCatalogAfterResolve(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
+  queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
+  queryClient.invalidateQueries({ queryKey: queryKeys.globalCatalog });
+  queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });
+  queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
+  queryClient.invalidateQueries({ queryKey: queryKeys.allLocalProducts });
+}
+
+export function useResolveCustomLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, globalProductId }: { id: string; globalProductId: string }) =>
+      resolveCustomLink(id, globalProductId),
+    onSuccess: () => invalidateCatalogAfterResolve(queryClient),
+  });
+}
+
+export function usePromoteCustomToGlobal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Parameters<typeof promoteCustomToGlobal>[1];
+    }) => promoteCustomToGlobal(id, payload),
+    onSuccess: () => invalidateCatalogAfterResolve(queryClient),
   });
 }
 

@@ -115,6 +115,14 @@ export async function getProducerStock(producerId: string) {
   return data;
 }
 
+export async function adjustProducerStock(
+  producerId: string,
+  payload: { local_product_id: string; new_quantity: number; notes?: string },
+) {
+  const { data } = await api.post(`/producers/${producerId}/stock/adjust`, payload);
+  return data;
+}
+
 export async function removeFarmAccess(producerId: string, farmId: string) {
   await api.delete(`/producers/${producerId}/farms/${farmId}`);
 }

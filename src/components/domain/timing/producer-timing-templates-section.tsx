@@ -39,6 +39,9 @@ import {
   useHardDeleteTimingTemplate,
   useTimingTemplates,
 } from "@/lib/api/hooks";
+import { usePlanQuota } from "@/lib/api/hooks/auth";
+import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 import { CROP_LABELS } from "@/lib/season-constants";
 
 const createSchema = z.object({
@@ -67,8 +70,10 @@ export function ProducerTimingTemplatesPanel({
   const createMutation = useCreateTimingTemplate(producerId);
   const deleteMutation = useDeleteTimingTemplate(producerId);
   const hardDeleteMutation = useHardDeleteTimingTemplate(producerId);
+  const { data: planQuota } = usePlanQuota();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [limitOpen, setLimitOpen] = useState(false);
   const [tab, setTab] = useState<"active" | "archived">("active");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(
     null,
@@ -94,10 +99,21 @@ export function ProducerTimingTemplatesPanel({
           `/producers/${producerId}/timing-templates/${created.id}${qs}`,
         );
       },
+      onError: (err) => {
+        setSheetOpen(false);
+        if (apiErrorMessage(err, "").includes("modelos do plano")) setLimitOpen(true);
+        else toast.error(apiErrorMessage(err, "Não foi possível criar o modelo."));
+      },
     });
   });
 
   const templatesData = templates ?? [];
+  const modelQuota = planQuota?.plan?.timing_template_quota ?? 3;
+  const atModelLimit = templatesData.length >= modelQuota;
+  const handleNewModel = () => {
+    if (atModelLimit) setLimitOpen(true);
+    else setSheetOpen(true);
+  };
   const archivedData = archived ?? [];
   const baseHref = `/producers/${producerId}/timing-templates`;
 
@@ -121,7 +137,7 @@ export function ProducerTimingTemplatesPanel({
               ]}
             />
             {tab === "active" ? (
-              <Button size="sm" className="gap-1.5" onClick={() => setSheetOpen(true)}>
+              <Button size="sm" className="gap-1.5" onClick={handleNewModel}>
                 <Plus className="h-4 w-4" />
                 Novo modelo
               </Button>
@@ -138,7 +154,7 @@ export function ProducerTimingTemplatesPanel({
                 description="Crie modelos de recomendação para reutilizar nas safras deste produtor."
                 variant="inline"
                 action={
-                  <Button size="sm" className="gap-1.5" onClick={() => setSheetOpen(true)}>
+                  <Button size="sm" className="gap-1.5" onClick={handleNewModel}>
                     <Plus className="h-4 w-4" />
                     Criar primeiro modelo
                   </Button>
@@ -269,6 +285,17 @@ export function ProducerTimingTemplatesPanel({
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={limitOpen}
+        onOpenChange={setLimitOpen}
+        title="Limite de modelos do plano atingido"
+        description={`O seu plano permite no máximo ${modelQuota} ${
+          modelQuota === 1 ? "modelo" : "modelos"
+        } de recomendação. Para criar mais, contate o administrador para um plano com quota maior — ou exclua um modelo existente.`}
+        confirmLabel="Entendi"
+        onConfirm={async () => setLimitOpen(false)}
+      />
 
       <ConfirmDialog
         open={!!deleteConfirm}

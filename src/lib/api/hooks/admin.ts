@@ -39,6 +39,7 @@ export function useUpdateAdminPlan() {
       payload: Partial<{
         name: string;
         plot_quota: number;
+        timing_template_quota: number;
         price_brl_monthly: number | string;
         is_active: boolean;
       }>;

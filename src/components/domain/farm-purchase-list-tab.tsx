@@ -10,13 +10,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/domain/season/_shared";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
+import { useCurrencyStore } from "@/stores/currency";
 import {
   useFarmAggregatedShoppingList,
   useUpdatePurchaseList,
 } from "@/lib/api/hooks";
+import { useProducerStock } from "@/lib/api/hooks/producers";
 import type { ListItem } from "@/components/domain/season/_shared";
 import {
-  listItemRequired,
+  isSeedItem,
+  listItemQuantity,
   listItemToPayload,
   validateListItems,
 } from "@/components/domain/season/_shared";
@@ -46,9 +49,12 @@ function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem
     nApps: String(it.n_applications),
     stock: String(it.current_stock),
     price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
+    priceUsd: it.price_usd != null ? String(it.price_usd) : "",
     thousandPlants:
       it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
     seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
+    bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
+    outOfProgram: it.out_of_program || undefined,
   };
 }
 
@@ -63,21 +69,36 @@ function validateItems(items: ListItem[]): string | null {
 function computeItemMetrics(
   items: ListItem[],
   totalHa: number,
-): { totalValue: number; productsCount: number; categoriesCount: number; pricedCount: number } {
-  let totalValue = 0;
+  fxRate: number,
+): {
+  totalProductsValue: number;
+  totalSeedsValue: number;
+  productsCount: number;
+  categoriesCount: number;
+  pricedCount: number;
+} {
+  let totalProductsValue = 0;
+  let totalSeedsValue = 0;
   let pricedCount = 0;
   for (const it of items) {
-    const required = listItemRequired(it, totalHa);
+    const required = listItemQuantity(it, totalHa);
     const toBuy = Math.max(0, required - Number(it.stock || 0));
-    if (it.price) {
-      totalValue += toBuy * Number(it.price);
+    const unitPrice =
+      it.priceUsd && fxRate > 0 ? Number(it.priceUsd) * fxRate : Number(it.price || 0);
+    if (unitPrice > 0) {
+      if (isSeedItem(it)) {
+        totalSeedsValue += toBuy * unitPrice;
+      } else {
+        totalProductsValue += toBuy * unitPrice;
+      }
       pricedCount += 1;
     }
   }
   return {
-    totalValue,
+    totalProductsValue,
+    totalSeedsValue,
     productsCount: items.length,
-    categoriesCount: items.length > 0 ? 1 : 0,
+    categoriesCount: new Set(items.map((it) => it.category || "OTHER")).size,
     pricedCount,
   };
 }
@@ -108,6 +129,14 @@ export function FarmPurchaseListTab({
   fallbackSeasonIds,
   readOnly = false,
 }: FarmPurchaseListTabProps) {
+  const { data: producerStock } = useProducerStock(producerId ?? "");
+  const stockByProductId = useMemo(
+    () =>
+      Object.fromEntries(
+        (producerStock ?? []).map((s) => [s.local_product_id, s.quantity]),
+      ),
+    [producerStock],
+  );
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +175,10 @@ export function FarmPurchaseListTab({
     setShowComparison(false);
     setEditing(false);
     setDraftItems(list ? (list.items ?? []).map(detailItemToListItem) : []);
+    // Carrega a cotação salva desta lista no seletor de moeda.
+    if (list?.fx_rate_usd_brl != null) {
+      useCurrencyStore.getState().setFxRate(String(list.fx_rate_usd_brl));
+    }
   }
 
   const startEditing = () => {
@@ -171,8 +204,10 @@ export function FarmPurchaseListTab({
     }
 
     try {
+      const fxRaw = useCurrencyStore.getState().fxRate;
       await updateMutation.mutateAsync({
         items: listItemsToPayload(draftItems),
+        fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
         plots: (list.plots ?? []).map((p) => ({
           plot_id: p.plot_id,
           planting_date: p.planting_date,
@@ -187,28 +222,17 @@ export function FarmPurchaseListTab({
     }
   };
 
-  const savedItems = useMemo(() => list?.items ?? [], [list?.items]);
   const viewItems = useMemo(
     () => (list?.items ?? []).map(detailItemToListItem),
     [list?.items],
   );
   const totalHa = list?.total_hectares ?? 0;
+  const fxRate = useCurrencyStore((state) => state.fxRate);
+  const fx = Number(fxRate) || 0;
 
   const kpis = useMemo(() => {
-    if (editing) {
-      return computeItemMetrics(draftItems, totalHa);
-    }
-    const totalValue = savedItems.reduce((s, it) => {
-      const price = it.price_brl_fixed ?? 0;
-      return s + it.quantity_to_buy * price;
-    }, 0);
-    return {
-      totalValue,
-      productsCount: savedItems.length,
-      categoriesCount: new Set(savedItems.map((it) => it.category || "OTHER")).size,
-      pricedCount: savedItems.filter((it) => it.price_brl_fixed).length,
-    };
-  }, [editing, draftItems, savedItems, totalHa]);
+    return computeItemMetrics(editing ? draftItems : viewItems, totalHa, fx);
+  }, [editing, draftItems, viewItems, totalHa, fx]);
 
   if (!producerId) {
     return (
@@ -359,9 +383,23 @@ export function FarmPurchaseListTab({
 
       <KpiStrip>
         <KpiCell
-          label="Valor total a gastar"
-          value={kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—"}
-          sub={kpis.totalValue > 0 ? "soma dos itens com preço" : "informe preços para calcular"}
+          label="Valor total produtos"
+          value={kpis.totalProductsValue > 0 ? fmtBrl(kpis.totalProductsValue) : "—"}
+          sub={
+            kpis.totalProductsValue > 0
+              ? "defensivos e fertilizantes"
+              : "informe preços para calcular"
+          }
+          icon={<Package className="size-4" />}
+        />
+        <KpiCell
+          label="Valor total sementes"
+          value={kpis.totalSeedsValue > 0 ? fmtBrl(kpis.totalSeedsValue) : "—"}
+          sub={
+            kpis.totalSeedsValue > 0
+              ? "cultivares e híbridos"
+              : "informe preços para calcular"
+          }
           icon={<Leaf className="size-4" />}
         />
         <KpiCell
@@ -398,7 +436,8 @@ export function FarmPurchaseListTab({
             setItems={setDraftItems}
             readOnly={!editing}
             totalHa={totalHa}
-            crop={list.crop === "SOYBEAN" || list.crop === "CORN" ? list.crop : null}
+            crop={list.crop as "SOYBEAN" | "CORN" | "ANY"}
+            stockByProductId={stockByProductId}
           />
           {error ? (
             <div className="max-w-xl">

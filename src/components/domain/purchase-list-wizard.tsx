@@ -13,8 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
+import { useCurrencyStore } from "@/stores/currency";
 import {
   createPurchaseList,
   type PurchaseListItemInput,
@@ -55,7 +55,7 @@ export function PurchaseListWizard({
   successRedirectLabel = "Ir para o produtor",
 }: PurchaseListWizardProps) {
   const [step, setStep] = useState(1);
-  const [crop, setCrop] = useState<"SOYBEAN" | "CORN">("SOYBEAN");
+  const [crop, setCrop] = useState<"SOYBEAN" | "CORN" | "ANY">("SOYBEAN");
   const [listName, setListName] = useState("");
   const [items, setItems] = useState<ListItem[]>([]);
 
@@ -78,7 +78,7 @@ export function PurchaseListWizard({
       {step === 1 && (
         <StepList
           crop={crop}
-          setCrop={(v) => setCrop(v as "SOYBEAN" | "CORN")}
+          setCrop={(v) => setCrop(v as "SOYBEAN" | "CORN" | "ANY")}
           listName={listName}
           setListName={setListName}
           items={items}
@@ -194,21 +194,37 @@ function StepList({
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="list-crop" className="text-sm font-medium text-muted-foreground">
-              Cultura
+            <Label className="text-sm font-medium text-muted-foreground">
+              Cultura(s)
             </Label>
-            <Select
-              id="list-crop"
-              value={crop}
-              onValueChange={setCrop}
-              options={[
-                { value: "SOYBEAN", label: CROP_LABELS.SOYBEAN },
-                { value: "CORN", label: CROP_LABELS.CORN },
-              ]}
-              filterLabel="Cultura"
-            />
+            <div className="flex gap-2">
+              {(["SOYBEAN", "CORN"] as const).map((c) => {
+                const on = crop === c || crop === "ANY";
+                return (
+                  <Button
+                    key={c}
+                    type="button"
+                    variant={on ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const sojaOn = crop === "SOYBEAN" || crop === "ANY";
+                      const milhoOn = crop === "CORN" || crop === "ANY";
+                      const nextSoja = c === "SOYBEAN" ? !sojaOn : sojaOn;
+                      const nextMilho = c === "CORN" ? !milhoOn : milhoOn;
+                      if (!nextSoja && !nextMilho) return; // mantém ao menos 1
+                      setCrop(
+                        nextSoja && nextMilho ? "ANY" : nextSoja ? "SOYBEAN" : "CORN",
+                      );
+                    }}
+                  >
+                    {CROP_LABELS[c]}
+                  </Button>
+                );
+              })}
+            </div>
             <p className="text-xs text-muted-foreground">
-              A cultura orienta relatórios e vínculos futuros com a safra.
+              Selecione 1 ou 2 culturas. As categorias de variedade (cultivar de soja /
+              híbrido de milho) aparecem conforme a escolha.
             </p>
           </div>
         </div>
@@ -244,7 +260,7 @@ function StepList({
             items={items}
             setItems={setItems}
             totalHa={totalHa}
-            crop={crop === "SOYBEAN" || crop === "CORN" ? crop : null}
+            crop={crop as "SOYBEAN" | "CORN" | "ANY"}
           />
         </div>
       </section>
@@ -297,11 +313,13 @@ function StepReview({
   const mutation = useMutation({
     mutationFn: () => {
       const itemsPayload: PurchaseListItemInput[] = items.map(listItemToPayload);
+      const fxRaw = useCurrencyStore.getState().fxRate;
       return createPurchaseList({
         producer_id: producerId,
         crop,
         name: listName,
         season_id: null,
+        fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
         plots: plots.map((p) => ({
           plot_id: p.id,
           planting_date: null,

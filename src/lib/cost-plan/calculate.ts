@@ -25,6 +25,8 @@ export interface CostItemInput {
   calc_rule: CalcRule;
   /** Para SEED_BAGS: qtde de população de base (G_pop). */
   population_base?: number | null;
+  /** Semente: bags/sacos ajustados à mão (sobrepõe o cálculo por população). */
+  bags_override?: number | null;
 }
 
 export interface CostParams {
@@ -63,6 +65,8 @@ export interface CostSummary {
 /** Ordem canônica das categorias na sidebar do plano. */
 export const CATEGORY_ORDER = [
   "SEED",
+  "CULTIVAR_SOJA",
+  "HIBRIDO_MILHO",
   "FERTILIZER",
   "HERBICIDE",
   "FUNGICIDE",
@@ -74,6 +78,20 @@ export const CATEGORY_ORDER = [
   "OTHER",
 ];
 
+/**
+ * Converte a população de sementes na quantidade final conforme a categoria.
+ * `populationBase` = população por hectare (nº de sementes) × área semeada.
+ * Cultivar de soja: bag de 5.000.000 sementes. Híbrido de milho: saca de 60.000.
+ *   bags  = (área × pop/ha) / 5.000.000
+ *   sacos = (área × pop/ha) / 60.000
+ * SEED genérico (legado) mantém a quantidade na própria população.
+ */
+export function seedQuantityFromPopulation(populationBase: number, category: string): number {
+  if (category === "CULTIVAR_SOJA") return populationBase / 5_000_000;
+  if (category === "HIBRIDO_MILHO") return populationBase / 60_000;
+  return populationBase;
+}
+
 /** Calcula uma linha do plano. */
 export function calculateLine(item: CostItemInput, params: CostParams): CostLineResult {
   const area = params.area_hectares;
@@ -84,8 +102,12 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
   // G — Qtde final
   let G: number;
   if (item.calc_rule === "SEED_POPULATION") {
-    // População de sementes: usa population_base como "G_pop" (caso vier preenchido).
-    G = item.population_base ?? 0;
+    // População de sementes convertida em bags (soja) ou sacos (milho) pela categoria,
+    // ou o valor ajustado à mão quando houver override.
+    G =
+      item.bags_override != null
+        ? item.bags_override
+        : seedQuantityFromPopulation(item.population_base ?? 0, item.category);
     if (item.deduct_stock) G = G - stock;
   } else if (item.calc_rule === "SEED_BAGS") {
     G = (item.population_base ?? 0) * 25;

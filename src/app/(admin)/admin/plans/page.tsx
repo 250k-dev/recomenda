@@ -33,6 +33,10 @@ const planFormSchema = z.object({
     .string()
     .min(1, "Informe a quota")
     .refine((s) => /^\d+$/.test(s) && parseInt(s, 10) >= 1, "Quota mínima 1"),
+  timing_template_quota: z
+    .string()
+    .min(1, "Informe a quota")
+    .refine((s) => /^\d+$/.test(s) && parseInt(s, 10) >= 1, "Quota mínima 1"),
   price_brl_monthly: z
     .string()
     .min(1, "Informe o preço")
@@ -60,12 +64,12 @@ export default function AdminPlansPage() {
 
   const createForm = useForm<PlanFormValues>({
     resolver: zodResolver(planFormSchema),
-    defaultValues: { name: "", plot_quota: "10", price_brl_monthly: "0", is_active: true },
+    defaultValues: { name: "", plot_quota: "10", timing_template_quota: "3", price_brl_monthly: "0", is_active: true },
   });
 
   const editForm = useForm<PlanFormValues>({
     resolver: zodResolver(planFormSchema),
-    defaultValues: { name: "", plot_quota: "1", price_brl_monthly: "0", is_active: true },
+    defaultValues: { name: "", plot_quota: "1", timing_template_quota: "3", price_brl_monthly: "0", is_active: true },
   });
 
   const removedCount = useMemo(() => (plans ?? []).filter((p) => !p.is_active).length, [plans]);
@@ -94,6 +98,7 @@ export default function AdminPlansPage() {
     editForm.reset({
       name: p.name,
       plot_quota: String(p.plot_quota),
+      timing_template_quota: String(p.timing_template_quota),
       price_brl_monthly: String(Number(p.price_brl_monthly)),
       is_active: p.is_active,
     });
@@ -104,6 +109,7 @@ export default function AdminPlansPage() {
       {
         name: values.name,
         plot_quota: parseInt(values.plot_quota, 10),
+        timing_template_quota: parseInt(values.timing_template_quota, 10),
         price_brl_monthly: parseFloat(values.price_brl_monthly.replace(",", ".")),
         is_active: values.is_active,
       },
@@ -111,7 +117,7 @@ export default function AdminPlansPage() {
         onSuccess: () => {
           toast.success("Plano criado.");
           setCreateOpen(false);
-          createForm.reset({ name: "", plot_quota: "10", price_brl_monthly: "0", is_active: true });
+          createForm.reset({ name: "", plot_quota: "10", timing_template_quota: "3", price_brl_monthly: "0", is_active: true });
         },
         onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível criar o plano.")),
       },
@@ -126,6 +132,7 @@ export default function AdminPlansPage() {
         payload: {
           name: values.name,
           plot_quota: parseInt(values.plot_quota, 10),
+          timing_template_quota: parseInt(values.timing_template_quota, 10),
           price_brl_monthly: parseFloat(values.price_brl_monthly.replace(",", ".")),
           is_active: values.is_active,
         },
@@ -185,6 +192,7 @@ export default function AdminPlansPage() {
     filteredPlans?.map((p) => [
       p.name,
       String(p.plot_quota),
+      String(p.timing_template_quota),
       `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
       <StatusBadge key={`st-a-${p.id}`} tone="success">Ativo</StatusBadge>,
       <div key={`a-${p.id}`} className="flex flex-wrap justify-end gap-2">
@@ -208,6 +216,7 @@ export default function AdminPlansPage() {
     filteredPlans?.map((p) => [
       p.name,
       String(p.plot_quota),
+      String(p.timing_template_quota),
       `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
       <StatusBadge key={`st-r-${p.id}`} tone="neutral">Removido</StatusBadge>,
       <div key={`r-${p.id}`} className="flex flex-wrap justify-end gap-2">
@@ -278,6 +287,13 @@ export default function AdminPlansPage() {
                   )}
                 </div>
                 <div className="space-y-1.5">
+                  <Label htmlFor="plan-create-tquota">Quota de modelos</Label>
+                  <Input id="plan-create-tquota" type="number" min={1} {...createForm.register("timing_template_quota")} />
+                  {createForm.formState.errors.timing_template_quota && (
+                    <p className="text-xs text-destructive">{createForm.formState.errors.timing_template_quota.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
                   <Label htmlFor="plan-create-price">Preço mensal (R$)</Label>
                   <Input id="plan-create-price" type="number" step="0.01" min={0} {...createForm.register("price_brl_monthly")} />
                   {createForm.formState.errors.price_brl_monthly && (
@@ -315,7 +331,7 @@ export default function AdminPlansPage() {
         <TableRowsSkeleton rows={8} columns={5} />
       ) : (
         <DataTable
-          headers={["Nome", "Quota de talhões", "Preço", "Status", ""]}
+          headers={["Nome", "Quota de talhões", "Quota de modelos", "Preço", "Status", ""]}
           rows={activeTab === "ativos" ? activeRows : removedRows}
         />
       )}
@@ -338,6 +354,13 @@ export default function AdminPlansPage() {
               <Input id="plan-edit-quota" type="number" min={1} {...editForm.register("plot_quota")} />
               {editForm.formState.errors.plot_quota && (
                 <p className="text-xs text-destructive">{editForm.formState.errors.plot_quota.message}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="plan-edit-tquota">Quota de modelos</Label>
+              <Input id="plan-edit-tquota" type="number" min={1} {...editForm.register("timing_template_quota")} />
+              {editForm.formState.errors.timing_template_quota && (
+                <p className="text-xs text-destructive">{editForm.formState.errors.timing_template_quota.message}</p>
               )}
             </div>
             <div className="space-y-1.5">

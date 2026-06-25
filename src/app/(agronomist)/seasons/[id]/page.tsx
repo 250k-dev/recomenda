@@ -36,15 +36,19 @@ import {
   useUpdateRecommendationItem,
   useDeleteRecommendationItem,
   usePlatformCatalog,
+  useMe,
 } from "@/lib/api/hooks";
 import { CostPlanView } from "@/components/domain/cost-plan/cost-plan-view";
+import { PlotHistoryTab } from "@/components/domain/season/plot-history-tab";
 import type { Recommendation, RecommendationItem } from "@/lib/api/client";
 import {
   Send,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
+  AlertTriangle,
   Clock,
+  Share2,
   SkipForward,
   Pencil,
   X,
@@ -61,20 +65,28 @@ import {
   recommendationToStageDraft,
   type RecommendationStageDraft,
 } from "@/components/domain/recommendation-stage-fields";
-import { todayLocalYmd } from "@/lib/timing/window-days";
+import { recommendedYmdToWindow, todayLocalYmd } from "@/lib/timing/window-days";
 import { cn } from "@/lib/utils";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
 import { extractError } from "@/components/domain/season/_shared";
+import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
+import {
+  displayRecStatus,
+  fmtDate,
+} from "@/lib/recommendations/format";
 
-type TabValue = "recommendations" | "cost-plan";
+type TabValue = "recommendations" | "cost-plan" | "plot-history";
 
 function parseSeasonTab(value: string | null): TabValue {
-  return value === "cost-plan" ? "cost-plan" : "recommendations";
+  if (value === "cost-plan") return "cost-plan";
+  if (value === "plot-history") return "plot-history";
+  return "recommendations";
 }
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
+  OVERDUE: "Atrasado",
   APPLIED_ON_TIME: "Aplicado no prazo",
   APPLIED_LATE: "Aplicado com atraso",
   SKIPPED: "Pulada",
@@ -82,6 +94,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   PENDING: "bg-surface-2 text-muted-foreground border border-border",
+  OVERDUE: "bg-warning-soft text-warning-strong border border-warning-border",
   APPLIED_ON_TIME: "bg-success-soft text-success-strong border border-success-border",
   APPLIED_LATE: "bg-warning-soft text-warning-strong border border-warning-border",
   SKIPPED: "bg-clay-soft text-clay-strong border border-clay-border",
@@ -89,17 +102,11 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
   PENDING: <Clock className="h-3.5 w-3.5" />,
+  OVERDUE: <AlertTriangle className="h-3.5 w-3.5" />,
   APPLIED_ON_TIME: <CheckCircle2 className="h-3.5 w-3.5" />,
   APPLIED_LATE: <CheckCircle2 className="h-3.5 w-3.5" />,
   SKIPPED: <SkipForward className="h-3.5 w-3.5" />,
 };
-
-const fmtDate = (d: string) =>
-  new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 
 function StageDateBadge({
   label,
@@ -539,12 +546,16 @@ function RecommendationCard({
       toast.error("Informe o nome da etapa.");
       return;
     }
+    // Ao corrigir a data, recalcula a janela (centrada na nova data ± tolerância).
+    const win = recommendedYmdToWindow(stageDraft.recommended_date || todayLocalYmd());
     patchMut.mutate(
       {
         id: rec.id,
         name: trimmed,
         trigger_type: stageDraft.trigger_type,
         predicted_date_current: stageDraft.recommended_date || null,
+        window_start_days: win.window_start_days,
+        window_end_days: win.window_end_days,
         notes: isPending ? stageDraft.notes.trim() || null : rec.notes,
       },
       {
@@ -596,12 +607,19 @@ function RecommendationCard({
         open && isPending && "ring-2 ring-primary/20",
       )}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
         aria-expanded={open}
         className={cn(
-          "flex w-full items-center gap-3 px-4 py-4 text-left transition-colors",
+          "flex w-full cursor-pointer items-center gap-3 px-4 py-4 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
           isPending ? "hover:bg-primary/5" : "hover:bg-accent/40",
         )}
       >
@@ -655,11 +673,11 @@ function RecommendationCard({
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold",
-                STATUS_BADGE_CLASS[rec.status] ?? "bg-muted text-muted-foreground",
+                STATUS_BADGE_CLASS[displayRecStatus(rec)] ?? "bg-muted text-muted-foreground",
               )}
             >
-              {STATUS_ICON[rec.status]}
-              {STATUS_LABEL[rec.status] ?? rec.status}
+              {STATUS_ICON[displayRecStatus(rec)]}
+              {STATUS_LABEL[displayRecStatus(rec)] ?? displayRecStatus(rec)}
             </span>
           </div>
           {rec.items.length > 0 ? (
@@ -697,7 +715,7 @@ function RecommendationCard({
             />
           </span>
         </div>
-      </button>
+      </div>
 
       {open && (
         <div className="flex flex-col gap-4 border-t px-4 pb-4 pt-3">
@@ -940,7 +958,10 @@ function RecommendationsTab({
 }) {
   const { data, isLoading } = useSeasonTimeline(seasonId);
   const [addingStage, setAddingStage] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const reorderMut = useReorderRecommendations(seasonId);
+  const meData = useMe().data as { name?: string } | undefined;
+  const producerQuery = useProducer(producerId ?? "");
 
   if (isLoading) return <TimelineCardsSkeleton count={5} />;
 
@@ -1013,6 +1034,18 @@ function RecommendationsTab({
   const total = recommendations.length;
   const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
 
+  const shareData = {
+    title,
+    plotName,
+    plantingDate,
+    statusLabel,
+    producerName: producerQuery.data?.name ?? null,
+    agronomistName: meData?.name ?? null,
+    done,
+    total,
+    recommendations,
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -1040,6 +1073,14 @@ function RecommendationsTab({
           </div>
 
           <div className="flex flex-wrap gap-3 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setExportOpen(true)}
+              className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent print:hidden"
+            >
+              <Share2 className="h-4 w-4 text-muted-foreground" />
+              Exportar
+            </button>
             {plantingDate ? (
               <div className="rounded-lg border border-border bg-surface-2 px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
@@ -1108,6 +1149,12 @@ function RecommendationsTab({
           />
         ))}
       </ul>
+
+      <RecommendationExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        data={shareData}
+      />
     </div>
   );
 }
@@ -1168,48 +1215,81 @@ export default function SeasonDetailPage() {
     { label: title },
   ];
 
+  const tabHref = (tab: TabValue) => {
+    const params = new URLSearchParams();
+    if (farmIdFromQuery) params.set("farm_id", farmIdFromQuery);
+    if (producerIdFromQuery) params.set("producer_id", producerIdFromQuery);
+    if (tab !== "recommendations") params.set("tab", tab);
+    const q = params.toString();
+    return q ? `?${q}` : "?";
+  };
+
   return (
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      {activeTab === "recommendations" ? (
-        <>
-          <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
-            {season?.status ? (
-              <Badge variant={STATUS_VARIANTS[season.status] || "default"}>
-                {statusLabel}
-              </Badge>
-            ) : null}
-            {season?.status === "DRAFT" ? (
-              <Button
-                size="sm"
-                className="gap-2"
-                onClick={handlePublish}
-                disabled={publishMutation.isPending}
-              >
-                <Send className="h-4 w-4" />
-                {publishMutation.isPending ? "Publicando..." : "Publicar safra"}
-              </Button>
-            ) : null}
-          </div>
+      {/* Tab navigation */}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-2 p-0.5">
+          {(
+            [
+              { value: "recommendations", label: "Cronograma" },
+              { value: "cost-plan", label: "Plano de custo" },
+              { value: "plot-history", label: "Histórico do talhão" },
+            ] as { value: TabValue; label: string }[]
+          ).map(({ value, label }) => (
+            <Link
+              key={value}
+              href={tabHref(value)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                activeTab === value
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
 
-          {loadingSeason ? (
-            <PageHeaderSkeleton withAction />
-          ) : (
-            <RecommendationsTab
-              seasonId={seasonId}
-              title={title}
-              plotName={season?.plot_name}
-              plantingDate={season?.planting_date}
-              statusLabel={statusLabel}
-              seasonStatus={season?.status}
-              producerId={producerId || undefined}
-              onPublish={season?.status === "DRAFT" ? handlePublish : undefined}
-              isPublishing={publishMutation.isPending}
-            />
-          )}
-        </>
-      ) : (
+        <div className="flex items-center gap-2">
+          {season?.status ? (
+            <Badge variant={STATUS_VARIANTS[season.status] || "default"}>
+              {statusLabel}
+            </Badge>
+          ) : null}
+          {season?.status === "DRAFT" && activeTab === "recommendations" ? (
+            <Button
+              size="sm"
+              className="gap-2"
+              onClick={handlePublish}
+              disabled={publishMutation.isPending}
+            >
+              <Send className="h-4 w-4" />
+              {publishMutation.isPending ? "Publicando..." : "Publicar safra"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {activeTab === "recommendations" ? (
+        loadingSeason ? (
+          <PageHeaderSkeleton withAction />
+        ) : (
+          <RecommendationsTab
+            seasonId={seasonId}
+            title={title}
+            plotName={season?.plot_name}
+            plantingDate={season?.planting_date}
+            statusLabel={statusLabel}
+            seasonStatus={season?.status}
+            producerId={producerId || undefined}
+            onPublish={season?.status === "DRAFT" ? handlePublish : undefined}
+            isPublishing={publishMutation.isPending}
+          />
+        )
+      ) : activeTab === "cost-plan" ? (
         <CostPlanView
           seasonId={seasonId}
           crop={season?.crop ?? "SOYBEAN"}
@@ -1218,6 +1298,8 @@ export default function SeasonDetailPage() {
           producerName={producer?.name}
           farmName={farm?.name}
         />
+      ) : (
+        <PlotHistoryTab seasonId={seasonId} />
       )}
     </>
   );

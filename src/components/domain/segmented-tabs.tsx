@@ -7,6 +7,8 @@ export type SegmentedTabItem<T extends string = string> = {
   value: T;
   label: ReactNode;
   badgeCount?: number;
+  /** Classe aplicada quando o item está ativo (cor própria por filtro). */
+  activeClassName?: string;
 };
 
 export type SegmentedTabsProps<T extends string> = {
@@ -47,9 +49,11 @@ export function SegmentedTabs<T extends string>({
               "focus-visible:ring-[3px] focus-visible:ring-ring/40",
               "rounded-lg px-4 py-2 text-sm",
               isActive
-                ? isPill
-                  ? "bg-surface text-text-strong shadow-sm"
-                  : "bg-primary text-primary-foreground shadow-sm"
+                ? item.activeClassName
+                  ? `${item.activeClassName} shadow-sm`
+                  : isPill
+                    ? "bg-surface text-text-strong shadow-sm"
+                    : "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-text-strong",
             )}
           >
@@ -59,7 +63,7 @@ export function SegmentedTabs<T extends string>({
                 className={cn(
                   "min-w-5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums transition-colors",
                   isActive
-                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    ? "bg-white/25 text-current"
                     : "bg-muted-foreground/15 text-muted-foreground group-hover:bg-muted-foreground/25",
                 )}
               >

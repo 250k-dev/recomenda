@@ -72,12 +72,28 @@ export function productsForPurchaseListCategory(
 ): PurchaseListCatalogProduct[] {
   if (!category) return [];
 
-  let filtered = products.filter((product) => product.category === category);
+  // Categorias de semente por cultura incluem também sementes SEED (legadas) da
+  // cultura correspondente, além das já recategorizadas.
+  const seedCropForCategory: Record<string, PurchaseListCrop> = {
+    CULTIVAR_SOJA: "SOYBEAN",
+    HIBRIDO_MILHO: "CORN",
+  };
+  const seedCrop = seedCropForCategory[category];
 
-  if (category === "SEED" && listCrop) {
-    filtered = filtered.filter(
-      (product) => !product.crop || product.crop === listCrop,
+  let filtered: PurchaseListCatalogProduct[];
+  if (seedCrop) {
+    filtered = products.filter(
+      (product) =>
+        product.category === category ||
+        (product.category === "SEED" && product.crop === seedCrop),
     );
+  } else {
+    filtered = products.filter((product) => product.category === category);
+    if (category === "SEED" && listCrop) {
+      filtered = filtered.filter(
+        (product) => !product.crop || product.crop === listCrop,
+      );
+    }
   }
 
   if (

@@ -45,4 +45,5 @@ export const queryKeys = {
   quoteResponse: (responseToken: string) => ["quote-response", responseToken] as const,
   agronomistAgenda: (producerId?: string) =>
     ["agronomist-agenda", producerId ?? "all"] as const,
+  plotHistory: (seasonId: string) => ["plot-history", seasonId] as const,
 };

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { PurchaseListItemInput } from "@/lib/api/purchase-lists";
+import { seedQuantityFromPopulation } from "@/lib/cost-plan/calculate";
 
 /** Talhão usado nos fluxos de lista de compra e safra. */
 export type WizardPlot = {
@@ -26,21 +27,57 @@ export type ListItem = {
   unit: string;
   nApps: string;
   stock: string;
+  /** Preço unitário em R$ (manual). */
   price: string;
-  /** Variedade/Híbrido: população em mil plantas/ha. */
+  /** Preço unitário em US$ (manual) — convertido para R$ pela cotação do dólar. */
+  priceUsd: string;
+  /** Variedade/Híbrido: população em plantas/ha (nº de sementes por hectare). */
   thousandPlants: string;
   /** Variedade/Híbrido: área a ser semeada (ha). */
   seedingArea: string;
+  /** Produto cadastrado na hora, fora do catálogo/programação (destaque vermelho). */
+  outOfProgram?: boolean;
+  /** Semente: quantidade de bags/sacos digitada à mão (sobrepõe o cálculo). */
+  bagsOverride?: string;
 };
 
-/** Itens de Variedade/Híbrido (semente) calculam por população, não por dose. */
-export const isSeedItem = (it: ListItem) => it.category === "SEED";
+/** Categorias tratadas como semente (cálculo por população, não por dose). */
+export const SEED_CATEGORIES = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO"];
 
-/** Quantidade necessária: população×área (semente) ou dose×área×aplicações. */
+/** Itens de Variedade/Híbrido (semente) calculam por população, não por dose. */
+export const isSeedItem = (it: ListItem) => SEED_CATEGORIES.includes(it.category);
+
+/** Rótulo curto da unidade de quantidade de semente conforme a categoria. */
+export function seedQuantityUnitLabel(category: string): string {
+  if (category === "CULTIVAR_SOJA") return "bag";
+  if (category === "HIBRIDO_MILHO") return "sacos";
+  return "pl";
+}
+
+/**
+ * Quantidade necessária: para semente, (população/ha × área) convertida em
+ * bags/sacos conforme a categoria; senão, dose×área×aplicações.
+ */
 export function listItemRequired(it: ListItem, totalHa: number): number {
-  return isSeedItem(it)
-    ? Number(it.thousandPlants || 0) * Number(it.seedingArea || 0)
-    : Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+  if (isSeedItem(it)) {
+    const populationBase = Number(it.thousandPlants || 0) * Number(it.seedingArea || 0);
+    return seedQuantityFromPopulation(populationBase, it.category);
+  }
+  return Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+}
+
+/** Indica se a semente teve a quantidade de bags/sacos ajustada manualmente. */
+export function hasBagsOverride(it: ListItem): boolean {
+  return isSeedItem(it) && it.bagsOverride !== undefined && it.bagsOverride !== "";
+}
+
+/**
+ * Quantidade efetiva: respeita o override manual de bags/sacos (semente) quando
+ * houver; senão usa o cálculo por população (ou dose, para defensivos).
+ */
+export function listItemQuantity(it: ListItem, totalHa: number): number {
+  if (hasBagsOverride(it)) return Number(it.bagsOverride) || 0;
+  return listItemRequired(it, totalHa);
 }
 
 /** Converte um item do formulário no payload da API (lógica única e compartilhada). */
@@ -54,9 +91,12 @@ export function listItemToPayload(it: ListItem): PurchaseListItemInput {
     n_applications: seed ? 1 : Number(it.nApps) || 1,
     current_stock: Number(it.stock) || 0,
     price_brl_fixed: it.price ? Number(it.price) : null,
+    price_usd: it.priceUsd ? Number(it.priceUsd) : null,
     calc_rule: seed ? "SEED_POPULATION" : null,
     thousand_plants_per_ha: seed ? Number(it.thousandPlants) || 0 : null,
     seeding_area_ha: seed ? Number(it.seedingArea) || 0 : null,
+    bags_override: hasBagsOverride(it) ? Number(it.bagsOverride) : null,
+    out_of_program: it.outOfProgram ?? false,
   };
 }
 
@@ -68,7 +108,7 @@ export function validateListItems(items: ListItem[]): string | null {
     if (!it.productId) return "Selecione o produto em todos os itens.";
     if (isSeedItem(it)) {
       if (!Number(it.thousandPlants))
-        return "Informe a população (mil pl/ha) nas variedades/híbridos.";
+        return "Informe a população (plantas/ha) nas variedades/híbridos.";
       if (!Number(it.seedingArea))
         return "Informe a área de semeadura (ha) nas variedades/híbridos.";
     } else if (!Number(it.dose)) {

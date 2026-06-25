@@ -45,6 +45,7 @@ import {
 import { getTimeline, type Recommendation } from "@/lib/api/seasons";
 import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
 import { FarmPurchaseListSummaryPanel } from "@/components/domain/farm-purchase-list-summary-panel";
+import { ProducerStockSection } from "@/components/domain/producer-stock-section";
 import type { PurchaseListDetail } from "@/lib/api/client";
 import { activeAgronomistProducerAccounts } from "@/lib/api/client";
 import { toast } from "sonner";
@@ -91,7 +92,7 @@ const plotSchema = z.object({
 type FarmFormValues = z.infer<typeof farmSchema>;
 type PlotFormValues = z.infer<typeof plotSchema>;
 
-type FarmViewTab = "seasons" | "purchase" | "plots";
+type FarmViewTab = "seasons" | "purchase" | "plots" | "stock";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -116,7 +117,9 @@ function seasonProgressFromTimeline(rows: Recommendation[] | undefined): {
 }
 
 function parseFarmViewTab(value: string | null): FarmViewTab {
-  if (value === "purchase" || value === "plots" || value === "seasons") return value;
+  if (value === "purchase" || value === "plots" || value === "seasons" || value === "stock") {
+    return value;
+  }
   return "seasons";
 }
 
@@ -471,7 +474,7 @@ export default function FarmDetailPage() {
         </Sheet>
       </section>
 
-      {tabFromUrl !== "purchase" ? (
+      {tabFromUrl !== "purchase" && tabFromUrl !== "stock" ? (
         <KpiStrip className="mb-8">
           <KpiCell
             label="Talhões"
@@ -523,6 +526,28 @@ export default function FarmDetailPage() {
             newPurchaseListHref={newPurchaseListHref}
             fallbackSeasonIds={activeSeasonIds}
           />
+        </section>
+      ) : tabFromUrl === "stock" ? (
+        <section>
+          <div className="mb-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground"
+              onClick={() => setFarmViewWithUrl("seasons")}
+            >
+              ← Voltar às safras
+            </Button>
+          </div>
+          {resolvedProducerId ? (
+            <ProducerStockSection producerId={resolvedProducerId} />
+          ) : (
+            <EmptyState
+              title="Produtor não vinculado"
+              description="Associe um produtor a esta fazenda para gerenciar o estoque."
+            />
+          )}
         </section>
       ) : (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">

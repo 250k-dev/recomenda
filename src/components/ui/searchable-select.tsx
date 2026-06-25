@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ const PANEL_GAP_PX = 4;
 
 type PanelPosition = {
   left: number;
-  minWidth: number;
+  width: number;
   top?: number;
   bottom?: number;
 };
@@ -31,24 +31,31 @@ function normalize(value: string): string {
     .trim();
 }
 
-function computePanelPosition(trigger: HTMLElement): PanelPosition {
+function computePanelPosition(trigger: HTMLElement, minWidth?: number): PanelPosition {
   const rect = trigger.getBoundingClientRect();
   const spaceBelow = window.innerHeight - rect.bottom - PANEL_GAP_PX;
   const spaceAbove = rect.top - PANEL_GAP_PX;
   const openUp = spaceBelow < PANEL_MAX_HEIGHT && spaceAbove > spaceBelow;
+  const viewportPadding = 8;
+  const maxWidth = window.innerWidth - viewportPadding * 2;
+  const width = Math.min(Math.max(rect.width, minWidth ?? rect.width), maxWidth);
+  const left = Math.min(
+    Math.max(viewportPadding, rect.left),
+    window.innerWidth - width - viewportPadding,
+  );
 
   if (openUp) {
     return {
       bottom: window.innerHeight - rect.top + PANEL_GAP_PX,
-      left: rect.left,
-      minWidth: rect.width,
+      left,
+      width,
     };
   }
 
   return {
     top: rect.bottom + PANEL_GAP_PX,
-    left: rect.left,
-    minWidth: rect.width,
+    left,
+    width,
   };
 }
 
@@ -71,6 +78,16 @@ export type BaseSelectProps = {
   emptyMessage?: string;
   className?: string;
   size?: "sm" | "default";
+  panelMinWidth?: number;
+  /** Rodapé fixo dentro do popover (não fecha ao clicar). Recebe a busca atual. */
+  footer?: (ctx: { query: string; close: () => void }) => React.ReactNode;
+  /**
+   * Permite cadastrar um item novo a partir do texto digitado: quando a busca
+   * não casa exatamente com nenhuma opção, exibe uma linha "Adicionar …" e
+   * dispara `onCreate(texto)` ao clicar, pressionar Enter ou sair do campo.
+   */
+  creatable?: boolean;
+  onCreate?: (label: string) => void;
 };
 
 export function BaseSelect({
@@ -91,9 +108,16 @@ export function BaseSelect({
   emptyMessage = "Nenhum resultado encontrado.",
   className,
   size = "default",
+  panelMinWidth,
+  footer,
+  creatable = false,
+  onCreate,
 }: BaseSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Evita cadastrar o mesmo texto duas vezes (ex.: Enter dispara o create e, ao
+  // desmontar o input, o blur tentaria disparar de novo).
+  const didCreateRef = useRef(false);
   const [panelPosition, setPanelPosition] = useState<PanelPosition | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -114,21 +138,19 @@ export function BaseSelect({
   const updatePanelPosition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
-    setPanelPosition(computePanelPosition(trigger));
-  }, []);
+    setPanelPosition(computePanelPosition(trigger, panelMinWidth));
+  }, [panelMinWidth]);
 
   useEffect(() => {
-    if (!open) {
-      setPanelPosition(null);
-      return;
-    }
+    if (!open) return;
 
-    updatePanelPosition();
+    const frame = requestAnimationFrame(updatePanelPosition);
 
     const onScrollOrResize = () => updatePanelPosition();
     window.addEventListener("scroll", onScrollOrResize, true);
     window.addEventListener("resize", onScrollOrResize);
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("scroll", onScrollOrResize, true);
       window.removeEventListener("resize", onScrollOrResize);
     };
@@ -166,6 +188,26 @@ export function BaseSelect({
     }
   };
 
+  const trimmedQuery = query.trim();
+  const hasExactMatch = options.some(
+    (option) => normalize(option.label) === normalize(trimmedQuery),
+  );
+  const canCreate =
+    creatable &&
+    searchable &&
+    Boolean(onCreate) &&
+    trimmedQuery.length > 0 &&
+    !hasExactMatch;
+
+  const runCreate = () => {
+    const label = query.trim();
+    if (!label || didCreateRef.current) return;
+    didCreateRef.current = true;
+    onCreate?.(label);
+    setOpen(false);
+    setQuery("");
+  };
+
   const displayLabel = loading
     ? loadingMessage
     : (selected?.label ?? selectedLabel ?? placeholder);
@@ -181,16 +223,16 @@ export function BaseSelect({
           top: panelPosition.top,
           bottom: panelPosition.bottom,
           left: panelPosition.left,
-          minWidth: panelPosition.minWidth,
+          width: panelPosition.width,
           zIndex: 100,
           // Garante cliques no painel mesmo dentro de modais (Radix Dialog/Sheet
           // aplica pointer-events:none no body).
           pointerEvents: "auto",
         }}
-        className="w-max overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md"
+        className="flex max-h-[280px] flex-col overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md"
       >
         {showHeader ? (
-          <div className={cn("px-3 py-2.5", searchable && "border-b")}>
+          <div className={cn("shrink-0 px-3 py-2.5", searchable && "border-b")}>
             {filterLabel ? (
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {filterLabel}
@@ -202,21 +244,31 @@ export function BaseSelect({
                 <Input
                   ref={searchRef}
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    didCreateRef.current = false;
+                    setQuery(event.target.value);
+                  }}
                   placeholder={searchPlaceholder}
                   autoComplete="off"
                   className="h-9 pl-8"
+                  onBlur={() => {
+                    // Sair do campo com um nome novo digitado cadastra o produto —
+                    // só quando não há nenhum produto correspondente (evita cadastro
+                    // acidental ao desistir de uma busca que tinha resultados).
+                    if (canCreate && filtered.length === 0) runCreate();
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
                       setOpen(false);
                       setQuery("");
-                    } else if (
-                      event.key === "Enter" &&
-                      filtered[0] &&
-                      !filtered[0].disabled
-                    ) {
-                      event.preventDefault();
-                      pick(filtered[0].value);
+                    } else if (event.key === "Enter") {
+                      if (filtered[0] && !filtered[0].disabled) {
+                        event.preventDefault();
+                        pick(filtered[0].value);
+                      } else if (canCreate) {
+                        event.preventDefault();
+                        runCreate();
+                      }
                     }
                   }}
                 />
@@ -226,8 +278,9 @@ export function BaseSelect({
         ) : null}
         <ul
           role="listbox"
-          className="max-h-56 overflow-y-auto py-1"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
           aria-label={placeholder}
+          onWheel={(event) => event.stopPropagation()}
         >
           {filtered.length > 0 ? (
             filtered.map((option) => {
@@ -244,7 +297,7 @@ export function BaseSelect({
                       if (!option.disabled) pick(option.value);
                     }}
                     className={cn(
-                      "flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60",
+                      "flex w-full min-w-0 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60",
                       isSelected && "bg-primary/8",
                       option.disabled && "cursor-not-allowed opacity-50",
                     )}
@@ -255,15 +308,46 @@ export function BaseSelect({
                         isSelected ? "opacity-100" : "opacity-0",
                       )}
                     />
-                    <span className="whitespace-nowrap">{option.label}</span>
+                    <span className="min-w-0 flex-1 whitespace-normal wrap-break-word">
+                      {option.label}
+                    </span>
                   </button>
                 </li>
               );
             })
-          ) : (
+          ) : canCreate ? null : (
             <li className="px-3 py-2.5 text-sm text-muted-foreground">{emptyMessage}</li>
           )}
+          {canCreate ? (
+            <li role="none">
+              <button
+                type="button"
+                role="option"
+                aria-selected={false}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={runCreate}
+                className="flex w-full min-w-0 items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60"
+              >
+                <Plus className="size-4 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1 truncate">{trimmedQuery}</span>
+                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary-strong">
+                  Adicionar
+                </span>
+              </button>
+            </li>
+          ) : null}
         </ul>
+        {footer ? (
+          <div className="shrink-0 border-t p-1">
+            {footer({
+              query,
+              close: () => {
+                setOpen(false);
+                setQuery("");
+              },
+            })}
+          </div>
+        ) : null}
       </div>
     ) : null;
 

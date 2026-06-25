@@ -40,7 +40,9 @@ export function aggregatePurchaseListDosePerHa(
   crop?: string,
 ): Map<string, { productName: string; unit: string; dosePerHa: number }> {
   const map = new Map<string, { productName: string; unit: string; dosePerHa: number }>();
-  const filtered = crop ? lists.filter((list) => list.crop === crop) : lists;
+  const filtered = crop
+    ? lists.filter((list) => list.crop === crop || list.crop === "ANY")
+    : lists;
 
   for (const list of filtered) {
     const hectares = list.total_hectares > 0 ? list.total_hectares : 0;

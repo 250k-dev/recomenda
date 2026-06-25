@@ -13,6 +13,7 @@ import {
   CalendarDays,
   ChevronRight,
   MapPin,
+  Boxes,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -310,6 +311,7 @@ function FarmCard({
   const farmBase = `/farms/${farm.id}?producer_id=${encodeURIComponent(producerId)}`;
   const seasonsHref = `${farmBase}&tab=seasons`;
   const purchaseHref = `${farmBase}&tab=purchase`;
+  const stockHref = `${farmBase}&tab=stock`;
   const cronogramSeasonId = pickCronogramSeasonId(farm);
   const recommendationHref = cronogramSeasonId
     ? `/seasons/${cronogramSeasonId}?tab=recommendations&farm_id=${encodeURIComponent(farm.id)}&producer_id=${encodeURIComponent(producerId)}`
@@ -381,18 +383,6 @@ function FarmCard({
               Safras
             </Link>
           </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <Link href={purchaseHref}>
-              <ShoppingCart className="size-3.5" />
-              Lista de compra
-            </Link>
-          </Button>
           {hasRunningSeasons ? (
             <Button
               asChild
@@ -407,6 +397,30 @@ function FarmCard({
               </Link>
             </Button>
           ) : null}
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Link href={purchaseHref}>
+              <ShoppingCart className="size-3.5" />
+              Lista de compra
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Link href={stockHref}>
+              <Boxes className="size-3.5" />
+              Estoque
+            </Link>
+          </Button>
         </div>
       ) : null}
     </Card>

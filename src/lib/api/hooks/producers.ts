@@ -10,6 +10,7 @@ import {
   setProducerActive,
   getProducerFarms,
   getProducerStock,
+  adjustProducerStock,
   removeFarmAccess,
   createInvitation,
   revokeInvitation,
@@ -87,6 +88,17 @@ export function useProducerStock(producerId: string) {
     queryKey: queryKeys.producerStock(producerId),
     queryFn: () => getProducerStock(producerId),
     enabled: Boolean(producerId),
+  });
+}
+
+export function useAdjustProducerStock(producerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { local_product_id: string; new_quantity: number; notes?: string }) =>
+      adjustProducerStock(producerId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(producerId) });
+    },
   });
 }
 

@@ -1,6 +1,7 @@
 export const CROP_LABELS: Record<string, string> = {
   SOYBEAN: "Soja",
   CORN: "Milho",
+  ANY: "Soja e Milho",
 };
 
 export const STATUS_LABELS: Record<string, string> = {

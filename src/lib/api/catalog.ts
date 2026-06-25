@@ -49,6 +49,7 @@ export type AdminPlatformActiveEntry = {
   is_active?: boolean;
   owner_agronomist_id?: string | null;
   owner_name?: string | null;
+  linked_global_name?: string | null;
 };
 
 export type AdminDeactivatedCatalogEntry = {
@@ -95,13 +96,40 @@ export async function createLocalProduct(payload: { name: string; category?: str
   return data;
 }
 
-export async function updateLocalProduct(id: string, payload: { name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean }) {
+export async function updateLocalProduct(id: string, payload: { name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean; global_product_id?: string | null }) {
   const { data } = await api.patch<Product>(`/catalog/local/${id}`, payload);
   return data;
 }
 
 export async function deleteLocalProduct(id: string) {
   await api.delete(`/catalog/local/${encodeURIComponent(id)}`);
+}
+
+/** Vincular: o customizado deixa de existir e tudo passa a apontar para o global. */
+export async function resolveCustomLink(id: string, globalProductId: string) {
+  const { data } = await api.post<Product>(
+    `/catalog/local/${encodeURIComponent(id)}/resolve-link`,
+    { global_product_id: globalProductId },
+  );
+  return data;
+}
+
+/** Cadastrar produto: cria o global a partir do customizado (editável) e o promove. */
+export async function promoteCustomToGlobal(
+  id: string,
+  payload: {
+    name: string;
+    category: string;
+    dose_unit: string;
+    default_label_url?: string | null;
+    equivalence_group?: string | null;
+  },
+) {
+  const { data } = await api.post<{ global: GlobalProduct; local: Product }>(
+    `/catalog/local/${encodeURIComponent(id)}/promote-global`,
+    payload,
+  );
+  return data;
 }
 
 export async function cloneGlobalProduct(globalId: string) {

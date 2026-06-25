@@ -5,6 +5,7 @@ export interface Plan {
   id: string;
   name: string;
   plot_quota: number;
+  timing_template_quota: number;
   price_brl_monthly: string;
   is_active: boolean;
 }
@@ -69,6 +70,7 @@ export async function getPlans() {
 export async function createAdminPlan(payload: {
   name: string;
   plot_quota: number;
+  timing_template_quota?: number;
   price_brl_monthly: number | string;
   is_active?: boolean;
 }) {
@@ -81,6 +83,7 @@ export async function updateAdminPlan(
   payload: Partial<{
     name: string;
     plot_quota: number;
+    timing_template_quota: number;
     price_brl_monthly: number | string;
     is_active: boolean;
   }>,

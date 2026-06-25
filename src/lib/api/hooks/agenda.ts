@@ -97,17 +97,20 @@ function recommendationWindowDays(raw: unknown): {
   centerYmd: string;
   days: string[];
 } | null {
-  const startYmd = recommendationYmd(raw);
-  if (!startYmd || !raw || typeof raw !== "object") return null;
+  const predictedYmd = recommendationYmd(raw);
+  if (!predictedYmd || !raw || typeof raw !== "object") return null;
 
+  // Janela centrada na data prevista (data ± metade do span). Atrasada só depois
+  // do fim da janela (data + metade do span).
   const r = raw as Recommendation;
   const span = recommendationWindowSpanDays(r.window_start_days ?? 0, r.window_end_days ?? 0);
-  const endYmd = ymdFromDate(addDays(localYmdToDate(startYmd), span));
-  const centerYmd = ymdFromDate(
-    addDays(localYmdToDate(startYmd), Math.round(span / 2)),
-  );
+  const half = Math.round(span / 2);
+  const predictedDate = localYmdToDate(predictedYmd);
+  const startYmd = ymdFromDate(addDays(predictedDate, -half));
+  const endYmd = ymdFromDate(addDays(predictedDate, half));
+  const centerYmd = predictedYmd;
   const days = Array.from({ length: span + 1 }, (_, index) =>
-    ymdFromDate(addDays(localYmdToDate(startYmd), index)),
+    ymdFromDate(addDays(predictedDate, index - half)),
   );
 
   return { startYmd, endYmd, centerYmd, days };
@@ -203,9 +206,13 @@ async function fetchAgendaEvents(
   for (const { season, r, window } of ordered) {
     const recommendationKey = `${season.id}-${r.id}`;
     const displayYmd = recommendationDisplayYmd(window, today);
-    const { label, isLate } = pillLabelForEvent(displayYmd, today, window.endYmd);
+    // Dessecação é sempre manual — nunca conta como atrasada (item 23).
+    const isDesiccation = /dessec/i.test(r.name ?? "");
+    const { label, isLate: rawLate } = pillLabelForEvent(displayYmd, today, window.endYmd);
+    const isLate = rawLate && !isDesiccation;
+    const pillText = rawLate && isDesiccation ? "Manual" : label;
 
-    if (window.endYmd < today && !countedLate.has(recommendationKey)) {
+    if (isLate && !countedLate.has(recommendationKey)) {
       lateCount += 1;
       countedLate.add(recommendationKey);
     }
@@ -226,7 +233,7 @@ async function fetchAgendaEvents(
       plotName: season.plot_name?.trim() || "Talhão",
       seasonId: season.id,
       isLate,
-      pillLabel: label,
+      pillLabel: pillText,
       windowEndYmd: window.endYmd,
       isCenterDay: displayYmd === window.centerYmd,
     };

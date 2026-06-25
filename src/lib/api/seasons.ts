@@ -180,3 +180,32 @@ export async function deleteRecommendationItem(id: string) {
   const { data } = await api.delete(`/recommendation_items/${id}`);
   return data;
 }
+
+export interface PlotHistoryRec {
+  id: string;
+  name: string;
+  status: "PENDING" | "APPLIED_ON_TIME" | "APPLIED_LATE" | "SKIPPED";
+  predicted_date_current: string | null;
+  executed_date: string | null;
+  items: Array<{
+    product_name: string;
+    dose_per_hectare: number;
+    dose_unit: string;
+  }>;
+}
+
+export interface PlotHistorySeason {
+  id: string;
+  crop: string;
+  variety: string | null;
+  status: string;
+  planting_date: string | null;
+  created_at: string;
+  is_current: boolean;
+  recommendations: PlotHistoryRec[];
+}
+
+export async function getPlotHistory(seasonId: string): Promise<PlotHistorySeason[]> {
+  const { data } = await api.get<PlotHistorySeason[]>(`/seasons/${seasonId}/plot-history`);
+  return data;
+}

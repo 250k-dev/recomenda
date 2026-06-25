@@ -1,6 +1,8 @@
 /** Alinhado ao enum `ProductCategory` do servidor. */
 export const GLOBAL_PRODUCT_CATEGORIES = [
   "SEED",
+  "CULTIVAR_SOJA",
+  "HIBRIDO_MILHO",
   "HERBICIDE",
   "FUNGICIDE",
   "INSECTICIDE",
@@ -13,13 +15,15 @@ export const GLOBAL_PRODUCT_CATEGORIES = [
 ] as const;
 
 /** Alinhado ao enum `DoseUnit` do servidor. */
-export const GLOBAL_DOSE_UNITS = ["L", "KG", "G", "ML", "DOSE"] as const;
+export const GLOBAL_DOSE_UNITS = ["L", "KG", "G", "ML", "DOSE", "T_HA", "BAG", "SACA"] as const;
 
 export type GlobalProductCategory = (typeof GLOBAL_PRODUCT_CATEGORIES)[number];
 export type GlobalDoseUnit = (typeof GLOBAL_DOSE_UNITS)[number];
 
 export const PRODUCT_CATEGORY_LABELS: Record<GlobalProductCategory, string> = {
   SEED: "Variedade / Híbrido",
+  CULTIVAR_SOJA: "Cultivar de soja",
+  HIBRIDO_MILHO: "Híbrido de milho",
   HERBICIDE: "Herbicida",
   FUNGICIDE: "Fungicida",
   INSECTICIDE: "Inseticida",
@@ -37,4 +41,7 @@ export const DOSE_UNIT_LABELS: Record<GlobalDoseUnit, string> = {
   G: "Gramas (g)",
   ML: "Mililitros (mL)",
   DOSE: "Dose",
+  T_HA: "Toneladas/ha (t/ha)",
+  BAG: "Bag (5M sementes)",
+  SACA: "Sacos (60k sementes)",
 };

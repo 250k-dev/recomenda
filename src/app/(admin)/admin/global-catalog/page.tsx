@@ -15,9 +15,10 @@ import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminCatalogNameCell, DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SearchableSelect } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalCatalogImportResult, GlobalProduct } from "@/lib/api/client";
+import { apiErrorMessage } from "@/lib/api-error";
 import {
   DOSE_UNIT_LABELS,
   GLOBAL_DOSE_UNITS,
@@ -31,8 +32,11 @@ import {
   useImportGlobalCatalog,
   useAdminPlatformActiveCatalog,
   useAdminDeactivatedCatalog,
+  useGlobalCatalog,
   useUpdateGlobalProduct,
   useUpdateLocalProduct,
+  useResolveCustomLink,
+  usePromoteCustomToGlobal,
 } from "@/lib/api/hooks";
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 
@@ -116,6 +120,9 @@ const DOSE_UNITS: Record<string, string> = {
   G: "g (Grama)",
   ML: "mL (Mililitro)",
   DOSE: "Dose",
+  T_HA: "t/ha (Tonelada/ha)",
+  BAG: "bag (5M sementes)",
+  SACA: "sacos (60k sementes)",
 };
 
 function downloadProdutosPlataformaTemplate() {
@@ -181,12 +188,49 @@ function OriginCell({ row }: { row: AdminPlatformActiveEntry }) {
   );
 }
 
+function normalizeForMatch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+/** Sugere o produto global mais parecido com o nome digitado pelo agrônomo. */
+function suggestGlobalId(name: string, globals: GlobalProduct[]): string {
+  const target = normalizeForMatch(name);
+  if (!target) return "";
+  const targetTokens = new Set(target.split(/\s+/).filter(Boolean));
+  let best = "";
+  let bestScore = 0;
+  for (const g of globals) {
+    const gn = normalizeForMatch(g.name);
+    let score = 0;
+    if (gn === target) score = 100;
+    else if (gn.startsWith(target) || target.startsWith(gn)) score = 80;
+    else if (gn.includes(target) || target.includes(gn)) score = 60;
+    else {
+      const overlap = gn.split(/\s+/).filter((t) => targetTokens.has(t)).length;
+      score = overlap > 0 ? 30 + overlap : 0;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = g.id;
+    }
+  }
+  // Só pré-seleciona quando há similaridade razoável; senão deixa o admin buscar.
+  return bestScore >= 60 ? best : "";
+}
+
 export default function AdminGlobalCatalogPage() {
   const { data: platformRes, isLoading: platformLoading } = useAdminPlatformActiveCatalog();
   const { data: deactivatedRes, isLoading: deactivatedLoading } = useAdminDeactivatedCatalog();
+  const { data: globalCatalogRes } = useGlobalCatalog();
   const createMutation = useCreateGlobalProduct();
   const updateGlobalMutation = useUpdateGlobalProduct();
   const updateLocalMutation = useUpdateLocalProduct();
+  const resolveLinkMutation = useResolveCustomLink();
+  const promoteMutation = usePromoteCustomToGlobal();
   const deleteGlobalMutation = useDeleteGlobalProduct();
   const deleteLocalMutation = useDeleteLocalProductAdmin();
   const importMutation = useImportGlobalCatalog();
@@ -203,8 +247,13 @@ export default function AdminGlobalCatalogPage() {
   const [globalPage, setGlobalPage] = useState(1);
   const [customPage, setCustomPage] = useState(1);
   const [inactivePage, setInactivePage] = useState(1);
+  const [linking, setLinking] = useState<{ id: string; name: string } | null>(null);
+  const [selectedGlobalId, setSelectedGlobalId] = useState("");
+  const [promoteRow, setPromoteRow] = useState<AdminPlatformActiveEntry | null>(null);
 
+  const globalProducts = globalCatalogRes?.data ?? [];
   const platformRows = platformRes?.data ?? [];
+  const selectedGlobalProduct = globalProducts.find((g) => g.id === selectedGlobalId);
 
   const filteredGlobalRows = useMemo(() => {
     const f = { name: filterName, category: filterCategory, doseUnit: filterDoseUnit, origin: filterOrigin };
@@ -300,11 +349,25 @@ export default function AdminGlobalCatalogPage() {
     },
   });
 
+  const promoteForm = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      category: "OTHER",
+      dose_unit: "L",
+      default_label_url: "",
+      equivalence_group: "",
+      is_active: true,
+    },
+  });
+
   const mutationPending =
     createMutation.isPending ||
     importMutation.isPending ||
     updateGlobalMutation.isPending ||
     updateLocalMutation.isPending ||
+    resolveLinkMutation.isPending ||
+    promoteMutation.isPending ||
     deleteGlobalMutation.isPending ||
     deleteLocalMutation.isPending;
 
@@ -484,6 +547,91 @@ export default function AdminGlobalCatalogPage() {
     }
   };
 
+  const openLink = (row: AdminPlatformActiveEntry) => {
+    if (!row.local_product_id) return;
+    setLinking({ id: row.local_product_id, name: row.name });
+    // Pré-seleciona o global mais parecido para o admin só confirmar.
+    setSelectedGlobalId(suggestGlobalId(row.name, globalProducts));
+  };
+
+  const saveGlobalLink = () => {
+    if (!linking || !selectedGlobalId) return;
+    resolveLinkMutation.mutate(
+      { id: linking.id, globalProductId: selectedGlobalId },
+      {
+        onSuccess: () => {
+          toast.success("Produto vinculado ao catálogo global.");
+          setLinking(null);
+          setSelectedGlobalId("");
+        },
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível vincular.")),
+      },
+    );
+  };
+
+  const openPromote = (row: AdminPlatformActiveEntry) => {
+    if (!row.local_product_id) return;
+    setPromoteRow(row);
+    promoteForm.reset({
+      name: row.name,
+      category: row.category,
+      dose_unit: row.dose_unit,
+      default_label_url: row.label_url?.trim() ? row.label_url : "",
+      equivalence_group: row.equivalence_group ?? "",
+      is_active: true,
+    });
+  };
+
+  const onPromote = promoteForm.handleSubmit((values) => {
+    if (!promoteRow?.local_product_id) return;
+    promoteMutation.mutate(
+      {
+        id: promoteRow.local_product_id,
+        payload: {
+          name: values.name,
+          category: values.category,
+          dose_unit: values.dose_unit,
+          default_label_url: values.default_label_url?.trim() ? values.default_label_url.trim() : null,
+          equivalence_group: values.equivalence_group?.trim() ? values.equivalence_group.trim() : null,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Produto cadastrado no catálogo global.");
+          setPromoteRow(null);
+        },
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível cadastrar o produto.")),
+      },
+    );
+  });
+
+  const renderCustomVinculo = (row: AdminPlatformActiveEntry) => {
+    if (!row.local_product_id) return <span className="text-xs text-muted-foreground">—</span>;
+
+    if (row.global_product_id) {
+      const linkedName = row.linked_global_name?.trim() || "Produto global";
+      return (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded bg-success-soft px-1.5 py-0.5 text-[11px] font-medium text-success-strong">
+            Vinculado
+          </span>
+          <span className="text-xs text-muted-foreground">→ {linkedName}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-1.5">
+        <Button size="sm" variant="outline" disabled={mutationPending} onClick={() => openLink(row)}>
+          Vincular
+        </Button>
+        <Button size="sm" variant="outline" disabled={mutationPending} onClick={() => openPromote(row)}>
+          Cadastrar produto
+        </Button>
+      </div>
+    );
+  };
+
   const globalTableRows = paginatedGlobalRows.map((p) => {
     const origin = <OriginCell key={`o-${p.entry_type}-${p.global_product_id ?? p.local_product_id}`} row={p} />;
 
@@ -532,6 +680,7 @@ export default function AdminGlobalCatalogPage() {
       DOSE_UNITS[p.dose_unit as keyof typeof DOSE_UNITS]?.split(" ")[0] ?? p.dose_unit,
       p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "-",
       agronomistCell,
+      <div key={`v-${p.local_product_id}`}>{renderCustomVinculo(p)}</div>,
       p.local_product_id ? (
         <AdminProductRowActions
           actionKey={`ct-${p.local_product_id}`}
@@ -877,14 +1026,14 @@ export default function AdminGlobalCatalogPage() {
       {activeTab === "customizados" && (
         <>
           {platformLoading ? (
-            <TableRowsSkeleton rows={10} columns={6} />
+            <TableRowsSkeleton rows={10} columns={7} />
           ) : customizedRows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto customizado ativo</p>
           ) : filteredCustomRows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
           ) : (
             <DataTable
-              headers={["Nome", "Categoria", "Unidade", "Preço", "Agrônomo", "Ações"]}
+              headers={["Nome", "Categoria", "Unidade", "Preço", "Agrônomo", "Vínculo", "Ações"]}
               rows={customizedTableRows}
               columnCellClassNames={[
                 "max-w-0 min-w-0",
@@ -892,6 +1041,7 @@ export default function AdminGlobalCatalogPage() {
                 "whitespace-nowrap",
                 "whitespace-nowrap",
                 "max-w-0 min-w-0",
+                "min-w-[9rem]",
                 "whitespace-nowrap",
               ]}
               footer={
@@ -1072,6 +1222,131 @@ export default function AdminGlobalCatalogPage() {
               </Button>
               <Button type="button" variant="secondary" onClick={() => setEditCustomRow(null)}>
                 Fechar
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!linking} onOpenChange={(open) => !open && setLinking(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Vincular “{linking?.name}” a um produto global</SheetTitle>
+            <p className="text-sm text-muted-foreground">
+              Escolha o produto oficial equivalente. O produto customizado do agrônomo deixa de existir e
+              tudo onde ele foi usado (listas de compra, cronogramas, estoque) passa a apontar para o
+              produto global escolhido.
+            </p>
+          </SheetHeader>
+          <div className="space-y-4 px-4 pb-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">Produto global</label>
+              <SearchableSelect
+                value={selectedGlobalId}
+                onValueChange={setSelectedGlobalId}
+                options={globalProducts.map((g) => ({
+                  value: g.id,
+                  label: g.name,
+                  keywords: g.name,
+                }))}
+                placeholder="Selecione o produto global…"
+                filterLabel="Buscar produto global"
+                searchPlaceholder="Buscar…"
+                className="w-full"
+              />
+            </div>
+            {selectedGlobalProduct ? (
+              <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Prévia da sugestão
+                </p>
+                <p className="mt-1 font-medium text-foreground">{selectedGlobalProduct.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {PRODUCT_CATEGORY_LABELS[
+                    selectedGlobalProduct.category as keyof typeof PRODUCT_CATEGORY_LABELS
+                  ] ?? selectedGlobalProduct.category}
+                  {" · "}
+                  {DOSE_UNIT_LABELS[selectedGlobalProduct.dose_unit as keyof typeof DOSE_UNIT_LABELS] ??
+                    selectedGlobalProduct.dose_unit}
+                </p>
+              </div>
+            ) : null}
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                onClick={saveGlobalLink}
+                disabled={!selectedGlobalId || resolveLinkMutation.isPending}
+              >
+                {resolveLinkMutation.isPending ? "Vinculando…" : "Vincular"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setLinking(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={Boolean(promoteRow)} onOpenChange={(o) => !o && setPromoteRow(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Cadastrar “{promoteRow?.name}” no catálogo global</SheetTitle>
+            <p className="text-sm text-muted-foreground">
+              Revise/edite os dados e confirme. O produto entra no catálogo global e sai da lista de
+              customizados, mantendo onde já foi usado.
+              {promoteRow?.owner_name ? ` Agrônomo: ${promoteRow.owner_name}.` : ""}
+            </p>
+          </SheetHeader>
+          <form onSubmit={onPromote} className="space-y-4 px-4 pb-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">Nome</label>
+              <Input {...promoteForm.register("name")} />
+              {promoteForm.formState.errors.name && (
+                <p className="mt-1 text-xs text-destructive">{promoteForm.formState.errors.name.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">Categoria</label>
+              <Select
+                {...promoteForm.register("category")}
+                value={promoteForm.watch("category") ?? ""}
+                filterLabel="Categoria"
+                options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
+                  value: c,
+                  label: PRODUCT_CATEGORY_LABELS[c],
+                }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">Unidade de dose</label>
+              <Select
+                {...promoteForm.register("dose_unit")}
+                value={promoteForm.watch("dose_unit") ?? ""}
+                filterLabel="Unidade de dose"
+                options={GLOBAL_DOSE_UNITS.map((u) => ({
+                  value: u,
+                  label: DOSE_UNIT_LABELS[u],
+                }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                URL do rótulo (opcional)
+              </label>
+              <Input {...promoteForm.register("default_label_url")} placeholder="https://..." />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">
+                Grupo de equivalência (opcional)
+              </label>
+              <Input {...promoteForm.register("equivalence_group")} />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" disabled={promoteMutation.isPending}>
+                {promoteMutation.isPending ? "Cadastrando…" : "Cadastrar produto"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setPromoteRow(null)}>
+                Cancelar
               </Button>
             </div>
           </form>

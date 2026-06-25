@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { duplicatePurchaseList } from "@/lib/api/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { useSeasonCostPlan, useUpdatePurchaseList, useLocalCatalog } from "@/lib/api/hooks";
+import { useCurrencyStore } from "@/stores/currency";
 import {
   calculateSummary,
   CATEGORY_ORDER,
@@ -37,6 +38,8 @@ import { cn } from "@/lib/utils";
 
 const CATEGORY_LABELS: Record<string, string> = {
   SEED: "Variedade / Híbrido",
+  CULTIVAR_SOJA: "Cultivar de soja",
+  HIBRIDO_MILHO: "Híbrido de milho",
   FERTILIZER: "Adubação",
   HERBICIDE: "Herbicida",
   FUNGICIDE: "Fungicida",
@@ -50,6 +53,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_COLORS: Record<string, string> = {
   SEED: "#3F7D3D",
+  CULTIVAR_SOJA: "#3F7D3D",
+  HIBRIDO_MILHO: "#C9A227",
   FERTILIZER: "#D9A441",
   HERBICIDE: "#B85C38",
   FUNGICIDE: "#4A7A99",
@@ -111,16 +116,25 @@ export function CostPlanView({
   const catalog = useLocalCatalog();
   const products = catalog.data?.data ?? [];
 
-  const [fxRate, setFxRate] = useState<string>("");
+  const { fxRate: globalFxRate, setFxRate: setGlobalFxRate } = useCurrencyStore();
   const [grainPrice, setGrainPrice] = useState<string>("");
   const [items, setItems] = useState<EditableItem[]>([]);
   const [filter, setFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [sortMode, setSortMode] = useState<"cost-desc" | "cost-asc" | "name">("cost-desc");
 
+  const fxRate = globalFxRate;
+  const setFxRate = useCallback(
+    (v: string) => setGlobalFxRate(v),
+    [setGlobalFxRate],
+  );
+
   useEffect(() => {
     if (!plan) return;
-    setFxRate(plan.fx_rate_usd_brl != null ? String(plan.fx_rate_usd_brl) : "");
+    // Seed the global store from the saved plan value if the global is still empty
+    if (!globalFxRate && plan.fx_rate_usd_brl != null) {
+      setGlobalFxRate(String(plan.fx_rate_usd_brl));
+    }
     setGrainPrice(plan.grain_price_brl != null ? String(plan.grain_price_brl) : "");
     setItems(
       plan.items.map((it) => ({
@@ -142,7 +156,8 @@ export function CostPlanView({
         stage: it.stage,
       })),
     );
-  }, [plan]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan?.id]);
 
   const area = plan?.total_hectares ?? 0;
   const plotsCount = plan?.plots?.length ?? 0;

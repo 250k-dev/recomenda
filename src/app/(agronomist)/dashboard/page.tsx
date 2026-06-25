@@ -14,7 +14,9 @@ import {
   ArrowRight,
   Sparkles,
   BellRing,
+  Info,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { RailCard, RailRow } from "@/components/domain/rail-card";
 import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
@@ -34,7 +36,7 @@ import {
 import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
 import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
 
-type AttentionTab = "late" | "today" | "week";
+type AttentionTab = "late" | "today" | "pending" | "week";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -94,15 +96,18 @@ export default function DashboardPage() {
       if (!existing || ev.ymd < existing.ymd) byRec.set(key, ev);
     }
     const recs = [...byRec.values()];
+    // Dessecação nunca é "atrasada" (isLate já vem false do agenda) — cai em Pendentes.
+    const inToday = (r: AgendaEvent) =>
+      !r.isLate && r.ymd <= today && r.windowEndYmd >= today;
+    const inWeek = (r: AgendaEvent) => !r.isLate && r.ymd > today && r.ymd <= weekEnd;
     return {
       late: recs
-        .filter((r) => r.windowEndYmd < today)
+        .filter((r) => r.isLate)
         .sort((a, b) => a.windowEndYmd.localeCompare(b.windowEndYmd)),
-      today: recs
-        .filter((r) => r.ymd <= today && r.windowEndYmd >= today)
-        .sort((a, b) => a.ymd.localeCompare(b.ymd)),
-      week: recs
-        .filter((r) => r.ymd > today && r.ymd <= weekEnd)
+      today: recs.filter(inToday).sort((a, b) => a.ymd.localeCompare(b.ymd)),
+      week: recs.filter(inWeek).sort((a, b) => a.ymd.localeCompare(b.ymd)),
+      pending: recs
+        .filter((r) => !r.isLate && !inToday(r) && !inWeek(r))
         .sort((a, b) => a.ymd.localeCompare(b.ymd)),
     };
   }, [agenda.eventsByDay]);
@@ -198,14 +203,54 @@ export default function DashboardPage() {
               <h3 className="font-display text-[1.05rem] font-semibold text-text-strong">
                 Precisa de atenção
               </h3>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Como funciona o status das etapas"
+                    className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Info className="size-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  sideOffset={6}
+                  className="w-64 whitespace-normal text-left text-xs leading-relaxed"
+                >
+                  Cada etapa tem uma janela de tolerância centrada na data prevista. Enquanto hoje
+                  está dentro da janela aparece como “Hoje” ou “Na janela”; depois que a janela
+                  fecha, vira “Atrasada”. Ao corrigir a data da etapa, a janela é recalculada.
+                </TooltipContent>
+              </Tooltip>
             </div>
             <SegmentedTabs<AttentionTab>
               value={tab}
               onValueChange={setTab}
               items={[
-                { value: "late", label: "Atrasadas", badgeCount: buckets.late.length },
-                { value: "today", label: "Hoje", badgeCount: buckets.today.length },
-                { value: "week", label: "Semana", badgeCount: buckets.week.length },
+                {
+                  value: "late",
+                  label: "Atrasadas",
+                  badgeCount: buckets.late.length,
+                  activeClassName: "bg-red-600 text-white",
+                },
+                {
+                  value: "today",
+                  label: "Hoje",
+                  badgeCount: buckets.today.length,
+                  activeClassName: "bg-primary text-primary-foreground",
+                },
+                {
+                  value: "pending",
+                  label: "Pendentes",
+                  badgeCount: buckets.pending.length,
+                  activeClassName: "bg-amber-500 text-white",
+                },
+                {
+                  value: "week",
+                  label: "Semana",
+                  badgeCount: buckets.week.length,
+                  activeClassName: "bg-sky-600 text-white",
+                },
               ]}
             />
           </div>
@@ -229,7 +274,9 @@ export default function DashboardPage() {
                   ? "Nenhuma aplicação atrasada. Tudo em dia!"
                   : tab === "today"
                     ? "Nenhuma aplicação para hoje."
-                    : "Nenhuma aplicação nos próximos 7 dias."
+                    : tab === "pending"
+                      ? "Nenhuma etapa pendente fora da janela."
+                      : "Nenhuma aplicação nos próximos 7 dias."
               }
             />
           ) : (

@@ -41,7 +41,9 @@ export function TimingTemplateStagesPanel({
   const reorder = useReorderTimingStages(templateId);
   const queryClient = useQueryClient();
   const { data: catalogData } = useLocalCatalog();
-  const catalogProducts = catalogData?.data ?? [];
+  // Memoizado para manter a referência estável (senão `[]` muda a cada render e
+  // o useEffect de hidratação entra em loop quando o modelo tem 0 etapas).
+  const catalogProducts = useMemo(() => catalogData?.data ?? [], [catalogData?.data]);
 
   const sortedStages = useMemo(
     () => [...(template.stages ?? [])].sort((a, b) => a.order_index - b.order_index),
@@ -93,7 +95,10 @@ export function TimingTemplateStagesPanel({
   useEffect(() => {
     if (mixesLoading || isDirty) return;
 
-    if (hydratedSignatureRef.current === stageSignature && editorStages.length > 0) {
+    // Hidrata uma única vez por assinatura de etapas. Não depender de
+    // `editorStages.length` evita loop quando deps instáveis (ex.: mixesById de
+    // useQueries) mudam a cada render e as etapas estão vazias.
+    if (hydratedSignatureRef.current === stageSignature) {
       return;
     }
 
@@ -119,7 +124,6 @@ export function TimingTemplateStagesPanel({
     );
   }, [
     catalogProducts,
-    editorStages.length,
     isDirty,
     mixesById,
     mixesLoading,

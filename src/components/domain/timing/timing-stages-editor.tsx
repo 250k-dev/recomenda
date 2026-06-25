@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, CircleAlert, FlaskConical, Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,13 +10,25 @@ import { Select, SearchableSelect } from "@/components/ui/select";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Field } from "@/components/domain/season/_shared";
-import { useLocalCatalog, useProducerPurchaseLists, useFarmPurchaseLists } from "@/lib/api/hooks";
+import {
+  usePlatformCatalog,
+  useGlobalCatalog,
+  useCloneGlobalProduct,
+  useCreateLocalProduct,
+  useProducerPurchaseLists,
+  useFarmPurchaseLists,
+} from "@/lib/api/hooks";
 import {
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
 } from "@/lib/catalog-global-options";
-import type { Product } from "@/lib/api/catalog";
-import { CROP_LABELS } from "@/lib/season-constants";
+import { toast } from "sonner";
+import {
+  buildPurchaseListCatalog,
+  productsForPurchaseListCategory,
+  purchaseListProductLabel,
+  type PurchaseListCatalogProduct,
+} from "@/lib/catalog/purchase-list-catalog";
 import {
   dayOffsetToIsoDate,
   isoDateToDayOffset,
@@ -51,19 +63,17 @@ export type StageProductDraft = {
   dose: string;
   unit: string;
   mixItemId?: string;
+  /** Produto fora da lista de compra (fora da programação). */
+  outOfProgram?: boolean;
 };
-
-function productsForCategory(products: Product[], category: string): Product[] {
-  if (!category) return [];
-  return products.filter((product) => (product.category ?? "OTHER") === category);
-}
 
 function usePurchaseListCatalogProducts(
   producerId?: string,
   crop?: string,
   farmId?: string,
 ) {
-  const { data: catalogData, isLoading: catalogLoading } = useLocalCatalog();
+  const platformCatalog = usePlatformCatalog();
+  const globalCatalog = useGlobalCatalog();
   const { data: producerLists, isLoading: listsLoading } = useProducerPurchaseLists(
     producerId ?? "",
   );
@@ -76,24 +86,36 @@ function usePurchaseListCatalogProducts(
       farmId && (farmLists?.length ?? 0) > 0
         ? (farmLists ?? [])
         : (producerLists ?? []);
-    return crop ? source.filter((list) => list.crop === crop) : source;
+    return crop
+      ? source.filter((list) => list.crop === crop || list.crop === "ANY")
+      : source;
   }, [crop, farmId, farmLists, producerLists]);
 
-  const productList = useMemo(() => {
-    const catalog = catalogData?.data ?? [];
-    if (!producerId) return catalog;
+  // Catálogo completo: global (admin) + local (agrônomo). Sementes ficam de fora (item 12).
+  const catalogProducts = useMemo(() => {
+    const seedCategories = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO"];
+    return buildPurchaseListCatalog(
+      platformCatalog.data?.data ?? [],
+      globalCatalog.data?.data ?? [],
+    ).filter((product) => !seedCategories.includes(product.category));
+  }, [platformCatalog.data?.data, globalCatalog.data?.data]);
 
-    const allowedIds = new Set(
-      purchaseLists.flatMap((list) => list.items.map((item) => item.local_product_id)),
-    );
-    return catalog.filter((product) => allowedIds.has(product.id));
-  }, [catalogData, producerId, purchaseLists]);
+  // Produtos que já estão na lista de compra (o que está "na programação").
+  const listProductIds = useMemo(
+    () =>
+      new Set(
+        purchaseLists.flatMap((list) => list.items.map((item) => item.local_product_id)),
+      ),
+    [purchaseLists],
+  );
 
   return {
-    productList,
+    catalogProducts,
+    listProductIds,
     purchaseLists,
     isLoading:
-      catalogLoading ||
+      platformCatalog.isLoading ||
+      globalCatalog.isLoading ||
       (Boolean(producerId) && listsLoading) ||
       (Boolean(farmId) && farmListsLoading),
   };
@@ -193,16 +215,30 @@ function StageProductsEditor({
   farmId?: string;
   overBudgetProductIds: Set<string>;
 }) {
-  const { productList, isLoading } = usePurchaseListCatalogProducts(
-    producerId,
-    crop,
-    farmId,
+  const { catalogProducts, listProductIds, isLoading } =
+    usePurchaseListCatalogProducts(producerId, crop, farmId);
+  const cloneGlobal = useCloneGlobalProduct();
+  const createLocal = useCreateLocalProduct();
+  const [resolvingKey, setResolvingKey] = useState<string | null>(null);
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  // Todas as categorias de defensivo/fertilizante (sementes já saíram do catálogo).
+  const availableCategories = useMemo(
+    () =>
+      GLOBAL_PRODUCT_CATEGORIES.filter(
+        (category) =>
+          category !== "SEED" &&
+          category !== "CULTIVAR_SOJA" &&
+          category !== "HIBRIDO_MILHO",
+      ),
+    [],
   );
 
-  const availableCategories = useMemo(() => {
-    const categories = new Set(productList.map((product) => product.category ?? "OTHER"));
-    return GLOBAL_PRODUCT_CATEGORIES.filter((category) => categories.has(category));
-  }, [productList]);
+  // Produtos que já estão na lista de compra (mostrados por padrão na recomendação).
+  const listCatalog = useMemo(
+    () => catalogProducts.filter((product) => listProductIds.has(product.optionValue)),
+    [catalogProducts, listProductIds],
+  );
 
   const updateProduct = (key: string, patch: Partial<StageProductDraft>) => {
     onChange(products.map((item) => (item.key === key ? { ...item, ...patch } : item)));
@@ -210,6 +246,55 @@ function StageProductsEditor({
 
   const removeProduct = (key: string) => {
     onChange(products.filter((item) => item.key !== key));
+  };
+
+  const resolveProduct = async (
+    key: string,
+    optionValue: string,
+    rowProducts: PurchaseListCatalogProduct[],
+  ) => {
+    const product = rowProducts.find((entry) => entry.optionValue === optionValue);
+    if (!product) return;
+    const apply = (localId: string, name: string, unit?: string) =>
+      updateProduct(key, {
+        productId: localId,
+        productName: name,
+        unit: unit ?? "L",
+        outOfProgram: !listProductIds.has(localId),
+      });
+    if (!product.globalId || !product.isGlobalOnly) {
+      apply(product.optionValue, product.name, product.dose_unit);
+      return;
+    }
+    setResolvingKey(key);
+    try {
+      const cloned = await cloneGlobal.mutateAsync(product.globalId);
+      apply(cloned.id, cloned.name ?? product.name, cloned.dose_unit ?? product.dose_unit);
+    } catch {
+      toast.error("Não foi possível adicionar o produto da plataforma.");
+    } finally {
+      setResolvingKey(null);
+    }
+  };
+
+  const confirmCreateProduct = async (key: string, category: string, rawName: string) => {
+    const name = rawName.trim();
+    if (!name) return;
+    try {
+      const created = await createLocal.mutateAsync({
+        name,
+        category: category || "OTHER",
+        dose_unit: "L",
+      });
+      updateProduct(key, {
+        productId: created.id,
+        productName: created.name ?? name,
+        unit: created.dose_unit ?? "L",
+        outOfProgram: true,
+      });
+    } catch {
+      toast.error("Não foi possível cadastrar o produto.");
+    }
   };
 
   return (
@@ -229,8 +314,9 @@ function StageProductsEditor({
               </button>
             </TooltipTrigger>
             <TooltipContent sideOffset={6} className="max-w-xs text-left leading-relaxed">
-              Só aparecem aqui os insumos já incluídos na lista de compra deste produtor. Para
-              usar outros produtos, adicione-os primeiro na lista de compra da fazenda.
+              O ideal é usar os insumos da lista de compra. Mas dá pra buscar qualquer produto do
+              catálogo (global + local) ou cadastrar um novo — itens fora da lista entram marcados
+              como “fora da programação”.
             </TooltipContent>
           </Tooltip>
         </div>
@@ -239,7 +325,7 @@ function StageProductsEditor({
           variant="outline"
           size="sm"
           className="h-7 gap-1 text-xs"
-          disabled={isLoading || productList.length === 0}
+          disabled={isLoading}
           onClick={() => onChange([...products, newStageProductDraft()])}
         >
           <Plus className="h-3.5 w-3.5" />
@@ -248,13 +334,7 @@ function StageProductsEditor({
       </div>
 
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Carregando produtos da lista de compra…</p>
-      ) : productList.length === 0 ? (
-        <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
-          Nenhum produto na lista de compra deste produtor
-          {crop ? ` para ${(CROP_LABELS[crop] ?? crop).toLowerCase()}` : ""}. Volte à fazenda e
-          adicione insumos na lista de compra antes de montar a receita desta etapa.
-        </p>
+        <p className="text-xs text-muted-foreground">Carregando catálogo de produtos…</p>
       ) : products.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
           Nenhum produto nesta etapa. Adicione insumos e doses por hectare.
@@ -262,14 +342,20 @@ function StageProductsEditor({
       ) : (
         <div className="flex flex-col gap-2">
           {products.map((item) => {
-            const rowProducts = productsForCategory(productList, item.category);
+            const expanded = expandedKeys.has(item.key);
+            const rowProducts = productsForPurchaseListCategory(
+              expanded ? catalogProducts : listCatalog,
+              item.category,
+              item.productId,
+              item.productName,
+            );
             return (
             <div
               key={item.key}
               className={cn(
                 "grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_120px_88px_auto]",
-                item.productId &&
-                  overBudgetProductIds.has(item.productId) &&
+                ((item.productId && overBudgetProductIds.has(item.productId)) ||
+                  item.outOfProgram) &&
                   "border-destructive/40 bg-destructive/5",
               )}
             >
@@ -278,16 +364,17 @@ function StageProductsEditor({
                   value={item.category}
                   onValueChange={(nextCategory) => {
                     const patch: Partial<StageProductDraft> = { category: nextCategory };
-                    const currentProduct = productList.find((product) => product.id === item.productId);
-                    if (
-                      item.productId &&
-                      currentProduct &&
-                      (currentProduct.category ?? "OTHER") !== nextCategory
-                    ) {
+                    if (item.productId) {
                       patch.productId = "";
                       patch.productName = "";
+                      patch.outOfProgram = false;
                     }
                     updateProduct(item.key, patch);
+                    setExpandedKeys((prev) => {
+                      const next = new Set(prev);
+                      next.delete(item.key);
+                      return next;
+                    });
                   }}
                   placeholder="Selecione…"
                   filterLabel="Categoria"
@@ -302,26 +389,69 @@ function StageProductsEditor({
                 <Field label="Produto">
                 <SearchableSelect
                   value={item.productId}
-                  onValueChange={(productId) => {
-                    const selected = rowProducts.find((product) => product.id === productId);
-                    updateProduct(item.key, {
-                      productId,
-                      productName: selected?.name ?? "",
-                      unit: selected?.dose_unit ?? item.unit,
-                    });
+                  onValueChange={(optionValue) => {
+                    void resolveProduct(item.key, optionValue, rowProducts);
                   }}
-                  disabled={!item.category}
+                  disabled={!item.category || resolvingKey === item.key}
+                  loading={resolvingKey === item.key}
+                  loadingMessage="Vinculando…"
                   placeholder={item.category ? "Selecione…" : "Escolha a categoria"}
                   filterLabel="Buscar produto"
-                  searchPlaceholder="Buscar produto…"
+                  searchPlaceholder={
+                    expanded
+                      ? "Buscar no catálogo ou digitar p/ cadastrar…"
+                      : "Buscar produto…"
+                  }
+                  emptyMessage={
+                    expanded
+                      ? "Nenhum produto encontrado no catálogo."
+                      : "Nenhum produto desta categoria na lista de compra."
+                  }
                   selectedLabel={item.productName || undefined}
                   options={rowProducts.map((product) => ({
-                    value: product.id,
-                    label: product.name,
+                    value: product.optionValue,
+                    label: purchaseListProductLabel(product),
                     keywords: product.name,
                   }))}
                   className="w-full"
+                  footer={({ query, close }) =>
+                    !item.category ? null : !expanded ? (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() =>
+                          setExpandedKeys((prev) => new Set(prev).add(item.key))
+                        }
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/8"
+                      >
+                        <Plus className="h-4 w-4 shrink-0" />
+                        Adicionar produto fora da lista de compra
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!query.trim() || createLocal.isPending}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={async () => {
+                          await confirmCreateProduct(item.key, item.category, query);
+                          close();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/8 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent"
+                      >
+                        <Plus className="h-4 w-4 shrink-0" />
+                        {query.trim()
+                          ? `Cadastrar "${query.trim()}" (fora da programação)`
+                          : "Digite um nome para cadastrar"}
+                      </button>
+                    )
+                  }
                 />
+                {item.outOfProgram ? (
+                  <span className="mt-1 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive">
+                    <CircleAlert className="h-3 w-3" />
+                    Fora da programação
+                  </span>
+                ) : null}
                 </Field>
               </div>
               <Field label="Dose/ha">

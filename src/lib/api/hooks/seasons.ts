@@ -11,6 +11,7 @@ import {
   getArchivedSeasons,
   getSeasonShoppingList,
   getTimeline,
+  getPlotHistory,
   createRecommendation,
   reorderRecommendations,
   patchRecommendation,
@@ -200,5 +201,13 @@ export function useDeleteRecommendationItem(seasonId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
     },
+  });
+}
+
+export function usePlotHistory(seasonId: string) {
+  return useQuery({
+    queryKey: queryKeys.plotHistory(seasonId),
+    queryFn: () => getPlotHistory(seasonId),
+    enabled: Boolean(seasonId),
   });
 }
