@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { useTimingTemplate, useTimingTemplates, usePlanQuota, queryKeys } from "@/lib/api/hooks";
 import {
@@ -78,6 +79,12 @@ export function SeasonWizard({
   onCancel,
 }: SeasonWizardProps) {
   const [step, setStep] = useState(1);
+  const { data: planData } = usePlanQuota();
+  const [quotaAck, setQuotaAck] = useState(false);
+  const quotaCurrent = planData?.quota_usage?.current ?? 0;
+  const quotaLimit = planData?.quota_usage?.limit ?? planData?.plan?.plot_quota ?? 0;
+  // Sem espaço para nem um talhão novo: já está no (ou acima do) limite do plano.
+  const noQuota = quotaLimit > 0 && quotaCurrent >= quotaLimit;
   const [crop, setCrop] = useState<Crop>("SOYBEAN");
   const [cronogramMode, setCronogramMode] = useState<CronogramMode>("template");
   const [timingTemplateId, setTimingTemplateId] = useState("");
@@ -125,6 +132,21 @@ export function SeasonWizard({
         </span>
       </div>
 
+      <ConfirmDialog
+        open={noQuota && !quotaAck}
+        onOpenChange={(open) => {
+          // Fechar sem confirmar (Cancelar / Esc / clicar fora) cancela a criação.
+          if (!open && !quotaAck) onCancel();
+        }}
+        title="Sem quota de talhões disponível"
+        description={`Seu plano permite ${quotaLimit} ${
+          quotaLimit === 1 ? "talhão ativo" : "talhões ativos"
+        } e todos já estão em uso (${quotaCurrent}/${quotaLimit}). Você pode montar esta recomendação agora, mas só conseguirá salvá-la como rascunho — para publicá-la, conclua ou arquive uma safra ativa, ou amplie o plano. Deseja continuar?`}
+        confirmLabel="Continuar como rascunho"
+        cancelLabel="Cancelar"
+        onConfirm={() => setQuotaAck(true)}
+      />
+
       {step === 1 && (
         <StepCronogram
           producerId={producerId}
@@ -167,6 +189,7 @@ export function SeasonWizard({
           timingTemplateId={timingTemplateId}
           schedules={schedules}
           totalHa={totalHa}
+          defaultPublishNow={!noQuota}
           onBack={() => setStep(2)}
           onComplete={onComplete}
           onViewSeason={onViewSeason}
@@ -931,6 +954,7 @@ function StepFinalize({
   timingTemplateId,
   schedules,
   totalHa,
+  defaultPublishNow = true,
   onBack,
   onComplete,
   onViewSeason,
@@ -943,12 +967,13 @@ function StepFinalize({
   timingTemplateId: string;
   schedules: PlotSchedule[];
   totalHa: number;
+  defaultPublishNow?: boolean;
   onBack: () => void;
   onComplete: () => void;
   onViewSeason?: (seasonId: string) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [publishNow, setPublishNow] = useState(true);
+  const [publishNow, setPublishNow] = useState(defaultPublishNow);
   const [createdIds, setCreatedIds] = useState<string[] | null>(null);
   const [savedAsDraft, setSavedAsDraft] = useState(false);
   const queryClient = useQueryClient();
