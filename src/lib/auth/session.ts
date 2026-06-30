@@ -4,7 +4,12 @@ import type { UserRole } from "@/types/auth";
 export async function getSessionRole(): Promise<UserRole | null> {
   const cookieStore = await cookies();
   const role = cookieStore.get("role")?.value;
-  if (role === "ADMIN" || role === "AGRONOMIST" || role === "PRODUCER") {
+  if (
+    role === "ADMIN" ||
+    role === "AGRONOMIST" ||
+    role === "PRODUCER" ||
+    role === "CONSULTANT"
+  ) {
     return role;
   }
   return null;

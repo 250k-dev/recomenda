@@ -14,3 +14,4 @@ export * from "./portfolio-price-coverage";
 export * from "./quotes";
 export * from "./reports";
 export * from "./agenda";
+export * from "./consultants";

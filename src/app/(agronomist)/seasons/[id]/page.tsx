@@ -1073,14 +1073,6 @@ function RecommendationsTab({
           </div>
 
           <div className="flex flex-wrap gap-3 sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setExportOpen(true)}
-              className="inline-flex items-center gap-2 self-start rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent print:hidden"
-            >
-              <Share2 className="h-4 w-4 text-muted-foreground" />
-              Exportar
-            </button>
             {plantingDate ? (
               <div className="rounded-lg border border-border bg-surface-2 px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
@@ -1116,17 +1108,28 @@ function RecommendationsTab({
 
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-base font-semibold text-text-strong">Etapas do cronograma</h2>
-        {canManageStages ? (
+        <div className="flex items-center gap-2">
           <Button
-            size="icon"
             variant="outline"
-            className="h-8 w-8 shrink-0"
-            aria-label="Adicionar etapa"
-            onClick={() => setAddingStage((v) => !v)}
+            size="sm"
+            className="gap-1.5 print:hidden"
+            onClick={() => setExportOpen(true)}
           >
-            <Plus className="h-4 w-4" />
+            <Share2 className="h-4 w-4 text-muted-foreground" />
+            Exportar
           </Button>
-        ) : null}
+          {canManageStages ? (
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8 shrink-0"
+              aria-label="Adicionar etapa"
+              onClick={() => setAddingStage((v) => !v)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {addingStage ? (

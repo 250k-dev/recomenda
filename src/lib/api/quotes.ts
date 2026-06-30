@@ -33,6 +33,8 @@ export interface QuoteShare {
 }
 
 export interface QuoteComparisonResponseItem {
+  /** Id da linha (quote_response_item) — usado para excluir/restaurar. */
+  id: string;
   purchase_list_item_id: string;
   availability: QuoteAvailability | null;
   unit_price_brl: number | null;
@@ -69,6 +71,67 @@ export async function createQuoteRequest(listId: string) {
 export async function getPurchaseListQuotes(listId: string) {
   const { data } = await api.get<QuoteComparison>(`/purchase-lists/${listId}/quotes`);
   return data;
+}
+
+// --- Lixeira de cotações (agrônomo) -------------------------------------------
+
+export interface QuoteTrashResponse {
+  id: string;
+  store_name: string;
+  deleted_at: string | null;
+}
+
+export interface QuoteTrashItem {
+  id: string;
+  response_id: string;
+  store_name: string | null;
+  product_name: string | null;
+  deleted_at: string | null;
+}
+
+export interface QuoteTrash {
+  responses: QuoteTrashResponse[];
+  items: QuoteTrashItem[];
+}
+
+/** Lixeira da lista: cotações de loja e linhas excluídas. */
+export async function getPurchaseListQuoteTrash(listId: string) {
+  const { data } = await api.get<QuoteTrash>(`/purchase-lists/${listId}/quotes/trash`);
+  return data;
+}
+
+/** Move a cotação de uma loja (coluna) para a lixeira. */
+export async function softDeleteQuoteResponse(listId: string, responseId: string) {
+  await api.delete(`/purchase-lists/${listId}/quotes/responses/${responseId}`);
+}
+
+/** Restaura a cotação de uma loja da lixeira. */
+export async function restoreQuoteResponse(listId: string, responseId: string) {
+  await api.post(`/purchase-lists/${listId}/quotes/responses/${responseId}/restore`);
+}
+
+/** Exclui definitivamente a cotação de uma loja. */
+export async function deleteQuoteResponse(listId: string, responseId: string) {
+  await api.delete(`/purchase-lists/${listId}/quotes/responses/${responseId}/permanent`);
+}
+
+/** Move uma linha (item de uma loja) para a lixeira. */
+export async function softDeleteQuoteItem(listId: string, responseId: string, itemId: string) {
+  await api.delete(`/purchase-lists/${listId}/quotes/responses/${responseId}/items/${itemId}`);
+}
+
+/** Restaura uma linha da lixeira. */
+export async function restoreQuoteItem(listId: string, responseId: string, itemId: string) {
+  await api.post(
+    `/purchase-lists/${listId}/quotes/responses/${responseId}/items/${itemId}/restore`,
+  );
+}
+
+/** Exclui definitivamente uma linha. */
+export async function deleteQuoteItem(listId: string, responseId: string, itemId: string) {
+  await api.delete(
+    `/purchase-lists/${listId}/quotes/responses/${responseId}/items/${itemId}/permanent`,
+  );
 }
 
 // --- Público (lojista) --------------------------------------------------------

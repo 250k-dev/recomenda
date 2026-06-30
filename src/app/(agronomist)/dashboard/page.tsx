@@ -15,6 +15,8 @@ import {
   Sparkles,
   BellRing,
   Info,
+  FileText,
+  UserCog,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
@@ -153,6 +155,18 @@ export default function DashboardPage() {
               <Users className="size-4" /> Produtores
             </Link>
           </Button>
+          <Button asChild variant="outline">
+            <Link href="/compra-templates">
+              <FileText className="size-4" /> Templates de compra
+            </Link>
+          </Button>
+          {me?.role === "AGRONOMIST" ? (
+            <Button asChild variant="outline">
+              <Link href="/consultants">
+                <UserCog className="size-4" /> Consultores
+              </Link>
+            </Button>
+          ) : null}
           <Button asChild variant="clay">
             <Link href="/producers/new">
               <Plus className="size-4" /> Cadastrar produtor

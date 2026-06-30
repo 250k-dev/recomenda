@@ -32,12 +32,17 @@ export interface PurchaseListPlotInput {
 }
 
 export interface PurchaseListInput {
-  producer_id: string;
+  /** Opcional: ausente quando a lista é um template (modelo sem produtor). */
+  producer_id?: string;
+  /** Marca a lista como template reutilizável (sem produtor/talhões). */
+  is_template?: boolean;
   crop: string;
   name: string;
   variety?: string;
   fx_rate_usd_brl?: number | null;
   grain_price_brl?: number | null;
+  /** Real × Desejado: meta de sacas/ha por categoria. */
+  category_targets?: Record<string, number>;
   season_id?: string | null;
   plots: PurchaseListPlotInput[];
   items: PurchaseListItemInput[];
@@ -60,13 +65,15 @@ export interface CostPlanSummary {
 
 export interface PurchaseListDetail {
   id: string;
-  producer_id: string;
+  producer_id: string | null;
+  is_template?: boolean;
   season_id: string | null;
   crop: string;
   name: string;
   variety: string | null;
   fx_rate_usd_brl: number | null;
   grain_price_brl: number | null;
+  category_targets?: Record<string, number>;
   created_at: string;
   updated_at?: string;
   total_hectares: number;
@@ -146,5 +153,28 @@ export async function updatePurchaseList(id: string, payload: Partial<PurchaseLi
 
 export async function duplicatePurchaseList(id: string) {
   const { data } = await api.post<PurchaseListDetail>(`/purchase-lists/${id}/duplicate`);
+  return data;
+}
+
+export async function deletePurchaseList(id: string) {
+  await api.delete(`/purchase-lists/${id}`);
+}
+
+// --- Templates de compra (modelos reutilizáveis) ------------------------------
+
+export async function getPurchaseListTemplates() {
+  const { data } = await api.get<PurchaseListDetail[]>("/purchase-lists/templates");
+  return data;
+}
+
+/** Importa um template para um produtor (cria a lista a partir do modelo). */
+export async function importPurchaseListTemplate(
+  templateId: string,
+  payload: { producer_id: string; name?: string },
+) {
+  const { data } = await api.post<PurchaseListDetail>(
+    `/purchase-lists/${templateId}/import-template`,
+    payload,
+  );
   return data;
 }

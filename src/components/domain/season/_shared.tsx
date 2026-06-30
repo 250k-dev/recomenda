@@ -49,9 +49,28 @@ export const isSeedItem = (it: ListItem) => SEED_CATEGORIES.includes(it.category
 
 /** Rótulo curto da unidade de quantidade de semente conforme a categoria. */
 export function seedQuantityUnitLabel(category: string): string {
-  if (category === "CULTIVAR_SOJA") return "bag";
+  if (category === "CULTIVAR_SOJA") return "Big Bag (BR)";
   if (category === "HIBRIDO_MILHO") return "sacos";
   return "pl";
+}
+
+/** Sementes por unidade: Big Bag BR de soja = 5.000.000; saco de milho = 60.000. */
+export function seedsPerUnit(category: string): number {
+  if (category === "CULTIVAR_SOJA") return 5_000_000;
+  if (category === "HIBRIDO_MILHO") return 60_000;
+  return 1;
+}
+
+/** Os 4 números do planejamento de semente (auto-calculados). */
+export function seedPlanOutputs(it: ListItem, totalHa: number) {
+  const populationPerHa = Number(it.thousandPlants || 0); // plantas/ha (meta)
+  const seedingArea = Number(it.seedingArea || 0) || totalHa;
+  const totalSeeds = populationPerHa * seedingArea; // qtd de sementes
+  const units = listItemQuantity(it, totalHa); // Big Bags (BR) / sacos
+  const perUnit = seedsPerUnit(it.category);
+  // Hectares atendidos pelas unidades efetivas (confere com a área quando exato).
+  const hectaresServed = populationPerHa > 0 ? (units * perUnit) / populationPerHa : 0;
+  return { populationPerHa, totalSeeds, units, hectaresServed };
 }
 
 /**

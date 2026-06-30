@@ -108,3 +108,17 @@ export function buildWhatsappMessage(data: RecommendationShareData): string {
   // Blocos separados por linha em branco.
   return [header.join("\n"), body.join("\n\n"), footer.join("\n")].join("\n\n");
 }
+
+/**
+ * Mensagem com vários talhões: um cabeçalho da fazenda + a recomendação de cada
+ * talhão selecionado, separadas por divisor. Reaproveita buildWhatsappMessage.
+ */
+export function buildMultiWhatsappMessage(
+  farmName: string | null | undefined,
+  items: RecommendationShareData[],
+): string {
+  const sections = items.map((it) => buildWhatsappMessage(it));
+  if (!farmName) return sections.join(`\n\n${DIVIDER}\n\n`);
+  const header = `🚜 *FAZENDA: ${farmName}*\n${items.length} ${items.length === 1 ? "talhão" : "talhões"}`;
+  return [header, ...sections].join(`\n\n${DIVIDER}\n\n`);
+}

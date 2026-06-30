@@ -6,9 +6,16 @@ import {
   type UpdateQuoteResponseInput,
   createQuoteRequest,
   createQuoteResponse,
+  deleteQuoteItem,
+  deleteQuoteResponse,
+  getPurchaseListQuoteTrash,
   getPurchaseListQuotes,
   getQuoteByToken,
   getQuoteResponse,
+  restoreQuoteItem,
+  restoreQuoteResponse,
+  softDeleteQuoteItem,
+  softDeleteQuoteResponse,
   updateQuoteResponse,
 } from "@/lib/api/quotes";
 import { queryKeys } from "./queryKeys";
@@ -31,6 +38,60 @@ export function usePurchaseListQuotes(listId: string, enabled = true) {
     queryFn: () => getPurchaseListQuotes(listId),
     enabled: Boolean(listId) && enabled,
   });
+}
+
+export function usePurchaseListQuoteTrash(listId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.purchaseListQuoteTrash(listId),
+    queryFn: () => getPurchaseListQuoteTrash(listId),
+    enabled: Boolean(listId) && enabled,
+  });
+}
+
+/** Mutations da lixeira de cotações — todas revalidam comparação + lixeira. */
+export function useQuoteTrashActions(listId: string) {
+  const queryClient = useQueryClient();
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListQuotes(listId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListQuoteTrash(listId) });
+  };
+
+  const softDeleteResponse = useMutation({
+    mutationFn: (responseId: string) => softDeleteQuoteResponse(listId, responseId),
+    onSuccess: invalidate,
+  });
+  const restoreResponse = useMutation({
+    mutationFn: (responseId: string) => restoreQuoteResponse(listId, responseId),
+    onSuccess: invalidate,
+  });
+  const deleteResponse = useMutation({
+    mutationFn: (responseId: string) => deleteQuoteResponse(listId, responseId),
+    onSuccess: invalidate,
+  });
+  const softDeleteItem = useMutation({
+    mutationFn: (vars: { responseId: string; itemId: string }) =>
+      softDeleteQuoteItem(listId, vars.responseId, vars.itemId),
+    onSuccess: invalidate,
+  });
+  const restoreItem = useMutation({
+    mutationFn: (vars: { responseId: string; itemId: string }) =>
+      restoreQuoteItem(listId, vars.responseId, vars.itemId),
+    onSuccess: invalidate,
+  });
+  const deleteItem = useMutation({
+    mutationFn: (vars: { responseId: string; itemId: string }) =>
+      deleteQuoteItem(listId, vars.responseId, vars.itemId),
+    onSuccess: invalidate,
+  });
+
+  return {
+    softDeleteResponse,
+    restoreResponse,
+    deleteResponse,
+    softDeleteItem,
+    restoreItem,
+    deleteItem,
+  };
 }
 
 // --- Público (lojista) --------------------------------------------------------

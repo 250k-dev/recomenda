@@ -17,9 +17,10 @@ import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items
 import { useCurrencyStore } from "@/stores/currency";
 import {
   createPurchaseList,
+  type PurchaseListDetail,
   type PurchaseListItemInput,
 } from "@/lib/api/client";
-import { queryKeys } from "@/lib/api/hooks";
+import { queryKeys, usePurchaseListTemplates } from "@/lib/api/hooks";
 import { CROP_LABELS } from "@/lib/season-constants";
 import {
   FieldError,
@@ -44,6 +45,27 @@ export type PurchaseListWizardProps = {
 };
 
 const WIZARD_STEPS = 2;
+
+/** Converte um item de template (PurchaseListDetail) no item do formulário. */
+function templateItemToListItem(it: PurchaseListDetail["items"][number]): ListItem {
+  return {
+    key: `tpl-${it.id}-${Math.random().toString(36).slice(2, 8)}`,
+    category: it.category ?? "OTHER",
+    productId: it.local_product_id,
+    productName: it.product_name,
+    stage: it.stage,
+    dose: String(it.dose_per_hectare),
+    unit: it.dose_unit,
+    nApps: String(it.n_applications),
+    stock: String(it.current_stock),
+    price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
+    priceUsd: it.price_usd != null ? String(it.price_usd) : "",
+    thousandPlants: it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
+    seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
+    bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
+    outOfProgram: it.out_of_program || undefined,
+  };
+}
 
 export function PurchaseListWizard({
   producerId,
@@ -131,6 +153,12 @@ function StepList({
   onNext: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const { data: templates } = usePurchaseListTemplates();
+
+  const importTemplate = (tpl: PurchaseListDetail) => {
+    setCrop(tpl.crop);
+    setItems(tpl.items.map(templateItemToListItem));
+  };
 
   const next = () => {
     setError(null);
@@ -229,6 +257,30 @@ function StepList({
           </div>
         </div>
       </section>
+
+      {items.length === 0 && templates && templates.length > 0 ? (
+        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-semibold text-foreground">Começar de um template</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Importe um modelo pronto e ajuste o que precisar. Você ainda escolhe os talhões no
+            próximo passo.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {templates.map((tpl) => (
+              <Button
+                key={tpl.id}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => importTemplate(tpl)}
+              >
+                {tpl.name}
+                <span className="ml-1 text-muted-foreground">· {tpl.items.length}</span>
+              </Button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-5 py-3">

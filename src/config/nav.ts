@@ -14,5 +14,12 @@ export const navByRole: Record<UserRole, Array<{ label: string; href: string }>>
     { label: "Produtos", href: "/catalog" },
     { label: "Relatórios", href: "/reports" },
   ],
+  // Consultor usa a mesma navegação do agrônomo (escopo aplicado no backend).
+  CONSULTANT: [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Produtores", href: "/producers" },
+    { label: "Produtos", href: "/catalog" },
+    { label: "Relatórios", href: "/reports" },
+  ],
   PRODUCER: [],
 };

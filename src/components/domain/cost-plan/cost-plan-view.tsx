@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { duplicatePurchaseList } from "@/lib/api/client";
+import { getCommodities } from "@/lib/api/market";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
@@ -17,6 +19,7 @@ import {
   calculateSummary,
   CATEGORY_ORDER,
   type CostItemInput,
+  type CostSummary,
 } from "@/lib/cost-plan/calculate";
 import {
   Pencil,
@@ -33,6 +36,8 @@ import {
   Scale,
   PackageCheck,
   TrendingUp,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -118,6 +123,7 @@ export function CostPlanView({
 
   const { fxRate: globalFxRate, setFxRate: setGlobalFxRate } = useCurrencyStore();
   const [grainPrice, setGrainPrice] = useState<string>("");
+  const [targets, setTargets] = useState<Record<string, number>>({});
   const [items, setItems] = useState<EditableItem[]>([]);
   const [filter, setFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -136,6 +142,7 @@ export function CostPlanView({
       setGlobalFxRate(String(plan.fx_rate_usd_brl));
     }
     setGrainPrice(plan.grain_price_brl != null ? String(plan.grain_price_brl) : "");
+    setTargets(plan.category_targets ?? {});
     setItems(
       plan.items.map((it) => ({
         id: it.id,
@@ -193,6 +200,7 @@ export function CostPlanView({
     update.mutate({
       fx_rate_usd_brl: fxRate ? Number(fxRate) : null,
       grain_price_brl: grainPrice ? Number(grainPrice) : null,
+      category_targets: targets,
       items: items.map((it) => ({
         local_product_id: it.local_product_id,
         stage: it.stage,
@@ -407,6 +415,12 @@ export function CostPlanView({
 
       <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
         <div className="flex min-w-0 flex-col gap-3">
+          <RealVsTargetPanel
+            summary={summary}
+            targets={targets}
+            setTargets={setTargets}
+            onCommit={persist}
+          />
           <Toolbar
             filter={filter}
             setFilter={setFilter}
@@ -430,6 +444,138 @@ export function CostPlanView({
           <CategoryDistributionPanel summary={summary} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Comparativo Real × Desejado: sc/ha real (calculado) vs meta digitada por categoria. */
+function RealVsTargetPanel({
+  summary,
+  targets,
+  setTargets,
+  onCommit,
+}: {
+  summary: CostSummary;
+  targets: Record<string, number>;
+  setTargets: (next: Record<string, number>) => void;
+  onCommit: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rows = summary.category_breakdown;
+  if (rows.length === 0) return null;
+
+  const totalReal = rows.reduce((s, r) => s + r.sacks_per_ha, 0);
+  const totalDesejado = rows.reduce((s, r) => s + (targets[r.category] ?? 0), 0);
+
+  const setOne = (category: string, value: string) => {
+    const n = value === "" ? 0 : Number(value);
+    setTargets({ ...targets, [category]: Number.isFinite(n) ? n : 0 });
+  };
+
+  return (
+    <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        className={cn(
+          "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-rail/80",
+          open && "border-b border-border bg-rail",
+          !open && "bg-rail",
+        )}
+      >
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-text-strong">
+            Real × Desejado (sacas/ha por categoria)
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Real é calculado (custo da categoria ÷ saca ÷ área). Desejado é a sua meta.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {!open ? (
+            <span className="hidden text-xs tabular-nums text-muted-foreground sm:inline">
+              Real {num(totalReal, 2)} · Desejado{" "}
+              {totalDesejado > 0 ? num(totalDesejado, 2) : "—"}
+            </span>
+          ) : null}
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        </div>
+      </button>
+      {open ? (
+        <div className="flex flex-col gap-3.5 p-4">
+          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span>Categoria</span>
+            <span>Real · Meta (sc/ha)</span>
+          </div>
+          {rows.map((r) => {
+            const real = r.sacks_per_ha;
+            const target = targets[r.category] ?? 0;
+            const over = target > 0 && real > target;
+            const pct = target > 0 ? Math.min(100, (real / target) * 100) : 0;
+            const color = CATEGORY_COLORS[r.category] ?? CATEGORY_COLORS.OTHER;
+            return (
+              <div key={r.category} className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-2 text-sm">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: color }}
+                    />
+                    <span className="truncate font-medium text-foreground">
+                      {CATEGORY_LABELS[r.category] ?? r.category}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "w-12 text-right text-sm tabular-nums",
+                        over ? "font-semibold text-danger-strong" : "text-text-strong",
+                      )}
+                    >
+                      {num(real, 2)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/</span>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={target ? String(target) : ""}
+                      placeholder="meta"
+                      onChange={(e) => setOne(r.category, e.target.value)}
+                      onBlur={onCommit}
+                      className="h-8 w-16 px-2 text-right text-sm tabular-nums"
+                    />
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn("h-full rounded-full transition-all", over && "bg-danger-strong")}
+                    style={{
+                      width: `${target > 0 ? pct : 0}%`,
+                      background: over ? undefined : color,
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+          <div className="mt-1 flex items-center justify-between border-t border-border pt-3 text-sm">
+            <span className="font-semibold text-text-strong">Total</span>
+            <span className="tabular-nums">
+              <strong className="text-text-strong">{num(totalReal, 2)}</strong>
+              <span className="text-muted-foreground">
+                {" "}
+                / {totalDesejado > 0 ? num(totalDesejado, 2) : "—"} sc/ha
+              </span>
+            </span>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -658,6 +804,28 @@ function ParamsBar({
   onCommit: () => void;
   saving: boolean;
 }) {
+  const [fetching, setFetching] = useState(false);
+
+  const fillFromMarket = async () => {
+    setFetching(true);
+    try {
+      const q = await getCommodities();
+      const saca = crop === "CORN" ? q.milho_brl_saca : q.soja_brl_saca;
+      if (q.usd_brl != null) setFxRate(String(q.usd_brl));
+      if (saca != null) setGrainPrice(String(saca));
+      onCommit();
+      if (q.usd_brl == null && saca == null) {
+        toast.error("Não foi possível obter a cotação agora. Informe os valores à mão.");
+      } else {
+        toast.success("Cotação do dia preenchida.");
+      }
+    } catch {
+      toast.error("Não foi possível obter a cotação agora. Informe os valores à mão.");
+    } finally {
+      setFetching(false);
+    }
+  };
+
   return (
     <div className="rounded-xl border bg-card px-4 py-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-4">
@@ -670,7 +838,7 @@ function ParamsBar({
           onChange={setFxRate}
           onBlur={onCommit}
           formatted={fxRate ? brlSmall(Number(fxRate)) : "—"}
-          sub="B3 PTAX"
+          sub="BCB PTAX"
           step="0.0001"
           placeholder="5,50"
         />
@@ -680,10 +848,21 @@ function ParamsBar({
           onChange={setGrainPrice}
           onBlur={onCommit}
           formatted={grainPrice ? brlSmall(Number(grainPrice)) : "—"}
-          sub="média 30 dias"
+          sub="CEPEA/ESALQ"
           step="0.01"
           placeholder="105,00"
         />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={fillFromMarket}
+          disabled={fetching}
+          title="Preencher dólar e saca com a cotação do dia"
+        >
+          <RefreshCw className={cn("size-3.5", fetching && "animate-spin")} />
+          {fetching ? "Buscando…" : "Cotação do dia"}
+        </Button>
         <div className="flex flex-col">
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
             Área plantada
@@ -830,15 +1009,16 @@ function Toolbar({
           className="h-9 pl-8"
         />
       </div>
-      <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2 pr-1 text-xs">
-        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+      <div className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border bg-card pl-2 pr-1">
+        <Filter className="size-3.5 shrink-0 text-muted-foreground" />
         <Select
           value={categoryFilter}
           onValueChange={setCategoryFilter}
           size="sm"
-          className="h-8 min-w-[10rem] border-0 bg-transparent pr-2 text-xs shadow-none"
+          filterLabel="Categoria"
+          className="w-auto min-w-[7.5rem] shrink-0 [&>button]:h-8 [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-1 [&>button]:text-xs [&>button]:shadow-none [&>button_span]:whitespace-nowrap"
           options={[
-            { value: "all", label: "Categoria: Todas" },
+            { value: "all", label: "Todas" },
             ...allCategories.map((c) => ({
               value: c,
               label: CATEGORY_LABELS[c] ?? c,
@@ -846,17 +1026,18 @@ function Toolbar({
           ]}
         />
       </div>
-      <div className="flex items-center gap-1.5 rounded-md border bg-card pl-2 pr-1 text-xs">
-        <ArrowDownUp className="h-3.5 w-3.5 text-muted-foreground" />
+      <div className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border bg-card pl-2 pr-1">
+        <ArrowDownUp className="size-3.5 shrink-0 text-muted-foreground" />
         <Select
           value={sortMode}
           onValueChange={(value) => setSortMode(value as typeof sortMode)}
           size="sm"
-          className="h-8 min-w-[10rem] border-0 bg-transparent pr-2 text-xs shadow-none"
+          filterLabel="Ordenar"
+          className="w-auto min-w-[7.5rem] shrink-0 [&>button]:h-8 [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-1 [&>button]:text-xs [&>button]:shadow-none [&>button_span]:whitespace-nowrap"
           options={[
-            { value: "cost-desc", label: "Ordenar: Custo ↓" },
-            { value: "cost-asc", label: "Ordenar: Custo ↑" },
-            { value: "name", label: "Ordenar: Nome" },
+            { value: "cost-desc", label: "Custo ↓" },
+            { value: "cost-asc", label: "Custo ↑" },
+            { value: "name", label: "Nome" },
           ]}
         />
       </div>
@@ -898,18 +1079,28 @@ function InputsTable({
     );
   }
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-      <table className="w-full min-w-[760px] text-sm">
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col className="w-[23%]" />
+          <col className="w-[17%]" />
+          <col className="w-[9%]" />
+          <col className="w-[10%]" />
+          <col className="w-[9%]" />
+          <col className="w-[11%]" />
+          <col className="w-[12%]" />
+          <col className="w-[3%]" />
+        </colgroup>
         <thead>
           <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <th className="px-3 py-2.5">Produto</th>
-            <th className="px-2 py-2.5">Dose / ha</th>
-            <th className="px-2 py-2.5">Estoque</th>
-            <th className="px-2 py-2.5 text-right">Qtde final</th>
-            <th className="px-2 py-2.5 text-right">US$ un.</th>
-            <th className="px-2 py-2.5 text-right">R$ un.</th>
-            <th className="px-2 py-2.5 text-right">Total</th>
-            <th className="px-2 py-2.5" />
+            <th className="px-1.5 py-2.5">Produto</th>
+            <th className="px-1.5 py-2.5 leading-tight">Dose/ha</th>
+            <th className="px-1.5 py-2.5">Estoque</th>
+            <th className="px-1.5 py-2.5 text-right leading-tight">Qtde</th>
+            <th className="px-1.5 py-2.5 text-right">US$</th>
+            <th className="px-1.5 py-2.5 text-right">R$</th>
+            <th className="px-1.5 py-2.5 text-right">Total</th>
+            <th className="px-1.5 py-2.5" />
           </tr>
         </thead>
         <tbody>
@@ -952,12 +1143,12 @@ function CategoryGroup({
   return (
     <>
       <tr className="bg-rail">
-        <td colSpan={8} className="px-3 py-1.5">
-          <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-            <Sprout className="h-3.5 w-3.5" style={{ color }} />
-            {CATEGORY_LABELS[category] ?? category}
-            <span className="font-normal text-muted-foreground/70">
+        <td colSpan={8} className="px-1.5 py-1.5">
+          <span className="inline-flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
+            <Sprout className="h-3.5 w-3.5 shrink-0" style={{ color }} />
+            <span className="truncate">{CATEGORY_LABELS[category] ?? category}</span>
+            <span className="shrink-0 font-normal text-muted-foreground/70">
               · {items.length} {items.length === 1 ? "insumo" : "insumos"}
             </span>
           </span>
@@ -967,16 +1158,16 @@ function CategoryGroup({
         const calc = lineById.get(it.id);
         return (
           <tr key={it.id} className="border-b last:border-b-0">
-            <td className="px-3 py-2">
+            <td className="px-1.5 py-2">
               <div className="min-w-0">
-                <p className="font-medium text-foreground">{it.product_name}</p>
+                <p className="truncate font-medium text-foreground">{it.product_name}</p>
                 {it.supplier ? (
-                  <p className="text-xs text-muted-foreground">{it.supplier}</p>
+                  <p className="truncate text-xs text-muted-foreground">{it.supplier}</p>
                 ) : null}
               </div>
             </td>
-            <td className="px-2 py-2">
-              <div className="flex items-center gap-1">
+            <td className="px-1.5 py-2">
+              <div className="flex min-w-0 items-center gap-0.5">
                 <Input
                   type="number"
                   value={it.dose_per_hectare}
@@ -984,16 +1175,16 @@ function CategoryGroup({
                     updateItem(it.id, { dose_per_hectare: Number(e.target.value) || 0 })
                   }
                   onBlur={onCommit}
-                  className="h-8 w-20"
+                  className="h-8 w-full min-w-0 px-2 text-sm"
                 />
                 <DoseUnitSelect
                   value={it.dose_unit ?? "L"}
                   onChange={(val) => { updateItem(it.id, { dose_unit: val }); onCommit(); }}
-                  className="h-8"
+                  className="h-8 w-[4.25rem] min-w-0 shrink-0"
                 />
               </div>
             </td>
-            <td className="px-2 py-2">
+            <td className="px-1.5 py-2">
               <Input
                 type="number"
                 value={it.current_stock}
@@ -1001,22 +1192,22 @@ function CategoryGroup({
                   updateItem(it.id, { current_stock: Number(e.target.value) || 0 })
                 }
                 onBlur={onCommit}
-                className="h-8 w-20"
+                className="h-8 w-full min-w-0 px-2 text-sm"
               />
             </td>
-            <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
+            <td className="px-1.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
               {num(calc?.quantity_final ?? 0, 0)}
             </td>
-            <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
+            <td className="px-1.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
               {it.price_usd != null ? `$${num(it.price_usd, 2)}` : "—"}
             </td>
-            <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
+            <td className="px-1.5 py-2 text-right text-sm tabular-nums text-muted-foreground">
               {brlSmall(calc?.unit_price_brl ?? 0)}
             </td>
-            <td className="px-2 py-2 text-right font-semibold tabular-nums text-foreground">
+            <td className="px-1.5 py-2 text-right text-sm font-semibold tabular-nums text-foreground">
               {brl(calc?.total_brl ?? 0)}
             </td>
-            <td className="px-2 py-2">
+            <td className="px-1.5 py-2 text-center">
               <button
                 type="button"
                 onClick={() => {

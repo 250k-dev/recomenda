@@ -39,8 +39,10 @@ export const queryKeys = {
   comparativeReport: ["comparative-report"],
   producerPurchaseLists: (producerId: string) => ["producer-purchase-lists", producerId] as const,
   farmPurchaseLists: (farmId: string) => ["farm-purchase-lists", farmId] as const,
+  purchaseListTemplates: () => ["purchase-list-templates"] as const,
   seasonCostPlan: (seasonId: string) => ["season-cost-plan", seasonId] as const,
   purchaseListQuotes: (listId: string) => ["purchase-list-quotes", listId] as const,
+  purchaseListQuoteTrash: (listId: string) => ["purchase-list-quote-trash", listId] as const,
   quoteByToken: (token: string) => ["quote-by-token", token] as const,
   quoteResponse: (responseToken: string) => ["quote-response", responseToken] as const,
   agronomistAgenda: (producerId?: string) =>

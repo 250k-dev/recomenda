@@ -125,7 +125,8 @@ const DOCUMENT_CSS = `
 `;
 
 /** Monta o documento HTML completo da recomendação, populado pelos dados. */
-export function buildRecommendationHtml(data: RecommendationShareData): string {
+/** Corpo (`.doc`) de um talhão — reutilizado no documento simples e no multi. */
+function buildDocBody(data: RecommendationShareData, pageBreak = false): string {
   const progressPct =
     data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
   const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
@@ -161,16 +162,8 @@ export function buildRecommendationHtml(data: RecommendationShareData): string {
       ? data.recommendations.map((rec, index) => stageHtml(rec, index)).join("")
       : `<p class="empty" style="margin-left:0">Nenhuma etapa cadastrada nesta safra.</p>`;
 
-  return `<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Recomendação - ${escapeHtml(data.title)}</title>
-<style>${DOCUMENT_CSS}</style>
-</head>
-<body>
-  <div class="doc">
+  return `
+  <div class="doc"${pageBreak ? ' style="page-break-before: always"' : ""}>
     <header class="header">
       <div class="brand">${LOGO_SVG}<span class="brand-name">Recomenda</span></div>
       <span class="emitted">Emitido em ${escapeHtml(emittedAt)}</span>
@@ -189,9 +182,33 @@ export function buildRecommendationHtml(data: RecommendationShareData): string {
       <span>${data.agronomistName ? `Responsável técnico: ${escapeHtml(data.agronomistName)}` : ""}</span>
       <span>Documento gerado pela plataforma Recomenda</span>
     </footer>
-  </div>
-</body>
+  </div>`;
+}
+
+function htmlShell(title: string, body: string): string {
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(title)}</title>
+<style>${DOCUMENT_CSS}</style>
+</head>
+<body>${body}</body>
 </html>`;
+}
+
+export function buildRecommendationHtml(data: RecommendationShareData): string {
+  return htmlShell(`Recomendação - ${data.title}`, buildDocBody(data));
+}
+
+/** Documento com vários talhões (um por página). */
+export function buildRecommendationsHtml(
+  list: RecommendationShareData[],
+  title: string,
+): string {
+  const body = list.map((d, i) => buildDocBody(d, i > 0)).join("");
+  return htmlShell(title, body);
 }
 
 /**
@@ -199,9 +216,21 @@ export function buildRecommendationHtml(data: RecommendationShareData): string {
  * UI do app. O navegador usa o <title> como nome padrão ao "Salvar como PDF".
  */
 export function printRecommendation(data: RecommendationShareData): void {
+  printHtml(buildRecommendationHtml(data));
+}
+
+/** Imprime vários talhões num único PDF (um por página). */
+export function printRecommendations(
+  list: RecommendationShareData[],
+  title = "Recomendações",
+): void {
+  if (list.length === 0) return;
+  printHtml(buildRecommendationsHtml(list, title));
+}
+
+function printHtml(html: string): void {
   if (typeof window === "undefined") return;
 
-  const html = buildRecommendationHtml(data);
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.cssText =

@@ -34,6 +34,7 @@ import {
   isSeedItem,
   listItemQuantity,
   listItemRequired,
+  seedPlanOutputs,
   seedQuantityUnitLabel,
   SEED_CATEGORIES,
   type ListItem,
@@ -485,28 +486,41 @@ export function PurchaseListItemsEditor({
                 {`${fmt(required)} ${seedQuantityUnitAbbrev(it.category)}`}
               </span>
             ) : (
-              <div className="flex items-center justify-end gap-1">
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={bagsInputValue}
-                  onChange={(e) =>
-                    updateItem(it.key, {
-                      bagsOverride: e.target.value === "" ? undefined : e.target.value,
-                    })
-                  }
-                  className="h-8 w-20 shrink-0 px-2 text-sm"
-                />
-                {overridden ? (
-                  <button
-                    type="button"
-                    title="Voltar ao calculado"
-                    onClick={() => updateItem(it.key, { bagsOverride: undefined })}
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                  >
-                    ↺
-                  </button>
-                ) : null}
+              <div className="flex flex-col items-end gap-0.5">
+                <div className="flex items-center justify-end gap-1">
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={bagsInputValue}
+                    onChange={(e) =>
+                      updateItem(it.key, {
+                        bagsOverride: e.target.value === "" ? undefined : e.target.value,
+                      })
+                    }
+                    className="h-8 w-20 shrink-0 px-2 text-sm"
+                  />
+                  {overridden ? (
+                    <button
+                      type="button"
+                      title="Voltar ao calculado"
+                      onClick={() => updateItem(it.key, { bagsOverride: undefined })}
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      ↺
+                    </button>
+                  ) : null}
+                </div>
+                {(() => {
+                  const o = seedPlanOutputs(it, totalHa);
+                  return o.populationPerHa > 0 ? (
+                    <span
+                      className="text-[10px] leading-tight text-muted-foreground"
+                      title="Sementes (população × área) e hectares atendidos pelas unidades"
+                    >
+                      {fmt(o.totalSeeds)} sementes · {fmt(o.hectaresServed)} ha
+                    </span>
+                  ) : null;
+                })()}
               </div>
             )}
           </td>

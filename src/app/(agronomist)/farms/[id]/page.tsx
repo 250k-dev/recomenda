@@ -40,9 +40,14 @@ import {
   useRevokeFarmAccess,
   useUpdateFarm,
   useArchiveSeason,
+  useMe,
   queryKeys,
 } from "@/lib/api/hooks";
 import { getTimeline, type Recommendation } from "@/lib/api/seasons";
+import {
+  FarmSeasonsExportDialog,
+  type FarmExportItem,
+} from "@/components/domain/farm-seasons-export-dialog";
 import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
 import { FarmPurchaseListSummaryPanel } from "@/components/domain/farm-purchase-list-summary-panel";
 import { ProducerStockSection } from "@/components/domain/producer-stock-section";
@@ -67,6 +72,7 @@ import {
   ShoppingCart,
   CalendarDays,
   Calculator,
+  Share2,
 } from "lucide-react";
 
 const SEASON_PRIORITY: Record<string, number> = {
@@ -133,6 +139,7 @@ export default function FarmDetailPage() {
 
   const { data: farm } = useFarm(farmId);
   const { data: producer } = useProducer(producerId ?? "");
+  const { data: me } = useMe();
   const { data: access, isLoading: loadingAccess } = useFarmAccess(farmId);
 
   const resolvedProducerId = useMemo(() => {
@@ -559,6 +566,9 @@ export default function FarmDetailPage() {
               producerId={resolvedProducerId}
               newSeasonHref={newSeasonHref}
               onOpenPurchaseList={openPurchaseForSeason}
+              farmName={farm?.name}
+              producerName={producer?.name}
+              agronomistName={me?.name}
             />
           </section>
 
@@ -790,6 +800,9 @@ function FarmSeasonsTab({
   producerId,
   newSeasonHref,
   onOpenPurchaseList,
+  farmName,
+  producerName,
+  agronomistName,
 }: {
   seasons: Array<{
     id: string;
@@ -803,12 +816,16 @@ function FarmSeasonsTab({
   producerId: string | null;
   newSeasonHref: string;
   onOpenPurchaseList: (seasonId: string) => void;
+  farmName?: string | null;
+  producerName?: string | null;
+  agronomistName?: string | null;
 }) {
   const archiveMutation = useArchiveSeason();
   const [archiveConfirm, setArchiveConfirm] = useState<{
     id: string;
     name: string;
   } | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const displaySeasons = useMemo(
     () => seasons.filter((season) => season.status !== "ARCHIVED"),
@@ -822,6 +839,38 @@ function FarmSeasonsTab({
       staleTime: 60_000,
     })),
   });
+
+  const exportItems = useMemo<FarmExportItem[]>(() => {
+    return displaySeasons.map((season, index) => {
+      const raw = timelineQueries[index]?.data;
+      const rows = (
+        Array.isArray(raw)
+          ? raw
+          : ((raw as { data?: Recommendation[] } | undefined)?.data ?? [])
+      ) as Recommendation[];
+      const done = rows.filter((r) =>
+        ["APPLIED_ON_TIME", "APPLIED_LATE"].includes(r.status),
+      ).length;
+      const label = `${season.plot_name} · ${CROP_LABELS[season.crop] ?? season.crop}${
+        season.variety ? ` — ${season.variety}` : ""
+      }`;
+      return {
+        id: season.id,
+        label,
+        data: {
+          title: `${CROP_LABELS[season.crop] ?? season.crop}${
+            season.variety ? ` — ${season.variety}` : ""
+          }`,
+          plotName: season.plot_name,
+          producerName: producerName ?? null,
+          agronomistName: agronomistName ?? null,
+          done,
+          total: rows.length,
+          recommendations: rows,
+        },
+      };
+    });
+  }, [displaySeasons, timelineQueries, producerName, agronomistName]);
 
   const progressBySeasonId = useMemo(() => {
     const map = new Map<string, { done: number; total: number; pct: number }>();
@@ -863,14 +912,27 @@ function FarmSeasonsTab({
           <h2 className="font-display text-lg font-semibold text-text-strong">
             Safras desta fazenda
           </h2>
-          {producerId ? (
-            <Button asChild size="sm" className="gap-1.5">
-              <Link href={newSeasonHref}>
-                <Plus className="h-4 w-4" />
-                Nova safra
-              </Link>
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {exportItems.length > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setExportOpen(true)}
+              >
+                <Share2 className="h-4 w-4" />
+                Exportar
+              </Button>
+            ) : null}
+            {producerId ? (
+              <Button asChild size="sm" className="gap-1.5">
+                <Link href={newSeasonHref}>
+                  <Plus className="h-4 w-4" />
+                  Nova safra
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -990,6 +1052,13 @@ function FarmSeasonsTab({
             }),
           );
         }}
+      />
+
+      <FarmSeasonsExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        farmName={farmName}
+        items={exportItems}
       />
     </>
   );

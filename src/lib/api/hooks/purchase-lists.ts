@@ -3,7 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type PurchaseListInput,
+  createPurchaseList,
+  deletePurchaseList,
   getPurchaseListBySeason,
+  getPurchaseListTemplates,
+  importPurchaseListTemplate,
   updatePurchaseList,
   getProducerPurchaseLists,
   getFarmPurchaseLists,
@@ -26,7 +30,11 @@ export function useUpdatePurchaseList(id: string, options?: { farmId?: string })
       if (data.season_id) {
         queryClient.invalidateQueries({ queryKey: queryKeys.seasonCostPlan(data.season_id) });
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.producerPurchaseLists(data.producer_id) });
+      if (data.producer_id) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.producerPurchaseLists(data.producer_id),
+        });
+      }
       if (options?.farmId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.farmPurchaseLists(options.farmId) });
       }
@@ -47,5 +55,64 @@ export function useFarmPurchaseLists(farmId: string) {
     queryKey: queryKeys.farmPurchaseLists(farmId),
     queryFn: () => getFarmPurchaseLists(farmId),
     enabled: Boolean(farmId),
+  });
+}
+
+// --- Templates de compra ------------------------------------------------------
+
+export function usePurchaseListTemplates() {
+  return useQuery({
+    queryKey: queryKeys.purchaseListTemplates(),
+    queryFn: getPurchaseListTemplates,
+  });
+}
+
+export function useCreatePurchaseListTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PurchaseListInput) =>
+      createPurchaseList({ ...payload, is_template: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListTemplates() });
+    },
+  });
+}
+
+export function useUpdatePurchaseListTemplate(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<PurchaseListInput>) => updatePurchaseList(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListTemplates() });
+    },
+  });
+}
+
+export function useDeletePurchaseListTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deletePurchaseList(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListTemplates() });
+    },
+  });
+}
+
+export function useImportPurchaseListTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { templateId: string; producer_id: string; name?: string }) =>
+      importPurchaseListTemplate(vars.templateId, {
+        producer_id: vars.producer_id,
+        name: vars.name,
+      }),
+    onSuccess: (data) => {
+      if (data.producer_id) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.producerPurchaseLists(data.producer_id),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
+    },
   });
 }

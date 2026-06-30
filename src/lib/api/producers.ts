@@ -69,6 +69,7 @@ export interface InvitationPreview {
   status: string;
   expires_at: string;
   agronomist_id: string;
+  kind?: "PRODUCER" | "CONSULTANT";
 }
 
 export interface Invitation {
@@ -140,7 +141,11 @@ export async function acceptInvitation(token: string, payload: { name: string; p
   return data;
 }
 
-export async function createInvitation(payload: { email?: string; farm_ids: string[] }) {
+export async function createInvitation(payload: {
+  email?: string;
+  farm_ids: string[];
+  kind?: "PRODUCER" | "CONSULTANT";
+}) {
   const { data } = await api.post<Invitation>("/invitations", payload);
   return data;
 }

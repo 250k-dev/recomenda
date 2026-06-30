@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { useAcceptInvitation, useInvitationByToken } from "@/lib/api/hooks";
+import type { InvitationPreview } from "@/lib/api/producers";
 
 const acceptSchema = z
   .object({
@@ -27,6 +29,21 @@ const acceptSchema = z
   });
 
 type AcceptFormValues = z.infer<typeof acceptSchema>;
+
+function invitationRoleLabel(kind?: InvitationPreview["kind"]): string {
+  return kind === "CONSULTANT" ? "consultor" : "produtor";
+}
+
+const INVITATION_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pendente",
+  ACCEPTED: "Aceito",
+  REVOKED: "Revogado",
+  EXPIRED: "Expirado",
+};
+
+function invitationStatusLabel(status: string): string {
+  return INVITATION_STATUS_LABELS[status] ?? status;
+}
 
 export default function InviteTokenPage() {
   const params = useParams<{ token: string }>();
@@ -87,8 +104,11 @@ export default function InviteTokenPage() {
             Convite já utilizado
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Status: <strong className="text-text-strong">{invitation.status}</strong>
+            Status: <strong className="text-text-strong">{invitationStatusLabel(invitation.status)}</strong>
           </p>
+          <Button asChild className="mt-5 w-full" size="lg">
+            <Link href="/login">Fazer login</Link>
+          </Button>
         </Card>
       </AuthShell>
     );
@@ -102,7 +122,7 @@ export default function InviteTokenPage() {
         </h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Você foi convidado para acessar {invitation.farm_ids.length} fazenda(s)
-          como produtor.
+          como {invitationRoleLabel(invitation.kind)}.
         </p>
 
         <form onSubmit={onSubmit} className="mt-5 space-y-4">
