@@ -28,6 +28,7 @@ import {
   useSeasonTimeline,
   useCreateRecommendation,
   useReorderRecommendations,
+  useSeasonCostPlan,
   useApplyRecommendation,
   useSkipRecommendation,
   useUndoRecommendation,
@@ -69,7 +70,11 @@ import { recommendedYmdToWindow, todayLocalYmd } from "@/lib/timing/window-days"
 import { cn } from "@/lib/utils";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
-import { extractError } from "@/components/domain/season/_shared";
+import {
+  extractError,
+  SEED_CATEGORIES,
+  seedQuantityUnitLabel,
+} from "@/components/domain/season/_shared";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
 import {
   displayRecStatus,
@@ -345,7 +350,12 @@ function AddProductRow({
               onValueChange={handleCategoryChange}
               placeholder="Selecione…"
               filterLabel="Categoria"
-              options={GLOBAL_PRODUCT_CATEGORIES.map((item) => ({
+              options={GLOBAL_PRODUCT_CATEGORIES.filter(
+                (item) =>
+                  item !== "SEED" &&
+                  item !== "CULTIVAR_SOJA" &&
+                  item !== "HIBRIDO_MILHO",
+              ).map((item) => ({
                 value: item,
                 label: PRODUCT_CATEGORY_LABELS[item],
               }))}
@@ -935,6 +945,60 @@ function RecommendationCard({
   );
 }
 
+/** Semente da safra — seção própria (população/bags), separada das etapas de
+ *  aplicação. Lê a lista de compra vinculada; a edição é feita no plano de custo. */
+function SeedPlanSection({ seasonId }: { seasonId: string }) {
+  const searchParams = useSearchParams();
+  const { data: plan } = useSeasonCostPlan(seasonId);
+  const seeds = (plan?.items ?? []).filter((it) => SEED_CATEGORIES.includes(it.category));
+  if (seeds.length === 0) return null;
+
+  const costPlanHref = (() => {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("tab", "cost-plan");
+    return `?${p.toString()}`;
+  })();
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-rail px-4 py-2.5">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-text-strong">
+          <Sprout className="h-4 w-4 text-primary-strong" />
+          Semente
+        </h3>
+        <Button asChild variant="ghost" size="sm" className="gap-1.5 print:hidden">
+          <Link href={costPlanHref}>Editar no plano de custo</Link>
+        </Button>
+      </div>
+      <ul className="divide-y divide-border">
+        {seeds.map((it) => {
+          const unit = seedQuantityUnitLabel(it.category);
+          const qty = it.quantity_final || it.required_quantity || 0;
+          return (
+            <li
+              key={it.id}
+              className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
+            >
+              <span className="font-medium text-text-strong">{it.product_name}</span>
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums text-muted-foreground">
+                {it.thousand_plants_per_ha ? (
+                  <span>{it.thousand_plants_per_ha.toLocaleString("pt-BR")} plantas/ha</span>
+                ) : null}
+                {it.seeding_area_ha ? (
+                  <span>{it.seeding_area_ha.toLocaleString("pt-BR")} ha</span>
+                ) : null}
+                <strong className="text-text-strong">
+                  {qty.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} {unit}
+                </strong>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function RecommendationsTab({
   seasonId,
   title,
@@ -1105,6 +1169,8 @@ function RecommendationsTab({
           <ProgressBar value={progressPct} />
         </div>
       </section>
+
+      <SeedPlanSection seasonId={seasonId} />
 
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-base font-semibold text-text-strong">Etapas do cronograma</h2>
