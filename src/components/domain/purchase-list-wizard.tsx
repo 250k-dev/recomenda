@@ -6,15 +6,23 @@ import {
   Check,
   Sprout,
   ArrowRight,
+  ArrowLeft,
   ShoppingCart,
   Leaf,
   Type,
+  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
-import { useCurrencyStore } from "@/stores/currency";
+import {
+  useCurrencyStore,
+  DEFAULT_GRAIN_PRICE_BRL,
+  DEFAULT_SPACING_M,
+} from "@/stores/currency";
+import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
+import { CategoryMetaProgress } from "@/components/domain/category-meta-progress";
 import {
   createPurchaseList,
   type PurchaseListDetail,
@@ -39,12 +47,14 @@ export type PurchaseListWizardProps = {
   producerName: string;
   plots: WizardPlot[];
   farmName?: string;
+  /** Safra da fazenda dona da lista (fluxo novo: uma lista única por safra). */
+  cycleId?: string | null;
   onComplete: () => void;
   onCancel: () => void;
   successRedirectLabel?: string;
 };
 
-const WIZARD_STEPS = 2;
+const WIZARD_STEPS = 3;
 
 /** Converte um item de template (PurchaseListDetail) no item do formulário. */
 function templateItemToListItem(it: PurchaseListDetail["items"][number]): ListItem {
@@ -60,6 +70,8 @@ function templateItemToListItem(it: PurchaseListDetail["items"][number]): ListIt
     stock: String(it.current_stock),
     price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
     priceUsd: it.price_usd != null ? String(it.price_usd) : "",
+    seedsPerMeter: it.seeds_per_meter != null ? String(it.seeds_per_meter) : "",
+    cycleDays: it.cycle_days != null ? String(it.cycle_days) : "",
     thousandPlants: it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
     seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
     bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
@@ -72,6 +84,7 @@ export function PurchaseListWizard({
   producerName,
   plots,
   farmName,
+  cycleId,
   onComplete,
   onCancel,
   successRedirectLabel = "Ir para o produtor",
@@ -80,6 +93,7 @@ export function PurchaseListWizard({
   const [crop, setCrop] = useState<"SOYBEAN" | "CORN" | "ANY">("SOYBEAN");
   const [listName, setListName] = useState("");
   const [items, setItems] = useState<ListItem[]>([]);
+  const [targets, setTargets] = useState<Record<string, number>>({});
 
   const totalHa = useMemo(() => plots.reduce((s, p) => s + p.area, 0), [plots]);
 
@@ -98,6 +112,14 @@ export function PurchaseListWizard({
       </div>
 
       {step === 1 && (
+        <StepTargets
+          targets={targets}
+          setTargets={setTargets}
+          onBack={onCancel}
+          onNext={() => setStep(2)}
+        />
+      )}
+      {step === 2 && (
         <StepList
           crop={crop}
           setCrop={(v) => setCrop(v as "SOYBEAN" | "CORN" | "ANY")}
@@ -107,21 +129,23 @@ export function PurchaseListWizard({
           setItems={setItems}
           totalHa={totalHa}
           farmName={farmName}
-          onBack={onCancel}
-          onNext={() => setStep(2)}
+          onBack={() => setStep(1)}
+          onNext={() => setStep(3)}
         />
       )}
-      {step === 2 && (
+      {step === 3 && (
         <StepReview
           producerId={producerId}
           producerName={producerName}
           plots={plots}
           crop={crop}
+          cycleId={cycleId ?? null}
           listName={listName}
           items={items}
+          targets={targets}
           totalHa={totalHa}
           successRedirectLabel={successRedirectLabel}
-          onBack={() => setStep(1)}
+          onBack={() => setStep(2)}
           onComplete={onComplete}
         />
       )}
@@ -156,7 +180,7 @@ function StepList({
   const { data: templates } = usePurchaseListTemplates();
 
   const importTemplate = (tpl: PurchaseListDetail) => {
-    setCrop(tpl.crop);
+    setCrop(tpl.crop ?? "ANY");
     setItems(tpl.items.map(templateItemToListItem));
   };
 
@@ -335,13 +359,161 @@ function StepList({
   );
 }
 
+/** Categorias que o agrônomo pode orçar — antes de montar a lista (sem crop ainda). */
+const META_CATEGORIES = [
+  "CULTIVAR_SOJA",
+  "HIBRIDO_MILHO",
+  "FERTILIZER",
+  "HERBICIDE",
+  "FUNGICIDE",
+  "INSECTICIDE",
+  "BIOLOGICAL",
+  "FOLIAR",
+  "ADJUVANT",
+];
+
+function StepTargets({
+  targets,
+  setTargets,
+  onBack,
+  onNext,
+}: {
+  targets: Record<string, number>;
+  setTargets: (next: Record<string, number>) => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  // Pergunta antes de montar a lista: quer definir metas? Se já há metas
+  // (voltou ao passo), abre direto nos campos.
+  const [enabled, setEnabled] = useState(
+    Object.values(targets).some((v) => (v ?? 0) > 0),
+  );
+  const num = (n: number, d = 2) =>
+    n.toLocaleString("pt-BR", { maximumFractionDigits: d });
+  const totalDesejado = META_CATEGORIES.reduce((s, c) => s + (targets[c] ?? 0), 0);
+
+  const setOne = (category: string, value: string) => {
+    const n = value === "" ? 0 : Number(value);
+    setTargets({ ...targets, [category]: Number.isFinite(n) ? n : 0 });
+  };
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className="mb-6 flex min-w-0 items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Target className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Metas
+          </p>
+          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+            Antes de montar a lista, quer definir metas?
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Diga quanto pretende gastar por categoria (em sacas/ha). Ao montar a lista você
+            acompanha o quanto já comprometeu e recebe um aviso se passar da meta. É opcional.
+          </p>
+        </div>
+      </div>
+
+      {!enabled ? (
+        <section className="flex flex-col items-center gap-4 rounded-xl border bg-card px-6 py-10 text-center shadow-sm">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Target className="h-6 w-6" />
+          </span>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Você pode definir uma meta de gasto por categoria agora, ou seguir direto para
+            montar a lista e definir depois.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button size="lg" className="gap-2" onClick={() => setEnabled(true)}>
+              <Target className="h-4 w-4" />
+              Sim, definir metas
+            </Button>
+            <Button size="lg" variant="outline" className="gap-2" onClick={onNext}>
+              Agora não
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </section>
+      ) : (
+        <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="flex items-center justify-between border-b bg-muted/30 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span>Categoria</span>
+            <span>Meta (sc/ha)</span>
+          </div>
+          <div className="flex flex-col gap-3.5 p-5">
+            {META_CATEGORIES.map((category) => {
+              const target = targets[category] ?? 0;
+              const color = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.OTHER;
+              return (
+                <div
+                  key={category}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-sm">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: color }}
+                    />
+                    <span className="truncate font-medium text-foreground">
+                      {CATEGORY_LABELS[category] ?? category}
+                    </span>
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={target ? String(target) : ""}
+                    placeholder="meta"
+                    onChange={(e) => setOne(category, e.target.value)}
+                    className="h-8 w-20 px-2 text-right text-sm tabular-nums"
+                  />
+                </div>
+              );
+            })}
+            <div className="mt-1 flex items-center justify-between border-t pt-3 text-sm">
+              <span className="font-semibold text-foreground">Total</span>
+              <span className="tabular-nums">
+                <strong className="text-foreground">
+                  {totalDesejado > 0 ? num(totalDesejado) : "—"}
+                </strong>
+                <span className="text-muted-foreground"> sc/ha</span>
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <StepFooter
+        back={
+          <Button variant="ghost" onClick={onBack} size="lg" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Button>
+        }
+        primary={
+          enabled ? (
+            <Button onClick={onNext} size="lg" className="gap-2">
+              Próximo
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          ) : undefined
+        }
+      />
+    </div>
+  );
+}
+
 function StepReview({
   producerId,
   producerName,
   plots,
   crop,
+  cycleId,
   listName,
   items,
+  targets,
   totalHa,
   successRedirectLabel,
   onBack,
@@ -351,8 +523,10 @@ function StepReview({
   producerName: string;
   plots: WizardPlot[];
   crop: string;
+  cycleId: string | null;
   listName: string;
   items: ListItem[];
+  targets: Record<string, number>;
   totalHa: number;
   successRedirectLabel: string;
   onBack: () => void;
@@ -364,14 +538,27 @@ function StepReview({
 
   const mutation = useMutation({
     mutationFn: () => {
-      const itemsPayload: PurchaseListItemInput[] = items.map(listItemToPayload);
-      const fxRaw = useCurrencyStore.getState().fxRate;
+      const itemsPayload: PurchaseListItemInput[] = items.map((it) =>
+        listItemToPayload(it, crop),
+      );
+      const {
+        fxRate: fxRaw,
+        grainPrice: grainRaw,
+        spacing: spacingRaw,
+      } = useCurrencyStore.getState();
+      const cleanedTargets = Object.fromEntries(
+        Object.entries(targets).filter(([, v]) => v > 0),
+      );
       return createPurchaseList({
         producer_id: producerId,
         crop,
+        cycle_id: cycleId,
         name: listName,
         season_id: null,
         fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
+        grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+        spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
+        category_targets: cleanedTargets,
         plots: plots.map((p) => ({
           plot_id: p.id,
           planting_date: null,
@@ -387,6 +574,16 @@ function StepReview({
         queryKey: queryKeys.producerPurchaseLists(producerId),
       });
       void queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
+      if (cycleId) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.cyclePurchaseList(cycleId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.cycleCostPlan(cycleId),
+        });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId) });
+        void queryClient.invalidateQueries({ queryKey: ["farm-cycles"] });
+      }
     },
     onError: (e: unknown) => setError(extractError(e)),
   });
@@ -481,6 +678,13 @@ function StepReview({
           <strong className="text-base text-foreground">{fmt(totalToBuy)}</strong>
         </div>
       </div>
+
+      <CategoryMetaProgress
+        items={items}
+        totalHa={totalHa}
+        targets={targets}
+        className="mt-4"
+      />
 
       {error ? (
         <div className="mt-4 max-w-xl">

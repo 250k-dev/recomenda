@@ -21,6 +21,8 @@ import {
   type CostItemInput,
   type CostSummary,
 } from "@/lib/cost-plan/calculate";
+import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
+import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
 import {
   Pencil,
   Plus,
@@ -40,36 +42,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  SEED: "Variedade / Híbrido",
-  CULTIVAR_SOJA: "Cultivar de soja",
-  HIBRIDO_MILHO: "Híbrido de milho",
-  FERTILIZER: "Adubação",
-  HERBICIDE: "Herbicida",
-  FUNGICIDE: "Fungicida",
-  INSECTICIDE: "Inseticida",
-  BIOLOGICAL: "Biológico",
-  SEED_TREATMENT: "Tratamento de sementes",
-  FOLIAR: "Foliar",
-  ADJUVANT: "Adjuvante",
-  OTHER: "Outros",
-};
-
-const CATEGORY_COLORS: Record<string, string> = {
-  SEED: "#3F7D3D",
-  CULTIVAR_SOJA: "#3F7D3D",
-  HIBRIDO_MILHO: "#C9A227",
-  FERTILIZER: "#D9A441",
-  HERBICIDE: "#B85C38",
-  FUNGICIDE: "#4A7A99",
-  INSECTICIDE: "#B5453A",
-  BIOLOGICAL: "#7BAE3F",
-  SEED_TREATMENT: "#8B5A2B",
-  FOLIAR: "#9A9E7E",
-  ADJUVANT: "#6B7155",
-  OTHER: "#6B7155",
-};
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", {
@@ -382,7 +354,7 @@ export function CostPlanView({
         variety={plan.variety}
         area={area}
         plotsCount={plotsCount}
-        crop={plan.crop}
+        crop={plan.crop ?? "ANY"}
         planTitle={planTitle}
         updatedAt={plan.updated_at}
         purchaseListId={plan.id}
@@ -400,7 +372,7 @@ export function CostPlanView({
         grainPrice={grainPrice}
         setGrainPrice={setGrainPrice}
         area={area}
-        crop={plan.crop}
+        crop={plan.crop ?? "ANY"}
         plotsCount={plotsCount}
         onCommit={persist}
         saving={update.isPending}
@@ -441,7 +413,7 @@ export function CostPlanView({
           />
         </div>
         <div>
-          <CategoryDistributionPanel summary={summary} />
+          <CategoryDistributionPanel breakdown={summary.category_breakdown} />
         </div>
       </div>
     </div>
@@ -1224,77 +1196,6 @@ function CategoryGroup({
         );
       })}
     </>
-  );
-}
-
-function CategoryDistributionPanel({
-  summary,
-}: {
-  summary: ReturnType<typeof calculateSummary>["summary"];
-}) {
-  const [mode, setMode] = useState<"brl" | "sacks">("brl");
-  const items = summary.category_breakdown;
-  return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Distribuição por categoria</h3>
-        <div className="flex rounded-md border p-0.5 text-xs">
-          <button
-            type="button"
-            onClick={() => setMode("brl")}
-            className={cn(
-              "rounded px-2 py-0.5",
-              mode === "brl" ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground",
-            )}
-          >
-            R$
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("sacks")}
-            className={cn(
-              "rounded px-2 py-0.5",
-              mode === "sacks" ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground",
-            )}
-          >
-            sacas/ha
-          </button>
-        </div>
-      </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Sem dados.</p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {items.map((it) => {
-            const color = CATEGORY_COLORS[it.category] ?? CATEGORY_COLORS.OTHER;
-            return (
-              <li key={it.category}>
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate font-medium text-foreground">
-                    {CATEGORY_LABELS[it.category] ?? it.category}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">
-                    {num(it.share_pct, 1)}% ·{" "}
-                    {mode === "brl"
-                      ? brlSmall(it.total_brl)
-                      : `${num(it.sacks_per_ha, 2)} sc/ha`}
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${Math.min(100, it.share_pct)}%`,
-                      background: color,
-                    }}
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
   );
 }
 

@@ -67,7 +67,7 @@ export type StageProductDraft = {
   outOfProgram?: boolean;
 };
 
-function usePurchaseListCatalogProducts(
+export function usePurchaseListCatalogProducts(
   producerId?: string,
   crop?: string,
   farmId?: string,
@@ -568,7 +568,7 @@ export function TimingStagesEditor({
               disabled={isSaving || saveDisabled}
               onClick={onSave}
             >
-              {isSaving ? "Salvando…" : "Salvar"}
+              {isSaving ? "Salvando…" : saveDisabled ? "Salvo ✓" : "Salvar"}
             </Button>
           ) : null}
           <Button
@@ -706,6 +706,37 @@ export function TimingStagesEditor({
           ))}
         </div>
       )}
+
+      {/* Lista longa: barra fixa no rodapé do viewport para adicionar etapa sem
+          rolar de volta ao topo do editor. */}
+      {stages.length > 3 ? (
+        <div className="sticky bottom-3 z-10 mt-4 flex justify-end">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-card/95 px-2 py-1.5 shadow-lg backdrop-blur">
+            {showSaveButton && onSave ? (
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5 rounded-full"
+                disabled={isSaving || saveDisabled}
+                onClick={onSave}
+              >
+                {isSaving ? "Salvando…" : saveDisabled ? "Salvo ✓" : "Salvar"}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 rounded-full"
+              disabled={isAdding || isSaving}
+              onClick={() => onAdd()}
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar etapa
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

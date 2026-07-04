@@ -31,6 +31,7 @@ import {
   useFarm,
   useFarmAccess,
   useFarmPlots,
+  useFarmCycles,
   useFarmPurchaseLists,
   useFarmSeasons,
   useGrantFarmAccess,
@@ -48,8 +49,7 @@ import {
   FarmSeasonsExportDialog,
   type FarmExportItem,
 } from "@/components/domain/farm-seasons-export-dialog";
-import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
-import { FarmPurchaseListSummaryPanel } from "@/components/domain/farm-purchase-list-summary-panel";
+import { FarmCyclesSection } from "@/components/domain/farm-cycles-section";
 import { ProducerStockSection } from "@/components/domain/producer-stock-section";
 import type { PurchaseListDetail } from "@/lib/api/client";
 import { activeAgronomistProducerAccounts } from "@/lib/api/client";
@@ -83,8 +83,6 @@ const SEASON_PRIORITY: Record<string, number> = {
   ARCHIVED: 4,
 };
 
-const ACTIVE_SEASON_STATUSES = new Set(["DRAFT", "PUBLISHED", "IN_PROGRESS"]);
-
 const farmSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
   location: z.string().optional(),
@@ -98,7 +96,7 @@ const plotSchema = z.object({
 type FarmFormValues = z.infer<typeof farmSchema>;
 type PlotFormValues = z.infer<typeof plotSchema>;
 
-type FarmViewTab = "seasons" | "purchase" | "plots" | "stock";
+type FarmViewTab = "seasons" | "plots" | "stock";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -123,9 +121,10 @@ function seasonProgressFromTimeline(rows: Recommendation[] | undefined): {
 }
 
 function parseFarmViewTab(value: string | null): FarmViewTab {
-  if (value === "purchase" || value === "plots" || value === "seasons" || value === "stock") {
+  if (value === "plots" || value === "seasons" || value === "stock") {
     return value;
   }
+  // Links legados com tab=purchase caem nas safras (a lista vive na safra).
   return "seasons";
 }
 
@@ -150,6 +149,7 @@ export default function FarmDetailPage() {
   const updateFarm = useUpdateFarm(farmId);
   const { data: plots, isLoading: loadingPlots } = useFarmPlots(farmId);
   const { data: seasons, isLoading: loadingSeasons } = useFarmSeasons(farmId);
+  const { data: cycles } = useFarmCycles(farmId);
   const { data: producersData } = useProducers();
 
   const createPlot = useCreatePlot(farmId);
@@ -175,17 +175,6 @@ export default function FarmDetailPage() {
     },
     [router, searchParams],
   );
-
-  const { data: farmPurchaseLists, isLoading: loadingFarmPurchaseLists } =
-    useFarmPurchaseLists(farmId);
-  const { data: producerPurchaseLists, isLoading: loadingProducerPurchaseLists } =
-    useProducerPurchaseLists(resolvedProducerId ?? "");
-
-  const loadingPurchaseLists =
-    loadingFarmPurchaseLists ||
-    loadingProducerPurchaseLists ||
-    loadingPlots ||
-    (Boolean(resolvedProducerId) && loadingAccess);
 
   const farmForm = useForm<FarmFormValues>({
     resolver: zodResolver(farmSchema),
@@ -230,61 +219,7 @@ export default function FarmDetailPage() {
     grantableProducers.map((p) => [p.producer_id, p]),
   );
 
-  const plotIds = useMemo(
-    () => new Set((plots ?? []).map((p) => p.id)),
-    [plots],
-  );
-
-  const farmPurchaseListsResolved = useMemo(() => {
-    if (farmPurchaseLists?.length) return farmPurchaseLists;
-    if (!producerPurchaseLists?.length) return [];
-    return producerPurchaseLists.filter((list) =>
-      (list.plots ?? []).some((lp) => plotIds.has(lp.plot_id)),
-    );
-  }, [farmPurchaseLists, producerPurchaseLists, plotIds]);
-
-  const latestPurchaseList = useMemo(() => {
-    const sorted = [...farmPurchaseListsResolved].sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
-    return sorted[0] ?? null;
-  }, [farmPurchaseListsResolved]);
-
-  const sortedPurchaseLists = useMemo(
-    () =>
-      [...farmPurchaseListsResolved].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      ),
-    [farmPurchaseListsResolved],
-  );
-
-  const [selectedListId, setSelectedListId] = useState<string>("");
   const [plotsPanelOpen, setPlotsPanelOpen] = useState(false);
-
-  const effectiveSelectedListId = useMemo(() => {
-    if (sortedPurchaseLists.length === 0) return "";
-    if (sortedPurchaseLists.some((list) => list.id === selectedListId)) {
-      return selectedListId;
-    }
-    return sortedPurchaseLists[0].id;
-  }, [sortedPurchaseLists, selectedListId]);
-
-  const selectedList = useMemo(
-    () =>
-      farmPurchaseListsResolved.find((list) => list.id === effectiveSelectedListId) ??
-      latestPurchaseList,
-    [farmPurchaseListsResolved, effectiveSelectedListId, latestPurchaseList],
-  );
-
-  const activeSeasonIds = useMemo(
-    () =>
-      (seasons ?? [])
-        .filter((s) => ACTIVE_SEASON_STATUSES.has(s.status))
-        .map((s) => s.id),
-    [seasons],
-  );
 
   const sortedPlots = useMemo(() => {
     if (!plots) return [];
@@ -330,49 +265,17 @@ export default function FarmDetailPage() {
     [plots],
   );
 
+  // Conta safras (ciclos), não as programações por talhão dentro delas —
+  // do contrário uma safra com 3 talhões aparecia como "3 safras ativas".
   const activeSeasonsCount = useMemo(
-    () => (seasons ?? []).filter((s) => ACTIVE_SEASON_STATUSES.has(s.status)).length,
-    [seasons],
+    () => (cycles ?? []).filter((c) => c.status === "ACTIVE").length,
+    [cycles],
   );
-
-  const purchaseListBySeasonId = useMemo(() => {
-    const map = new Map<string, PurchaseListDetail>();
-    for (const list of farmPurchaseListsResolved) {
-      if (list.season_id) map.set(list.season_id, list);
-    }
-    return map;
-  }, [farmPurchaseListsResolved]);
 
   const openPlotsPanel = useCallback(() => {
     setPlotsPanelOpen(true);
     setFarmViewWithUrl("plots");
   }, [setFarmViewWithUrl]);
-
-  const openPurchaseView = useCallback(
-    (listId?: string) => {
-      if (listId) setSelectedListId(listId);
-      setFarmViewWithUrl("purchase");
-    },
-    [setFarmViewWithUrl],
-  );
-
-  const openPurchaseForSeason = useCallback(
-    (seasonId: string) => {
-      const list = purchaseListBySeasonId.get(seasonId);
-      openPurchaseView(list?.id);
-    },
-    [purchaseListBySeasonId, openPurchaseView],
-  );
-
-  const summaryCostPlanHref = useMemo(() => {
-    const seasonId =
-      selectedList?.season_id ??
-      sortedSeasons.find((season) => ACTIVE_SEASON_STATUSES.has(season.status))?.id;
-    if (!seasonId) return null;
-    return resolvedProducerId
-      ? `/seasons/${seasonId}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(resolvedProducerId)}`
-      : `/seasons/${seasonId}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}`;
-  }, [selectedList?.season_id, sortedSeasons, farmId, resolvedProducerId]);
 
   const handlePlotsPanelChange = useCallback(
     (open: boolean) => {
@@ -398,13 +301,9 @@ export default function FarmDetailPage() {
     { label: farm?.name ?? "Fazenda" },
   ];
 
-  const newSeasonHref = resolvedProducerId
-    ? `/farms/${farmId}/season/new?producer_id=${encodeURIComponent(resolvedProducerId)}`
-    : `/farms/${farmId}/season/new`;
-
-  const newPurchaseListHref = resolvedProducerId
-    ? `/farms/${farmId}/purchase-list/new?producer_id=${encodeURIComponent(resolvedProducerId)}`
-    : `/farms/${farmId}/purchase-list/new`;
+  const stockHref = resolvedProducerId
+    ? `/farms/${farmId}?producer_id=${encodeURIComponent(resolvedProducerId)}&tab=stock`
+    : `/farms/${farmId}?tab=stock`;
 
   return (
     <>
@@ -481,7 +380,7 @@ export default function FarmDetailPage() {
         </Sheet>
       </section>
 
-      {tabFromUrl !== "purchase" && tabFromUrl !== "stock" ? (
+      {tabFromUrl !== "stock" ? (
         <KpiStrip className="mb-8">
           <KpiCell
             label="Talhões"
@@ -499,42 +398,10 @@ export default function FarmDetailPage() {
             value={activeSeasonsCount}
             icon={<Leaf className="size-4" />}
           />
-          <KpiCell
-            label={selectedList?.name ?? "Lista de compra"}
-            value={selectedList ? (selectedList.items ?? []).length : 0}
-            sub="produtos"
-            icon={<ShoppingCart className="size-4" />}
-            onClick={() => openPurchaseView()}
-          />
         </KpiStrip>
       ) : null}
 
-      {tabFromUrl === "purchase" ? (
-        <section>
-          <div className="mb-4">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-muted-foreground"
-              onClick={() => setFarmViewWithUrl("seasons")}
-            >
-              ← Voltar às safras
-            </Button>
-          </div>
-          <FarmPurchaseListTab
-            farmId={farmId}
-            list={selectedList}
-            purchaseLists={sortedPurchaseLists}
-            selectedListId={effectiveSelectedListId}
-            onSelectList={setSelectedListId}
-            isLoading={loadingPurchaseLists}
-            producerId={resolvedProducerId}
-            newPurchaseListHref={newPurchaseListHref}
-            fallbackSeasonIds={activeSeasonIds}
-          />
-        </section>
-      ) : tabFromUrl === "stock" ? (
+      {tabFromUrl === "stock" ? (
         <section>
           <div className="mb-4">
             <Button
@@ -557,31 +424,13 @@ export default function FarmDetailPage() {
           )}
         </section>
       ) : (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-          <section>
-            <FarmSeasonsTab
-              seasons={sortedSeasons}
-              isLoading={loadingSeasons}
-              farmId={farmId}
-              producerId={resolvedProducerId}
-              newSeasonHref={newSeasonHref}
-              onOpenPurchaseList={openPurchaseForSeason}
-              farmName={farm?.name}
-              producerName={producer?.name}
-              agronomistName={me?.name}
-            />
-          </section>
-
-          <aside className="min-w-0 xl:sticky xl:top-24">
-            <FarmPurchaseListSummaryPanel
-              list={selectedList}
-              isLoading={loadingPurchaseLists}
-              producerName={producer?.name}
-              onOpenFull={() => openPurchaseView()}
-              costPlanHref={summaryCostPlanHref}
-            />
-          </aside>
-        </div>
+        <section>
+          <FarmCyclesSection
+            farmId={farmId}
+            producerId={resolvedProducerId}
+            stockHref={stockHref}
+          />
+        </section>
       )}
 
       <Sheet open={plotsPanelOpen} onOpenChange={handlePlotsPanelChange}>
@@ -793,494 +642,3 @@ export default function FarmDetailPage() {
   );
 }
 
-function FarmSeasonsTab({
-  seasons,
-  isLoading,
-  farmId,
-  producerId,
-  newSeasonHref,
-  onOpenPurchaseList,
-  farmName,
-  producerName,
-  agronomistName,
-}: {
-  seasons: Array<{
-    id: string;
-    plot_name: string;
-    crop: string;
-    variety?: string | null;
-    status: string;
-  }>;
-  isLoading: boolean;
-  farmId: string;
-  producerId: string | null;
-  newSeasonHref: string;
-  onOpenPurchaseList: (seasonId: string) => void;
-  farmName?: string | null;
-  producerName?: string | null;
-  agronomistName?: string | null;
-}) {
-  const archiveMutation = useArchiveSeason();
-  const [archiveConfirm, setArchiveConfirm] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-
-  const displaySeasons = useMemo(
-    () => seasons.filter((season) => season.status !== "ARCHIVED"),
-    [seasons],
-  );
-
-  const timelineQueries = useQueries({
-    queries: displaySeasons.map((season) => ({
-      queryKey: queryKeys.seasonTimeline(season.id),
-      queryFn: () => getTimeline(season.id),
-      staleTime: 60_000,
-    })),
-  });
-
-  const exportItems = useMemo<FarmExportItem[]>(() => {
-    return displaySeasons.map((season, index) => {
-      const raw = timelineQueries[index]?.data;
-      const rows = (
-        Array.isArray(raw)
-          ? raw
-          : ((raw as { data?: Recommendation[] } | undefined)?.data ?? [])
-      ) as Recommendation[];
-      const done = rows.filter((r) =>
-        ["APPLIED_ON_TIME", "APPLIED_LATE"].includes(r.status),
-      ).length;
-      const label = `${season.plot_name} · ${CROP_LABELS[season.crop] ?? season.crop}${
-        season.variety ? ` — ${season.variety}` : ""
-      }`;
-      return {
-        id: season.id,
-        label,
-        data: {
-          title: `${CROP_LABELS[season.crop] ?? season.crop}${
-            season.variety ? ` — ${season.variety}` : ""
-          }`,
-          plotName: season.plot_name,
-          producerName: producerName ?? null,
-          agronomistName: agronomistName ?? null,
-          done,
-          total: rows.length,
-          recommendations: rows,
-        },
-      };
-    });
-  }, [displaySeasons, timelineQueries, producerName, agronomistName]);
-
-  const progressBySeasonId = useMemo(() => {
-    const map = new Map<string, { done: number; total: number; pct: number }>();
-    displaySeasons.forEach((season, index) => {
-      const raw = timelineQueries[index]?.data;
-      const rows = (
-        Array.isArray(raw)
-          ? raw
-          : ((raw as { data?: Recommendation[] } | undefined)?.data ?? [])
-      ) as Recommendation[];
-      const progress = seasonProgressFromTimeline(rows);
-      if (progress) map.set(season.id, progress);
-    });
-    return map;
-  }, [displaySeasons, timelineQueries]);
-
-  if (isLoading) return <ListCardsSkeleton count={3} />;
-
-  if (displaySeasons.length === 0) {
-    return (
-      <EmptyState
-        title="Nenhuma safra nesta fazenda."
-        description="Configure a primeira safra para gerar o cronograma de aplicações."
-        action={
-          producerId ? (
-            <Button asChild size="sm">
-              <Link href={newSeasonHref}>Configurar safra</Link>
-            </Button>
-          ) : undefined
-        }
-      />
-    );
-  }
-
-  return (
-    <>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-display text-lg font-semibold text-text-strong">
-            Safras desta fazenda
-          </h2>
-          <div className="flex items-center gap-2">
-            {exportItems.length > 0 ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => setExportOpen(true)}
-              >
-                <Share2 className="h-4 w-4" />
-                Exportar
-              </Button>
-            ) : null}
-            {producerId ? (
-              <Button asChild size="sm" className="gap-1.5">
-                <Link href={newSeasonHref}>
-                  <Plus className="h-4 w-4" />
-                  Nova safra
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {displaySeasons.map((season) => {
-            const recommendationHref = producerId
-              ? `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
-              : `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}`;
-            const costPlanHref = producerId
-              ? `/seasons/${season.id}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
-              : `/seasons/${season.id}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}`;
-            const displayName = `${CROP_LABELS[season.crop] ?? season.crop}${
-              season.variety ? ` — ${season.variety}` : ""
-            }`;
-            const progress = progressBySeasonId.get(season.id);
-
-            return (
-              <Card key={season.id} className="overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="flex items-start gap-3 px-4 py-4">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-                      <Leaf className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="font-semibold text-foreground">{displayName}</p>
-                        <Badge
-                          className="shrink-0"
-                          variant={STATUS_VARIANTS[season.status] ?? "default"}
-                        >
-                          {STATUS_LABELS[season.status] ?? season.status}
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        Talhão {season.plot_name}
-                      </p>
-                    </div>
-                  </div>
-
-                  {progress ? (
-                    <div className="border-t border-border bg-rail px-4 py-3">
-                      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                        <span className="text-muted-foreground">
-                          {progress.done}/{progress.total} aplicadas
-                        </span>
-                        <span className="font-semibold tabular-nums text-primary-strong">
-                          {progress.pct}%
-                        </span>
-                      </div>
-                      <ProgressBar value={progress.pct} />
-                    </div>
-                  ) : null}
-
-                  <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-                    <Button asChild variant="outline" size="sm" className="gap-1.5">
-                      <Link href={recommendationHref}>
-                        <CalendarDays className="size-3.5" />
-                        Ver Recomendação
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => onOpenPurchaseList(season.id)}
-                    >
-                      <ShoppingCart className="size-3.5" />
-                      Lista de compra
-                    </Button>
-                    <Button asChild variant="outline" size="sm" className="gap-1.5">
-                      <Link href={costPlanHref}>
-                        <Calculator className="size-3.5" />
-                        Plano de custo
-                      </Link>
-                    </Button>
-                    {season.status !== "ARCHIVED" ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn("ml-auto text-muted-foreground", deactivateOutlineButtonClass)}
-                        onClick={() =>
-                          setArchiveConfirm({ id: season.id, name: displayName })
-                        }
-                      >
-                        Remover
-                      </Button>
-                    ) : null}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      <ConfirmDialog
-        open={!!archiveConfirm}
-        onOpenChange={(open) => !open && setArchiveConfirm(null)}
-        title="Remover safra"
-        description={
-          archiveConfirm
-            ? `A safra "${archiveConfirm.name}" será movida para Removidas.`
-            : undefined
-        }
-        confirmLabel="Remover"
-        tone="destructive"
-        loading={archiveMutation.isPending}
-        onConfirm={async () => {
-          if (!archiveConfirm) return;
-          await new Promise<void>((resolve, reject) =>
-            archiveMutation.mutate(archiveConfirm.id, {
-              onSuccess: () => {
-                setArchiveConfirm(null);
-                toast.success("Safra removida.");
-                resolve();
-              },
-              onError: (err) => reject(err),
-            }),
-          );
-        }}
-      />
-
-      <FarmSeasonsExportDialog
-        open={exportOpen}
-        onOpenChange={setExportOpen}
-        farmName={farmName}
-        items={exportItems}
-      />
-    </>
-  );
-}
-
-function ActiveSeasonsRecommendationFallback({
-  activeSeasons,
-  farmId,
-  producerId,
-  newSeasonHref,
-  hint,
-}: {
-  activeSeasons: Array<{
-    id: string;
-    plot_name: string;
-    crop: string;
-    variety?: string | null;
-    status: string;
-  }>;
-  farmId: string;
-  producerId: string | null;
-  newSeasonHref: string;
-  hint?: string;
-}) {
-  return (
-    <div className="space-y-4">
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-4 text-sm text-muted-foreground">
-          {hint ??
-            `Há ${activeSeasons.length} ${activeSeasons.length === 1 ? "safra ativa" : "safras ativas"} nesta fazenda. Abra a linha do tempo de cada safra para ver o cronograma de aplicação.`}
-        </CardContent>
-      </Card>
-      <div className="space-y-3">
-        {activeSeasons.map((season) => {
-          const href = producerId
-            ? `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}&producer_id=${encodeURIComponent(producerId)}`
-            : `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}`;
-          return (
-            <Card key={season.id}>
-              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{season.plot_name}</p>
-                  <p className="font-semibold text-foreground">
-                    {CROP_LABELS[season.crop] ?? season.crop}
-                    {season.variety ? ` — ${season.variety}` : ""}
-                  </p>
-                  <Badge
-                    className="mt-2"
-                    variant={STATUS_VARIANTS[season.status] ?? "default"}
-                  >
-                    {STATUS_LABELS[season.status] ?? season.status}
-                  </Badge>
-                </div>
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href={href}>
-                    <Eye className="h-4 w-4" />
-                    Ver Recomendação
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-      <div className="flex justify-end">
-        <Button asChild size="sm" variant="outline">
-          <Link href={newSeasonHref}>Configurar nova safra</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function FarmRecommendationTab({
-  list,
-  isLoading,
-  newSeasonHref,
-  activeSeasons,
-  farmId,
-  producerId,
-}: {
-  list: PurchaseListDetail | null;
-  isLoading: boolean;
-  newSeasonHref: string;
-  activeSeasons: Array<{
-    id: string;
-    plot_name: string;
-    crop: string;
-    variety?: string | null;
-    status: string;
-  }>;
-  farmId: string;
-  producerId: string | null;
-}) {
-  if (isLoading) return <ListCardsSkeleton count={3} />;
-
-  if (!list) {
-    if (activeSeasons.length > 0) {
-      return (
-        <ActiveSeasonsRecommendationFallback
-          activeSeasons={activeSeasons}
-          farmId={farmId}
-          producerId={producerId}
-          newSeasonHref={newSeasonHref}
-        />
-      );
-    }
-
-    return (
-      <EmptyState
-        title="Configure uma safra para ver o cronograma e as datas por talhão."
-        action={<Button asChild size="sm"><Link href={newSeasonHref}>Configurar safra</Link></Button>}
-      />
-    );
-  }
-
-  const plotRows = list.plots ?? [];
-  const listItems = list.items ?? [];
-
-  if (plotRows.length === 0 && listItems.length === 0) {
-    if (activeSeasons.length > 0) {
-      return (
-        <ActiveSeasonsRecommendationFallback
-          activeSeasons={activeSeasons}
-          farmId={farmId}
-          producerId={producerId}
-          newSeasonHref={newSeasonHref}
-          hint="As safras abaixo foram criadas sem lista de compra vinculada. Abra cada safra ou configure uma nova safra completa."
-        />
-      );
-    }
-
-    return (
-      <EmptyState
-        title={`A lista "${list.name}" ainda não tem talhões ou produtos vinculados.`}
-        action={<Button asChild size="sm"><Link href={newSeasonHref}>Atualizar safra</Link></Button>}
-      />
-    );
-  }
-
-  const itemsByStage = (list.items ?? []).reduce<Map<string, PurchaseListDetail["items"]>>(
-    (map, item) => {
-      const group = map.get(item.stage) ?? [];
-      group.push(item);
-      map.set(item.stage, group);
-      return map;
-    },
-    new Map(),
-  );
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-lg font-semibold text-text-strong">Datas por talhão</h2>
-        <div className="mt-3 flex flex-col gap-3">
-          {plotRows.map((plot) => (
-            <Card key={plot.id}>
-              <CardContent className="p-4">
-                <p className="font-medium text-foreground">
-                  {plot.plot_name}{" "}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    · {fmtQty(plot.area_hectares)} ha
-                  </span>
-                </p>
-                <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Dessecação</dt>
-                    <dd className="font-medium text-foreground">
-                      {plot.desiccation_date
-                        ? new Date(plot.desiccation_date).toLocaleDateString("pt-BR")
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Plantio</dt>
-                    <dd className="font-medium text-foreground">
-                      {plot.planting_date
-                        ? new Date(plot.planting_date).toLocaleDateString("pt-BR")
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Ciclo</dt>
-                    <dd className="font-medium text-foreground">
-                      {plot.cycle_days ? `${plot.cycle_days} dias` : "—"}
-                    </dd>
-                  </div>
-                </dl>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {listItems.length > 0 && (
-        <div>
-          <h2 className="font-display text-lg font-semibold text-text-strong">Produtos por etapa</h2>
-          <div className="mt-3 flex flex-col gap-4">
-            {Array.from(itemsByStage.entries()).map(([stage, stageItems]) => (
-              <Card key={stage}>
-                <CardContent className="p-4">
-                  <p className="text-sm font-semibold text-foreground">{stage}</p>
-                  <ul className="mt-2 flex flex-col gap-1.5">
-                    {stageItems.map((item) => (
-                      <li
-                        key={item.id}
-                        className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                      >
-                        <span className="text-foreground">{item.product_name}</span>
-                        <span className="text-muted-foreground tabular-nums">
-                          {fmtQty(item.dose_per_hectare)} {item.dose_unit}/ha ·{" "}
-                          {item.n_applications} apl.
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, DollarSign, Plus, Trash2 } from "lucide-react";
-import { useCurrencyStore } from "@/stores/currency";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, DollarSign, Plus, Sprout, Trash2 } from "lucide-react";
+import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
 import { useLiveFxRate } from "@/hooks/use-live-fx-rate";
 import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
@@ -30,12 +30,13 @@ import { cn } from "@/lib/utils";
 import {
   Field,
   fmt,
-  hasBagsOverride,
+  fmtArea,
+  areaFromBags,
   isSeedItem,
   listItemQuantity,
-  listItemRequired,
-  seedPlanOutputs,
+  populationFromSeeds,
   seedQuantityUnitLabel,
+  DEFAULT_SPACING_M,
   SEED_CATEGORIES,
   type ListItem,
 } from "@/components/domain/season/_shared";
@@ -162,14 +163,69 @@ export function PurchaseListItemsEditor({
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
   };
 
+  // Área derivada (ha), formatada com 2 casas ("" quando não há bags/população).
+  const areaString = (bags: number, pop: number, category: string): string => {
+    const area = areaFromBags(bags, pop, category);
+    return area > 0 ? String(Math.round(area * 100) / 100) : "";
+  };
+
+  // Semente/metro é o input. A população (plantas/ha) deriva pelo espaçamento e,
+  // como o volume de bags é fixo (manual), a ÁREA PLANTADA recalcula sozinha —
+  // igual à planilha: mexeu na semente/metro, a área se ajusta.
+  const setSeedsPerMeter = (key: string, value: string) => {
+    const item = items.find((i) => i.key === key);
+    const pop = populationFromSeeds(Number(value) || 0, spacing);
+    updateItem(key, {
+      seedsPerMeter: value,
+      thousandPlants: pop > 0 ? String(Math.round(pop)) : "",
+      seedingArea: areaString(Number(item?.bagsOverride || 0), pop, item?.category ?? ""),
+    });
+  };
+
+  // Volume de bags/sacos é digitado à mão pelo agrônomo (o produtor diz "faço
+  // com 10 bags"). NÃO calcula sozinho — ao informar, a área plantada recalcula.
+  const setBags = (key: string, value: string) => {
+    const item = items.find((i) => i.key === key);
+    const pop = Number(item?.thousandPlants || 0);
+    updateItem(key, {
+      bagsOverride: value === "" ? undefined : value,
+      seedingArea: areaString(Number(value || 0), pop, item?.category ?? ""),
+    });
+  };
+
   const removeItem = (key: string) => {
     setItems((prev) => prev.filter((it) => it.key !== key));
   };
 
   // Cotação do dólar (US$ → R$) — global, preenchida manualmente. Converte
   // automaticamente os produtos cotados em dólar para reais.
-  const { fxRate, setFxRate } = useCurrencyStore();
+  const { fxRate, setFxRate, grainPrice, setGrainPrice, spacing: spacingStr, setSpacing } =
+    useCurrencyStore();
   const fx = Number(fxRate) || 0;
+  const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
+  const spacing = Number(spacingStr) || DEFAULT_SPACING_M;
+
+  // População das sementes é derivada de semente/metro ÷ espaçamento. Quando o
+  // espaçamento (parâmetro único) muda, recalcula a população e — como o volume
+  // de bags é fixo — a área plantada de todas as sementes.
+  const spacingRef = useRef(spacing);
+  useEffect(() => {
+    if (spacingRef.current === spacing) return;
+    spacingRef.current = spacing;
+    if (readOnly) return;
+    setItems((prev) =>
+      prev.map((it) => {
+        if (!(isSeedItem(it) && it.seedsPerMeter)) return it;
+        const pop = populationFromSeeds(Number(it.seedsPerMeter) || 0, spacing);
+        const area = areaFromBags(Number(it.bagsOverride || 0), pop, it.category);
+        return {
+          ...it,
+          thousandPlants: String(Math.round(pop)),
+          seedingArea: area > 0 ? String(Math.round(area * 100) / 100) : "",
+        };
+      }),
+    );
+  }, [spacing, readOnly, setItems]);
 
   // Item 4: traz a cotação real do dólar como valor padrão a cada abertura da
   // lista, mas sem sobrescrever uma edição manual feita nesta tela.
@@ -217,6 +273,8 @@ export function PurchaseListItemsEditor({
         patch.dose = "";
         patch.nApps = "1";
       } else {
+        patch.seedsPerMeter = "";
+        patch.cycleDays = "";
         patch.thousandPlants = "";
         patch.seedingArea = "";
       }
@@ -350,6 +408,13 @@ export function PurchaseListItemsEditor({
       maximumFractionDigits: 2,
     });
 
+  // Tabela com rolagem horizontal simples — nenhuma coluna fixa. As colunas de
+  // resumo à direita ganham um leve tom "rail" só para agrupá-las visualmente.
+  const summaryCellClass =
+    "bg-rail/50 px-1.5 py-1.5 text-right text-sm tabular-nums whitespace-nowrap";
+  const summaryHeaderClass =
+    "bg-rail/50 px-1.5 py-2 text-right leading-tight whitespace-nowrap";
+
   const renderRow = (it: ListItem) => {
     const seed = isSeedItem(it);
     const required = listItemQuantity(it, totalHa);
@@ -361,10 +426,6 @@ export function PurchaseListItemsEditor({
     const hasPrice = Boolean(it.price || it.priceUsd);
     const usdDriven = Boolean(it.priceUsd) && fx > 0;
     const exceedsStock = Number(it.stock || 0) > 0 && toBuy > 0;
-    const computedBags = listItemRequired(it, totalHa);
-    const overridden = hasBagsOverride(it);
-    const bagsInputValue =
-      it.bagsOverride ?? String(Math.round(computedBags * 10000) / 10000);
     const catLabel =
       PRODUCT_CATEGORY_LABELS[it.category as keyof typeof PRODUCT_CATEGORY_LABELS] ??
       it.category ??
@@ -418,125 +479,124 @@ export function PurchaseListItemsEditor({
           )}
         </td>
         {seed ? (
-          <td className="px-1.5 py-1.5 text-right">
-            {readOnly ? (
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {fmt(Number(it.thousandPlants || 0))}
+          <>
+            {/* Semente/metro */}
+            <td className="px-1.5 py-1.5 text-right">
+              {readOnly ? (
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {fmt(Number(it.seedsPerMeter || 0))}
+                </span>
+              ) : (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={it.seedsPerMeter ?? ""}
+                  onChange={(e) => setSeedsPerMeter(it.key, e.target.value)}
+                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                />
+              )}
+            </td>
+            {/* Ciclo (dias) */}
+            <td className="px-1.5 py-1.5 text-right">
+              {readOnly ? (
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {it.cycleDays ? it.cycleDays : "—"}
+                </span>
+              ) : (
+                <Input
+                  type="number"
+                  step="1"
+                  placeholder="dias"
+                  value={it.cycleDays ?? ""}
+                  onChange={(e) => updateItem(it.key, { cycleDays: e.target.value })}
+                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                />
+              )}
+            </td>
+            {/* População final — derivada de semente/metro ÷ espaçamento */}
+            <td className="px-1.5 py-1.5 text-right">
+              <span
+                className="text-sm tabular-nums text-muted-foreground"
+                title="População final = semente/metro × 10.000 ÷ espaçamento"
+              >
+                {Number(it.thousandPlants || 0) > 0
+                  ? fmt(Number(it.thousandPlants || 0))
+                  : "—"}
               </span>
-            ) : (
-              <Input
-                type="number"
-                step="0.01"
-                value={it.thousandPlants}
-                onChange={(e) => updateItem(it.key, { thousandPlants: e.target.value })}
-                className="h-8 w-full min-w-0 px-2 text-sm"
-              />
-            )}
-          </td>
+            </td>
+            {/* Volume BAG's — digitado à mão (não calcula sozinho) */}
+            <td className="px-1.5 py-1.5 text-right">
+              {readOnly ? (
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {`${fmt(required)} ${seedQuantityUnitAbbrev(it.category)}`}
+                </span>
+              ) : (
+                <Input
+                  type="number"
+                  step="0.0001"
+                  placeholder={seedQuantityUnitAbbrev(it.category)}
+                  value={it.bagsOverride ?? ""}
+                  onChange={(e) => setBags(it.key, e.target.value)}
+                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                />
+              )}
+            </td>
+            {/* Área plantado (ha) — derivada dos bags ÷ população */}
+            <td className="px-1.5 py-1.5 text-right">
+              <span
+                className="text-sm tabular-nums text-muted-foreground"
+                title="Área plantada = volume de bags × sementes/unidade ÷ população"
+              >
+                {Number(it.seedingArea || 0) > 0
+                  ? fmtArea(Number(it.seedingArea || 0))
+                  : "—"}
+              </span>
+            </td>
+          </>
         ) : (
-          <td className="px-1.5 py-1.5 text-right">
-            {readOnly ? (
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {fmt(Number(it.dose || 0))}
-              </span>
-            ) : (
-              <Input
-                type="number"
-                step="0.01"
-                value={it.dose}
-                onChange={(e) => updateItem(it.key, { dose: e.target.value })}
-                className="h-8 w-full min-w-0 px-2 text-sm"
-              />
-            )}
-          </td>
-        )}
-        {seed ? (
-          <td className="px-1.5 py-1.5 text-right">
-            {readOnly ? (
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {fmt(Number(it.seedingArea || 0))}
-              </span>
-            ) : (
-              <Input
-                type="number"
-                step="0.01"
-                value={it.seedingArea}
-                onChange={(e) => updateItem(it.key, { seedingArea: e.target.value })}
-                className="h-8 w-full min-w-0 px-2 text-sm"
-              />
-            )}
-          </td>
-        ) : (
-          <td className="px-1.5 py-1.5">
-            {readOnly ? (
-              <span className="text-sm text-muted-foreground">{it.unit}</span>
-            ) : (
-              <DoseUnitSelect
-                value={it.unit}
-                onChange={(val) => updateItem(it.key, { unit: val })}
-                className="w-full min-w-0"
-              />
-            )}
-          </td>
-        )}
-        {seed ? (
-          <td className="px-1.5 py-1.5 text-right">
-            {readOnly ? (
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {`${fmt(required)} ${seedQuantityUnitAbbrev(it.category)}`}
-              </span>
-            ) : (
-              <div className="flex flex-col items-end gap-0.5">
-                <div className="flex items-center justify-end gap-1">
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={bagsInputValue}
-                    onChange={(e) =>
-                      updateItem(it.key, {
-                        bagsOverride: e.target.value === "" ? undefined : e.target.value,
-                      })
-                    }
-                    className="h-8 w-20 shrink-0 px-2 text-sm"
-                  />
-                  {overridden ? (
-                    <button
-                      type="button"
-                      title="Voltar ao calculado"
-                      onClick={() => updateItem(it.key, { bagsOverride: undefined })}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      ↺
-                    </button>
-                  ) : null}
-                </div>
-                {(() => {
-                  const o = seedPlanOutputs(it, totalHa);
-                  return o.populationPerHa > 0 ? (
-                    <span
-                      className="text-[10px] leading-tight text-muted-foreground"
-                      title="Sementes (população × área) e hectares atendidos pelas unidades"
-                    >
-                      {fmt(o.totalSeeds)} sementes · {fmt(o.hectaresServed)} ha
-                    </span>
-                  ) : null;
-                })()}
-              </div>
-            )}
-          </td>
-        ) : (
-          <td className="px-1.5 py-1.5 text-right">
-            {readOnly ? (
-              <span className="text-sm tabular-nums text-muted-foreground">{`${it.nApps}×`}</span>
-            ) : (
-              <Input
-                type="number"
-                value={it.nApps}
-                onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
-                className="h-8 w-full min-w-0 px-2 text-sm"
-              />
-            )}
-          </td>
+          <>
+            {/* Dose */}
+            <td className="px-1.5 py-1.5 text-right">
+              {readOnly ? (
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {fmt(Number(it.dose || 0))}
+                </span>
+              ) : (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={it.dose}
+                  onChange={(e) => updateItem(it.key, { dose: e.target.value })}
+                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                />
+              )}
+            </td>
+            {/* Unidade */}
+            <td className="px-1.5 py-1.5">
+              {readOnly ? (
+                <span className="text-sm text-muted-foreground">{it.unit}</span>
+              ) : (
+                <DoseUnitSelect
+                  value={it.unit}
+                  onChange={(val) => updateItem(it.key, { unit: val })}
+                  className="w-full min-w-0"
+                />
+              )}
+            </td>
+            {/* Nº aplicações */}
+            <td className="px-1.5 py-1.5 text-right">
+              {readOnly ? (
+                <span className="text-sm tabular-nums text-muted-foreground">{`${it.nApps}×`}</span>
+              ) : (
+                <Input
+                  type="number"
+                  value={it.nApps}
+                  onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
+                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                />
+              )}
+            </td>
+          </>
         )}
         <td className="px-1.5 py-1.5 text-right">
           {readOnly ? (
@@ -549,7 +609,7 @@ export function PurchaseListItemsEditor({
               step="0.01"
               value={it.stock}
               onChange={(e) => updateItem(it.key, { stock: e.target.value })}
-              className="h-8 w-full min-w-0 px-2 text-sm"
+              className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
             />
           )}
         </td>
@@ -565,7 +625,7 @@ export function PurchaseListItemsEditor({
               placeholder="US$"
               value={it.priceUsd}
               onChange={(e) => updateItem(it.key, { priceUsd: e.target.value })}
-              className="h-8 w-full min-w-0 px-2 text-sm"
+              className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
             />
           )}
         </td>
@@ -588,16 +648,17 @@ export function PurchaseListItemsEditor({
               placeholder="R$"
               value={it.price}
               onChange={(e) => updateItem(it.key, { price: e.target.value })}
-              className="h-8 w-full min-w-0 px-2 text-sm"
+              className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
             />
           )}
         </td>
-        <td className="bg-rail/50 px-1.5 py-1.5 text-right text-sm tabular-nums text-muted-foreground">
+        <td className={cn(summaryCellClass, "text-muted-foreground")}>
           {fmt(required)}
         </td>
         <td
           className={cn(
-            "bg-rail/50 px-1.5 py-1.5 text-right text-sm font-semibold tabular-nums",
+            summaryCellClass,
+            "font-semibold",
             exceedsStock ? "text-amber-700" : "text-foreground",
           )}
         >
@@ -606,14 +667,14 @@ export function PurchaseListItemsEditor({
             {fmt(toBuy)}
           </span>
         </td>
-        <td className="bg-rail/50 px-1.5 py-1.5 text-right text-sm tabular-nums text-foreground">
+        <td className={cn(summaryCellClass, "font-medium text-foreground")}>
           {hasPrice ? fmtBrl(totalValue) : "—"}
         </td>
-        <td className="bg-rail/50 px-1.5 py-1.5 text-right text-sm tabular-nums text-muted-foreground">
+        <td className={cn(summaryCellClass, "text-muted-foreground")}>
           {hasPrice && rowUnitUsd > 0 ? fmtUsd(totalValueUsd) : "—"}
         </td>
         {!readOnly ? (
-          <td className="px-1.5 py-1.5 text-center">
+          <td className={cn(summaryCellClass, "text-center")}>
             <button
               type="button"
               onClick={() => removeItem(it.key)}
@@ -625,6 +686,133 @@ export function PurchaseListItemsEditor({
           </td>
         ) : null}
       </tr>
+    );
+  };
+
+  // Cabeçalho das colunas compartilhadas (à direita) — igual para sementes e
+  // defensivos. As de resumo (Necessário → Total US$) ganham o tom "rail".
+  const sharedHeaderCells = (
+    <>
+      <td className="px-1.5 py-2 text-right">Estoque</td>
+      <td className="px-1.5 py-2 text-right">Preço US$</td>
+      <td className="px-1.5 py-2 text-right">Valor</td>
+      <td className={summaryHeaderClass}>Necessário</td>
+      <td className={summaryHeaderClass}>Qtde final</td>
+      <td className={summaryHeaderClass}>Total</td>
+      <td className={summaryHeaderClass}>Total US$</td>
+      {!readOnly ? <td className={summaryHeaderClass} /> : null}
+    </>
+  );
+
+  // Cada banda (sementes / defensivos) vira sua própria tabela com rolagem
+  // horizontal simples, pois têm conjuntos de colunas diferentes.
+  const renderBandTable = (band: {
+    id: string;
+    title: string;
+    seed: boolean;
+    items: ListItem[];
+  }) => {
+    const seedBand = band.seed;
+    const colCount = seedBand ? (readOnly ? 14 : 15) : readOnly ? 12 : 13;
+    const tableWidth = seedBand
+      ? readOnly
+        ? "w-[1752px]"
+        : "w-[1796px]"
+      : readOnly
+        ? "w-[1580px]"
+        : "w-[1624px]";
+    return (
+      <div
+        key={band.id}
+        className="overflow-x-auto rounded-xl border bg-card shadow-sm"
+      >
+        <table className={cn("table-fixed text-sm", tableWidth)}>
+          <colgroup>
+            {seedBand ? (
+              <>
+                <col className="w-[144px]" />
+                <col className="w-[240px]" />
+                <col className="w-[112px]" />
+                <col className="w-[88px]" />
+                <col className="w-[112px]" />
+                <col className="w-[128px]" />
+                <col className="w-[112px]" />
+                <col className="w-[104px]" />
+                <col className="w-[120px]" />
+                <col className="w-[128px]" />
+                <col className="w-[104px]" />
+                <col className="w-[104px]" />
+                <col className="w-[128px]" />
+                <col className="w-[128px]" />
+                {!readOnly ? <col className="w-[44px]" /> : null}
+              </>
+            ) : (
+              <>
+                <col className="w-[144px]" />
+                <col className="w-[260px]" />
+                <col className="w-[120px]" />
+                <col className="w-[120px]" />
+                <col className="w-[120px]" />
+                <col className="w-[104px]" />
+                <col className="w-[120px]" />
+                <col className="w-[128px]" />
+                <col className="w-[104px]" />
+                <col className="w-[104px]" />
+                <col className="w-[128px]" />
+                <col className="w-[128px]" />
+                {!readOnly ? <col className="w-[44px]" /> : null}
+              </>
+            )}
+          </colgroup>
+          <tbody className="divide-y">
+            <tr className={seedBand ? "bg-primary/10" : "bg-rail"}>
+              <td
+                colSpan={colCount}
+                className={cn(
+                  "px-3 py-2 text-[11px] font-semibold uppercase tracking-wide",
+                  seedBand ? "text-primary-strong" : "text-muted-foreground",
+                )}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-2 w-2 rounded-sm",
+                      seedBand ? "bg-primary" : "bg-muted-foreground/50",
+                    )}
+                  />
+                  {band.title} · {band.items.length}{" "}
+                  {band.items.length === 1 ? "item" : "itens"}
+                </span>
+              </td>
+            </tr>
+            <tr className="bg-muted/40 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <td className="px-1.5 py-2 text-left">
+                {seedBand ? "Categoria" : "Classe"}
+              </td>
+              <td className="px-1.5 py-2 text-left">
+                {seedBand ? "Variedades" : "Produto"}
+              </td>
+              {seedBand ? (
+                <>
+                  <td className="px-1.5 py-2 text-right leading-tight">Semente/metro</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">Ciclo</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">População final</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">Volume BAG&apos;s</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">Área plantado</td>
+                </>
+              ) : (
+                <>
+                  <td className="px-1.5 py-2 text-right leading-tight">Dose</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">Un.</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">Nº apl.</td>
+                </>
+              )}
+              {sharedHeaderCells}
+            </tr>
+            {band.items.map((it) => renderRow(it))}
+          </tbody>
+        </table>
+      </div>
     );
   };
 
@@ -692,6 +880,68 @@ export function PurchaseListItemsEditor({
             </div>
           )}
         </div>
+        {/* Preço da saca (R$) — ao lado do dólar, default 110. Converte o custo em sacas. */}
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+            <Sprout className="h-4 w-4" />
+          </span>
+          <div className="flex flex-col">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Preço da saca
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              converte o custo em sacas
+            </span>
+          </div>
+          {readOnly ? (
+            <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
+              {fmtBrl(saca)}
+            </span>
+          ) : (
+            <div className="ml-2 flex items-center gap-1">
+              <span className="text-sm text-muted-foreground">R$</span>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="110,00"
+                value={grainPrice}
+                onChange={(e) => setGrainPrice(e.target.value)}
+                className="h-8 w-24"
+              />
+            </div>
+          )}
+        </div>
+        {/* Espaçamento entre linhas (m) — parâmetro único; deriva a população da semente. */}
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+            <Sprout className="h-4 w-4" />
+          </span>
+          <div className="flex flex-col">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Espaçamento
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              deriva a população da semente
+            </span>
+          </div>
+          {readOnly ? (
+            <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
+              {fmt(spacing)} m
+            </span>
+          ) : (
+            <div className="ml-2 flex items-center gap-1">
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0,65"
+                value={spacingStr}
+                onChange={(e) => setSpacing(e.target.value)}
+                className="h-8 w-20"
+              />
+              <span className="text-sm text-muted-foreground">m</span>
+            </div>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex flex-col items-end">
             <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -727,92 +977,13 @@ export function PurchaseListItemsEditor({
           </ul>
         </div>
       ) : null}
-      <div className="hidden overflow-hidden rounded-xl border bg-card shadow-sm lg:block">
-        <table className="w-full table-fixed text-sm">
-          <colgroup>
-            <col className="w-[10%]" />
-            <col className="w-[14%]" />
-            <col className="w-[8%]" />
-            <col className="w-[8%]" />
-            <col className="w-[11%]" />
-            <col className="w-[6%]" />
-            <col className="w-[7%]" />
-            <col className="w-[7%]" />
-            <col className="w-[6.5%]" />
-            <col className="w-[6.5%]" />
-            <col className="w-[6.5%]" />
-            <col className="w-[6.5%]" />
-            {!readOnly ? <col className="w-[2%]" /> : null}
-          </colgroup>
-          <tbody className="divide-y">
-            {items.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={readOnly ? 12 : 13}
-                  className="px-3 py-10 text-center text-sm text-muted-foreground"
-                >
-                  Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
-                </td>
-              </tr>
-            ) : (
-              bands.map((band) => (
-                <Fragment key={band.id}>
-                  <tr className={band.seed ? "bg-primary/10" : "bg-rail"}>
-                    <td
-                      colSpan={readOnly ? 12 : 13}
-                      className={cn(
-                        "px-3 py-2 text-[11px] font-semibold uppercase tracking-wide",
-                        band.seed ? "text-primary-strong" : "text-muted-foreground",
-                      )}
-                    >
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "h-2 w-2 rounded-sm",
-                            band.seed ? "bg-primary" : "bg-muted-foreground/50",
-                          )}
-                        />
-                        {band.title} · {band.items.length}{" "}
-                        {band.items.length === 1 ? "item" : "itens"}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="bg-muted/30 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <td className="px-1.5 py-2 text-left">Categoria</td>
-                    <td className="px-1.5 py-2 text-left">Produto</td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      {band.seed ? "Plantas/ha" : "Dose/ha"}
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      {band.seed ? "Área sem." : "Un."}
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      {band.seed ? "Bags/Sacos" : "Nº apl."}
-                    </td>
-                    <td className="px-1.5 py-2 text-right">Estoque</td>
-                    <td className="px-1.5 py-2 text-right">Preço US$</td>
-                    <td className="px-1.5 py-2 text-right">Preço R$</td>
-                    <td className="bg-rail/50 px-1.5 py-2 text-right leading-tight">
-                      Necessário
-                    </td>
-                    <td className="bg-rail/50 px-1.5 py-2 text-right leading-tight">
-                      A comprar
-                    </td>
-                    <td className="bg-rail/50 px-1.5 py-2 text-right leading-tight">
-                      Total R$
-                    </td>
-                    <td className="bg-rail/50 px-1.5 py-2 text-right leading-tight">
-                      Total US$
-                    </td>
-                    {!readOnly ? <td className="px-1.5 py-2" /> : null}
-                  </tr>
-                  {band.items.map((it) => renderRow(it))}
-                </Fragment>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {items.length === 0 ? (
+        <div className="hidden rounded-xl border bg-card px-3 py-10 text-center text-sm text-muted-foreground shadow-sm lg:block">
+          Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
+        </div>
+      ) : (
+        <div className="hidden space-y-4 lg:block">{bands.map(renderBandTable)}</div>
+      )}
 
       <div className="mt-6 space-y-3 lg:hidden">
         {items.length === 0 ? (
@@ -846,7 +1017,7 @@ export function PurchaseListItemsEditor({
                     </span>
                     <p className="mt-0.5 tabular-nums">
                       {seed
-                        ? `${fmt(Number(it.thousandPlants || 0))} plantas/ha · ${fmt(Number(it.seedingArea || 0))} ha`
+                        ? `${fmt(Number(it.thousandPlants || 0))} plantas/ha · ${fmtArea(Number(it.seedingArea || 0))} ha`
                         : `${fmt(Number(it.dose || 0))} ${it.unit}/ha · ${it.nApps}×`}
                     </p>
                   </div>
@@ -890,10 +1061,6 @@ export function PurchaseListItemsEditor({
             const seed = isSeedItem(it);
             const required = listItemQuantity(it, totalHa);
             const toBuy = Math.max(0, required - Number(it.stock || 0));
-            const computedBags = listItemRequired(it, totalHa);
-            const overridden = hasBagsOverride(it);
-            const bagsInputValue =
-              it.bagsOverride ?? String(Math.round(computedBags * 10000) / 10000);
             return (
               <div key={it.key} className="rounded-xl border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -933,51 +1100,43 @@ export function PurchaseListItemsEditor({
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   {seed ? (
                     <>
-                      <Field label="Plantas/ha">
+                      <Field
+                        label="Semente/metro"
+                        hint={
+                          Number(it.thousandPlants || 0) > 0
+                            ? `${fmt(Number(it.thousandPlants || 0))} pl/ha`
+                            : undefined
+                        }
+                      >
                         <Input
                           type="number"
                           step="0.01"
-                          value={it.thousandPlants}
-                          onChange={(e) =>
-                            updateItem(it.key, { thousandPlants: e.target.value })
-                          }
+                          value={it.seedsPerMeter ?? ""}
+                          onChange={(e) => setSeedsPerMeter(it.key, e.target.value)}
                         />
                       </Field>
-                      <Field label="área sem. (ha)">
+                      <Field label="Ciclo (dias)">
                         <Input
                           type="number"
-                          step="0.01"
-                          value={it.seedingArea}
-                          onChange={(e) =>
-                            updateItem(it.key, { seedingArea: e.target.value })
-                          }
+                          step="1"
+                          value={it.cycleDays ?? ""}
+                          onChange={(e) => updateItem(it.key, { cycleDays: e.target.value })}
                         />
                       </Field>
-                      <Field label={`Bags/Sacos (${seedQuantityUnitLabel(it.category)})`}>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="0.0001"
-                            value={bagsInputValue}
-                            onChange={(e) =>
-                              updateItem(it.key, {
-                                bagsOverride:
-                                  e.target.value === "" ? undefined : e.target.value,
-                              })
-                            }
-                          />
-                          {overridden ? (
-                            <button
-                              type="button"
-                              title="Voltar ao calculado"
-                              onClick={() =>
-                                updateItem(it.key, { bagsOverride: undefined })
-                              }
-                              className="shrink-0 text-muted-foreground hover:text-foreground"
-                            >
-                              ↺
-                            </button>
-                          ) : null}
+                      <Field label={`Volume BAG's (${seedQuantityUnitLabel(it.category)})`}>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          placeholder={seedQuantityUnitLabel(it.category)}
+                          value={it.bagsOverride ?? ""}
+                          onChange={(e) => setBags(it.key, e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Área plantado (ha)" hint="calculada pelos bags">
+                        <div className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
+                          {Number(it.seedingArea || 0) > 0
+                            ? `${fmtArea(Number(it.seedingArea || 0))} ha`
+                            : "—"}
                         </div>
                       </Field>
                     </>
@@ -1058,22 +1217,41 @@ export function PurchaseListItemsEditor({
       </div>
 
       {!readOnly ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {seedCategories.length > 0 ? (
+        // Lista longa: a barra fica fixa no rodapé do viewport para adicionar
+        // itens de qualquer ponto da lista, sem rolar até o fim.
+        <div
+          className={cn(
+            "mt-4 flex flex-wrap gap-2",
+            items.length > 3 && "sticky bottom-3 z-10 justify-end",
+          )}
+        >
+          <div
+            className={cn(
+              items.length > 3 &&
+                "flex items-center gap-2 rounded-full border border-border bg-card/95 px-2 py-1.5 shadow-lg backdrop-blur",
+            )}
+          >
+            {seedCategories.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addSeedItem}
+                className={cn("gap-2", items.length > 3 && "rounded-full")}
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar semente
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="outline"
-              onClick={addSeedItem}
-              className="gap-2"
+              onClick={addItem}
+              className={cn("gap-2", items.length > 3 && "rounded-full")}
             >
               <Plus className="h-4 w-4" />
-              Adicionar semente
+              Adicionar produto
             </Button>
-          ) : null}
-          <Button type="button" variant="outline" onClick={addItem} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Adicionar produto
-          </Button>
+          </div>
         </div>
       ) : null}
     </div>

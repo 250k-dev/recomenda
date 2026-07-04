@@ -31,7 +31,12 @@ export type ListItem = {
   price: string;
   /** Preço unitário em US$ (manual) — convertido para R$ pela cotação do dólar. */
   priceUsd: string;
-  /** Variedade/Híbrido: população em plantas/ha (nº de sementes por hectare). */
+  /** Variedade/Híbrido: semente por metro (input; população é derivada). */
+  seedsPerMeter?: string;
+  /** Variedade/Híbrido: ciclo do cultivar em dias (referência). */
+  cycleDays?: string;
+  /** Variedade/Híbrido: população final em plantas/ha — DERIVADA de
+   *  semente/metro × 10.000 ÷ espaçamento (mantida para o cálculo de bags). */
   thousandPlants: string;
   /** Variedade/Híbrido: área a ser semeada (ha). */
   seedingArea: string;
@@ -40,6 +45,18 @@ export type ListItem = {
   /** Semente: quantidade de bags/sacos digitada à mão (sobrepõe o cálculo). */
   bagsOverride?: string;
 };
+
+/** Espaçamento padrão entre linhas (m) quando a lista não informa outro valor. */
+export const DEFAULT_SPACING_M = 0.65;
+
+/**
+ * População final (plantas/ha) = semente/metro × 10.000 ÷ espaçamento.
+ * Espelha a planilha: `=E*(100/$G$6*100)` (E = semente/metro, G6 = espaçamento).
+ */
+export function populationFromSeeds(seedsPerMeter: number, spacingM: number): number {
+  const sp = spacingM > 0 ? spacingM : DEFAULT_SPACING_M;
+  return seedsPerMeter > 0 ? (seedsPerMeter * 10_000) / sp : 0;
+}
 
 /** Categorias tratadas como semente (cálculo por população, não por dose). */
 export const SEED_CATEGORIES = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO"];
@@ -59,6 +76,20 @@ export function seedsPerUnit(category: string): number {
   if (category === "CULTIVAR_SOJA") return 5_000_000;
   if (category === "HIBRIDO_MILHO") return 60_000;
   return 1;
+}
+
+/**
+ * Área plantada (ha) derivada do volume de bags/sacos — inverso da conversão
+ * população→bags. Espelha a planilha: o agrônomo digita os bags à mão e a área
+ * se ajusta sozinha. área = bags × sementes/unidade ÷ população.
+ */
+export function areaFromBags(
+  bags: number,
+  populationPerHa: number,
+  category: string,
+): number {
+  if (bags <= 0 || populationPerHa <= 0) return 0;
+  return (bags * seedsPerUnit(category)) / populationPerHa;
 }
 
 /** Os 4 números do planejamento de semente (auto-calculados). */
@@ -99,11 +130,22 @@ export function listItemQuantity(it: ListItem, totalHa: number): number {
   return listItemRequired(it, totalHa);
 }
 
+/** Cultura do item numa lista multi-cultura: sementes são inequívocas pela
+ *  categoria; os demais herdam a cultura única da lista (null quando "ANY" —
+ *  produto comum às culturas). */
+function deriveItemCrop(it: ListItem, listCrop?: string): string | null {
+  if (it.category === "CULTIVAR_SOJA") return "SOYBEAN";
+  if (it.category === "HIBRIDO_MILHO") return "CORN";
+  if (listCrop === "SOYBEAN" || listCrop === "CORN") return listCrop;
+  return null;
+}
+
 /** Converte um item do formulário no payload da API (lógica única e compartilhada). */
-export function listItemToPayload(it: ListItem): PurchaseListItemInput {
+export function listItemToPayload(it: ListItem, listCrop?: string): PurchaseListItemInput {
   const seed = isSeedItem(it);
   return {
     local_product_id: it.productId,
+    crop: deriveItemCrop(it, listCrop),
     stage: it.stage,
     dose_per_hectare: seed ? 0 : Number(it.dose),
     dose_unit: it.unit,
@@ -113,6 +155,8 @@ export function listItemToPayload(it: ListItem): PurchaseListItemInput {
     price_usd: it.priceUsd ? Number(it.priceUsd) : null,
     calc_rule: seed ? "SEED_POPULATION" : null,
     thousand_plants_per_ha: seed ? Number(it.thousandPlants) || 0 : null,
+    seeds_per_meter: seed ? Number(it.seedsPerMeter) || 0 : null,
+    cycle_days: seed && it.cycleDays ? Number(it.cycleDays) || null : null,
     seeding_area_ha: seed ? Number(it.seedingArea) || 0 : null,
     bags_override: hasBagsOverride(it) ? Number(it.bagsOverride) : null,
     out_of_program: it.outOfProgram ?? false,
@@ -126,10 +170,10 @@ export function validateListItems(items: ListItem[]): string | null {
     if (!it.category) return "Selecione a categoria em todos os itens.";
     if (!it.productId) return "Selecione o produto em todos os itens.";
     if (isSeedItem(it)) {
-      if (!Number(it.thousandPlants))
-        return "Informe a população (plantas/ha) nas variedades/híbridos.";
-      if (!Number(it.seedingArea))
-        return "Informe a área de semeadura (ha) nas variedades/híbridos.";
+      if (!Number(it.seedsPerMeter))
+        return "Informe a semente/metro nas variedades/híbridos.";
+      if (!Number(it.bagsOverride))
+        return "Informe o volume de bags/sacos nas variedades/híbridos.";
     } else if (!Number(it.dose)) {
       return "Informe a dose/ha em todos os itens.";
     }
@@ -167,6 +211,10 @@ export const STAGES = [
 
 export const fmt = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+
+/** Área plantada — sempre com 2 casas (ex.: 325 → "325,00"). */
+export const fmtArea = (n: number) =>
+  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function StepHeader({
   title,

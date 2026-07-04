@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Eye, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, X, Check, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Boxes, Eye, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -10,7 +10,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/domain/season/_shared";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
-import { useCurrencyStore } from "@/stores/currency";
+import {
+  useCurrencyStore,
+  DEFAULT_GRAIN_PRICE_BRL,
+  DEFAULT_SPACING_M,
+} from "@/stores/currency";
+import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
+import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
+import { CategoryMetaProgress } from "@/components/domain/category-meta-progress";
 import {
   useFarmAggregatedShoppingList,
   useUpdatePurchaseList,
@@ -18,8 +25,6 @@ import {
 import { useProducerStock } from "@/lib/api/hooks/producers";
 import type { ListItem } from "@/components/domain/season/_shared";
 import {
-  isSeedItem,
-  listItemQuantity,
   listItemToPayload,
   validateListItems,
 } from "@/components/domain/season/_shared";
@@ -50,6 +55,8 @@ function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem
     stock: String(it.current_stock),
     price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
     priceUsd: it.price_usd != null ? String(it.price_usd) : "",
+    seedsPerMeter: it.seeds_per_meter != null ? String(it.seeds_per_meter) : "",
+    cycleDays: it.cycle_days != null ? String(it.cycle_days) : "",
     thousandPlants:
       it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
     seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
@@ -58,49 +65,12 @@ function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem
   };
 }
 
-function listItemsToPayload(items: ListItem[]): PurchaseListItemInput[] {
-  return items.map(listItemToPayload);
+function listItemsToPayload(items: ListItem[], listCrop?: string | null): PurchaseListItemInput[] {
+  return items.map((it) => listItemToPayload(it, listCrop ?? undefined));
 }
 
 function validateItems(items: ListItem[]): string | null {
   return validateListItems(items);
-}
-
-function computeItemMetrics(
-  items: ListItem[],
-  totalHa: number,
-  fxRate: number,
-): {
-  totalProductsValue: number;
-  totalSeedsValue: number;
-  productsCount: number;
-  categoriesCount: number;
-  pricedCount: number;
-} {
-  let totalProductsValue = 0;
-  let totalSeedsValue = 0;
-  let pricedCount = 0;
-  for (const it of items) {
-    const required = listItemQuantity(it, totalHa);
-    const toBuy = Math.max(0, required - Number(it.stock || 0));
-    const unitPrice =
-      it.priceUsd && fxRate > 0 ? Number(it.priceUsd) * fxRate : Number(it.price || 0);
-    if (unitPrice > 0) {
-      if (isSeedItem(it)) {
-        totalSeedsValue += toBuy * unitPrice;
-      } else {
-        totalProductsValue += toBuy * unitPrice;
-      }
-      pricedCount += 1;
-    }
-  }
-  return {
-    totalProductsValue,
-    totalSeedsValue,
-    productsCount: items.length,
-    categoriesCount: new Set(items.map((it) => it.category || "OTHER")).size,
-    pricedCount,
-  };
 }
 
 export type FarmPurchaseListTabProps = {
@@ -115,6 +85,10 @@ export type FarmPurchaseListTabProps = {
   fallbackSeasonIds: string[];
   /** Hide edit affordances (used by the standalone read-only list page). */
   readOnly?: boolean;
+  /** Quando embutido na safra (sem abas), abre o plano de custo agregado. */
+  onOpenCostPlan?: () => void;
+  /** Quando informado, mostra o botão Estoque na mesma linha dos outros. */
+  stockHref?: string;
 };
 
 export function FarmPurchaseListTab({
@@ -128,6 +102,8 @@ export function FarmPurchaseListTab({
   newPurchaseListHref,
   fallbackSeasonIds,
   readOnly = false,
+  onOpenCostPlan,
+  stockHref,
 }: FarmPurchaseListTabProps) {
   const { data: producerStock } = useProducerStock(producerId ?? "");
   const stockByProductId = useMemo(
@@ -175,11 +151,20 @@ export function FarmPurchaseListTab({
     setShowComparison(false);
     setEditing(false);
     setDraftItems(list ? (list.items ?? []).map(detailItemToListItem) : []);
-    // Carrega a cotação salva desta lista no seletor de moeda.
-    if (list?.fx_rate_usd_brl != null) {
-      useCurrencyStore.getState().setFxRate(String(list.fx_rate_usd_brl));
-    }
   }
+
+  // Carrega a cotação e o preço da saca salvos desta lista no store — em efeito,
+  // pois escrever num store externo durante o render dispara re-render em cascata.
+  useEffect(() => {
+    const store = useCurrencyStore.getState();
+    if (list?.fx_rate_usd_brl != null) {
+      store.setFxRate(String(list.fx_rate_usd_brl));
+    }
+    store.setGrainPrice(
+      list?.grain_price_brl != null ? String(list.grain_price_brl) : "",
+    );
+    store.setSpacing(list?.spacing_m != null ? String(list.spacing_m) : "");
+  }, [list?.id, list?.fx_rate_usd_brl, list?.grain_price_brl, list?.spacing_m]);
 
   const startEditing = () => {
     if (!list) return;
@@ -194,20 +179,27 @@ export function FarmPurchaseListTab({
     setEditing(false);
   };
 
-  const saveItems = async () => {
+  const saveItems = async (opts?: { silent?: boolean }) => {
     if (!list) return;
     setError(null);
     const validationError = validateItems(draftItems);
     if (validationError) {
-      setError(validationError);
+      // Autosave não grita validação no meio da digitação; o Salvar manual sim.
+      if (!opts?.silent) setError(validationError);
       return;
     }
 
     try {
-      const fxRaw = useCurrencyStore.getState().fxRate;
+      const {
+        fxRate: fxRaw,
+        grainPrice: grainRaw,
+        spacing: spacingRaw,
+      } = useCurrencyStore.getState();
       await updateMutation.mutateAsync({
-        items: listItemsToPayload(draftItems),
+        items: listItemsToPayload(draftItems, list.crop),
         fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
+        grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+        spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
         plots: (list.plots ?? []).map((p) => ({
           plot_id: p.plot_id,
           planting_date: p.planting_date,
@@ -215,12 +207,31 @@ export function FarmPurchaseListTab({
           cycle_days: p.cycle_days,
         })),
       });
-      toast.success("Lista de compra atualizada.");
-      setEditing(false);
+      if (!opts?.silent) {
+        toast.success("Lista de compra atualizada.");
+        setEditing(false);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível salvar a lista.");
+      if (!opts?.silent) {
+        setError(e instanceof Error ? e.message : "Não foi possível salvar a lista.");
+      }
     }
   };
+
+  // Autosave dos itens em edição: persiste sozinho após pausa na digitação,
+  // mantendo o modo de edição aberto (o Salvar manual continua como está).
+  const draftRef = useRef(draftItems);
+  draftRef.current = draftItems;
+  useEffect(() => {
+    if (!editing || !list || draftItems.length === 0) return;
+    const timer = setTimeout(() => {
+      if (validateItems(draftRef.current) === null) {
+        void saveItems({ silent: true });
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftItems, editing, list?.id]);
 
   const viewItems = useMemo(
     () => (list?.items ?? []).map(detailItemToListItem),
@@ -229,10 +240,17 @@ export function FarmPurchaseListTab({
   const totalHa = list?.total_hectares ?? 0;
   const fxRate = useCurrencyStore((state) => state.fxRate);
   const fx = Number(fxRate) || 0;
+  const grainPrice = useCurrencyStore((state) => state.grainPrice);
+  const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
 
   const kpis = useMemo(() => {
-    return computeItemMetrics(editing ? draftItems : viewItems, totalHa, fx);
-  }, [editing, draftItems, viewItems, totalHa, fx]);
+    return computePurchaseListMetrics(
+      editing ? draftItems : viewItems,
+      totalHa,
+      fx,
+      saca,
+    );
+  }, [editing, draftItems, viewItems, totalHa, fx, saca]);
 
   if (!producerId) {
     return (
@@ -315,7 +333,7 @@ export function FarmPurchaseListTab({
               Lista de compra · {list.name}
             </p>
             <h2 className="mt-0.5 font-display text-xl font-semibold tracking-[-0.02em] text-text-strong">
-              {CROP_LABELS[list.crop] ?? list.crop}
+              {CROP_LABELS[list.crop ?? "ANY"] ?? list.crop ?? "Multi-cultura"}
               {list.variety ? ` · ${list.variety}` : ""}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -339,7 +357,7 @@ export function FarmPurchaseListTab({
               <Button
                 size="sm"
                 className="gap-1.5"
-                onClick={saveItems}
+                onClick={() => void saveItems()}
                 disabled={updateMutation.isPending}
               >
                 {updateMutation.isPending ? (
@@ -368,11 +386,32 @@ export function FarmPurchaseListTab({
                 <Store className="h-4 w-4" />
                 Cotações das lojas
               </Button>
-              {list.season_id ? (
+              {/* Sem barra de abas, este é o caminho para o plano de custo da
+                  safra. Embutido usa o callback (troca de view sem recarregar);
+                  no modo avulso, o link direto para o plano do talhão. */}
+              {onOpenCostPlan ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={onOpenCostPlan}
+                >
+                  <Eye className="h-4 w-4" />
+                  Ver plano de custo
+                </Button>
+              ) : list.season_id ? (
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={`/seasons/${list.season_id}?tab=cost-plan`}>
                     <Eye className="h-4 w-4" />
                     Ver plano de custo
+                  </Link>
+                </Button>
+              ) : null}
+              {stockHref ? (
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link href={stockHref}>
+                    <Boxes className="h-4 w-4" />
+                    Estoque
                   </Link>
                 </Button>
               ) : null}
@@ -393,14 +432,28 @@ export function FarmPurchaseListTab({
           icon={<Package className="size-4" />}
         />
         <KpiCell
-          label="Valor total sementes"
-          value={kpis.totalSeedsValue > 0 ? fmtBrl(kpis.totalSeedsValue) : "—"}
+          label="Volume de sacas"
+          value={kpis.seedVolume > 0 ? fmtQty(kpis.seedVolume) : "—"}
           sub={
-            kpis.totalSeedsValue > 0
-              ? "cultivares e híbridos"
-              : "informe preços para calcular"
+            kpis.seedVolume > 0
+              ? `${fmtQty(kpis.seedSacksPerHa)} sc/ha · sementes`
+              : "cultivares e híbridos"
           }
           icon={<Leaf className="size-4" />}
+        />
+        <KpiCell
+          label="Custo (sc/ha)"
+          value={
+            kpis.productCostSacksPerHa > 0
+              ? `${fmtQty(kpis.productCostSacksPerHa)} sc/ha`
+              : "—"
+          }
+          sub={
+            kpis.productCostSacksPerHa > 0
+              ? `÷ ${fmtBrl(saca)}/saca · ${kpis.pricedCount}/${kpis.productsCount || 0} com preço`
+              : "informe preço e saca"
+          }
+          icon={<Tag className="size-4" />}
         />
         <KpiCell
           label="Produtos"
@@ -414,13 +467,6 @@ export function FarmPurchaseListTab({
           sub={`${(list.plots ?? []).length} talhões`}
           icon={<Sprout className="size-4" />}
         />
-        <KpiCell
-          label="Itens com preço"
-          value={`${kpis.pricedCount}/${kpis.productsCount || 0}`}
-          sub="cobertura de preços"
-          icon={<Tag className="size-4" />}
-          alert
-        />
       </KpiStrip>
 
       {hasItems || editing ? (
@@ -431,6 +477,14 @@ export function FarmPurchaseListTab({
               {fmtQty(totalHa)} ha × nº de aplicações.
             </p>
           ) : null}
+          {kpis.categoryBreakdown.length > 0 ? (
+            <CategoryDistributionPanel breakdown={kpis.categoryBreakdown} />
+          ) : null}
+          <CategoryMetaProgress
+            items={editing ? draftItems : viewItems}
+            totalHa={totalHa}
+            targets={list.category_targets ?? {}}
+          />
           <PurchaseListItemsEditor
             items={editing ? draftItems : viewItems}
             setItems={setDraftItems}

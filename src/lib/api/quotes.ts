@@ -46,6 +46,8 @@ export interface QuoteComparisonResponseItem {
 export interface QuoteComparisonResponse {
   id: string;
   store_name: string;
+  /** Token privado da loja — para reenviar o mesmo link de edição. */
+  response_token: string;
   responder_name: string | null;
   phone: string | null;
   status: QuoteResponseStatus;

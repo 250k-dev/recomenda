@@ -26,11 +26,14 @@ import { StatusBadge } from "@/components/domain/status-badge";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { DashboardKpiSkeleton } from "@/components/domain/page-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CompactListSkeleton,
+  DashboardKpiSkeleton,
+} from "@/components/domain/page-skeletons";
 import {
   useFarms,
   useProducers,
-  useSeasons,
   useMe,
   usePlanQuota,
   usePortfolioPriceCoverage,
@@ -50,9 +53,8 @@ function greeting(): string {
 export default function DashboardPage() {
   const farms = useFarms();
   const producers = useProducers();
-  const seasons = useSeasons();
   const { data: me } = useMe();
-  const { data: planData } = usePlanQuota();
+  const { data: planData, isLoading: planLoading } = usePlanQuota();
   const agenda = useAgronomistAgenda(new Date());
 
   const [tab, setTab] = useState<AttentionTab>("late");
@@ -77,15 +79,16 @@ export default function DashboardPage() {
 
   const priceCoverage = usePortfolioPriceCoverage(producerIds);
 
-  const activeSeasonCount = useMemo(
-    () =>
-      (seasons.data?.data ?? []).filter((season) =>
-        season.status === "PUBLISHED" || season.status === "IN_PROGRESS",
-      ).length,
-    [seasons.data],
+  // Safras ativas = cycles (a safra de verdade), já vem pronto por produtor no
+  // endpoint de carteira — soma aqui em vez de buscar todas as `seasons`
+  // (uma por talhão) só para contar, que era mais uma chamada e o número errado.
+  const activeCyclesCount = useMemo(
+    () => activeProducers.reduce((sum, producer) => sum + (producer.active_cycles_count ?? 0), 0),
+    [activeProducers],
   );
 
-  const loading = farms.isLoading || producers.isLoading || seasons.isLoading;
+  const statsLoading = farms.isLoading || producers.isLoading;
+  const kpiLoading = statsLoading || agenda.isLoading;
 
   // Dedupe agenda events (one per recommendation) and bucket by state.
   const buckets = useMemo(() => {
@@ -135,12 +138,18 @@ export default function DashboardPage() {
               {firstName ? `, ${firstName}` : ""}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Você tem{" "}
-              <b className="text-text-strong">
-                {agenda.lateCount} aplicaç{agenda.lateCount === 1 ? "ão" : "ões"}{" "}
-                atrasada{agenda.lateCount === 1 ? "" : "s"}
-              </b>{" "}
-              e <b className="text-text-strong">{agenda.todayCount} para hoje</b>.
+              {agenda.isLoading ? (
+                <Skeleton className="mt-0.5 h-4 w-72 max-w-full" />
+              ) : (
+                <>
+                  Você tem{" "}
+                  <b className="text-text-strong">
+                    {agenda.lateCount} aplicaç{agenda.lateCount === 1 ? "ão" : "ões"}{" "}
+                    atrasada{agenda.lateCount === 1 ? "" : "s"}
+                  </b>{" "}
+                  e <b className="text-text-strong">{agenda.todayCount} para hoje</b>.
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -176,8 +185,8 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI strip */}
-      {loading ? (
-        <DashboardKpiSkeleton cards={4} />
+      {kpiLoading ? (
+        <DashboardKpiSkeleton cards={4} className="mb-6" />
       ) : (
         <KpiStrip className="mb-6">
           <KpiCell
@@ -194,7 +203,7 @@ export default function DashboardPage() {
           />
           <KpiCell
             label="Safras ativas"
-            value={activeSeasonCount}
+            value={activeCyclesCount}
             sub="em andamento"
             icon={<Leaf className="size-4" />}
           />
@@ -237,36 +246,40 @@ export default function DashboardPage() {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <SegmentedTabs<AttentionTab>
-              value={tab}
-              onValueChange={setTab}
-              items={[
-                {
-                  value: "late",
-                  label: "Atrasadas",
-                  badgeCount: buckets.late.length,
-                  activeClassName: "bg-red-600 text-white",
-                },
-                {
-                  value: "today",
-                  label: "Hoje",
-                  badgeCount: buckets.today.length,
-                  activeClassName: "bg-primary text-primary-foreground",
-                },
-                {
-                  value: "pending",
-                  label: "Pendentes",
-                  badgeCount: buckets.pending.length,
-                  activeClassName: "bg-amber-500 text-white",
-                },
-                {
-                  value: "week",
-                  label: "Semana",
-                  badgeCount: buckets.week.length,
-                  activeClassName: "bg-sky-600 text-white",
-                },
-              ]}
-            />
+            {agenda.isLoading ? (
+              <Skeleton className="h-10 w-[min(100%,22rem)] rounded-xl" />
+            ) : (
+              <SegmentedTabs<AttentionTab>
+                value={tab}
+                onValueChange={setTab}
+                items={[
+                  {
+                    value: "late",
+                    label: "Atrasadas",
+                    badgeCount: buckets.late.length,
+                    activeClassName: "bg-red-600 text-white",
+                  },
+                  {
+                    value: "today",
+                    label: "Hoje",
+                    badgeCount: buckets.today.length,
+                    activeClassName: "bg-primary text-primary-foreground",
+                  },
+                  {
+                    value: "pending",
+                    label: "Pendentes",
+                    badgeCount: buckets.pending.length,
+                    activeClassName: "bg-amber-500 text-white",
+                  },
+                  {
+                    value: "week",
+                    label: "Semana",
+                    badgeCount: buckets.week.length,
+                    activeClassName: "bg-sky-600 text-white",
+                  },
+                ]}
+              />
+            )}
           </div>
 
           {agenda.isLoading ? (
@@ -341,14 +354,20 @@ export default function DashboardPage() {
 
         <div className="flex flex-col gap-4">
           <RailCard title="Resumo da carteira">
-            <RailRow label="Produtores" value={producerCount} />
-            <RailRow label="Fazendas" value={farms.data?.pagination?.total ?? 0} />
-            <RailRow label="Talhões" value={plotCount} />
-            <RailRow
-              label="Safras em andamento"
-              value={seasons.data?.pagination?.total ?? 0}
-              last
-            />
+            {statsLoading ? (
+              <CompactListSkeleton rows={4} />
+            ) : (
+              <>
+                <RailRow label="Produtores" value={producerCount} />
+                <RailRow label="Fazendas" value={farms.data?.pagination?.total ?? 0} />
+                <RailRow label="Talhões" value={plotCount} />
+                <RailRow
+                  label="Safras em andamento"
+                  value={activeCyclesCount}
+                  last
+                />
+              </>
+            )}
           </RailCard>
 
           <PriceCoverageRailCard
@@ -359,7 +378,12 @@ export default function DashboardPage() {
             isLoading={priceCoverage.isLoading}
           />
 
-          {planData?.plan ? (
+          {planLoading ? (
+            <div className="rounded-xl border border-clay-border bg-clay-soft p-4.5 shadow-sm">
+              <Skeleton className="h-4 w-56" />
+              <Skeleton className="mt-2 h-4 w-full" />
+            </div>
+          ) : planData?.plan ? (
             <div className="rounded-xl border border-clay-border bg-clay-soft p-4.5 shadow-sm">
               <div className="mb-2 flex items-center gap-2.5">
                 <Sparkles className="size-4 text-clay-strong" />

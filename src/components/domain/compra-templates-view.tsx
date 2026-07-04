@@ -39,6 +39,8 @@ function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem
     stock: String(it.current_stock),
     price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
     priceUsd: it.price_usd != null ? String(it.price_usd) : "",
+    seedsPerMeter: it.seeds_per_meter != null ? String(it.seeds_per_meter) : "",
+    cycleDays: it.cycle_days != null ? String(it.cycle_days) : "",
     thousandPlants: it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
     seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
     bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
@@ -191,7 +193,7 @@ function TemplateEditor({
       crop,
       name: name.trim(),
       plots: [],
-      items: items.map(listItemToPayload),
+      items: items.map((it) => listItemToPayload(it, crop)),
     };
     try {
       if (isNew) {

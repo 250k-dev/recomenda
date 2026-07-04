@@ -36,9 +36,15 @@ import {
   useCreateRecommendationItem,
   useUpdateRecommendationItem,
   useDeleteRecommendationItem,
-  usePlatformCatalog,
+  useCloneGlobalProduct,
   useMe,
 } from "@/lib/api/hooks";
+import { usePurchaseListCatalogProducts } from "@/components/domain/timing/timing-stages-editor";
+import {
+  productsForPurchaseListCategory,
+  purchaseListProductLabel,
+  type PurchaseListCatalogProduct,
+} from "@/lib/catalog/purchase-list-catalog";
 import { CostPlanView } from "@/components/domain/cost-plan/cost-plan-view";
 import { PlotHistoryTab } from "@/components/domain/season/plot-history-tab";
 import type { Recommendation, RecommendationItem } from "@/lib/api/client";
@@ -48,6 +54,7 @@ import {
   ChevronUp,
   CheckCircle2,
   AlertTriangle,
+  CircleAlert,
   Clock,
   Share2,
   SkipForward,
@@ -70,11 +77,7 @@ import { recommendedYmdToWindow, todayLocalYmd } from "@/lib/timing/window-days"
 import { cn } from "@/lib/utils";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
-import {
-  extractError,
-  SEED_CATEGORIES,
-  seedQuantityUnitLabel,
-} from "@/components/domain/season/_shared";
+import { extractError, SEED_CATEGORIES } from "@/components/domain/season/_shared";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
 import {
   displayRecStatus,
@@ -172,10 +175,12 @@ function ProductRow({
   item,
   seasonId,
   onDelete,
+  outOfProgram,
 }: {
   item: RecommendationItem;
   seasonId: string;
   onDelete: (id: string) => void;
+  outOfProgram?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [dose, setDose] = useState(String(item.dose_per_hectare));
@@ -198,13 +203,24 @@ function ProductRow({
   };
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm",
+        outOfProgram && "border-destructive/40 bg-destructive/5",
+      )}
+    >
       <FlaskConical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 font-medium text-foreground">
         {item.product_name}
         {item.is_substitution && (
           <span className="ml-1.5 text-[10px] text-warning-strong">(substituído)</span>
         )}
+        {outOfProgram ? (
+          <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive align-middle">
+            <CircleAlert className="h-3 w-3" />
+            Fora da programação
+          </span>
+        ) : null}
       </span>
 
       {editing ? (
@@ -270,44 +286,72 @@ function AddProductRow({
   recommendationId,
   seasonId,
   onClose,
+  catalogProducts,
+  listProductIds,
 }: {
   recommendationId: string;
   seasonId: string;
   onClose: () => void;
+  catalogProducts: PurchaseListCatalogProduct[];
+  listProductIds: Set<string>;
 }) {
-  const { data: catalogData } = usePlatformCatalog();
-  const catalog = catalogData?.data ?? [];
   const [category, setCategory] = useState("");
-  const [selectedId, setSelectedId] = useState("");
+  const [productId, setProductId] = useState("");
+  const [productName, setProductName] = useState("");
   const [dose, setDose] = useState("");
   const [unit, setUnit] = useState("L");
+  const [expanded, setExpanded] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const createMut = useCreateRecommendationItem(seasonId);
+  const cloneGlobal = useCloneGlobalProduct();
 
-  const rowProducts = useMemo(
-    () =>
-      catalog.filter(
-        (product) =>
-          product.local_product_id &&
-          (product.category ?? "OTHER") === category,
-      ),
-    [catalog, category],
+  // Por padrão só a lista de compra; ao expandir, o catálogo completo (global +
+  // local). Produtos fora da lista entram marcados como "fora da programação".
+  const listCatalog = useMemo(
+    () => catalogProducts.filter((product) => listProductIds.has(product.optionValue)),
+    [catalogProducts, listProductIds],
   );
+  const rowProducts = productsForPurchaseListCategory(
+    expanded ? catalogProducts : listCatalog,
+    category,
+    productId,
+    productName,
+  );
+  const outOfProgram = Boolean(productId) && !listProductIds.has(productId);
 
   const handleCategoryChange = (nextCategory: string) => {
     setCategory(nextCategory);
-    const selected = catalog.find((product) => product.local_product_id === selectedId);
-    if (
-      selectedId &&
-      selected &&
-      (selected.category ?? "OTHER") !== nextCategory
-    ) {
-      setSelectedId("");
-      setUnit("L");
+    setProductId("");
+    setProductName("");
+    setUnit("L");
+    setExpanded(false);
+  };
+
+  const resolveProduct = async (optionValue: string) => {
+    const product = rowProducts.find((entry) => entry.optionValue === optionValue);
+    if (!product) return;
+    const apply = (localId: string, name: string, doseUnit?: string) => {
+      setProductId(localId);
+      setProductName(name);
+      setUnit(doseUnit ?? "L");
+    };
+    if (!product.globalId || !product.isGlobalOnly) {
+      apply(product.optionValue, product.name, product.dose_unit);
+      return;
+    }
+    setResolving(true);
+    try {
+      const cloned = await cloneGlobal.mutateAsync(product.globalId);
+      apply(cloned.id, cloned.name ?? product.name, cloned.dose_unit ?? product.dose_unit);
+    } catch {
+      toast.error("Não foi possível adicionar o produto da plataforma.");
+    } finally {
+      setResolving(false);
     }
   };
 
   const handleAdd = () => {
-    const localId = selectedId;
+    const localId = productId;
     const doseVal = parseFloat(dose.replace(",", "."));
     if (!category) {
       toast.error("Selecione a categoria do produto.");
@@ -339,7 +383,12 @@ function AddProductRow({
   };
 
   return (
-    <div className="rounded-xl border border-dashed bg-muted/20 p-3">
+    <div
+      className={cn(
+        "rounded-xl border border-dashed bg-muted/20 p-3",
+        outOfProgram && "border-destructive/40 bg-destructive/5",
+      )}
+    >
       <p className="mb-2 text-xs font-semibold text-foreground">Adicionar produto</p>
       <div className="flex flex-col gap-3">
         <div className="grid gap-2 sm:grid-cols-2">
@@ -365,25 +414,51 @@ function AddProductRow({
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Produto</Label>
             <SearchableSelect
-              value={selectedId}
-              onValueChange={(productId) => {
-                const product = rowProducts.find(
-                  (item) => item.local_product_id === productId,
-                );
-                setSelectedId(productId);
-                setUnit(product?.dose_unit ?? "L");
-              }}
-              disabled={!category}
+              value={productId}
+              onValueChange={(optionValue) => void resolveProduct(optionValue)}
+              disabled={!category || resolving}
+              loading={resolving}
+              loadingMessage="Vinculando…"
               placeholder={category ? "Selecione…" : "Escolha a categoria"}
               filterLabel="Buscar produto"
-              searchPlaceholder="Buscar produto…"
+              searchPlaceholder={
+                expanded ? "Buscar no catálogo…" : "Buscar produto…"
+              }
+              emptyMessage={
+                expanded
+                  ? "Nenhum produto encontrado no catálogo."
+                  : "Nenhum produto desta categoria na lista de compra."
+              }
+              selectedLabel={productName || undefined}
               options={rowProducts.map((product) => ({
-                value: product.local_product_id ?? "",
-                label: product.name,
+                value: product.optionValue,
+                label: purchaseListProductLabel(product),
                 keywords: product.name,
               }))}
               className="w-full"
+              footer={({ close }) =>
+                !category || expanded ? null : (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setExpanded(true);
+                      close();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/8"
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    Adicionar produto fora da lista de compra
+                  </button>
+                )
+              }
             />
+            {outOfProgram ? (
+              <span className="mt-1 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive">
+                <CircleAlert className="h-3 w-3" />
+                Fora da programação
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -409,7 +484,7 @@ function AddProductRow({
             <Button
               size="sm"
               onClick={handleAdd}
-              disabled={!category || !selectedId || !dose || createMut.isPending}
+              disabled={!category || !productId || !dose || createMut.isPending}
               className="h-8 gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -499,6 +574,128 @@ function AddStagePanel({
   );
 }
 
+/** Linha de semente numa etapa: mostra população e Big Bags/sacos (sem dose). */
+function SeedRow({
+  item,
+  onDelete,
+}: {
+  item: RecommendationItem;
+  onDelete: (id: string) => void;
+}) {
+  const seedsPerUnit = item.dose_unit === "SACA" ? 60000 : 5000000;
+  const population = Number(item.dose_per_hectare) * seedsPerUnit;
+  const unitLabel = item.dose_unit === "SACA" ? "sacos" : "Big Bags";
+  return (
+    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
+      <Sprout className="h-3.5 w-3.5 shrink-0 text-primary-strong" />
+      <span className="min-w-0 flex-1 font-medium text-foreground">{item.product_name}</span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {population.toLocaleString("pt-BR")} plantas/ha
+        {item.total_quantity
+          ? ` · ${item.total_quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unitLabel}`
+          : ""}
+      </span>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7 text-muted-foreground hover:text-danger-strong"
+        onClick={() => onDelete(item.id)}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+/** Formulário "Adicionar semente" de uma etapa: escolhe uma semente da LISTA DE
+ *  COMPRA da safra (a população já vem de lá). Salva como item da etapa (Big Bag/Saca). */
+function AddSeedRow({
+  recommendationId,
+  seasonId,
+  onClose,
+}: {
+  recommendationId: string;
+  seasonId: string;
+  onClose: () => void;
+}) {
+  const { data: plan } = useSeasonCostPlan(seasonId);
+  const [selectedId, setSelectedId] = useState("");
+  const createMut = useCreateRecommendationItem(seasonId);
+
+  const listSeeds = (plan?.items ?? []).filter((it) =>
+    SEED_CATEGORIES.includes(it.category),
+  );
+  const selected = listSeeds.find((s) => s.local_product_id === selectedId);
+
+  const handleAdd = () => {
+    if (!selected) return toast.error("Selecione a semente.");
+    const seedsPerUnit = selected.category === "HIBRIDO_MILHO" ? 60000 : 5000000;
+    const unit = selected.category === "HIBRIDO_MILHO" ? "SACA" : "BAG";
+    const pop = selected.thousand_plants_per_ha ?? 0;
+    createMut.mutate(
+      {
+        recommendation_id: recommendationId,
+        local_product_id: selected.local_product_id,
+        dose_per_hectare: seedsPerUnit > 0 ? pop / seedsPerUnit : 0,
+        dose_unit: unit,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Semente adicionada.");
+          onClose();
+        },
+        onError: () => toast.error("Não foi possível adicionar a semente."),
+      },
+    );
+  };
+
+  return (
+    <div className="rounded-xl border border-dashed bg-muted/20 p-3">
+      <p className="mb-2 text-xs font-semibold text-foreground">Adicionar semente</p>
+      {listSeeds.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Nenhuma semente na lista de compra desta safra. Adicione a semente no{" "}
+          <strong>Plano de custo</strong> primeiro.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Semente (da lista de compra)</Label>
+            <SearchableSelect
+              value={selectedId}
+              onValueChange={setSelectedId}
+              placeholder="Selecione a semente…"
+              filterLabel="Buscar semente"
+              searchPlaceholder="Buscar…"
+              options={listSeeds.map((s) => ({
+                value: s.local_product_id,
+                label: s.thousand_plants_per_ha
+                  ? `${s.product_name} · ${s.thousand_plants_per_ha.toLocaleString("pt-BR")} plantas/ha`
+                  : s.product_name,
+                keywords: s.product_name,
+              }))}
+              className="w-full"
+            />
+          </div>
+          <div className="flex justify-end gap-1">
+            <Button
+              size="sm"
+              onClick={handleAdd}
+              disabled={!selectedId || createMut.isPending}
+              className="h-8 gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" /> Adicionar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onClose} className="h-8">
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RecommendationCard({
   rec,
   index,
@@ -509,6 +706,9 @@ function RecommendationCard({
   onMoveDown,
   isReordering,
   canReorder,
+  catalogProducts,
+  listProductIds,
+  listReady,
 }: {
   rec: Recommendation;
   index: number;
@@ -519,12 +719,22 @@ function RecommendationCard({
   onMoveDown: () => void;
   isReordering: boolean;
   canReorder: boolean;
+  catalogProducts: PurchaseListCatalogProduct[];
+  listProductIds: Set<string>;
+  listReady: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
+  const [addingSeed, setAddingSeed] = useState(false);
   const [stageDraft, setStageDraft] = useState<RecommendationStageDraft>(() =>
     recommendationToStageDraft(rec),
   );
+
+  // Semente é um item da etapa com unidade Big Bag/Saca (separada dos produtos).
+  const isSeedRow = (it: RecommendationItem) =>
+    it.dose_unit === "BAG" || it.dose_unit === "SACA";
+  const productItems = rec.items.filter((it) => !isSeedRow(it));
+  const seedItems = rec.items.filter((it) => isSeedRow(it));
 
   const [registering, setRegistering] = useState(false);
   const [executedDate, setExecutedDate] = useState(
@@ -759,14 +969,15 @@ function RecommendationCard({
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Produtos recomendados
             </p>
-            {rec.items.length > 0 ? (
+            {productItems.length > 0 ? (
               <div className="flex flex-col gap-1.5">
-                {rec.items.map((item) => (
+                {productItems.map((item) => (
                   <ProductRow
                     key={item.id}
                     item={item}
                     seasonId={seasonId}
                     onDelete={handleDeleteItem}
+                    outOfProgram={listReady && !listProductIds.has(item.local_product_id)}
                   />
                 ))}
               </div>
@@ -774,25 +985,68 @@ function RecommendationCard({
               <p className="text-xs text-muted-foreground">Nenhum produto vinculado.</p>
             )}
 
-            <div className="mt-2">
-              {addingProduct ? (
+            {seedItems.length > 0 ? (
+              <>
+                <p className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Sementes
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {seedItems.map((item) => (
+                    <SeedRow
+                      key={item.id}
+                      item={item}
+                      onDelete={handleDeleteItem}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : null}
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {!addingProduct && !addingSeed ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAddingProduct(true)}
+                    className="h-8 gap-1.5 text-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Adicionar produto
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAddingSeed(true)}
+                    className="h-8 gap-1.5 text-xs"
+                  >
+                    <Sprout className="h-3.5 w-3.5" />
+                    Adicionar semente
+                  </Button>
+                </>
+              ) : null}
+            </div>
+
+            {addingProduct ? (
+              <div className="mt-2">
                 <AddProductRow
                   recommendationId={rec.id}
                   seasonId={seasonId}
                   onClose={() => setAddingProduct(false)}
+                  catalogProducts={catalogProducts}
+                  listProductIds={listProductIds}
                 />
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAddingProduct(true)}
-                  className="mt-1 h-8 gap-1.5 text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Adicionar produto
-                </Button>
-              )}
-            </div>
+              </div>
+            ) : null}
+            {addingSeed ? (
+              <div className="mt-2">
+                <AddSeedRow
+                  recommendationId={rec.id}
+                  seasonId={seasonId}
+                  onClose={() => setAddingSeed(false)}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div
@@ -944,61 +1198,6 @@ function RecommendationCard({
     </li>
   );
 }
-
-/** Semente da safra — seção própria (população/bags), separada das etapas de
- *  aplicação. Lê a lista de compra vinculada; a edição é feita no plano de custo. */
-function SeedPlanSection({ seasonId }: { seasonId: string }) {
-  const searchParams = useSearchParams();
-  const { data: plan } = useSeasonCostPlan(seasonId);
-  const seeds = (plan?.items ?? []).filter((it) => SEED_CATEGORIES.includes(it.category));
-  if (seeds.length === 0) return null;
-
-  const costPlanHref = (() => {
-    const p = new URLSearchParams(searchParams.toString());
-    p.set("tab", "cost-plan");
-    return `?${p.toString()}`;
-  })();
-
-  return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-rail px-4 py-2.5">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-text-strong">
-          <Sprout className="h-4 w-4 text-primary-strong" />
-          Semente
-        </h3>
-        <Button asChild variant="ghost" size="sm" className="gap-1.5 print:hidden">
-          <Link href={costPlanHref}>Editar no plano de custo</Link>
-        </Button>
-      </div>
-      <ul className="divide-y divide-border">
-        {seeds.map((it) => {
-          const unit = seedQuantityUnitLabel(it.category);
-          const qty = it.quantity_final || it.required_quantity || 0;
-          return (
-            <li
-              key={it.id}
-              className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
-            >
-              <span className="font-medium text-text-strong">{it.product_name}</span>
-              <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums text-muted-foreground">
-                {it.thousand_plants_per_ha ? (
-                  <span>{it.thousand_plants_per_ha.toLocaleString("pt-BR")} plantas/ha</span>
-                ) : null}
-                {it.seeding_area_ha ? (
-                  <span>{it.seeding_area_ha.toLocaleString("pt-BR")} ha</span>
-                ) : null}
-                <strong className="text-text-strong">
-                  {qty.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} {unit}
-                </strong>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
 function RecommendationsTab({
   seasonId,
   title,
@@ -1007,6 +1206,8 @@ function RecommendationsTab({
   statusLabel,
   seasonStatus,
   producerId,
+  crop,
+  farmId,
   onPublish,
   isPublishing,
 }: {
@@ -1017,11 +1218,26 @@ function RecommendationsTab({
   statusLabel?: string;
   seasonStatus?: string;
   producerId?: string;
+  crop?: string;
+  farmId?: string;
   onPublish?: () => void;
   isPublishing?: boolean;
 }) {
   const { data, isLoading } = useSeasonTimeline(seasonId);
+  // Catálogo (global + local) e IDs que já estão na lista de compra desta safra,
+  // para o editor de produtos e o alerta "fora da programação".
+  const {
+    catalogProducts,
+    listProductIds,
+    isLoading: catalogLoading,
+  } = usePurchaseListCatalogProducts(producerId, crop, farmId);
+  // Só marca item como "fora da programação" depois que a lista carregou —
+  // senão todos os itens piscariam em vermelho enquanto a lista não chega.
+  const listReady = !catalogLoading;
   const [addingStage, setAddingStage] = useState(false);
+  // Botão de "Adicionar etapa" repetido no fim da lista (aparece quando há
+  // muitas etapas) para o agrônomo não precisar rolar até o topo.
+  const [addingStageBottom, setAddingStageBottom] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const reorderMut = useReorderRecommendations(seasonId);
   const meData = useMe().data as { name?: string } | undefined;
@@ -1055,13 +1271,13 @@ function RecommendationsTab({
         </Button>
       ) : canManageStages ? (
         <Button
-          size="icon"
           variant="outline"
-          className="h-9 w-9"
-          aria-label="Adicionar etapa"
+          size="sm"
+          className="gap-1.5"
           onClick={() => setAddingStage(true)}
         >
           <Plus className="h-4 w-4" />
+          Adicionar etapa
         </Button>
       ) : producerId ? (
         <Button asChild size="sm" variant="outline">
@@ -1170,8 +1386,6 @@ function RecommendationsTab({
         </div>
       </section>
 
-      <SeedPlanSection seasonId={seasonId} />
-
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-base font-semibold text-text-strong">Etapas do cronograma</h2>
         <div className="flex items-center gap-2">
@@ -1188,7 +1402,7 @@ function RecommendationsTab({
             <Button
               size="icon"
               variant="outline"
-              className="h-8 w-8 shrink-0"
+              className="h-9 w-9 shrink-0"
               aria-label="Adicionar etapa"
               onClick={() => setAddingStage((v) => !v)}
             >
@@ -1215,9 +1429,32 @@ function RecommendationsTab({
             onMoveDown={() => moveStage(i, "down")}
             isReordering={reorderMut.isPending}
             canReorder={canManageStages}
+            catalogProducts={catalogProducts}
+            listProductIds={listProductIds}
+            listReady={listReady}
           />
         ))}
       </ul>
+
+      {/* Etapas costumam passar de 4 — repete o "adicionar" embaixo da última,
+          como um card fantasma com + centralizado, pra não obrigar o agrônomo a
+          rolar de volta ao topo. */}
+      {canManageStages && recommendations.length >= 4 ? (
+        addingStageBottom ? (
+          <AddStagePanel seasonId={seasonId} onClose={() => setAddingStageBottom(false)} />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAddingStageBottom(true)}
+            className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/30 py-8 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary-soft/30 hover:text-primary-strong"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-current">
+              <Plus className="h-5 w-5" />
+            </span>
+            <span className="text-sm font-medium">Adicionar etapa</span>
+          </button>
+        )
+      ) : null}
 
       <RecommendationExportDialog
         open={exportOpen}
@@ -1354,6 +1591,8 @@ export default function SeasonDetailPage() {
             statusLabel={statusLabel}
             seasonStatus={season?.status}
             producerId={producerId || undefined}
+            crop={season?.crop}
+            farmId={farmId || undefined}
             onPublish={season?.status === "DRAFT" ? handlePublish : undefined}
             isPublishing={publishMutation.isPending}
           />

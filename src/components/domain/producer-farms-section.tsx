@@ -9,7 +9,6 @@ import { ptBR } from "date-fns/locale";
 import {
   Plus,
   Tractor,
-  ShoppingCart,
   CalendarDays,
   ChevronRight,
   MapPin,
@@ -23,12 +22,12 @@ import { StatusBadge } from "@/components/domain/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAgronomistAgenda, useTimingTemplates, queryKeys } from "@/lib/api/hooks";
 import { getTimeline, type Recommendation } from "@/lib/api/seasons";
+import { getFarmCycles } from "@/lib/api/cycles";
 import { getTimingTemplate } from "@/lib/api/templates";
 import type { ProducerFarm } from "@/lib/api/client";
 import { CROP_LABELS } from "@/lib/season-constants";
 import { cn } from "@/lib/utils";
 
-const ACTIVE_SEASON_STATUSES = new Set(["DRAFT", "PUBLISHED", "IN_PROGRESS"]);
 const RUNNING_SEASON_STATUSES = new Set(["PUBLISHED", "IN_PROGRESS"]);
 
 const fmtHa = (n: number) =>
@@ -51,15 +50,6 @@ function farmProgressFromTimelines(
   }
   if (total === 0) return null;
   return Math.round((done / total) * 100);
-}
-
-function pickCronogramSeasonId(farm: ProducerFarm): string | null {
-  const running = farm.seasons.filter((season) =>
-    RUNNING_SEASON_STATUSES.has(season.status),
-  );
-  if (running.length === 0) return null;
-  const inProgress = running.find((season) => season.status === "IN_PROGRESS");
-  return (inProgress ?? running[0]).id;
 }
 
 export function ProducerFarmsSection({
@@ -101,6 +91,26 @@ export function ProducerFarmsSection({
       enabled: showSeasonActions,
     })),
   });
+
+  // Safras (cycles) por fazenda, para o badge "N safras" do card — não dá pra
+  // contar `farm.seasons` (uma linha por talhão plantado): uma safra com vários
+  // talhões inflava o número.
+  const cycleQueries = useQueries({
+    queries: farms.map((farm) => ({
+      queryKey: queryKeys.farmCycles(farm.id),
+      queryFn: () => getFarmCycles(farm.id),
+      staleTime: 60_000,
+    })),
+  });
+
+  const activeCyclesByFarm = useMemo(() => {
+    const map = new Map<string, number>();
+    farms.forEach((farm, index) => {
+      const cycles = cycleQueries[index]?.data ?? [];
+      map.set(farm.id, cycles.filter((c) => c.status === "ACTIVE").length);
+    });
+    return map;
+  }, [farms, cycleQueries]);
 
   const timelinesBySeason = useMemo(() => {
     const map = new Map<string, Recommendation[]>();
@@ -181,6 +191,7 @@ export function ProducerFarmsSection({
                 farm={farm}
                 producerId={producerId}
                 showSeasonActions={showSeasonActions}
+                activeCyclesCount={activeCyclesByFarm.get(farm.id) ?? 0}
                 progressPct={farmProgressFromTimelines(
                   farm.seasons
                     .filter((season) => RUNNING_SEASON_STATUSES.has(season.status))
@@ -288,12 +299,14 @@ function FarmCard({
   farm,
   producerId,
   showSeasonActions,
+  activeCyclesCount,
   progressPct,
   onOpen,
 }: {
   farm: ProducerFarm;
   producerId: string;
   showSeasonActions: boolean;
+  activeCyclesCount: number;
   progressPct: number | null;
   onOpen: () => void;
 }) {
@@ -301,21 +314,12 @@ function FarmCard({
     (acc, plot) => acc + (parseFloat(plot.area_hectares) || 0),
     0,
   );
-  const activeSeasonsCount = farm.seasons.filter((season) =>
-    ACTIVE_SEASON_STATUSES.has(season.status),
-  ).length;
-  const hasRunningSeasons = farm.seasons.some((season) =>
-    RUNNING_SEASON_STATUSES.has(season.status),
-  );
 
+  // Fluxo por safra: a fazenda expõe apenas Safras e Estoque; lista de compra
+  // e recomendações vivem dentro de cada safra.
   const farmBase = `/farms/${farm.id}?producer_id=${encodeURIComponent(producerId)}`;
   const seasonsHref = `${farmBase}&tab=seasons`;
-  const purchaseHref = `${farmBase}&tab=purchase`;
   const stockHref = `${farmBase}&tab=stock`;
-  const cronogramSeasonId = pickCronogramSeasonId(farm);
-  const recommendationHref = cronogramSeasonId
-    ? `/seasons/${cronogramSeasonId}?tab=recommendations&farm_id=${encodeURIComponent(farm.id)}&producer_id=${encodeURIComponent(producerId)}`
-    : seasonsHref;
 
   const metaParts = [
     farm.location?.trim(),
@@ -338,10 +342,10 @@ function FarmCard({
             <span className="truncate text-base font-semibold text-text-strong">
               {farm.name}
             </span>
-            {activeSeasonsCount > 0 ? (
+            {activeCyclesCount > 0 ? (
               <Badge variant="success" className="shrink-0">
-                {activeSeasonsCount}{" "}
-                {activeSeasonsCount === 1 ? "safra" : "safras"}
+                {activeCyclesCount}{" "}
+                {activeCyclesCount === 1 ? "safra" : "safras"}
               </Badge>
             ) : null}
           </span>
@@ -381,32 +385,6 @@ function FarmCard({
             <Link href={seasonsHref}>
               <CalendarDays className="size-3.5" />
               Safras
-            </Link>
-          </Button>
-          {hasRunningSeasons ? (
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Link href={recommendationHref}>
-                <CalendarDays className="size-3.5" />
-                Recomendação
-              </Link>
-            </Button>
-          ) : null}
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <Link href={purchaseHref}>
-              <ShoppingCart className="size-3.5" />
-              Lista de compra
             </Link>
           </Button>
           <Button

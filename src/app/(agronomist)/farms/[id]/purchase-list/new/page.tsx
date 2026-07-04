@@ -14,6 +14,7 @@ export default function FarmPurchaseListNewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const producerId = searchParams.get("producer_id") ?? "";
+  const cycleId = searchParams.get("cycle_id");
   const onboarding = searchParams.get("onboarding");
 
   const { data: farm } = useFarm(farmId);
@@ -87,15 +88,32 @@ export default function FarmPurchaseListNewPage() {
         producerName={producer?.name ?? "Produtor"}
         plots={plots}
         farmName={farm?.name}
-        successRedirectLabel="Ir para o produtor"
-        onComplete={() =>
+        cycleId={cycleId}
+        successRedirectLabel={cycleId ? "Ir para a safra" : "Ir para o produtor"}
+        onComplete={() => {
+          if (onboarding === "recommendation") {
+            router.push(
+              `/producers/${producerId}?onboarding=recommendation&farm_id=${encodeURIComponent(farmId)}${
+                cycleId ? `&cycle_id=${encodeURIComponent(cycleId)}` : ""
+              }`,
+            );
+            return;
+          }
+          if (cycleId) {
+            router.push(
+              `/farms/${farmId}/cycles/${cycleId}?producer_id=${encodeURIComponent(producerId)}`,
+            );
+            return;
+          }
+          router.push(producerHref);
+        }}
+        onCancel={() =>
           router.push(
-            onboarding === "recommendation"
-              ? `/producers/${producerId}?onboarding=recommendation&farm_id=${encodeURIComponent(farmId)}`
+            cycleId
+              ? `/farms/${farmId}/cycles/${cycleId}?producer_id=${encodeURIComponent(producerId)}`
               : producerHref,
           )
         }
-        onCancel={() => router.push(producerHref)}
       />
     </>
   );

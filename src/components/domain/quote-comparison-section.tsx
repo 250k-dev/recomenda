@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { RotateCcw, Store, Trash2 } from "lucide-react";
+import { RotateCcw, Share2, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
@@ -242,8 +242,9 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
     );
   }
 
-  // Menor preço efetivo por item (para destacar a loja mais barata).
+  // Menor preço efetivo por item + a(s) loja(s) que oferecem esse preço.
   const cheapestByItem = new Map<string, number>();
+  const bestStoresByItem = new Map<string, string[]>();
   for (const it of items) {
     let min = Infinity;
     for (const r of responses) {
@@ -251,23 +252,57 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
       const eff = cell?.unit_price_brl ?? cell?.substitute_unit_price_brl ?? null;
       if (eff != null && eff < min) min = eff;
     }
-    if (min !== Infinity) cheapestByItem.set(it.purchase_list_item_id, min);
+    if (min !== Infinity) {
+      cheapestByItem.set(it.purchase_list_item_id, min);
+      const stores = responses
+        .filter((r) => {
+          const cell = r.items.find(
+            (ci) => ci.purchase_list_item_id === it.purchase_list_item_id,
+          );
+          const eff = cell?.unit_price_brl ?? cell?.substitute_unit_price_brl ?? null;
+          return eff != null && eff <= min;
+        })
+        .map((r) => r.store_name);
+      bestStoresByItem.set(it.purchase_list_item_id, stores);
+    }
   }
 
   const cheapestTotal = Math.min(
     ...responses.map((r) => (r.total_brl > 0 ? r.total_brl : Infinity)),
   );
+  const bestTotalStores = responses
+    .filter((r) => r.total_brl > 0 && r.total_brl <= cheapestTotal)
+    .map((r) => r.store_name);
+
+  // Reenvia o MESMO link privado de edição da loja (caso o lojista o perca).
+  const requestToken = data.request.token;
+  const shareStoreLink = async (r: QuoteComparisonResponse) => {
+    const url = `${window.location.origin}/cotacao/${requestToken}/loja/${r.response_token}`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: `Cotação — ${r.store_name}`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success(`Link de ${r.store_name} copiado — é só enviar à loja.`);
+    } catch {
+      // Usuário cancelou o compartilhamento ou o clipboard falhou — silencioso.
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3">
       {trashToggle}
       {trashPanel}
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+        <table className="w-full min-w-[920px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-rail text-left align-bottom">
               <th className="sticky left-0 z-10 bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
                 Produto
+              </th>
+              <th className="min-w-[160px] px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-success-strong">
+                Melhor preço
               </th>
               {responses.map((r) => (
                 <th key={r.id} className="min-w-[150px] px-3 py-3 text-right">
@@ -275,6 +310,15 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
                     <span className="inline-flex items-center gap-1.5 font-semibold text-text-strong">
                       <Store className="h-3.5 w-3.5 text-primary-strong" />
                       {r.store_name}
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        title={`Reenviar o link de cotação de ${r.store_name}`}
+                        className="text-muted-foreground hover:text-primary-strong"
+                        onClick={() => void shareStoreLink(r)}
+                      >
+                        <Share2 className="size-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon-xs"
@@ -302,6 +346,21 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
                     <div className="text-xs text-muted-foreground tabular-nums">
                       {fmtQty(it.quantity_to_buy)} {unit} · {it.stage}
                     </div>
+                  </td>
+                  <td className="px-3 py-2.5 align-top">
+                    {cheapest != null ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold tabular-nums text-success-strong">
+                          {fmtBrl(cheapest)}
+                        </span>
+                        <span className="inline-flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                          <Store className="h-3 w-3 text-primary-strong" />
+                          {(bestStoresByItem.get(it.purchase_list_item_id) ?? []).join(", ")}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-placeholder">—</span>
+                    )}
                   </td>
                   {responses.map((r) => {
                     const cell = r.items.find(
@@ -388,6 +447,21 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
             <tr className="border-t border-border bg-rail">
               <td className="sticky left-0 z-10 bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-text-strong">
                 Total estimado
+              </td>
+              <td className="px-3 py-3 align-top">
+                {Number.isFinite(cheapestTotal) && cheapestTotal > 0 ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold tabular-nums text-success-strong">
+                      {fmtBrl(cheapestTotal)}
+                    </span>
+                    <span className="inline-flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                      <Store className="h-3 w-3 text-primary-strong" />
+                      {bestTotalStores.join(", ")}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-placeholder">—</span>
+                )}
               </td>
               {responses.map((r) => {
                 const isCheapest = r.total_brl > 0 && r.total_brl <= cheapestTotal;

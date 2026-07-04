@@ -2,9 +2,11 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { getFarmCycles } from "@/lib/api/cycles";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
+import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
@@ -49,8 +51,6 @@ import {
   ShoppingCart,
 } from "lucide-react";
 
-const ACTIVE_SEASON_STATUSES = new Set(["DRAFT", "PUBLISHED", "IN_PROGRESS"]);
-
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
@@ -92,14 +92,16 @@ export function ProducerDetailView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const onbFarmId = searchParams.get("farm_id") ?? "";
-  const [onbStage, setOnbStage] = useState<
-    "purchase-list" | "recommendation" | "season" | null
-  >(() => {
+  const onbCycleId = searchParams.get("cycle_id") ?? "";
+  // Fluxo por safra: "season" (criar safra) → lista de compra → "recommendation"
+  // (programação). "purchase-list" é legado e cai no início do fluxo novo.
+  const [onbStage, setOnbStage] = useState<"season" | "recommendation" | null>(() => {
     const s = searchParams.get("onboarding");
-    return s === "purchase-list" || s === "recommendation" || s === "season"
-      ? s
-      : null;
+    if (s === "season" || s === "purchase-list") return "season";
+    if (s === "recommendation") return "recommendation";
+    return null;
   });
+  const [newCycleOpen, setNewCycleOpen] = useState(false);
 
   const newFarmMutation = useMutation({
     mutationFn: async () => {
@@ -124,22 +126,32 @@ export function ProducerDetailView({
 
   const farmsList = useMemo(() => farms ?? [], [farms]);
 
+  // Safras ativas = cycles (safra de verdade), não `f.seasons` (uma linha por
+  // talhão plantado) — do contrário uma safra com 3 talhões virava "3 safras".
+  const cycleQueries = useQueries({
+    queries: farmsList.map((f) => ({
+      queryKey: queryKeys.farmCycles(f.id),
+      queryFn: () => getFarmCycles(f.id),
+      staleTime: 60_000,
+    })),
+  });
+
   const stats = useMemo(() => {
     let plots = 0;
     let hectares = 0;
-    let activeSeasons = 0;
     for (const f of farmsList) {
       plots += f.plots.length;
       hectares += f.plots.reduce(
         (s, p) => s + (parseFloat(p.area_hectares) || 0),
         0,
       );
-      activeSeasons += f.seasons.filter((s) =>
-        ACTIVE_SEASON_STATUSES.has(s.status),
-      ).length;
     }
+    const activeSeasons = cycleQueries.reduce(
+      (sum, q) => sum + (q.data ?? []).filter((c) => c.status === "ACTIVE").length,
+      0,
+    );
     return { farms: farmsList.length, plots, hectares, activeSeasons };
-  }, [farmsList]);
+  }, [farmsList, cycleQueries]);
 
   const openEdit = () => {
     if (!producer) return;
@@ -330,13 +342,7 @@ export function ProducerDetailView({
             </DialogContent>
           </Dialog>
 
-          <Dialog
-            open={templatesOpen}
-            onOpenChange={(open) => {
-              setTemplatesOpen(open);
-              if (!open && onbStage === "recommendation") setOnbStage("season");
-            }}
-          >
+          <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
             <DialogContent className="max-w-7xl">
               <DialogHeader>
                 <DialogTitle>Modelos de recomendação</DialogTitle>
@@ -356,49 +362,53 @@ export function ProducerDetailView({
             </DialogContent>
           </Dialog>
 
+          {/* Fluxo por safra: 1) criar a safra (nome + culturas, leve) →
+              2) lista de compra da safra (o agrônomo entrega ao produtor) →
+              3) programação (modelos × talhões), que pode ficar para depois. */}
           <OnboardingPromptDialog
-            open={onbStage === "purchase-list"}
-            onOpenChange={(open) => {
-              if (!open) setOnbStage("recommendation");
-            }}
-            icon={ShoppingCart}
-            eyebrow="Próximo passo"
-            title="Vamos montar a primeira lista de compra?"
-            description="Com os talhões cadastrados, você já pode gerar a lista de produtos e doses recomendadas para este produtor. Quer fazer isso agora?"
-            confirmLabel="Sim, criar lista"
-            onConfirm={() =>
-              router.push(
-                `/farms/${onbFarmId}/purchase-list/new?producer_id=${encodeURIComponent(producerId)}&onboarding=recommendation`,
-              )
-            }
-          />
-
-          <OnboardingPromptDialog
-            open={onbStage === "recommendation" && !templatesOpen}
-            onOpenChange={(open) => {
-              if (!open) setOnbStage("season");
-            }}
-            icon={Clock}
-            eyebrow="Próximo passo"
-            title="Quer criar um modelo de recomendação?"
-            description="Modelos reutilizáveis de dessecação, fungicidas e janelas agilizam a montagem das próximas safras deste produtor. Vamos criar o primeiro?"
-            confirmLabel="Sim, criar modelo"
-            onConfirm={() => setTemplatesOpen(true)}
-          />
-
-          <OnboardingPromptDialog
-            open={onbStage === "season" && !templatesOpen}
+            open={onbStage === "season" && !newCycleOpen}
             onOpenChange={(open) => {
               if (!open) setOnbStage(null);
             }}
             icon={Sprout}
             eyebrow="Próximo passo"
-            title="Quer configurar a safra agora?"
-            description="Defina cultura, cronograma e talhões para acompanhar as aplicações ao longo da safra. Podemos configurar agora ou depois."
-            confirmLabel="Sim, configurar safra"
+            title="Vamos criar a primeira safra?"
+            confirmLabel="Sim, criar safra"
+            onConfirm={() => setNewCycleOpen(true)}
+          />
+
+          {onbFarmId ? (
+            <NewCycleDialog
+              open={newCycleOpen}
+              onOpenChange={(open) => {
+                setNewCycleOpen(open);
+                if (!open) setOnbStage(null);
+              }}
+              farmId={onbFarmId}
+              producerId={producerId}
+              onCreated={(cycleId) =>
+                router.push(
+                  `/farms/${onbFarmId}/purchase-list/new?producer_id=${encodeURIComponent(producerId)}&cycle_id=${encodeURIComponent(cycleId)}&onboarding=recommendation`,
+                )
+              }
+            />
+          ) : null}
+
+          <OnboardingPromptDialog
+            open={onbStage === "recommendation"}
+            onOpenChange={(open) => {
+              if (!open) setOnbStage(null);
+            }}
+            icon={Clock}
+            eyebrow="Próximo passo"
+            title="Quer montar a programação da safra?"
+            description="Escolha um modelo de recomendação (ou monte um na hora) e aplique aos talhões. Também pode ficar para depois — a safra e a lista de compra já estão salvas."
+            confirmLabel="Sim, montar programação"
             onConfirm={() =>
               router.push(
-                `/farms/${onbFarmId}/season/new?producer_id=${encodeURIComponent(producerId)}`,
+                onbCycleId
+                  ? `/farms/${onbFarmId}/cycles/${onbCycleId}?producer_id=${encodeURIComponent(producerId)}`
+                  : `/farms/${onbFarmId}?producer_id=${encodeURIComponent(producerId)}&tab=seasons`,
               )
             }
           />

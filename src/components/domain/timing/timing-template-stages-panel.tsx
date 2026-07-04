@@ -142,7 +142,7 @@ export function TimingTemplateStagesPanel({
     [queryClient, templateId],
   );
 
-  const saveAll = useCallback(async () => {
+  const saveAll = useCallback(async (opts?: { silent?: boolean }) => {
     if (editorStages.length === 0) {
       setIsDirty(false);
       return;
@@ -180,13 +180,23 @@ export function TimingTemplateStagesPanel({
       hydratedSignatureRef.current = null;
       await invalidateTemplateData();
       setIsDirty(false);
-      toast.success("Modelo salvo.");
+      if (!opts?.silent) toast.success("Modelo salvo.");
     } catch {
       toast.error("Não foi possível salvar o modelo.");
     } finally {
       setIsSaving(false);
     }
   }, [editorStages, invalidateTemplateData, sortedStages, template.crop, template.name]);
+
+  // Autosave: persiste sozinho após uma pausa na edição (o botão Salvar
+  // continua como fallback). Timer reinicia a cada mudança nas etapas.
+  useEffect(() => {
+    if (!isDirty || isSaving) return;
+    const timer = setTimeout(() => {
+      void saveAll({ silent: true });
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [editorStages, isDirty, isSaving, saveAll]);
 
   const ensureSavedBeforeStructureChange = useCallback(async () => {
     if (!isDirty) return;

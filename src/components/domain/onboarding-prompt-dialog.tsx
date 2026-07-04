@@ -20,7 +20,7 @@ interface OnboardingPromptDialogProps {
   icon: LucideIcon;
   eyebrow?: string;
   title: string;
-  description: React.ReactNode;
+  description?: React.ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
   onConfirm: () => void;
@@ -45,7 +45,10 @@ export function OnboardingPromptDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="sm:max-w-md">
+      <AlertDialogContent
+        className="sm:max-w-md"
+        {...(description ? {} : { "aria-describedby": undefined })}
+      >
         <div className="flex flex-col items-center text-center sm:items-start sm:text-left">
           <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Icon className="size-6" />
@@ -58,9 +61,11 @@ export function OnboardingPromptDialog({
           <AlertDialogTitle className="mt-1 font-display text-xl font-semibold tracking-[-0.01em] text-text-strong">
             {title}
           </AlertDialogTitle>
-          <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {description}
-          </AlertDialogDescription>
+          {description ? (
+            <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </AlertDialogDescription>
+          ) : null}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>

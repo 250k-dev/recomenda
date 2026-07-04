@@ -2,6 +2,8 @@ import { api } from "@/lib/http/axios";
 
 export interface PurchaseListItemInput {
   local_product_id: string;
+  /** Cultura do item numa lista de safra multi-cultura (null = comum). */
+  crop?: string | null;
   stage: string;
   dose_per_hectare: number;
   dose_unit: string;
@@ -14,8 +16,12 @@ export interface PurchaseListItemInput {
   cost_per_ha_mode?: "DOSE_PRICE" | "TOTAL_OVER_AREA";
   deduct_stock?: boolean;
   calc_rule?: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
-  /** Variedade/Híbrido: população em plantas/ha (nº de sementes por hectare). */
+  /** Variedade/Híbrido: população em plantas/ha (derivada de semente/metro ÷ espaçamento). */
   thousand_plants_per_ha?: number | null;
+  /** Variedade/Híbrido: semente por metro (input da planilha). */
+  seeds_per_meter?: number | null;
+  /** Variedade/Híbrido: ciclo do cultivar em dias (referência). */
+  cycle_days?: number | null;
   /** Variedade/Híbrido: área a ser semeada (ha). */
   seeding_area_ha?: number | null;
   /** Semente: bags/sacos ajustados à mão (sobrepõe o cálculo). */
@@ -36,13 +42,20 @@ export interface PurchaseListInput {
   producer_id?: string;
   /** Marca a lista como template reutilizável (sem produtor/talhões). */
   is_template?: boolean;
-  crop: string;
+  /** Legado (lista de cultura única); listas de safra usam a cultura por item. */
+  crop?: string | null;
+  /** Safra da fazenda dona da lista — uma lista única por safra. */
+  cycle_id?: string | null;
   name: string;
   variety?: string;
   fx_rate_usd_brl?: number | null;
   grain_price_brl?: number | null;
+  /** Preço da saca por cultura (CropType → R$/saca) — listas multi-cultura. */
+  grain_prices_brl?: Record<string, number>;
   /** Real × Desejado: meta de sacas/ha por categoria. */
   category_targets?: Record<string, number>;
+  /** Espaçamento entre linhas (m) — parâmetro único da lista (semente). */
+  spacing_m?: number | null;
   season_id?: string | null;
   plots: PurchaseListPlotInput[];
   items: PurchaseListItemInput[];
@@ -68,12 +81,15 @@ export interface PurchaseListDetail {
   producer_id: string | null;
   is_template?: boolean;
   season_id: string | null;
-  crop: string;
+  cycle_id?: string | null;
+  crop: string | null;
   name: string;
   variety: string | null;
   fx_rate_usd_brl: number | null;
   grain_price_brl: number | null;
+  grain_prices_brl?: Record<string, number>;
   category_targets?: Record<string, number>;
+  spacing_m?: number | null;
   created_at: string;
   updated_at?: string;
   total_hectares: number;
@@ -91,6 +107,7 @@ export interface PurchaseListDetail {
     local_product_id: string;
     product_name: string;
     category: string;
+    crop?: string | null;
     stage: string;
     dose_per_hectare: number;
     dose_unit: string;
@@ -106,6 +123,8 @@ export interface PurchaseListDetail {
     deduct_stock: boolean;
     calc_rule: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
     thousand_plants_per_ha: number | null;
+    seeds_per_meter: number | null;
+    cycle_days: number | null;
     seeding_area_ha: number | null;
     bags_override: number | null;
     out_of_program: boolean;
@@ -142,6 +161,14 @@ export async function getFarmPurchaseLists(farmId: string) {
 export async function getPurchaseListBySeason(seasonId: string) {
   const { data } = await api.get<PurchaseListDetail | null>(
     `/purchase-lists/by-season/${seasonId}`,
+  );
+  return data;
+}
+
+/** Lista de compra única da safra (null se ainda não criada). */
+export async function getPurchaseListByCycle(cycleId: string) {
+  const { data } = await api.get<PurchaseListDetail | null>(
+    `/purchase-lists/by-cycle/${cycleId}`,
   );
   return data;
 }

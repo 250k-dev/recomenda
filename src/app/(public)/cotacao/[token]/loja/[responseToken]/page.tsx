@@ -219,9 +219,7 @@ export default function StoreQuotePage() {
                   <Label className="text-xs">Disponibilidade</Label>
                   <NativeSelect
                     className="w-full"
-                    value={d.availability}
-                    disabled={submitted}
-                    onChange={(e) =>
+                    value={d.availability}                    onChange={(e) =>
                       setField(it.purchase_list_item_id, "availability", e.target.value)
                     }
                   >
@@ -237,9 +235,7 @@ export default function StoreQuotePage() {
                     className="h-11"
                     inputMode="decimal"
                     placeholder="0,00"
-                    value={d.unit_price_brl}
-                    disabled={submitted}
-                    onChange={(e) =>
+                    value={d.unit_price_brl}                    onChange={(e) =>
                       setField(it.purchase_list_item_id, "unit_price_brl", e.target.value)
                     }
                   />
@@ -253,9 +249,7 @@ export default function StoreQuotePage() {
                     <Input
                       className="h-11"
                       placeholder="Nome do produto que você tem"
-                      value={d.substitute_product_name}
-                      disabled={submitted}
-                      onChange={(e) =>
+                      value={d.substitute_product_name}                      onChange={(e) =>
                         setField(
                           it.purchase_list_item_id,
                           "substitute_product_name",
@@ -270,9 +264,7 @@ export default function StoreQuotePage() {
                       className="h-11"
                       inputMode="decimal"
                       placeholder="0,00"
-                      value={d.substitute_unit_price_brl}
-                      disabled={submitted}
-                      onChange={(e) =>
+                      value={d.substitute_unit_price_brl}                      onChange={(e) =>
                         setField(
                           it.purchase_list_item_id,
                           "substitute_unit_price_brl",
@@ -290,9 +282,7 @@ export default function StoreQuotePage() {
                   className="min-h-0 py-2"
                   rows={2}
                   placeholder="Prazo de entrega, marca, etc."
-                  value={d.notes}
-                  disabled={submitted}
-                  onChange={(e) =>
+                  value={d.notes}                  onChange={(e) =>
                     setField(it.purchase_list_item_id, "notes", e.target.value)
                   }
                 />
@@ -304,17 +294,17 @@ export default function StoreQuotePage() {
 
       {/* Barra de ações fixa */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur supports-backdrop-filter:bg-surface/80">
-        <div className="mx-auto flex w-full max-w-3xl items-center justify-end gap-2 p-3">
-          <Button
-            variant="outline"
-            size="lg"
-            className="gap-2"
-            onClick={() => save(false)}
-            disabled={update.isPending}
-          >
-            {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Salvar rascunho
-          </Button>
+        <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 p-3">
+          {submitted ? (
+            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-success-strong" />
+              Enviada — você pode ajustar os preços e salvar de novo.
+            </span>
+          ) : (
+            <span className="hidden text-sm text-muted-foreground sm:inline">
+              Salva e envia direto para o agrônomo.
+            </span>
+          )}
           <Button
             size="lg"
             variant="clay"
@@ -322,8 +312,12 @@ export default function StoreQuotePage() {
             onClick={() => save(true)}
             disabled={update.isPending}
           >
-            <Send className="h-4 w-4" />
-            {submitted ? "Reenviar cotação" : "Enviar cotação"}
+            {update.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Salvar e enviar
           </Button>
         </div>
       </div>

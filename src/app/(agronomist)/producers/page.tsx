@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useEffect, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -64,9 +64,15 @@ export default function ProducersPage() {
   const [page, setPage] = useState(1);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
-  useEffect(() => {
+  // Volta à página 1 quando muda o tab/filtro/ordenação. Ajuste durante o render
+  // (padrão recomendado do React — https://react.dev/learn/you-might-not-need-an-effect)
+  // em vez de setState dentro de um useEffect.
+  const resetKey = `${tab}|${filter}|${sort}`;
+  const [trackedResetKey, setTrackedResetKey] = useState(resetKey);
+  if (resetKey !== trackedResetKey) {
+    setTrackedResetKey(resetKey);
     setPage(1);
-  }, [tab, filter, sort]);
+  }
 
   const onArchive = (id: string, name: string) =>
     setPendingAction({ kind: "archive", id, name });
@@ -405,7 +411,7 @@ function ProducerRow({
         {producer.plots_count ?? "—"}
       </td>
       <td className="px-2 py-3 text-center tabular-nums text-text-strong">
-        {producer.active_seasons_count ?? "—"}
+        {producer.active_cycles_count ?? "—"}
       </td>
       <td className="px-2 py-3">
         {producer.row_type === "producer" ? (

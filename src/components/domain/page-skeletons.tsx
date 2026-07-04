@@ -115,12 +115,19 @@ export function TimelineCardsSkeleton({ count = 4 }: { count?: number }) {
 }
 
 /** KPIs tipo dashboard (cards pequenos). */
-export function DashboardKpiSkeleton({ cards = 3 }: { cards?: 3 | 4 }) {
+export function DashboardKpiSkeleton({
+  cards = 3,
+  className,
+}: {
+  cards?: 3 | 4;
+  className?: string;
+}) {
   return (
     <div
       className={cn(
         "grid gap-4",
         cards === 4 ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3",
+        className,
       )}
       aria-hidden
     >

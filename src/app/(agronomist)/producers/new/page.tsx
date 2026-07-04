@@ -214,7 +214,7 @@ export default function OnboardingPage() {
             onAnotherFarm={() => setStep(2)}
             onFinish={() =>
               router.push(
-                `/producers/${producer.id}?onboarding=purchase-list&farm_id=${encodeURIComponent(currentFarm.id)}`,
+                `/producers/${producer.id}?onboarding=season&farm_id=${encodeURIComponent(currentFarm.id)}`,
               )
             }
           />

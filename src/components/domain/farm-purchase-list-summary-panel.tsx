@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import type { PurchaseListDetail } from "@/lib/api/client";
+import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
+import {
+  computePurchaseListMetrics,
+  detailItemToListItem,
+} from "@/lib/purchase-list-breakdown";
 import { cn } from "@/lib/utils";
 
 const fmtBrl = (n: number) =>
@@ -15,21 +20,25 @@ const fmtBrl = (n: number) =>
     currency: "BRL",
     maximumFractionDigits: 2,
   });
+const fmtQty = (n: number) =>
+  n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
-function computeMetrics(list: PurchaseListDetail | null) {
+function computeMetrics(
+  list: PurchaseListDetail | null,
+  fx: number,
+  saca: number,
+) {
   if (!list) {
-    return { totalValue: 0, productsCount: 0, pricedCount: 0 };
+    return {
+      totalValue: 0,
+      seedVolume: 0,
+      productCostSacksPerHa: 0,
+      productsCount: 0,
+      pricedCount: 0,
+    };
   }
-  const items = list.items ?? [];
-  const totalValue = items.reduce((sum, item) => {
-    const price = item.price_brl_fixed ?? 0;
-    return sum + item.quantity_to_buy * price;
-  }, 0);
-  return {
-    totalValue,
-    productsCount: items.length,
-    pricedCount: items.filter((item) => item.price_brl_fixed).length,
-  };
+  const items = (list.items ?? []).map(detailItemToListItem);
+  return computePurchaseListMetrics(items, list.total_hectares ?? 0, fx, saca);
 }
 
 function SummaryRow({
@@ -74,6 +83,8 @@ export function FarmPurchaseListSummaryPanel({
   onOpenFull: () => void;
   costPlanHref?: string | null;
 }) {
+  const fxRate = useCurrencyStore((state) => state.fxRate);
+  const grainPrice = useCurrencyStore((state) => state.grainPrice);
   if (isLoading) {
     return (
       <Card className="gap-0 overflow-hidden py-0 shadow-sm">
@@ -91,7 +102,9 @@ export function FarmPurchaseListSummaryPanel({
     );
   }
 
-  const metrics = computeMetrics(list);
+  const fx = Number(fxRate) || 0;
+  const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
+  const metrics = computeMetrics(list, fx, saca);
   const listLabel = list?.name ?? "—";
   const productsTotal = metrics.productsCount || 0;
 
@@ -109,11 +122,19 @@ export function FarmPurchaseListSummaryPanel({
           value={metrics.totalValue > 0 ? fmtBrl(metrics.totalValue) : "—"}
           largeValue
         />
-        <SummaryRow label="Produtos" value={String(productsTotal)} />
         <SummaryRow
-          label="Itens com preço"
-          value={`${metrics.pricedCount}/${productsTotal}`}
+          label="Volume de sacas"
+          value={metrics.seedVolume > 0 ? `${fmtQty(metrics.seedVolume)} sc` : "—"}
         />
+        <SummaryRow
+          label="Custo (sc/ha)"
+          value={
+            metrics.productCostSacksPerHa > 0
+              ? `${fmtQty(metrics.productCostSacksPerHa)} sc/ha`
+              : "—"
+          }
+        />
+        <SummaryRow label="Produtos" value={String(productsTotal)} />
 
         <div className="my-3 rounded-[10px] border border-warning-border bg-warning-soft px-[13px] py-[11px] text-[13px] font-medium leading-snug text-warning-strong">
           Informe preços ou gere uma cotação para calcular o custo por hectare.
