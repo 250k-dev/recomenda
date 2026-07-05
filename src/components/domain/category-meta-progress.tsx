@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { AlertTriangle, Target } from "lucide-react";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
 import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
+import { CATEGORY_ORDER } from "@/lib/cost-plan/calculate";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
 import type { ListItem } from "@/components/domain/season/_shared";
 import { cn } from "@/lib/utils";
@@ -36,9 +37,24 @@ export function CategoryMetaProgress({
     [items, totalHa, fx, saca],
   );
 
-  const rows = metrics.categoryBreakdown
-    .map((r) => ({ ...r, target: targets[r.category] ?? 0 }))
-    .filter((r) => r.target > 0);
+  // Parte de TODAS as metas configuradas (não só das categorias que já têm item):
+  // assim toda meta aparece desde o começo e o "Real" sobe de 0 conforme o
+  // agrônomo vai preenchendo produtos/sementes e seus preços.
+  const realByCategory = new Map(
+    metrics.categoryBreakdown.map((r) => [r.category, r.sacks_per_ha]),
+  );
+  const rows = Object.entries(targets)
+    .filter(([, target]) => (target ?? 0) > 0)
+    .map(([category, target]) => ({
+      category,
+      target,
+      sacks_per_ha: realByCategory.get(category) ?? 0,
+    }))
+    .sort((a, b) => {
+      const ia = CATEGORY_ORDER.indexOf(a.category);
+      const ib = CATEGORY_ORDER.indexOf(b.category);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
 
   if (rows.length === 0) return null;
 

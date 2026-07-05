@@ -47,12 +47,17 @@ export interface PurchaseListMetrics {
   totalSeedsValue: number;
   /** Custo total geral (produtos + sementes) — VALOR TOTAL da planilha. */
   totalValue: number;
-  /** Volume total de sacas/BAGs de semente a comprar — VOLUME SC TOTAL. */
+  /** Volume total de sacas/BAGs de semente a comprar (só o físico da semente). */
   seedVolume: number;
-  /** Sacas de semente por hectare — VOLUME SC/HÁ (pedido: volume ÷ hectares). */
+  /** Sacas de semente por hectare (físico da semente ÷ hectares). */
   seedSacksPerHa: number;
-  /** Custo dos produtos convertido em sacas/ha (valor ÷ saca ÷ hectares). */
-  productCostSacksPerHa: number;
+  /**
+   * VOLUME SC TOTAL da planilha: o **valor total** (produtos + sementes)
+   * convertido em sacas de grão pelo preço da saca (valor ÷ saca).
+   */
+  totalSacks: number;
+  /** VOLUME SC/HÁ: custo total convertido em sacas por hectare (valor ÷ saca ÷ ha). */
+  costSacksPerHa: number;
   productsCount: number;
   categoriesCount: number;
   pricedCount: number;
@@ -115,8 +120,8 @@ export function computePurchaseListMetrics(
     totalValue,
     seedVolume,
     seedSacksPerHa: totalHa > 0 ? seedVolume / totalHa : 0,
-    productCostSacksPerHa:
-      gp > 0 && totalHa > 0 ? totalProductsValue / gp / totalHa : 0,
+    totalSacks: gp > 0 ? totalValue / gp : 0,
+    costSacksPerHa: gp > 0 && totalHa > 0 ? totalValue / gp / totalHa : 0,
     productsCount: items.length,
     categoriesCount: categoryTotals.size,
     pricedCount,

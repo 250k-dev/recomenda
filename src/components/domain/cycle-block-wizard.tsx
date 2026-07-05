@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  readLocalDraft,
+  clearLocalDraft,
+  useLocalDraft,
+} from "@/lib/use-local-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +58,17 @@ import {
 
 type CronogramMode = "template" | "custom";
 
+/** Progresso do wizard de bloco persistido localmente (rascunho). */
+type BlockWizardDraft = {
+  step: number;
+  crop: string;
+  cronogramMode: CronogramMode;
+  timingTemplateId: string;
+  templateName: string;
+  saveToLibrary: boolean;
+  draftStages: TimingStageField[];
+};
+
 type PlotConfig = {
   variety: string;
   plantingDate: string;
@@ -74,16 +90,55 @@ export function CycleBlockWizard({
   onDone: () => void;
   onCancel: () => void;
 }) {
+  // Rascunho local: restaura o progresso da programação (modelo/etapas) ao voltar
+  // ou recarregar. Some quando o bloco é aplicado (onDone).
+  const draftKey = `cycle-block-draft:${cycle.id}`;
+  const savedDraft = useMemo(
+    () => readLocalDraft<BlockWizardDraft>(draftKey),
+    [draftKey],
+  );
+
+  // Sempre retoma no passo 1: o passo 2 (talhões) depende do modelo resolvido
+  // no passo 1, que não é persistido — então o rascunho restaura a edição do
+  // passo 1 e o agrônomo segue para os talhões de novo.
   const [step, setStep] = useState(1);
-  const [crop, setCrop] = useState<string>(cycle.crops[0] ?? "SOYBEAN");
-  const [cronogramMode, setCronogramMode] = useState<CronogramMode>("template");
-  const [timingTemplateId, setTimingTemplateId] = useState("");
-  const [templateName, setTemplateName] = useState("");
-  const [saveToLibrary, setSaveToLibrary] = useState(true);
-  const [draftStages, setDraftStages] = useState<TimingStageField[]>([
-    newTimingStageField("Dessecação"),
-  ]);
+  const [crop, setCrop] = useState<string>(
+    savedDraft?.crop ?? cycle.crops[0] ?? "SOYBEAN",
+  );
+  const [cronogramMode, setCronogramMode] = useState<CronogramMode>(
+    savedDraft?.cronogramMode ?? "template",
+  );
+  const [timingTemplateId, setTimingTemplateId] = useState(
+    savedDraft?.timingTemplateId ?? "",
+  );
+  const [templateName, setTemplateName] = useState(savedDraft?.templateName ?? "");
+  const [saveToLibrary, setSaveToLibrary] = useState(
+    savedDraft?.saveToLibrary ?? true,
+  );
+  const [draftStages, setDraftStages] = useState<TimingStageField[]>(
+    savedDraft?.draftStages ?? [newTimingStageField("Dessecação")],
+  );
   const [resolvedTemplateId, setResolvedTemplateId] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  // Autosave silencioso: salva o progresso no fundo enquanto o bloco não é aplicado.
+  const draft: BlockWizardDraft = {
+    step,
+    crop,
+    cronogramMode,
+    timingTemplateId,
+    templateName,
+    saveToLibrary,
+    draftStages,
+  };
+  useLocalDraft(draftKey, draft, !saved);
+
+  // Ao aplicar o bloco: para de autosalvar, apaga o rascunho e segue.
+  const handleDone = () => {
+    setSaved(true);
+    clearLocalDraft(draftKey);
+    onDone();
+  };
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -127,7 +182,7 @@ export function CycleBlockWizard({
           crop={crop}
           timingTemplateId={resolvedTemplateId}
           onBack={() => setStep(1)}
-          onDone={onDone}
+          onDone={handleDone}
         />
       )}
     </div>

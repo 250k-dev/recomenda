@@ -42,6 +42,8 @@ import {
 } from "@/components/domain/season/_shared";
 
 const DEFAULT_ITEM_STAGE = "Outra";
+/** Ciclo padrão da semente (dias) — soja gira em ~110 dias. */
+const DEFAULT_CYCLE_DAYS = "110";
 
 type PurchaseListItemsEditorProps = {
   items: ListItem[];
@@ -155,6 +157,7 @@ export function PurchaseListItemsEditor({
         priceUsd: "",
         thousandPlants: "",
         seedingArea: "",
+        cycleDays: DEFAULT_CYCLE_DAYS,
       },
     ]);
   };
@@ -272,6 +275,9 @@ export function PurchaseListItemsEditor({
       if (SEED_CATEGORIES.includes(category)) {
         patch.dose = "";
         patch.nApps = "1";
+        // Ciclo (dias) já nasce com o padrão da soja quando vira semente.
+        const current = items.find((i) => i.key === key);
+        if (!current?.cycleDays) patch.cycleDays = DEFAULT_CYCLE_DAYS;
       } else {
         patch.seedsPerMeter = "";
         patch.cycleDays = "";
@@ -843,8 +849,10 @@ export function PurchaseListItemsEditor({
     })
     .filter((w): w is { key: string; name: string; excess: number; unit: string } => w !== null);
 
+  const useStickyActions = !readOnly && items.length > 3;
+
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex min-w-0 w-full flex-col", className)}>
       {/* Cotação do dólar — conversão automática US$ → R$ na lista de compra */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
         <div className="flex items-center gap-2">
@@ -1217,26 +1225,28 @@ export function PurchaseListItemsEditor({
       </div>
 
       {!readOnly ? (
-        // Lista longa: a barra fica fixa no rodapé do viewport para adicionar
-        // itens de qualquer ponto da lista, sem rolar até o fim.
+        // Lista longa (desktop): barra sticky no rodapé do viewport — só em lg+,
+        // onde a tabela larga rola dentro do overflow-x-auto sem empurrar a página.
         <div
           className={cn(
-            "mt-4 flex flex-wrap gap-2",
-            items.length > 3 && "sticky bottom-3 z-10 justify-end",
+            "mt-4 flex w-full max-w-full justify-end",
+            useStickyActions && "lg:sticky lg:bottom-3 lg:z-10",
           )}
         >
           <div
             className={cn(
-              items.length > 3 &&
-                "flex items-center gap-2 rounded-full border border-border bg-card/95 px-2 py-1.5 shadow-lg backdrop-blur",
+              "flex max-w-full flex-wrap items-center justify-end gap-2",
+              useStickyActions &&
+                "lg:rounded-full lg:border lg:border-border lg:bg-card/95 lg:px-2 lg:py-1.5 lg:shadow-lg lg:backdrop-blur",
             )}
           >
             {seedCategories.length > 0 ? (
               <Button
                 type="button"
                 variant="outline"
+                size={useStickyActions ? "sm" : "default"}
                 onClick={addSeedItem}
-                className={cn("gap-2", items.length > 3 && "rounded-full")}
+                className={cn("shrink-0 gap-2", useStickyActions && "lg:rounded-full")}
               >
                 <Plus className="h-4 w-4" />
                 Adicionar semente
@@ -1245,8 +1255,9 @@ export function PurchaseListItemsEditor({
             <Button
               type="button"
               variant="outline"
+              size={useStickyActions ? "sm" : "default"}
               onClick={addItem}
-              className={cn("gap-2", items.length > 3 && "rounded-full")}
+              className={cn("shrink-0 gap-2", useStickyActions && "lg:rounded-full")}
             >
               <Plus className="h-4 w-4" />
               Adicionar produto

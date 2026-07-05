@@ -51,6 +51,11 @@ import {
   type PlotSchedule,
   type WizardPlot,
 } from "@/components/domain/season/_shared";
+import {
+  readLocalDraft,
+  clearLocalDraft,
+  useLocalDraft,
+} from "@/lib/use-local-draft";
 
 export type SeasonWizardProps = {
   producerId: string;
@@ -68,6 +73,16 @@ type CronogramMode = "template" | "custom";
 
 const WIZARD_STEPS = 3;
 
+/** Progresso do wizard de recomendação persistido localmente (autosave silencioso). */
+type SeasonWizardDraft = {
+  crop: Crop;
+  cronogramMode: CronogramMode;
+  timingTemplateId: string;
+  draftStages: TimingStageField[];
+  schedules: PlotSchedule[];
+  selectedPlotIds: string[];
+};
+
 export function SeasonWizard({
   producerId,
   producerName,
@@ -78,6 +93,15 @@ export function SeasonWizard({
   onViewSeason,
   onCancel,
 }: SeasonWizardProps) {
+  // Autosave silencioso: restaura o progresso da recomendação ao voltar/recarregar
+  // (rede de segurança local, além do "Salvar rascunho" que grava no servidor).
+  // Sempre retoma no passo 1 (os passos seguintes dependem do modelo resolvido lá).
+  const draftKey = `season-draft:${farmId ?? "farm"}:${producerId}`;
+  const savedDraft = useMemo(
+    () => readLocalDraft<SeasonWizardDraft>(draftKey),
+    [draftKey],
+  );
+
   const [step, setStep] = useState(1);
   const { data: planData } = usePlanQuota();
   const [quotaAck, setQuotaAck] = useState(false);
@@ -85,24 +109,51 @@ export function SeasonWizard({
   const quotaLimit = planData?.quota_usage?.limit ?? planData?.plan?.plot_quota ?? 0;
   // Sem espaço para nem um talhão novo: já está no (ou acima do) limite do plano.
   const noQuota = quotaLimit > 0 && quotaCurrent >= quotaLimit;
-  const [crop, setCrop] = useState<Crop>("SOYBEAN");
-  const [cronogramMode, setCronogramMode] = useState<CronogramMode>("template");
-  const [timingTemplateId, setTimingTemplateId] = useState("");
-  const [draftStages, setDraftStages] = useState<TimingStageField[]>([
-    newTimingStageField("Dessecação"),
-    newTimingStageField("Pós-emergência"),
-  ]);
-  const [schedules, setSchedules] = useState<PlotSchedule[]>(() =>
-    plots.map((p) => ({
-      plotId: p.id,
-      variety: "",
-      plantingDate: "",
-      cycleDays: "",
-    })),
+  const [crop, setCrop] = useState<Crop>(savedDraft?.crop ?? "SOYBEAN");
+  const [cronogramMode, setCronogramMode] = useState<CronogramMode>(
+    savedDraft?.cronogramMode ?? "template",
   );
-  const [selectedPlotIds, setSelectedPlotIds] = useState<Set<string>>(
-    () => new Set(plots.length === 1 ? [plots[0].id] : []),
+  const [timingTemplateId, setTimingTemplateId] = useState(
+    savedDraft?.timingTemplateId ?? "",
   );
+  const [draftStages, setDraftStages] = useState<TimingStageField[]>(
+    savedDraft?.draftStages ?? [
+      newTimingStageField("Dessecação"),
+      newTimingStageField("Pós-emergência"),
+    ],
+  );
+  const [schedules, setSchedules] = useState<PlotSchedule[]>(
+    () =>
+      savedDraft?.schedules ??
+      plots.map((p) => ({
+        plotId: p.id,
+        variety: "",
+        plantingDate: "",
+        cycleDays: "",
+      })),
+  );
+  const [selectedPlotIds, setSelectedPlotIds] = useState<Set<string>>(() =>
+    savedDraft?.selectedPlotIds
+      ? new Set(savedDraft.selectedPlotIds)
+      : new Set(plots.length === 1 ? [plots[0].id] : []),
+  );
+  const [saved, setSaved] = useState(false);
+
+  // Autosave silencioso (sem UI) enquanto a recomendação não é criada.
+  const draft: SeasonWizardDraft = {
+    crop,
+    cronogramMode,
+    timingTemplateId,
+    draftStages,
+    schedules,
+    selectedPlotIds: [...selectedPlotIds],
+  };
+  useLocalDraft(draftKey, draft, !saved);
+
+  const onSaved = () => {
+    setSaved(true);
+    clearLocalDraft(draftKey);
+  };
 
   const selectedPlots = useMemo(
     () => plots.filter((p) => selectedPlotIds.has(p.id)),
@@ -193,6 +244,7 @@ export function SeasonWizard({
           onBack={() => setStep(2)}
           onComplete={onComplete}
           onViewSeason={onViewSeason}
+          onSaved={onSaved}
         />
       )}
     </div>
@@ -958,6 +1010,7 @@ function StepFinalize({
   onBack,
   onComplete,
   onViewSeason,
+  onSaved,
 }: {
   producerId: string;
   producerName: string;
@@ -971,6 +1024,8 @@ function StepFinalize({
   onBack: () => void;
   onComplete: () => void;
   onViewSeason?: (seasonId: string) => void;
+  /** Recomendação criada (publicada ou rascunho no servidor) — limpa o autosave local. */
+  onSaved: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [publishNow, setPublishNow] = useState(defaultPublishNow);
@@ -1013,6 +1068,7 @@ function StepFinalize({
     onSuccess: ({ ids, asDraft }) => {
       setCreatedIds(ids);
       setSavedAsDraft(asDraft);
+      onSaved();
       void queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
       void queryClient.invalidateQueries({ queryKey: queryKeys.quota });
       void queryClient.invalidateQueries({

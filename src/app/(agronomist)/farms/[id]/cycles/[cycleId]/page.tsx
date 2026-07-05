@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Calculator,
@@ -126,6 +126,17 @@ export default function CycleDetailPage() {
   const newPurchaseListHref = `/farms/${farmId}/purchase-list/new?cycle_id=${encodeURIComponent(cycleId)}${
     producerId ? `&producer_id=${encodeURIComponent(producerId)}` : ""
   }`;
+
+  // Lista em rascunho: abrir a aba de compra retoma o wizard direto (continua o
+  // fluxo de onde parou), sem tela intermediária. Ao finalizar vira `active` e a
+  // aba mostra a lista normal; ao salvar rascunho voltamos para a aba padrão
+  // (recommendations), então não há loop.
+  const listIsDraft = purchaseList?.status === "draft";
+  useEffect(() => {
+    if (tab === "purchase" && listIsDraft) {
+      router.replace(newPurchaseListHref);
+    }
+  }, [tab, listIsDraft, newPurchaseListHref, router]);
 
   const breadcrumbs = [
     { label: "Produtores", href: "/producers" },
@@ -286,6 +297,22 @@ export default function CycleDetailPage() {
                 <Link href={newPurchaseListHref}>
                   <Plus className="size-4" />
                   Montar lista de compra
+                </Link>
+              </Button>
+            }
+          />
+        ) : listIsDraft ? (
+          // Rascunho em andamento: o efeito acima já redireciona para o wizard
+          // (continua o fluxo). Este é só o estado enquanto o redirect acontece.
+          <EmptyState
+            icon={ShoppingCart}
+            title="Retomando o rascunho da lista…"
+            description="Abrindo a lista de compra de onde você parou."
+            action={
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link href={newPurchaseListHref}>
+                  <ShoppingCart className="size-4" />
+                  Continuar rascunho
                 </Link>
               </Button>
             }

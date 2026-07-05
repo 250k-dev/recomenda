@@ -172,7 +172,10 @@ export function validateListItems(items: ListItem[]): string | null {
     if (isSeedItem(it)) {
       if (!Number(it.seedsPerMeter))
         return "Informe a semente/metro nas variedades/híbridos.";
-      if (!Number(it.bagsOverride))
+      // Aceita o volume de bags (input novo) OU a área plantada (listas antigas,
+      // salvas antes de o bag virar manual) — só trava se a semente não tiver
+      // nenhum dos dois. Assim listas existentes voltam a salvar normalmente.
+      if (!Number(it.bagsOverride) && !Number(it.seedingArea))
         return "Informe o volume de bags/sacos nas variedades/híbridos.";
     } else if (!Number(it.dose)) {
       return "Informe a dose/ha em todos os itens.";

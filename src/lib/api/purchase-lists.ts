@@ -57,6 +57,8 @@ export interface PurchaseListInput {
   /** Espaçamento entre linhas (m) — parâmetro único da lista (semente). */
   spacing_m?: number | null;
   season_id?: string | null;
+  /** Rascunho (em montagem) × finalizada. Default 'active' no backend. */
+  status?: "draft" | "active";
   plots: PurchaseListPlotInput[];
   items: PurchaseListItemInput[];
 }
@@ -80,6 +82,8 @@ export interface PurchaseListDetail {
   id: string;
   producer_id: string | null;
   is_template?: boolean;
+  /** Rascunho (em montagem) × finalizada. Ausente em dados antigos = 'active'. */
+  status?: "draft" | "active";
   season_id: string | null;
   cycle_id?: string | null;
   crop: string | null;

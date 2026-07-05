@@ -17,7 +17,6 @@ import {
 } from "@/stores/currency";
 import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
-import { CategoryMetaProgress } from "@/components/domain/category-meta-progress";
 import {
   useFarmAggregatedShoppingList,
   useUpdatePurchaseList,
@@ -422,49 +421,32 @@ export function FarmPurchaseListTab({
 
       <KpiStrip>
         <KpiCell
-          label="Valor total produtos"
-          value={kpis.totalProductsValue > 0 ? fmtBrl(kpis.totalProductsValue) : "—"}
-          sub={
-            kpis.totalProductsValue > 0
-              ? "defensivos e fertilizantes"
-              : "informe preços para calcular"
-          }
+          label="Valor total"
+          value={kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—"}
           icon={<Package className="size-4" />}
         />
         <KpiCell
           label="Volume de sacas"
-          value={kpis.seedVolume > 0 ? fmtQty(kpis.seedVolume) : "—"}
-          sub={
-            kpis.seedVolume > 0
-              ? `${fmtQty(kpis.seedSacksPerHa)} sc/ha · sementes`
-              : "cultivares e híbridos"
-          }
+          value={kpis.totalSacks > 0 ? `${fmtQty(kpis.totalSacks)} sc` : "—"}
           icon={<Leaf className="size-4" />}
         />
         <KpiCell
           label="Custo (sc/ha)"
           value={
-            kpis.productCostSacksPerHa > 0
-              ? `${fmtQty(kpis.productCostSacksPerHa)} sc/ha`
+            kpis.costSacksPerHa > 0
+              ? `${fmtQty(kpis.costSacksPerHa)} sc/ha`
               : "—"
-          }
-          sub={
-            kpis.productCostSacksPerHa > 0
-              ? `÷ ${fmtBrl(saca)}/saca · ${kpis.pricedCount}/${kpis.productsCount || 0} com preço`
-              : "informe preço e saca"
           }
           icon={<Tag className="size-4" />}
         />
         <KpiCell
           label="Produtos"
           value={String(kpis.productsCount)}
-          sub={editing ? "em edição" : `${kpis.categoriesCount} categorias`}
           icon={<Package className="size-4" />}
         />
         <KpiCell
           label="Hectares"
           value={`${fmtQty(totalHa)} ha`}
-          sub={`${(list.plots ?? []).length} talhões`}
           icon={<Sprout className="size-4" />}
         />
       </KpiStrip>
@@ -477,14 +459,13 @@ export function FarmPurchaseListTab({
               {fmtQty(totalHa)} ha × nº de aplicações.
             </p>
           ) : null}
-          {kpis.categoryBreakdown.length > 0 ? (
-            <CategoryDistributionPanel breakdown={kpis.categoryBreakdown} />
+          {kpis.categoryBreakdown.length > 0 ||
+          Object.values(list.category_targets ?? {}).some((v) => (v ?? 0) > 0) ? (
+            <CategoryDistributionPanel
+              breakdown={kpis.categoryBreakdown}
+              targets={list.category_targets ?? {}}
+            />
           ) : null}
-          <CategoryMetaProgress
-            items={editing ? draftItems : viewItems}
-            totalHa={totalHa}
-            targets={list.category_targets ?? {}}
-          />
           <PurchaseListItemsEditor
             items={editing ? draftItems : viewItems}
             setItems={setDraftItems}

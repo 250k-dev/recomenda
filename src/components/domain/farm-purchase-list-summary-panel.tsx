@@ -32,7 +32,8 @@ function computeMetrics(
     return {
       totalValue: 0,
       seedVolume: 0,
-      productCostSacksPerHa: 0,
+      totalSacks: 0,
+      costSacksPerHa: 0,
       productsCount: 0,
       pricedCount: 0,
     };
@@ -124,13 +125,13 @@ export function FarmPurchaseListSummaryPanel({
         />
         <SummaryRow
           label="Volume de sacas"
-          value={metrics.seedVolume > 0 ? `${fmtQty(metrics.seedVolume)} sc` : "—"}
+          value={metrics.totalSacks > 0 ? `${fmtQty(metrics.totalSacks)} sc` : "—"}
         />
         <SummaryRow
           label="Custo (sc/ha)"
           value={
-            metrics.productCostSacksPerHa > 0
-              ? `${fmtQty(metrics.productCostSacksPerHa)} sc/ha`
+            metrics.costSacksPerHa > 0
+              ? `${fmtQty(metrics.costSacksPerHa)} sc/ha`
               : "—"
           }
         />

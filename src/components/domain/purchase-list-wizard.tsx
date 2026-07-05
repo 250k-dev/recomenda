@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Check,
+  Save,
   Sprout,
   ArrowRight,
   ArrowLeft,
@@ -11,8 +13,14 @@ import {
   Leaf,
   Type,
   Target,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  readLocalDraft,
+  clearLocalDraft,
+  useLocalDraft,
+} from "@/lib/use-local-draft";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
@@ -25,9 +33,11 @@ import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
 import { CategoryMetaProgress } from "@/components/domain/category-meta-progress";
 import {
   createPurchaseList,
+  updatePurchaseList,
   type PurchaseListDetail,
-  type PurchaseListItemInput,
+  type PurchaseListInput,
 } from "@/lib/api/client";
+import { detailItemToListItem } from "@/lib/purchase-list-breakdown";
 import { queryKeys, usePurchaseListTemplates } from "@/lib/api/hooks";
 import { CROP_LABELS } from "@/lib/season-constants";
 import {
@@ -49,12 +59,69 @@ export type PurchaseListWizardProps = {
   farmName?: string;
   /** Safra da fazenda dona da lista (fluxo novo: uma lista única por safra). */
   cycleId?: string | null;
+  /** Rascunho salvo no servidor a ser retomado (reabre o wizard preenchido). */
+  draftList?: PurchaseListDetail | null;
   onComplete: () => void;
   onCancel: () => void;
   successRedirectLabel?: string;
 };
 
 const WIZARD_STEPS = 3;
+
+/** Progresso do wizard persistido localmente (rascunho). */
+type WizardDraft = {
+  step: number;
+  crop: "SOYBEAN" | "CORN" | "ANY";
+  listName: string;
+  items: ListItem[];
+  targets: Record<string, number>;
+};
+
+/** Se o erro for "a safra já tem lista" (409), devolve o id da lista existente. */
+function existingCycleListId(e: unknown): string | null {
+  if (e && typeof e === "object" && "response" in e) {
+    const data = (
+      e as {
+        response?: {
+          data?: { code?: string; details?: { purchase_list_id?: string } };
+        };
+      }
+    ).response?.data;
+    if (data?.code === "CYCLE_LIST_EXISTS" && data.details?.purchase_list_id) {
+      return data.details.purchase_list_id;
+    }
+  }
+  return null;
+}
+
+/** Botão "Salvar rascunho" — disponível em todos os passos do wizard. */
+function SaveDraftButton({
+  onSaveDraft,
+  savingDraft,
+  size = "lg",
+}: {
+  onSaveDraft: () => void;
+  savingDraft: boolean;
+  size?: "default" | "lg";
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size={size}
+      className="gap-2"
+      onClick={onSaveDraft}
+      disabled={savingDraft}
+    >
+      {savingDraft ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Save className="h-4 w-4" />
+      )}
+      Salvar rascunho
+    </Button>
+  );
+}
 
 /** Converte um item de template (PurchaseListDetail) no item do formulário. */
 function templateItemToListItem(it: PurchaseListDetail["items"][number]): ListItem {
@@ -79,23 +146,170 @@ function templateItemToListItem(it: PurchaseListDetail["items"][number]): ListIt
   };
 }
 
+/** Monta o payload da lista (rascunho ou finalizada) a partir do estado do wizard. */
+function buildListPayload(opts: {
+  producerId: string;
+  crop: string;
+  cycleId: string | null;
+  listName: string;
+  items: ListItem[];
+  targets: Record<string, number>;
+  plots: WizardPlot[];
+  status: "draft" | "active";
+}): PurchaseListInput {
+  const {
+    fxRate: fxRaw,
+    grainPrice: grainRaw,
+    spacing: spacingRaw,
+  } = useCurrencyStore.getState();
+  const cleanedTargets = Object.fromEntries(
+    Object.entries(opts.targets).filter(([, v]) => v > 0),
+  );
+  return {
+    producer_id: opts.producerId,
+    crop: opts.crop,
+    cycle_id: opts.cycleId,
+    name: opts.listName,
+    season_id: null,
+    fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
+    grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+    spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
+    category_targets: cleanedTargets,
+    status: opts.status,
+    plots: opts.plots.map((p) => ({
+      plot_id: p.id,
+      planting_date: null,
+      desiccation_date: null,
+      cycle_days: null,
+    })),
+    items: opts.items.map((it) => listItemToPayload(it, opts.crop)),
+  };
+}
+
 export function PurchaseListWizard({
   producerId,
   producerName,
   plots,
   farmName,
   cycleId,
+  draftList,
   onComplete,
   onCancel,
   successRedirectLabel = "Ir para o produtor",
 }: PurchaseListWizardProps) {
-  const [step, setStep] = useState(1);
-  const [crop, setCrop] = useState<"SOYBEAN" | "CORN" | "ANY">("SOYBEAN");
-  const [listName, setListName] = useState("");
-  const [items, setItems] = useState<ListItem[]>([]);
-  const [targets, setTargets] = useState<Record<string, number>>({});
+  // Rascunho local: restaura o progresso ao voltar/recarregar (e sobrevive a
+  // queda de internet). Some quando a lista é criada de verdade.
+  const draftKey = `pl-draft:${cycleId ?? producerId ?? "new"}`;
+  const savedDraft = useMemo(
+    () => readLocalDraft<WizardDraft>(draftKey),
+    [draftKey],
+  );
 
+  // Retomando um rascunho do servidor: os valores dele têm prioridade sobre o
+  // rascunho local (o servidor é a fonte da verdade quando existe).
+  const [step, setStep] = useState(draftList ? 2 : (savedDraft?.step ?? 1));
+  const [crop, setCrop] = useState<"SOYBEAN" | "CORN" | "ANY">(
+    (draftList?.crop as "SOYBEAN" | "CORN" | "ANY") ?? savedDraft?.crop ?? "SOYBEAN",
+  );
+  const [listName, setListName] = useState(
+    draftList?.name ?? savedDraft?.listName ?? "",
+  );
+  const [items, setItems] = useState<ListItem[]>(
+    draftList ? draftList.items.map(detailItemToListItem) : (savedDraft?.items ?? []),
+  );
+  const [targets, setTargets] = useState<Record<string, number>>(
+    draftList?.category_targets ?? savedDraft?.targets ?? {},
+  );
+  const [saved, setSaved] = useState(false);
+  // Id da lista no servidor: já existe se estamos retomando um rascunho; passa a
+  // existir na primeira vez que "Salvar rascunho" é clicado.
+  const [listId, setListId] = useState<string | null>(draftList?.id ?? null);
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  const queryClient = useQueryClient();
   const totalHa = useMemo(() => plots.reduce((s, p) => s + p.area, 0), [plots]);
+
+  // Ao retomar um rascunho, carrega dólar/saca/espaçamento salvos nele na store.
+  useEffect(() => {
+    if (!draftList) return;
+    const store = useCurrencyStore.getState();
+    if (draftList.fx_rate_usd_brl != null) {
+      store.setFxRate(String(draftList.fx_rate_usd_brl));
+    }
+    store.setGrainPrice(
+      draftList.grain_price_brl != null ? String(draftList.grain_price_brl) : "",
+    );
+    store.setSpacing(draftList.spacing_m != null ? String(draftList.spacing_m) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftList?.id]);
+
+  // Autosave silencioso: salva o progresso no fundo enquanto a lista não é criada.
+  const draft: WizardDraft = { step, crop, listName, items, targets };
+  useLocalDraft(draftKey, draft, !saved);
+
+  // Ao criar a lista: para de autosalvar e apaga o rascunho.
+  const onSaved = () => {
+    setSaved(true);
+    clearLocalDraft(draftKey);
+  };
+
+  const invalidateAfterSave = () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.producerPurchaseLists(producerId),
+    });
+    void queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
+    if (cycleId) {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.cyclePurchaseList(cycleId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.cycleCostPlan(cycleId),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId) });
+      void queryClient.invalidateQueries({ queryKey: ["farm-cycles"] });
+    }
+  };
+
+  // "Salvar rascunho": grava a lista como `draft` no servidor (cria na 1ª vez,
+  // atualiza depois) e volta para a safra. Ao reabrir a lista, cai no rascunho.
+  const saveDraft = async () => {
+    if (savingDraft) return;
+    setSavingDraft(true);
+    try {
+      const payload = buildListPayload({
+        producerId,
+        crop,
+        cycleId: cycleId ?? null,
+        listName: listName.trim() || "Rascunho de lista",
+        items,
+        targets,
+        plots,
+        status: "draft",
+      });
+      let saved;
+      if (listId) {
+        saved = await updatePurchaseList(listId, payload);
+      } else {
+        try {
+          saved = await createPurchaseList(payload);
+        } catch (e) {
+          // Já existe uma lista para a safra (ex.: rascunho criado antes): atualiza.
+          const existing = existingCycleListId(e);
+          if (!existing) throw e;
+          saved = await updatePurchaseList(existing, payload);
+        }
+      }
+      setListId(saved.id);
+      onSaved();
+      invalidateAfterSave();
+      toast.success("Rascunho salvo. É só voltar aqui para continuar.");
+      onComplete();
+    } catch (e) {
+      toast.error(extractError(e));
+    } finally {
+      setSavingDraft(false);
+    }
+  };
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -117,6 +331,8 @@ export function PurchaseListWizard({
           setTargets={setTargets}
           onBack={onCancel}
           onNext={() => setStep(2)}
+          onSaveDraft={saveDraft}
+          savingDraft={savingDraft}
         />
       )}
       {step === 2 && (
@@ -127,10 +343,14 @@ export function PurchaseListWizard({
           setListName={setListName}
           items={items}
           setItems={setItems}
+          targets={targets}
           totalHa={totalHa}
           farmName={farmName}
           onBack={() => setStep(1)}
+          onEditTargets={() => setStep(1)}
           onNext={() => setStep(3)}
+          onSaveDraft={saveDraft}
+          savingDraft={savingDraft}
         />
       )}
       {step === 3 && (
@@ -144,9 +364,13 @@ export function PurchaseListWizard({
           items={items}
           targets={targets}
           totalHa={totalHa}
+          listId={listId}
           successRedirectLabel={successRedirectLabel}
           onBack={() => setStep(2)}
           onComplete={onComplete}
+          onSaved={onSaved}
+          onSaveDraft={saveDraft}
+          savingDraft={savingDraft}
         />
       )}
     </div>
@@ -160,10 +384,14 @@ function StepList({
   setListName,
   items,
   setItems,
+  targets,
   totalHa,
   farmName,
   onBack,
+  onEditTargets,
   onNext,
+  onSaveDraft,
+  savingDraft,
 }: {
   crop: string;
   setCrop: (v: string) => void;
@@ -171,10 +399,14 @@ function StepList({
   setListName: (v: string) => void;
   items: ListItem[];
   setItems: React.Dispatch<React.SetStateAction<ListItem[]>>;
+  targets: Record<string, number>;
   totalHa: number;
   farmName?: string;
   onBack: () => void;
+  onEditTargets: () => void;
   onNext: () => void;
+  onSaveDraft: () => void;
+  savingDraft: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const { data: templates } = usePurchaseListTemplates();
@@ -306,6 +538,26 @@ function StepList({
         </section>
       ) : null}
 
+      {/* Metas definidas no passo anterior — o agrônomo acompanha o Real × Meta
+          enquanto monta a lista, e pode voltar para editá-las. */}
+      {Object.values(targets).some((v) => (v ?? 0) > 0) ? (
+        <div className="mb-6">
+          <CategoryMetaProgress items={items} totalHa={totalHa} targets={targets} />
+          <div className="mt-2 flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={onEditTargets}
+            >
+              <Target className="h-4 w-4" />
+              Editar metas
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-5 py-3">
           <div>
@@ -348,6 +600,13 @@ function StepList({
       ) : null}
 
       <StepFooter
+        secondary={
+          <SaveDraftButton
+            onSaveDraft={onSaveDraft}
+            savingDraft={savingDraft}
+            size="default"
+          />
+        }
         primary={
           <Button onClick={next} className="gap-2">
             Próximo
@@ -377,11 +636,15 @@ function StepTargets({
   setTargets,
   onBack,
   onNext,
+  onSaveDraft,
+  savingDraft,
 }: {
   targets: Record<string, number>;
   setTargets: (next: Record<string, number>) => void;
   onBack: () => void;
   onNext: () => void;
+  onSaveDraft: () => void;
+  savingDraft: boolean;
 }) {
   // Pergunta antes de montar a lista: quer definir metas? Se já há metas
   // (voltou ao passo), abre direto nos campos.
@@ -492,6 +755,9 @@ function StepTargets({
             Voltar
           </Button>
         }
+        secondary={
+          <SaveDraftButton onSaveDraft={onSaveDraft} savingDraft={savingDraft} />
+        }
         primary={
           enabled ? (
             <Button onClick={onNext} size="lg" className="gap-2">
@@ -515,9 +781,13 @@ function StepReview({
   items,
   targets,
   totalHa,
+  listId,
   successRedirectLabel,
   onBack,
   onComplete,
+  onSaved,
+  onSaveDraft,
+  savingDraft,
 }: {
   producerId: string;
   producerName: string;
@@ -528,63 +798,66 @@ function StepReview({
   items: ListItem[];
   targets: Record<string, number>;
   totalHa: number;
+  /** Id da lista no servidor quando veio de um rascunho (finaliza via update). */
+  listId: string | null;
   successRedirectLabel: string;
   onBack: () => void;
   onComplete: () => void;
+  /** Chamado quando a lista é criada (ou já existia) — limpa o rascunho local. */
+  onSaved: () => void;
+  onSaveDraft: () => void;
+  savingDraft: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const mutation = useMutation({
-    mutationFn: () => {
-      const itemsPayload: PurchaseListItemInput[] = items.map((it) =>
-        listItemToPayload(it, crop),
-      );
-      const {
-        fxRate: fxRaw,
-        grainPrice: grainRaw,
-        spacing: spacingRaw,
-      } = useCurrencyStore.getState();
-      const cleanedTargets = Object.fromEntries(
-        Object.entries(targets).filter(([, v]) => v > 0),
-      );
-      return createPurchaseList({
-        producer_id: producerId,
-        crop,
-        cycle_id: cycleId,
-        name: listName,
-        season_id: null,
-        fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
-        grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
-        spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
-        category_targets: cleanedTargets,
-        plots: plots.map((p) => ({
-          plot_id: p.id,
-          planting_date: null,
-          desiccation_date: null,
-          cycle_days: null,
-        })),
-        items: itemsPayload,
-      });
-    },
-    onSuccess: (list) => {
-      setSavedId(list.id);
+  // Marca a lista como salva e atualiza os caches — usado tanto no sucesso quanto
+  // quando o backend responde que a lista da safra JÁ existe (envio duplicado).
+  const handleSaved = (listId: string) => {
+    setSavedId(listId);
+    setError(null);
+    onSaved();
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.producerPurchaseLists(producerId),
+    });
+    void queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
+    if (cycleId) {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.producerPurchaseLists(producerId),
+        queryKey: queryKeys.cyclePurchaseList(cycleId),
       });
-      void queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
-      if (cycleId) {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.cyclePurchaseList(cycleId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.cycleCostPlan(cycleId),
-        });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId) });
-        void queryClient.invalidateQueries({ queryKey: ["farm-cycles"] });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.cycleCostPlan(cycleId),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId) });
+      void queryClient.invalidateQueries({ queryKey: ["farm-cycles"] });
+    }
+  };
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const payload = buildListPayload({
+        producerId,
+        crop,
+        cycleId,
+        listName,
+        items,
+        targets,
+        plots,
+        status: "active",
+      });
+      // Veio de um rascunho: finaliza o MESMO registro (draft → active).
+      if (listId) return updatePurchaseList(listId, payload);
+      try {
+        return await createPurchaseList(payload);
+      } catch (e) {
+        // A safra já tem uma lista (ex.: rascunho criado em outra aba): finaliza-a.
+        const existing = existingCycleListId(e);
+        if (existing) return updatePurchaseList(existing, payload);
+        throw e;
       }
     },
+    onSuccess: (list) => handleSaved(list.id),
     onError: (e: unknown) => setError(extractError(e)),
   });
 
@@ -697,6 +970,9 @@ function StepReview({
           <Button variant="ghost" onClick={onBack} size="lg" className="gap-2">
             Voltar
           </Button>
+        }
+        secondary={
+          <SaveDraftButton onSaveDraft={onSaveDraft} savingDraft={savingDraft} />
         }
         primary={
           <Button size="lg" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
