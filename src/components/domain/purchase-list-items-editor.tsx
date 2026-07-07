@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Select, SearchableSelect } from "@/components/ui/select";
 import {
   useCloneGlobalProduct,
@@ -625,12 +626,10 @@ export function PurchaseListItemsEditor({
               {it.priceUsd ? fmtUsd(Number(it.priceUsd)) : "—"}
             </span>
           ) : (
-            <Input
-              type="number"
-              step="0.01"
+            <MoneyInput
               placeholder="US$"
               value={it.priceUsd}
-              onChange={(e) => updateItem(it.key, { priceUsd: e.target.value })}
+              onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
               className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
             />
           )}
@@ -648,12 +647,10 @@ export function PurchaseListItemsEditor({
               {fmtBrl(rowUnitBrl)}
             </span>
           ) : (
-            <Input
-              type="number"
-              step="0.01"
+            <MoneyInput
               placeholder="R$"
               value={it.price}
-              onChange={(e) => updateItem(it.key, { price: e.target.value })}
+              onValueChange={(v) => updateItem(it.key, { price: v })}
               className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
             />
           )}
@@ -874,14 +871,12 @@ export function PurchaseListItemsEditor({
           ) : (
             <div className="ml-2 flex items-center gap-1">
               <span className="text-sm text-muted-foreground">US$ 1 =</span>
-              <Input
-                type="number"
-                step="0.0001"
+              <MoneyInput
                 placeholder="5,50"
                 value={fxRate}
-                onChange={(e) => {
+                onValueChange={(v) => {
                   fxUserEditedRef.current = true;
-                  setFxRate(e.target.value);
+                  setFxRate(v);
                 }}
                 className="h-8 w-24"
               />
@@ -908,12 +903,10 @@ export function PurchaseListItemsEditor({
           ) : (
             <div className="ml-2 flex items-center gap-1">
               <span className="text-sm text-muted-foreground">R$</span>
-              <Input
-                type="number"
-                step="0.01"
+              <MoneyInput
                 placeholder="110,00"
                 value={grainPrice}
-                onChange={(e) => setGrainPrice(e.target.value)}
+                onValueChange={(v) => setGrainPrice(v)}
                 className="h-8 w-24"
               />
             </div>
@@ -1182,12 +1175,10 @@ export function PurchaseListItemsEditor({
                     />
                   </Field>
                   <Field label="Preço US$/un.">
-                    <Input
-                      type="number"
-                      step="0.01"
+                    <MoneyInput
                       placeholder="US$"
                       value={it.priceUsd}
-                      onChange={(e) => updateItem(it.key, { priceUsd: e.target.value })}
+                      onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
                     />
                   </Field>
                   <Field label="Preço R$/un.">
@@ -1197,12 +1188,10 @@ export function PurchaseListItemsEditor({
                         <span className="ml-1 text-[10px]">(do US$)</span>
                       </div>
                     ) : (
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <MoneyInput
                         placeholder="R$"
                         value={it.price}
-                        onChange={(e) => updateItem(it.key, { price: e.target.value })}
+                        onValueChange={(v) => updateItem(it.key, { price: v })}
                       />
                     )}
                   </Field>

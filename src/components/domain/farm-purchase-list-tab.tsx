@@ -16,6 +16,12 @@ import {
   DEFAULT_SPACING_M,
 } from "@/stores/currency";
 import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
+import {
+  readLocalDraft,
+  clearLocalDraft,
+  useLocalDraft,
+} from "@/lib/use-local-draft";
+import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
 import {
   useFarmAggregatedShoppingList,
@@ -40,6 +46,42 @@ const fmtQty = (n: number) =>
 
 const fmtBrl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+
+/** Indicador do estado do autosave durante a edição da lista. */
+function SaveStatus({
+  state,
+  savedAt,
+}: {
+  state: "idle" | "saving" | "saved" | "error";
+  savedAt: Date | null;
+}) {
+  if (state === "saving") {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…
+      </span>
+    );
+  }
+  if (state === "saved") {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-primary-strong">
+        <Check className="h-3.5 w-3.5" />
+        Salvo
+        {savedAt
+          ? ` ${savedAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+          : ""}
+      </span>
+    );
+  }
+  if (state === "error") {
+    return (
+      <span className="flex items-center gap-1.5 text-xs font-medium text-warning-strong">
+        <X className="h-3.5 w-3.5" /> Não salvo
+      </span>
+    );
+  }
+  return null;
+}
 
 function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem {
   return {
@@ -118,6 +160,17 @@ export function FarmPurchaseListTab({
   const [showComparison, setShowComparison] = useState(false);
   const quotesSectionRef = useRef<HTMLDivElement>(null);
 
+  // Rede de segurança do autosave: além de gravar no servidor, guarda os itens em
+  // edição no navegador (localStorage). O servidor pode falhar calado (servidor
+  // free "acordando", ou item incompleto que bloqueia o autosave); o backup local
+  // não. Some quando um save de verdade dá certo.
+  const editDraftKey = `pl-edit:${list?.id ?? "none"}`;
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [restoreItems, setRestoreItems] = useState<ListItem[] | null>(null);
+
   const toggleQuotesComparison = useCallback(() => {
     setShowComparison((prev) => {
       const next = !prev;
@@ -143,13 +196,31 @@ export function FarmPurchaseListTab({
   // Reseta o estado local quando a lista selecionada muda — padrão recomendado
   // pelo React (https://react.dev/learn/you-might-not-need-an-effect) em vez de
   // setState dentro de useEffect.
-  const [trackedListId, setTrackedListId] = useState(list?.id);
+  // Inicia como `undefined` (não `list?.id`) para o bloco abaixo rodar também no
+  // primeiro render — inclusive quando a lista já vem do cache.
+  const [trackedListId, setTrackedListId] = useState<string | undefined>(undefined);
   if (list?.id !== trackedListId) {
     setTrackedListId(list?.id);
     setError(null);
     setShowComparison(false);
     setEditing(false);
     setDraftItems(list ? (list.items ?? []).map(detailItemToListItem) : []);
+    setSaveState("idle");
+    setSavedAt(null);
+    // Havia trabalho não salvo guardado localmente? (o último autosave pode ter
+    // falhado calado — servidor frio ou item incompleto.) Só oferece restaurar
+    // quando o backup DIFERE do que está salvo no servidor — evita falso alarme.
+    const backup = list
+      ? readLocalDraft<{ items: ListItem[] }>(`pl-edit:${list.id}`)
+      : null;
+    const serverItems = list
+      ? (list.items ?? []).map(detailItemToListItem)
+      : [];
+    const hasUnsaved =
+      !!backup?.items &&
+      backup.items.length > 0 &&
+      JSON.stringify(backup.items) !== JSON.stringify(serverItems);
+    setRestoreItems(hasUnsaved ? backup!.items : null);
   }
 
   // Carrega a cotação e o preço da saca salvos desta lista no store — em efeito,
@@ -176,6 +247,23 @@ export function FarmPurchaseListTab({
     setError(null);
     resetDraft();
     setEditing(false);
+    // Cancelar = descartar as alterações, inclusive o backup local.
+    clearLocalDraft(editDraftKey);
+    setRestoreItems(null);
+    setSaveState("idle");
+  };
+
+  // Restaura alterações não salvas guardadas no navegador (abre em modo edição).
+  const restoreBackup = () => {
+    if (!restoreItems) return;
+    setDraftItems(restoreItems);
+    setError(null);
+    setSaveState("idle");
+    setEditing(true);
+  };
+  const discardBackup = () => {
+    clearLocalDraft(editDraftKey);
+    setRestoreItems(null);
   };
 
   const saveItems = async (opts?: { silent?: boolean }) => {
@@ -189,6 +277,7 @@ export function FarmPurchaseListTab({
     }
 
     try {
+      setSaveState("saving");
       const {
         fxRate: fxRaw,
         grainPrice: grainRaw,
@@ -206,11 +295,18 @@ export function FarmPurchaseListTab({
           cycle_days: p.cycle_days,
         })),
       });
+      // Salvou de verdade no servidor: pode descartar o backup local.
+      setSaveState("saved");
+      setSavedAt(new Date());
+      clearLocalDraft(editDraftKey);
+      setRestoreItems(null);
       if (!opts?.silent) {
         toast.success("Lista de compra atualizada.");
         setEditing(false);
       }
     } catch (e) {
+      // NÃO engole o erro: marca "não salvo" (o backup local continua guardado).
+      setSaveState("error");
       if (!opts?.silent) {
         setError(e instanceof Error ? e.message : "Não foi possível salvar a lista.");
       }
@@ -218,19 +314,25 @@ export function FarmPurchaseListTab({
   };
 
   // Autosave dos itens em edição: persiste sozinho após pausa na digitação,
-  // mantendo o modo de edição aberto (o Salvar manual continua como está).
-  const draftRef = useRef(draftItems);
-  draftRef.current = draftItems;
+  // mantendo o modo de edição aberto (o Salvar manual continua como está). O
+  // efeito depende de `draftItems`, então o closure já tem sempre o valor atual.
   useEffect(() => {
     if (!editing || !list || draftItems.length === 0) return;
     const timer = setTimeout(() => {
-      if (validateItems(draftRef.current) === null) {
+      if (validateItems(draftItems) === null) {
         void saveItems({ silent: true });
       }
     }, 2500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftItems, editing, list?.id]);
+
+  // Backup local contínuo (400ms) enquanto edita — guarda QUALQUER estado, mesmo
+  // inválido ou incompleto, então nada se perde se o autosave do servidor falhar.
+  useLocalDraft(editDraftKey, { items: draftItems }, editing && Boolean(list));
+
+  // Trava: editando e ainda não confirmado como salvo → avisa antes de sair.
+  useUnsavedChangesWarning(editing && saveState !== "saved");
 
   const viewItems = useMemo(
     () => (list?.items ?? []).map(detailItemToListItem),
@@ -343,6 +445,7 @@ export function FarmPurchaseListTab({
         <div className="flex flex-wrap items-center gap-2">
           {editing ? (
             <>
+              <SaveStatus state={saveState} savedAt={savedAt} />
               <Button
                 variant="outline"
                 size="sm"
@@ -418,6 +521,31 @@ export function FarmPurchaseListTab({
           )}
         </div>
       </div>
+
+      {restoreItems && !editing && !readOnly ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
+          <span className="flex items-center gap-2">
+            Há alterações desta lista <strong>não salvas</strong> guardadas neste
+            navegador (o último salvamento pode ter falhado). Quer recuperá-las?
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            <Button size="sm" variant="clay" className="gap-1.5" onClick={restoreBackup}>
+              Recuperar
+            </Button>
+            <Button size="sm" variant="outline" onClick={discardBackup}>
+              Descartar
+            </Button>
+          </span>
+        </div>
+      ) : null}
+
+      {saveState === "error" && editing ? (
+        <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
+          Não foi possível salvar no servidor agora — suas alterações estão{" "}
+          <strong>guardadas neste navegador</strong>. Tente <strong>Salvar</strong>{" "}
+          de novo em alguns segundos (o servidor pode estar reativando).
+        </div>
+      ) : null}
 
       <KpiStrip>
         <KpiCell

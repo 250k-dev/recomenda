@@ -137,20 +137,20 @@ export default function DashboardPage() {
               {greeting()}
               {firstName ? `, ${firstName}` : ""}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <div className="mt-1 text-sm text-muted-foreground">
               {agenda.isLoading ? (
                 <Skeleton className="mt-0.5 h-4 w-72 max-w-full" />
               ) : (
-                <>
+                <p>
                   Você tem{" "}
                   <b className="text-text-strong">
                     {agenda.lateCount} aplicaç{agenda.lateCount === 1 ? "ão" : "ões"}{" "}
                     atrasada{agenda.lateCount === 1 ? "" : "s"}
                   </b>{" "}
                   e <b className="text-text-strong">{agenda.todayCount} para hoje</b>.
-                </>
+                </p>
               )}
-            </p>
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2.5">

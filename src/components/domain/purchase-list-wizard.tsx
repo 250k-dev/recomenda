@@ -38,6 +38,7 @@ import {
   type PurchaseListInput,
 } from "@/lib/api/client";
 import { detailItemToListItem } from "@/lib/purchase-list-breakdown";
+import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 import { queryKeys, usePurchaseListTemplates } from "@/lib/api/hooks";
 import { CROP_LABELS } from "@/lib/season-constants";
 import {
@@ -205,20 +206,21 @@ export function PurchaseListWizard({
     [draftKey],
   );
 
-  // Retomando um rascunho do servidor: os valores dele têm prioridade sobre o
-  // rascunho local (o servidor é a fonte da verdade quando existe).
-  const [step, setStep] = useState(draftList ? 2 : (savedDraft?.step ?? 1));
+  // O rascunho LOCAL (localStorage, atualizado a cada digitação e só apagado após
+  // salvar de verdade) é o estado mais fresco — tem prioridade sobre o rascunho do
+  // servidor, senão reabrir um rascunho poderia descartar o que ainda não subiu.
+  const [step, setStep] = useState(savedDraft?.step ?? (draftList ? 2 : 1));
   const [crop, setCrop] = useState<"SOYBEAN" | "CORN" | "ANY">(
-    (draftList?.crop as "SOYBEAN" | "CORN" | "ANY") ?? savedDraft?.crop ?? "SOYBEAN",
+    savedDraft?.crop ?? (draftList?.crop as "SOYBEAN" | "CORN" | "ANY") ?? "SOYBEAN",
   );
   const [listName, setListName] = useState(
-    draftList?.name ?? savedDraft?.listName ?? "",
+    savedDraft?.listName ?? draftList?.name ?? "",
   );
   const [items, setItems] = useState<ListItem[]>(
-    draftList ? draftList.items.map(detailItemToListItem) : (savedDraft?.items ?? []),
+    savedDraft?.items ?? (draftList ? draftList.items.map(detailItemToListItem) : []),
   );
   const [targets, setTargets] = useState<Record<string, number>>(
-    draftList?.category_targets ?? savedDraft?.targets ?? {},
+    savedDraft?.targets ?? draftList?.category_targets ?? {},
   );
   const [saved, setSaved] = useState(false);
   // Id da lista no servidor: já existe se estamos retomando um rascunho; passa a
@@ -246,6 +248,15 @@ export function PurchaseListWizard({
   // Autosave silencioso: salva o progresso no fundo enquanto a lista não é criada.
   const draft: WizardDraft = { step, crop, listName, items, targets };
   useLocalDraft(draftKey, draft, !saved);
+
+  // Trava contra perder trabalho: avisa antes de fechar/recarregar/sair com itens
+  // não salvos. O rascunho local acima restaura o progresso ao voltar.
+  const hasUnsavedProgress =
+    !saved &&
+    (items.length > 0 ||
+      listName.trim() !== "" ||
+      Object.values(targets).some((v) => (v ?? 0) > 0));
+  useUnsavedChangesWarning(hasUnsavedProgress);
 
   // Ao criar a lista: para de autosalvar e apaga o rascunho.
   const onSaved = () => {

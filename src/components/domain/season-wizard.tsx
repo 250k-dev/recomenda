@@ -56,6 +56,7 @@ import {
   clearLocalDraft,
   useLocalDraft,
 } from "@/lib/use-local-draft";
+import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 
 export type SeasonWizardProps = {
   producerId: string;
@@ -150,6 +151,16 @@ export function SeasonWizard({
   };
   useLocalDraft(draftKey, draft, !saved);
 
+  // Trava contra perder trabalho: se há progresso não salvo, o navegador avisa
+  // antes de fechar/recarregar/sair. O rascunho local acima já restaura ao voltar.
+  const hasUnsavedProgress =
+    !saved &&
+    (timingTemplateId !== "" ||
+      draftStages.some((s) => s.products.length > 0) ||
+      schedules.some((s) => s.plantingDate || s.variety || s.cycleDays) ||
+      selectedPlotIds.size > 0);
+  useUnsavedChangesWarning(hasUnsavedProgress);
+
   const onSaved = () => {
     setSaved(true);
     clearLocalDraft(draftKey);
@@ -171,7 +182,7 @@ export function SeasonWizard({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-2 flex items-center gap-3">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-primary transition-all"
@@ -182,6 +193,15 @@ export function SeasonWizard({
           Passo {step} de {WIZARD_STEPS}
         </span>
       </div>
+      {hasUnsavedProgress ? (
+        <p className="mb-5 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Check className="h-3.5 w-3.5 text-primary-strong" />
+          Progresso salvo automaticamente neste navegador — você não perde o
+          preenchimento se recarregar ou cair a conexão.
+        </p>
+      ) : (
+        <div className="mb-5" />
+      )}
 
       <ConfirmDialog
         open={noQuota && !quotaAck}
