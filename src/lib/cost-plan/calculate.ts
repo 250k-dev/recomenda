@@ -111,12 +111,14 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
     if (item.deduct_stock) G = G - stock;
   } else if (item.calc_rule === "SEED_BAGS") {
     G = (item.population_base ?? 0) * 25;
-  } else if (!item.deduct_stock) {
-    G = dose * area * nApps;
-  } else if (item.area_factor < 1) {
-    G = (dose * area * nApps - stock) * item.area_factor;
   } else {
-    G = dose * area * nApps - stock;
+    // Espelha a planilha: `(dose × área × aplicações − estoque) × %`. O fator de
+    // área vale sempre — inclusive quando o estoque não é descontado.
+    const base = dose * area * nApps;
+    const afterStock = item.deduct_stock ? base - stock : base;
+    const factor =
+      Number.isFinite(item.area_factor) && item.area_factor > 0 ? item.area_factor : 1;
+    G = afterStock * factor;
   }
 
   // I — Preço unitário R$

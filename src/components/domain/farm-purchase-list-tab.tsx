@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, Eye, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, X, Check, Loader2 } from "lucide-react";
+import { Boxes, Eye, FileDown, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -15,7 +15,10 @@ import {
   DEFAULT_GRAIN_PRICE_BRL,
   DEFAULT_SPACING_M,
 } from "@/stores/currency";
-import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
+import {
+  computePurchaseListMetrics,
+  detailItemToListItem,
+} from "@/lib/purchase-list-breakdown";
 import {
   readLocalDraft,
   clearLocalDraft,
@@ -40,6 +43,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
+import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -81,29 +85,6 @@ function SaveStatus({
     );
   }
   return null;
-}
-
-function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem {
-  return {
-    key: it.id,
-    category: it.category ?? "OTHER",
-    productId: it.local_product_id,
-    productName: it.product_name,
-    stage: it.stage,
-    dose: String(it.dose_per_hectare),
-    unit: it.dose_unit,
-    nApps: String(it.n_applications),
-    stock: String(it.current_stock),
-    price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
-    priceUsd: it.price_usd != null ? String(it.price_usd) : "",
-    seedsPerMeter: it.seeds_per_meter != null ? String(it.seeds_per_meter) : "",
-    cycleDays: it.cycle_days != null ? String(it.cycle_days) : "",
-    thousandPlants:
-      it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
-    seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
-    bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
-    outOfProgram: it.out_of_program || undefined,
-  };
 }
 
 function listItemsToPayload(items: ListItem[], listCrop?: string | null): PurchaseListItemInput[] {
@@ -158,6 +139,7 @@ export function FarmPurchaseListTab({
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const quotesSectionRef = useRef<HTMLDivElement>(null);
 
   // Rede de segurança do autosave: além de gravar no servidor, guarda os itens em
@@ -283,17 +265,15 @@ export function FarmPurchaseListTab({
         grainPrice: grainRaw,
         spacing: spacingRaw,
       } = useCurrencyStore.getState();
+      // NÃO envia `plots`: esta tela edita ITENS. Os talhões da lista vêm da
+      // cobertura da safra (ou do retrato gravado na criação) e não devem ser
+      // reescritos aqui — mandar uma lista vazia (cache velho) apagava os
+      // talhões no servidor e zerava a área, quebrando o cálculo dos defensivos.
       await updateMutation.mutateAsync({
         items: listItemsToPayload(draftItems, list.crop),
         fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
         grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
         spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
-        plots: (list.plots ?? []).map((p) => ({
-          plot_id: p.plot_id,
-          planting_date: p.planting_date,
-          desiccation_date: p.desiccation_date,
-          cycle_days: p.cycle_days,
-        })),
       });
       // Salvou de verdade no servidor: pode descartar o backup local.
       setSaveState("saved");
@@ -313,11 +293,31 @@ export function FarmPurchaseListTab({
     }
   };
 
+  // Itens como estão no servidor (fonte da verdade da visualização).
+  const viewItems = useMemo(
+    () => (list?.items ?? []).map(detailItemToListItem),
+    [list?.items],
+  );
+
   // Autosave dos itens em edição: persiste sozinho após pausa na digitação,
   // mantendo o modo de edição aberto (o Salvar manual continua como está). O
   // efeito depende de `draftItems`, então o closure já tem sempre o valor atual.
+  //
+  // Só grava se o rascunho DIFERE do que está no servidor. Sem essa trava, abrir
+  // a edição e esperar 2,5s já disparava um save do estado semeado — se esse
+  // estado viesse de um cache velho, o servidor era sobrescrito com dados antigos.
+  // Compara pelo PAYLOAD, não pelo estado bruto: itens recém-adicionados têm
+  // chave local (`i-…`) enquanto os do servidor têm o id do banco, então comparar
+  // `draftItems` com `viewItems` diretamente daria "sujo" para sempre — e o
+  // autosave entraria em laço (salva → refetch → salva…).
+  const draftIsDirty = useMemo(
+    () =>
+      JSON.stringify(listItemsToPayload(draftItems, list?.crop)) !==
+      JSON.stringify(listItemsToPayload(viewItems, list?.crop)),
+    [draftItems, viewItems, list?.crop],
+  );
   useEffect(() => {
-    if (!editing || !list || draftItems.length === 0) return;
+    if (!editing || !list || draftItems.length === 0 || !draftIsDirty) return;
     const timer = setTimeout(() => {
       if (validateItems(draftItems) === null) {
         void saveItems({ silent: true });
@@ -325,7 +325,7 @@ export function FarmPurchaseListTab({
     }, 2500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftItems, editing, list?.id]);
+  }, [draftItems, editing, list?.id, draftIsDirty]);
 
   // Backup local contínuo (400ms) enquanto edita — guarda QUALQUER estado, mesmo
   // inválido ou incompleto, então nada se perde se o autosave do servidor falhar.
@@ -334,10 +334,6 @@ export function FarmPurchaseListTab({
   // Trava: editando e ainda não confirmado como salvo → avisa antes de sair.
   useUnsavedChangesWarning(editing && saveState !== "saved");
 
-  const viewItems = useMemo(
-    () => (list?.items ?? []).map(detailItemToListItem),
-    [list?.items],
-  );
   const totalHa = list?.total_hectares ?? 0;
   const fxRate = useCurrencyStore((state) => state.fxRate);
   const fx = Number(fxRate) || 0;
@@ -478,6 +474,15 @@ export function FarmPurchaseListTab({
                   Editar lista
                 </Button>
               ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setExportOpen(true)}
+              >
+                <FileDown className="h-4 w-4" />
+                Exportar
+              </Button>
               <ShareQuoteSheet listId={list.id} listName={list.name} />
               <Button
                 variant={showComparison ? "clay" : "outline"}
@@ -633,9 +638,15 @@ export function FarmPurchaseListTab({
               · preços por loja (somente você vê esta comparação)
             </span>
           </div>
-          <QuoteComparisonSection listId={list.id} />
+          <QuoteComparisonSection listId={list.id} listName={list.name} />
         </div>
       ) : null}
+
+      <PurchaseListExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        list={list}
+      />
     </div>
   );
 }

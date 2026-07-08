@@ -21,6 +21,12 @@ export interface CycleSummary {
   is_planning: boolean;
 }
 
+/** Uma variedade plantada num talhão, com a área que ocupa. */
+export interface SeasonVariety {
+  variety: string;
+  planted_area_ha: number | null;
+}
+
 export interface CycleSeasonRow {
   id: string;
   plot_id: string;
@@ -28,7 +34,10 @@ export interface CycleSeasonRow {
   plot_area_ha: number;
   planted_area_ha: number | null;
   crop: string;
+  /** Variedade primária (compat) — é `varieties[0]`. */
   variety: string | null;
+  /** Todas as variedades do talhão (pode ser mais de uma, com áreas próprias). */
+  varieties: SeasonVariety[];
   status: string;
   planting_date: string | null;
   desiccation_date: string | null;
@@ -111,7 +120,10 @@ export interface CycleCostPlan {
 export interface BlockPlotInput {
   plot_id: string;
   crop: string;
+  /** Compat: variedade única. Prefira `varieties`. */
   variety?: string | null;
+  /** Uma ou mais variedades, cada uma com sua área plantada. */
+  varieties?: SeasonVariety[];
   planting_date?: string | null;
   desiccation_date?: string | null;
   cycle_days?: number | null;

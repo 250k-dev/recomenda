@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -14,8 +15,18 @@ import {
   Type,
   Target,
   Loader2,
+  BookmarkPlus,
+  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   readLocalDraft,
   clearLocalDraft,
@@ -39,7 +50,12 @@ import {
 } from "@/lib/api/client";
 import { detailItemToListItem } from "@/lib/purchase-list-breakdown";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
-import { queryKeys, usePurchaseListTemplates } from "@/lib/api/hooks";
+import {
+  queryKeys,
+  usePurchaseListTemplates,
+  useCreatePurchaseListTemplate,
+} from "@/lib/api/hooks";
+import { apiErrorMessage } from "@/lib/api-error";
 import { CROP_LABELS } from "@/lib/season-constants";
 import {
   FieldError,
@@ -47,6 +63,7 @@ import {
   SummaryCard,
   fmt,
   extractError,
+  listItemToBuy,
   listItemToPayload,
   validateListItems,
   type ListItem,
@@ -525,27 +542,40 @@ function StepList({
         </div>
       </section>
 
-      {items.length === 0 && templates && templates.length > 0 ? (
+      {items.length === 0 ? (
         <section className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
-          <p className="text-sm font-semibold text-foreground">Começar de um template</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Importe um modelo pronto e ajuste o que precisar. Você ainda escolhe os talhões no
-            próximo passo.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {templates.map((tpl) => (
-              <Button
-                key={tpl.id}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => importTemplate(tpl)}
-              >
-                {tpl.name}
-                <span className="ml-1 text-muted-foreground">· {tpl.items.length}</span>
-              </Button>
-            ))}
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">Começar de um template</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {templates && templates.length > 0
+                  ? "Importe um modelo pronto e ajuste o que precisar. Você ainda escolhe os talhões no próximo passo."
+                  : "Você ainda não tem templates. Crie um para reaproveitar listas em outras safras."}
+              </p>
+            </div>
+            <Button asChild type="button" variant="outline" size="sm" className="gap-1.5">
+              <Link href="/compra-templates" target="_blank" rel="noopener noreferrer">
+                <Settings2 className="h-4 w-4" />
+                Criar/gerenciar templates
+              </Link>
+            </Button>
           </div>
+          {templates && templates.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {templates.map((tpl) => (
+                <Button
+                  key={tpl.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => importTemplate(tpl)}
+                >
+                  {tpl.name}
+                  <span className="ml-1 text-muted-foreground">· {tpl.items.length}</span>
+                </Button>
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -823,6 +853,39 @@ function StepReview({
   const [savedId, setSavedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
+  // "Salvar como template": grava os itens atuais como modelo reutilizável
+  // (sem talhões/produtor), sem interferir na lista de compra em si.
+  const createTemplate = useCreatePurchaseListTemplate();
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateError, setTemplateError] = useState<string | null>(null);
+
+  const openTemplateDialog = () => {
+    setTemplateError(null);
+    setTemplateName(listName.trim());
+    setTemplateOpen(true);
+  };
+
+  const saveAsTemplate = async () => {
+    setTemplateError(null);
+    if (!templateName.trim()) {
+      setTemplateError("Dê um nome para o template.");
+      return;
+    }
+    try {
+      await createTemplate.mutateAsync({
+        crop,
+        name: templateName.trim(),
+        plots: [],
+        items: items.map((it) => listItemToPayload(it, crop)),
+      });
+      toast.success("Template salvo.");
+      setTemplateOpen(false);
+    } catch (e) {
+      setTemplateError(apiErrorMessage(e, "Não foi possível salvar o template."));
+    }
+  };
+
   // Marca a lista como salva e atualiza os caches — usado tanto no sucesso quanto
   // quando o backend responde que a lista da safra JÁ existe (envio duplicado).
   const handleSaved = (listId: string) => {
@@ -872,10 +935,7 @@ function StepReview({
     onError: (e: unknown) => setError(extractError(e)),
   });
 
-  const totalToBuy = items.reduce((s, it) => {
-    const req = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
-    return s + Math.max(0, req - Number(it.stock || 0));
-  }, 0);
+  const totalToBuy = items.reduce((s, it) => s + listItemToBuy(it, totalHa), 0);
 
   if (savedId) {
     return (
@@ -940,8 +1000,7 @@ function StepReview({
 
         <div className="mt-3 flex flex-col gap-2">
           {items.map((it) => {
-            const req = Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
-            const toBuy = Math.max(0, req - Number(it.stock || 0));
+            const toBuy = listItemToBuy(it, totalHa);
             return (
               <div
                 key={it.key}
@@ -983,7 +1042,19 @@ function StepReview({
           </Button>
         }
         secondary={
-          <SaveDraftButton onSaveDraft={onSaveDraft} savingDraft={savingDraft} />
+          <>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={openTemplateDialog}
+              disabled={items.length === 0}
+              className="gap-2"
+            >
+              <BookmarkPlus className="h-4 w-4" />
+              Salvar como template
+            </Button>
+            <SaveDraftButton onSaveDraft={onSaveDraft} savingDraft={savingDraft} />
+          </>
         }
         primary={
           <Button size="lg" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
@@ -992,6 +1063,40 @@ function StepReview({
           </Button>
         }
       />
+
+      <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar como template</DialogTitle>
+            <DialogDescription>
+              Guarda os produtos desta lista como um modelo reutilizável (sem talhões nem
+              produtor). Você pode importá-lo em outras safras.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="template-name">Nome do template</Label>
+            <Input
+              id="template-name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Ex: Soja — dessecação + plantio"
+            />
+            {templateError ? <FieldError message={templateError} /> : null}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTemplateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void saveAsTemplate()}
+              disabled={createTemplate.isPending}
+              className="gap-2"
+            >
+              {createTemplate.isPending ? "Salvando…" : "Salvar template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

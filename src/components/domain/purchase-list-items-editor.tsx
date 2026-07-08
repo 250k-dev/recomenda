@@ -33,8 +33,10 @@ import {
   fmt,
   fmtArea,
   areaFromBags,
+  areaFactorOf,
   isSeedItem,
   listItemQuantity,
+  listItemToBuy,
   populationFromSeeds,
   seedQuantityUnitLabel,
   DEFAULT_SPACING_M,
@@ -57,6 +59,15 @@ type PurchaseListItemsEditorProps = {
   className?: string;
   readOnly?: boolean;
 };
+
+/** Chave estável e única de item. A antiga (`Date.now()`+índice) colidia ao
+ *  remover e re-adicionar no mesmo milissegundo, fazendo `updateItem` editar
+ *  dois itens de uma vez. */
+let itemKeySeq = 0;
+function newItemKey(): string {
+  itemKeySeq += 1;
+  return `i-${itemKeySeq}-${globalThis.crypto?.randomUUID?.() ?? itemKeySeq}`;
+}
 
 function toProductOptionValue(item: ListItem): string {
   return item.productId;
@@ -122,7 +133,7 @@ export function PurchaseListItemsEditor({
     setItems((prev) => [
       ...prev,
       {
-        key: `i-${Date.now()}-${prev.length}`,
+        key: newItemKey(),
         category: "",
         productId: "",
         productName: "",
@@ -145,7 +156,7 @@ export function PurchaseListItemsEditor({
     setItems((prev) => [
       ...prev,
       {
-        key: `i-${Date.now()}-${prev.length}`,
+        key: newItemKey(),
         category,
         productId: "",
         productName: "",
@@ -258,8 +269,7 @@ export function PurchaseListItemsEditor({
 
   const totals = items.reduce(
     (acc, it) => {
-      const required = listItemQuantity(it, totalHa);
-      const toBuy = Math.max(0, required - Number(it.stock || 0));
+      const toBuy = listItemToBuy(it, totalHa);
       acc.brl += toBuy * unitBrl(it);
       acc.usd += toBuy * unitUsd(it);
       return acc;
@@ -425,7 +435,7 @@ export function PurchaseListItemsEditor({
   const renderRow = (it: ListItem) => {
     const seed = isSeedItem(it);
     const required = listItemQuantity(it, totalHa);
-    const toBuy = Math.max(0, required - Number(it.stock || 0));
+    const toBuy = listItemToBuy(it, totalHa);
     const rowUnitBrl = unitBrl(it);
     const rowUnitUsd = unitUsd(it);
     const totalValue = toBuy * rowUnitBrl;
@@ -603,6 +613,41 @@ export function PurchaseListItemsEditor({
                 />
               )}
             </td>
+            {/* % da área — aplica só a essa fração (ex.: 20% da fazenda). */}
+            <td className="px-1.5 py-1.5 text-right">
+              {readOnly ? (
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {fmt(areaFactorOf(it) * 100)}%
+                </span>
+              ) : (
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={it.areaPercent ?? ""}
+                  placeholder="100"
+                  title="Percentual da área total em que o produto é aplicado"
+                  onChange={(e) => updateItem(it.key, { areaPercent: e.target.value })}
+                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                />
+              )}
+            </td>
+            {/* Observação de área — informativa, aparece no PDF do produtor. */}
+            <td className="px-1.5 py-1.5">
+              {readOnly ? (
+                <span className="block truncate text-sm text-muted-foreground">
+                  {it.areaNote || "—"}
+                </span>
+              ) : (
+                <Input
+                  value={it.areaNote ?? ""}
+                  placeholder="Ex: áreas sujas"
+                  onChange={(e) => updateItem(it.key, { areaNote: e.target.value })}
+                  className="h-8 w-full min-w-0 px-2 text-sm"
+                />
+              )}
+            </td>
           </>
         )}
         <td className="px-1.5 py-1.5 text-right">
@@ -611,11 +656,11 @@ export function PurchaseListItemsEditor({
               {fmt(Number(it.stock || 0))}
             </span>
           ) : (
-            <Input
-              type="number"
-              step="0.01"
+            // pt-BR: aceita "1.410,5". `type="number"` leria o ponto de milhar
+            // como decimal e viraria 1,41.
+            <MoneyInput
               value={it.stock}
-              onChange={(e) => updateItem(it.key, { stock: e.target.value })}
+              onValueChange={(v) => updateItem(it.key, { stock: v })}
               className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
             />
           )}
@@ -716,14 +761,16 @@ export function PurchaseListItemsEditor({
     items: ListItem[];
   }) => {
     const seedBand = band.seed;
-    const colCount = seedBand ? (readOnly ? 14 : 15) : readOnly ? 12 : 13;
+    // Defensivos ganham 2 colunas extras (% área + obs. área): +264px, o que
+    // iguala a contagem de colunas das duas bandas.
+    const colCount = readOnly ? 14 : 15;
     const tableWidth = seedBand
       ? readOnly
         ? "w-[1752px]"
         : "w-[1796px]"
       : readOnly
-        ? "w-[1580px]"
-        : "w-[1624px]";
+        ? "w-[1844px]"
+        : "w-[1888px]";
     return (
       <div
         key={band.id}
@@ -756,6 +803,9 @@ export function PurchaseListItemsEditor({
                 <col className="w-[120px]" />
                 <col className="w-[120px]" />
                 <col className="w-[120px]" />
+                {/* % área + obs. área */}
+                <col className="w-[104px]" />
+                <col className="w-[160px]" />
                 <col className="w-[104px]" />
                 <col className="w-[120px]" />
                 <col className="w-[128px]" />
@@ -808,6 +858,8 @@ export function PurchaseListItemsEditor({
                   <td className="px-1.5 py-2 text-right leading-tight">Dose</td>
                   <td className="px-1.5 py-2 text-right leading-tight">Un.</td>
                   <td className="px-1.5 py-2 text-right leading-tight">Nº apl.</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">% área</td>
+                  <td className="px-1.5 py-2 text-left leading-tight">Obs. área</td>
                 </>
               )}
               {sharedHeaderCells}
@@ -835,11 +887,11 @@ export function PurchaseListItemsEditor({
   ].filter((b) => b.items.length > 0);
 
   // Item 14: avisa quando o volume recomendado ultrapassa o estoque disponível.
+  // O excedente é o que de fato se compra — já com o % da área aplicado.
   const stockWarnings = items
     .map((it) => {
-      const required = listItemQuantity(it, totalHa);
       const stock = Number(it.stock || 0);
-      const excess = required - stock;
+      const excess = listItemToBuy(it, totalHa);
       if (stock <= 0 || excess <= 0) return null;
       const unit = isSeedItem(it) ? seedQuantityUnitLabel(it.category) : it.unit;
       return { key: it.key, name: it.productName || "Produto", excess, unit };
@@ -994,8 +1046,7 @@ export function PurchaseListItemsEditor({
         ) : readOnly ? (
           items.map((it) => {
             const seed = isSeedItem(it);
-            const required = listItemQuantity(it, totalHa);
-            const toBuy = Math.max(0, required - Number(it.stock || 0));
+            const toBuy = listItemToBuy(it, totalHa);
             const rowUnitBrl = unitBrl(it);
             const rowUnitUsd = unitUsd(it);
             const hasPrice = Boolean(it.price || it.priceUsd);
@@ -1061,7 +1112,7 @@ export function PurchaseListItemsEditor({
             );
             const seed = isSeedItem(it);
             const required = listItemQuantity(it, totalHa);
-            const toBuy = Math.max(0, required - Number(it.stock || 0));
+            const toBuy = listItemToBuy(it, totalHa);
             return (
               <div key={it.key} className="rounded-xl border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -1164,14 +1215,35 @@ export function PurchaseListItemsEditor({
                           onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
                         />
                       </Field>
+                      <Field
+                        label="% da área"
+                        hint="Fração da área onde aplica. Vazio = área toda."
+                      >
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.01"
+                          placeholder="100"
+                          value={it.areaPercent ?? ""}
+                          onChange={(e) =>
+                            updateItem(it.key, { areaPercent: e.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="Observação da área" hint="Só aparece no PDF.">
+                        <Input
+                          placeholder="Ex: áreas sujas"
+                          value={it.areaNote ?? ""}
+                          onChange={(e) => updateItem(it.key, { areaNote: e.target.value })}
+                        />
+                      </Field>
                     </>
                   )}
                   <Field label="Estoque atual">
-                    <Input
-                      type="number"
-                      step="0.01"
+                    <MoneyInput
                       value={it.stock}
-                      onChange={(e) => updateItem(it.key, { stock: e.target.value })}
+                      onValueChange={(v) => updateItem(it.key, { stock: v })}
                     />
                   </Field>
                   <Field label="Preço US$/un.">

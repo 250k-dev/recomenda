@@ -3,6 +3,8 @@ import { api } from "@/lib/http/axios";
 export type QuoteRequestStatus = "OPEN" | "CLOSED";
 export type QuoteResponseStatus = "DRAFT" | "SUBMITTED";
 export type QuoteAvailability = "AVAILABLE" | "UNAVAILABLE" | "PARTIAL";
+/** Condição de pagamento do preço da loja: à vista ou a prazo (parcelado). */
+export type QuotePaymentTerm = "CASH" | "TERM";
 
 /** Item da lista exibido na cotação (sem dados de custo do agrônomo). */
 export interface QuoteItemView {
@@ -37,6 +39,7 @@ export interface QuoteComparisonResponseItem {
   id: string;
   purchase_list_item_id: string;
   availability: QuoteAvailability | null;
+  payment_term: QuotePaymentTerm | null;
   unit_price_brl: number | null;
   substitute_product_name: string | null;
   substitute_unit_price_brl: number | null;
@@ -149,6 +152,7 @@ export interface QuotePreview {
 
 export interface QuoteResponseItem extends QuoteItemView {
   availability: QuoteAvailability | null;
+  payment_term: QuotePaymentTerm | null;
   unit_price_brl: number | null;
   substitute_product_name: string | null;
   substitute_unit_price_brl: number | null;
@@ -179,6 +183,7 @@ export interface CreateQuoteResponseInput {
 export interface QuoteResponseItemInput {
   purchase_list_item_id: string;
   availability?: QuoteAvailability;
+  payment_term?: QuotePaymentTerm;
   unit_price_brl?: number;
   substitute_product_name?: string;
   substitute_unit_price_brl?: number;

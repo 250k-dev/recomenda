@@ -37,6 +37,12 @@ export function detailItemToListItem(
     seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
     bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
     outOfProgram: it.out_of_program || undefined,
+    // `area_factor` vem como fração (0..1); no formulário editamos em %.
+    areaPercent:
+      it.area_factor != null && it.area_factor > 0 && it.area_factor !== 1
+        ? String(Number((it.area_factor * 100).toFixed(4)))
+        : "",
+    areaNote: it.area_note ?? "",
   };
 }
 

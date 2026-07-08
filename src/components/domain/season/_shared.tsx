@@ -44,7 +44,18 @@ export type ListItem = {
   outOfProgram?: boolean;
   /** Semente: quantidade de bags/sacos digitada à mão (sobrepõe o cálculo). */
   bagsOverride?: string;
+  /** % da área total em que o produto é aplicado (ex.: "20"). Vazio/ausente = 100. */
+  areaPercent?: string;
+  /** Observação de onde é aplicado (ex.: "áreas sujas"). Não entra em cálculo. */
+  areaNote?: string;
 };
+
+/** Fração (0..1) da área em que o item é aplicado. Default: área toda. */
+export function areaFactorOf(it: ListItem): number {
+  const pct = Number((it.areaPercent ?? "").replace(",", "."));
+  if (!Number.isFinite(pct) || pct <= 0) return 1;
+  return pct / 100;
+}
 
 /** Espaçamento padrão entre linhas (m) quando a lista não informa outro valor. */
 export const DEFAULT_SPACING_M = 0.65;
@@ -130,6 +141,17 @@ export function listItemQuantity(it: ListItem, totalHa: number): number {
   return listItemRequired(it, totalHa);
 }
 
+/**
+ * Quanto comprar. Espelha a planilha: `(necessário − estoque) × % da área`.
+ * O `%` é aplicado DEPOIS de descontar o estoque (ex.: Triclopir em áreas
+ * sujas: (1,5 × 870 − 0) × 50% = 652,5).
+ */
+export function listItemToBuy(it: ListItem, totalHa: number): number {
+  const required = listItemQuantity(it, totalHa);
+  const stock = Number(it.stock || 0);
+  return Math.max(0, (required - stock) * areaFactorOf(it));
+}
+
 /** Cultura do item numa lista multi-cultura: sementes são inequívocas pela
  *  categoria; os demais herdam a cultura única da lista (null quando "ANY" —
  *  produto comum às culturas). */
@@ -160,6 +182,8 @@ export function listItemToPayload(it: ListItem, listCrop?: string): PurchaseList
     seeding_area_ha: seed ? Number(it.seedingArea) || 0 : null,
     bags_override: hasBagsOverride(it) ? Number(it.bagsOverride) : null,
     out_of_program: it.outOfProgram ?? false,
+    area_factor: areaFactorOf(it),
+    area_note: it.areaNote?.trim() || null,
   };
 }
 

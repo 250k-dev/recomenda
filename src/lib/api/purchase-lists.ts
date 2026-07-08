@@ -10,7 +10,10 @@ export interface PurchaseListItemInput {
   n_applications?: number;
   current_stock?: number;
   supplier?: string | null;
+  /** Fração da área total (0..1) em que o produto é aplicado. 1 = área toda. */
   area_factor?: number;
+  /** Observação livre sobre onde é aplicado (ex.: "áreas sujas"). Não calcula. */
+  area_note?: string | null;
   price_usd?: number | null;
   price_brl_fixed?: number | null;
   cost_per_ha_mode?: "DOSE_PRICE" | "TOTAL_OVER_AREA";
@@ -121,6 +124,7 @@ export interface PurchaseListDetail {
     quantity_to_buy: number;
     supplier: string | null;
     area_factor: number;
+    area_note: string | null;
     price_usd: number | null;
     price_brl_fixed: number | null;
     cost_per_ha_mode: "DOSE_PRICE" | "TOTAL_OVER_AREA";

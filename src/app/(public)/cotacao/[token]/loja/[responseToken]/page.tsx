@@ -13,7 +13,11 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { useQuoteResponse, useUpdateQuoteResponse } from "@/lib/api/hooks";
 import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
 import { CompletionRing } from "@/components/domain/completion-ring";
-import type { QuoteAvailability, QuoteResponseItem } from "@/lib/api/quotes";
+import type {
+  QuoteAvailability,
+  QuotePaymentTerm,
+  QuoteResponseItem,
+} from "@/lib/api/quotes";
 import { CROP_LABELS } from "@/lib/season-constants";
 import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
 import { toast } from "sonner";
@@ -32,6 +36,7 @@ function parseNum(raw: string): number | undefined {
 
 type ItemDraft = {
   availability: "" | QuoteAvailability;
+  payment_term: "" | QuotePaymentTerm;
   unit_price_brl: string;
   substitute_product_name: string;
   substitute_unit_price_brl: string;
@@ -41,6 +46,7 @@ type ItemDraft = {
 function toDraft(it: QuoteResponseItem): ItemDraft {
   return {
     availability: it.availability ?? "",
+    payment_term: it.payment_term ?? "",
     unit_price_brl: it.unit_price_brl != null ? String(it.unit_price_brl) : "",
     substitute_product_name: it.substitute_product_name ?? "",
     substitute_unit_price_brl:
@@ -93,6 +99,11 @@ export default function StoreQuotePage() {
       return {
         purchase_list_item_id: it.purchase_list_item_id,
         availability: d.availability || undefined,
+        // Só envia a condição quando a loja tem o produto.
+        payment_term:
+          d.availability && d.availability !== "UNAVAILABLE"
+            ? d.payment_term || undefined
+            : undefined,
         unit_price_brl: parseNum(d.unit_price_brl),
         substitute_product_name: d.substitute_product_name.trim() || undefined,
         substitute_unit_price_brl: parseNum(d.substitute_unit_price_brl),
@@ -189,6 +200,7 @@ export default function StoreQuotePage() {
         {data.items.map((it) => {
           const d = drafts[it.purchase_list_item_id] ?? toDraft(it);
           const showSubstitute = d.availability === "UNAVAILABLE" || d.availability === "PARTIAL";
+          const showPaymentTerm = d.availability === "AVAILABLE" || d.availability === "PARTIAL";
           return (
             <div
               key={it.purchase_list_item_id}
@@ -240,6 +252,22 @@ export default function StoreQuotePage() {
                     }
                   />
                 </div>
+                {showPaymentTerm ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Condição de pagamento</Label>
+                    <NativeSelect
+                      className="w-full"
+                      value={d.payment_term}
+                      onChange={(e) =>
+                        setField(it.purchase_list_item_id, "payment_term", e.target.value)
+                      }
+                    >
+                      <NativeSelectOption value="">Selecione…</NativeSelectOption>
+                      <NativeSelectOption value="CASH">À vista</NativeSelectOption>
+                      <NativeSelectOption value="TERM">A prazo (parcelado)</NativeSelectOption>
+                    </NativeSelect>
+                  </div>
+                ) : null}
               </div>
 
               {showSubstitute ? (

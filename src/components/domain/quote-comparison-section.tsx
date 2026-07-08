@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { RotateCcw, Share2, Store, Trash2 } from "lucide-react";
+import { FileDown, RotateCcw, Share2, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,11 @@ import {
   useQuoteTrashActions,
 } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
+import { QuoteExportDialog } from "@/components/domain/quote-export-dialog";
 import type {
   QuoteAvailability,
   QuoteComparisonResponse,
+  QuotePaymentTerm,
 } from "@/lib/api/quotes";
 
 const fmtQty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -27,6 +29,11 @@ const AVAILABILITY_LABEL: Record<QuoteAvailability, string> = {
   AVAILABLE: "Tem",
   UNAVAILABLE: "Não tem",
   PARTIAL: "Parcial",
+};
+
+const PAYMENT_TERM_LABEL: Record<QuotePaymentTerm, string> = {
+  CASH: "À vista",
+  TERM: "A prazo",
 };
 
 function statusBadge(r: QuoteComparisonResponse) {
@@ -42,12 +49,23 @@ type PendingPermanent =
   | { kind: "response"; responseId: string; label: string }
   | { kind: "item"; responseId: string; itemId: string; label: string };
 
-export function QuoteComparisonSection({ listId }: { listId: string }) {
+export function QuoteComparisonSection({
+  listId,
+  listName,
+  producerName,
+  agronomistName,
+}: {
+  listId: string;
+  listName?: string | null;
+  producerName?: string | null;
+  agronomistName?: string | null;
+}) {
   const { data, isLoading } = usePurchaseListQuotes(listId);
   const { data: trash } = usePurchaseListQuoteTrash(listId);
   const actions = useQuoteTrashActions(listId);
 
   const [showTrash, setShowTrash] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [pendingPermanent, setPendingPermanent] = useState<PendingPermanent | null>(null);
 
   const itemUnitById = useMemo(() => {
@@ -292,16 +310,35 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {trashToggle}
+      <div className="flex items-center justify-end gap-1.5">
+        <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
+          <FileDown className="size-3.5" />
+          Exportar
+        </Button>
+        {trashCount > 0 ? (
+          <Button variant="ghost" size="sm" onClick={() => setShowTrash((v) => !v)}>
+            <Trash2 className="size-3.5" />
+            Lixeira ({trashCount})
+          </Button>
+        ) : null}
+      </div>
       {trashPanel}
+      {data ? (
+        <QuoteExportDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          data={data}
+          context={{ listName, producerName, agronomistName }}
+        />
+      ) : null}
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full min-w-[920px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-rail text-left align-bottom">
-              <th className="sticky left-0 z-10 bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+              <th className="sticky left-0 z-20 w-[200px] min-w-[200px] bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
                 Produto
               </th>
-              <th className="min-w-[160px] px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-success-strong">
+              <th className="sticky left-[200px] z-20 w-[160px] min-w-[160px] max-w-[160px] bg-rail px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-success-strong shadow-[inset_-1px_0_0_0_var(--color-border)]">
                 Melhor preço
               </th>
               {responses.map((r) => (
@@ -341,13 +378,13 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
               const cheapest = cheapestByItem.get(it.purchase_list_item_id) ?? null;
               return (
                 <tr key={it.purchase_list_item_id} className="border-b border-border last:border-b-0">
-                  <td className="sticky left-0 z-10 bg-card px-4 py-2.5">
-                    <div className="font-semibold text-text-strong">{it.product_name}</div>
+                  <td className="sticky left-0 z-10 w-[200px] min-w-[200px] max-w-[200px] bg-card px-4 py-2.5">
+                    <div className="break-words font-semibold text-text-strong">{it.product_name}</div>
                     <div className="text-xs text-muted-foreground tabular-nums">
                       {fmtQty(it.quantity_to_buy)} {unit} · {it.stage}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 align-top">
+                  <td className="sticky left-[200px] z-10 w-[160px] min-w-[160px] max-w-[160px] bg-card px-3 py-2.5 align-top shadow-[inset_-1px_0_0_0_var(--color-border)]">
                     {cheapest != null ? (
                       <div className="flex flex-col gap-0.5">
                         <span className="font-bold tabular-nums text-success-strong">
@@ -403,6 +440,12 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
                               </span>
                             ) : null}
 
+                            {cell.payment_term ? (
+                              <span className="rounded bg-rail px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                {PAYMENT_TERM_LABEL[cell.payment_term]}
+                              </span>
+                            ) : null}
+
                             {cell.substitute_product_name ? (
                               <span className="text-xs text-clay-strong">
                                 ↪ {cell.substitute_product_name}
@@ -445,10 +488,10 @@ export function QuoteComparisonSection({ listId }: { listId: string }) {
           </tbody>
           <tfoot>
             <tr className="border-t border-border bg-rail">
-              <td className="sticky left-0 z-10 bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-text-strong">
+              <td className="sticky left-0 z-10 w-[200px] min-w-[200px] bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-text-strong">
                 Total estimado
               </td>
-              <td className="px-3 py-3 align-top">
+              <td className="sticky left-[200px] z-10 w-[160px] min-w-[160px] max-w-[160px] bg-rail px-3 py-3 align-top shadow-[inset_-1px_0_0_0_var(--color-border)]">
                 {Number.isFinite(cheapestTotal) && cheapestTotal > 0 ? (
                   <div className="flex flex-col gap-0.5">
                     <span className="font-bold tabular-nums text-success-strong">

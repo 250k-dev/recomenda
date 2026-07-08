@@ -38,6 +38,16 @@ export function useUpdatePurchaseList(id: string, options?: { farmId?: string })
       if (options?.farmId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.farmPurchaseLists(options.farmId) });
       }
+      // A lista da safra alimenta o editor na página da safra. Sem invalidar aqui,
+      // a tela seguia mostrando os itens ANTIGOS depois de salvar — e ao reabrir a
+      // edição o rascunho era semeado com esse estado velho, que o autosave então
+      // gravava por cima, apagando o que tinha acabado de ser salvo.
+      if (data.cycle_id) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.cyclePurchaseList(data.cycle_id),
+        });
+        queryClient.invalidateQueries({ queryKey: queryKeys.cycleCostPlan(data.cycle_id) });
+      }
     },
   });
 }

@@ -413,8 +413,17 @@ export default function CycleDetailPage() {
                         (season.recommendations_done / season.recommendations_total) * 100,
                       )
                     : 0;
+                // Um talhão pode ter mais de uma variedade (áreas próprias).
+                const seasonVarieties = season.varieties ?? [];
+                const varietyNames = seasonVarieties
+                  .map((v) => v.variety)
+                  .filter(Boolean);
+                const varietyLabel =
+                  varietyNames.length > 0
+                    ? varietyNames.join(" + ")
+                    : (season.variety ?? "");
                 const displayName = `${CROP_LABELS[season.crop] ?? season.crop}${
-                  season.variety ? ` — ${season.variety}` : ""
+                  varietyLabel ? ` — ${varietyLabel}` : ""
                 }`;
                 return (
                   <Card key={season.id} className="overflow-hidden">
@@ -442,6 +451,20 @@ export default function CycleDetailPage() {
                               ? ` · ${fmtHa(season.planted_area_ha)} de ${fmtHa(season.plot_area_ha)} ha plantados`
                               : ` · ${fmtHa(season.plot_area_ha)} ha`}
                           </p>
+                          {seasonVarieties.length > 1 ? (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {seasonVarieties
+                                .map(
+                                  (v) =>
+                                    `${v.variety}${
+                                      v.planted_area_ha != null
+                                        ? ` (${fmtHa(v.planted_area_ha)} ha)`
+                                        : ""
+                                    }`,
+                                )
+                                .join(" · ")}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
 

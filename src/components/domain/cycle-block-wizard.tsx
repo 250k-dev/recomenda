@@ -10,7 +10,9 @@ import {
   Leaf,
   ListChecks,
   MapPin,
+  Plus,
   Sprout,
+  Trash2,
   Wheat,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -69,12 +71,33 @@ type BlockWizardDraft = {
   draftStages: TimingStageField[];
 };
 
-type PlotConfig = {
+/** Uma variedade do talhão + a área que ela ocupa (o agrônomo pode dividir o
+ *  talhão entre várias, ex.: 30 ha = 15 ha de cada). */
+type VarietyRow = {
   variety: string;
-  plantingDate: string;
-  cycleDays: string;
   plantedArea: string;
 };
+
+type PlotConfig = {
+  varieties: VarietyRow[];
+  plantingDate: string;
+  cycleDays: string;
+};
+
+const emptyConfig = (area: number): PlotConfig => ({
+  varieties: [{ variety: "", plantedArea: area > 0 ? String(area) : "" }],
+  plantingDate: "",
+  cycleDays: "",
+});
+
+/** Soma das áreas das variedades (ignora vazios/inválidos). */
+function sumPlantedArea(cfg: PlotConfig | undefined): number {
+  if (!cfg) return 0;
+  return cfg.varieties.reduce((s, v) => {
+    const n = v.plantedArea ? Number(v.plantedArea.replace(",", ".")) : NaN;
+    return s + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
 
 /** Bloco = um modelo de recomendação aplicado a um subconjunto de talhões da
  *  safra. O agrônomo repete o fluxo (dessecação → 10 talhões, fungicida → 5…)
@@ -571,9 +594,8 @@ function StepPlots({
   const plots = availablePlots ?? [];
   const selectedPlots = plots.filter((p) => selected.has(p.id));
   const totalHa = selectedPlots.reduce((s, p) => {
-    const cfg = configs[p.id];
-    const planted = cfg?.plantedArea ? Number(cfg.plantedArea.replace(",", ".")) : NaN;
-    return s + (Number.isFinite(planted) && planted > 0 ? planted : p.area_hectares);
+    const planted = sumPlantedArea(configs[p.id]);
+    return s + (planted > 0 ? planted : p.area_hectares);
   }, 0);
 
   /** Variedades da lista de compra da safra (sementes da cultura do bloco). */
@@ -596,12 +618,7 @@ function StepPlots({
         next.add(plotId);
         setConfigs((cfg) => ({
           ...cfg,
-          [plotId]: cfg[plotId] ?? {
-            variety: "",
-            plantingDate: "",
-            cycleDays: "",
-            plantedArea: String(area),
-          },
+          [plotId]: cfg[plotId] ?? emptyConfig(area),
         }));
       }
       return next;
@@ -611,8 +628,46 @@ function StepPlots({
   const updateConfig = (plotId: string, patch: Partial<PlotConfig>) => {
     setConfigs((cfg) => ({
       ...cfg,
-      [plotId]: { ...(cfg[plotId] ?? { variety: "", plantingDate: "", cycleDays: "", plantedArea: "" }), ...patch },
+      [plotId]: { ...(cfg[plotId] ?? emptyConfig(0)), ...patch },
     }));
+  };
+
+  /** Edita uma linha de variedade do talhão. */
+  const updateVariety = (plotId: string, index: number, patch: Partial<VarietyRow>) => {
+    setConfigs((cfg) => {
+      const current = cfg[plotId] ?? emptyConfig(0);
+      const varieties = current.varieties.map((v, i) =>
+        i === index ? { ...v, ...patch } : v,
+      );
+      return { ...cfg, [plotId]: { ...current, varieties } };
+    });
+  };
+
+  const addVariety = (plotId: string) => {
+    setConfigs((cfg) => {
+      const current = cfg[plotId] ?? emptyConfig(0);
+      return {
+        ...cfg,
+        [plotId]: {
+          ...current,
+          varieties: [...current.varieties, { variety: "", plantedArea: "" }],
+        },
+      };
+    });
+  };
+
+  const removeVariety = (plotId: string, index: number) => {
+    setConfigs((cfg) => {
+      const current = cfg[plotId] ?? emptyConfig(0);
+      if (current.varieties.length <= 1) return cfg;
+      return {
+        ...cfg,
+        [plotId]: {
+          ...current,
+          varieties: current.varieties.filter((_, i) => i !== index),
+        },
+      };
+    });
   };
 
   const submit = () => {
@@ -626,19 +681,29 @@ function StepPlots({
         timing_template_id: timingTemplateId,
         plots: selectedPlots.map((p) => {
           const cfg = configs[p.id];
-          const planted = cfg?.plantedArea
-            ? Number(cfg.plantedArea.replace(",", "."))
-            : null;
+          // Só envia variedades com nome; a área de cada uma pode ficar vazia.
+          const varieties = (cfg?.varieties ?? [])
+            .map((v) => {
+              const area = v.plantedArea
+                ? Number(v.plantedArea.replace(",", "."))
+                : NaN;
+              return {
+                variety: v.variety.trim(),
+                planted_area_ha:
+                  Number.isFinite(area) && area > 0 ? area : null,
+              };
+            })
+            .filter((v) => v.variety.length > 0);
+          const totalPlanted = sumPlantedArea(cfg);
           return {
             plot_id: p.id,
             crop,
-            variety: cfg?.variety?.trim() || null,
+            // `variety` (primária) mantém compat com as telas antigas.
+            variety: varieties[0]?.variety ?? null,
+            varieties,
             planting_date: cfg?.plantingDate || null,
             cycle_days: cfg?.cycleDays ? Number(cfg.cycleDays) : null,
-            planted_area_ha:
-              planted != null && Number.isFinite(planted) && planted > 0
-                ? planted
-                : null,
+            planted_area_ha: totalPlanted > 0 ? totalPlanted : null,
           };
         }),
       },
@@ -748,62 +813,136 @@ function StepPlots({
                 </button>
 
                 {isSelected ? (
-                  <div className="grid gap-3 border-t border-border/60 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Field label="Variedade / Híbrido" hint="Da lista de compra da safra.">
+                  <div className="flex flex-col gap-4 border-t border-border/60 p-4">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium text-foreground">
+                          Variedades / Híbridos
+                        </span>
+                        {(() => {
+                          const planted = sumPlantedArea(cfg);
+                          if (planted <= 0) return null;
+                          const over = planted > plot.area_hectares;
+                          return (
+                            <span
+                              className={
+                                over
+                                  ? "text-xs tabular-nums text-warning-strong"
+                                  : "text-xs tabular-nums text-muted-foreground"
+                              }
+                            >
+                              {fmt(planted)} de {fmt(plot.area_hectares)} ha
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      {(cfg?.varieties ?? []).map((row, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              list={
+                                varietyOptions.length > 0
+                                  ? `varieties-${plot.id}`
+                                  : undefined
+                              }
+                              value={row.variety}
+                              onChange={(e) =>
+                                updateVariety(plot.id, index, { variety: e.target.value })
+                              }
+                              placeholder={
+                                varietyOptions.length > 0
+                                  ? "Selecione ou digite"
+                                  : "Ex: BMX Potência RR"
+                              }
+                              aria-label={`Variedade ${index + 1} do talhão ${plot.name}`}
+                            />
+                          </div>
+                          <div className="w-32 shrink-0">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={row.plantedArea}
+                              onChange={(e) =>
+                                updateVariety(plot.id, index, {
+                                  plantedArea: e.target.value,
+                                })
+                              }
+                              placeholder="ha"
+                              aria-label={`Área da variedade ${index + 1} (ha)`}
+                            />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 text-muted-foreground hover:text-danger-strong"
+                            disabled={(cfg?.varieties.length ?? 0) <= 1}
+                            title="Remover esta variedade"
+                            onClick={() => removeVariety(plot.id, index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+
                       {varietyOptions.length > 0 ? (
-                        <>
-                          <Input
-                            list={`varieties-${plot.id}`}
-                            value={cfg?.variety ?? ""}
-                            onChange={(e) => updateConfig(plot.id, { variety: e.target.value })}
-                            placeholder="Selecione ou digite"
-                          />
-                          <datalist id={`varieties-${plot.id}`}>
-                            {varietyOptions.map((name) => (
-                              <option key={name} value={name} />
-                            ))}
-                          </datalist>
-                        </>
-                      ) : (
+                        <datalist id={`varieties-${plot.id}`}>
+                          {varietyOptions.map((name) => (
+                            <option key={name} value={name} />
+                          ))}
+                        </datalist>
+                      ) : null}
+
+                      <div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 text-primary-strong"
+                          onClick={() => addVariety(plot.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Adicionar variedade
+                        </Button>
+                      </div>
+
+                      {(() => {
+                        const planted = sumPlantedArea(cfg);
+                        return planted > plot.area_hectares ? (
+                          <p className="text-xs text-warning-strong">
+                            As variedades somam {fmt(planted)} ha, acima dos{" "}
+                            {fmt(plot.area_hectares)} ha cadastrados — liberado, só confira
+                            a área do talhão.
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Talhão tem {fmt(plot.area_hectares)} ha. Divida a área entre as
+                            variedades (ex.: 15 ha de cada).
+                          </p>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="Data de plantio">
                         <Input
-                          value={cfg?.variety ?? ""}
-                          onChange={(e) => updateConfig(plot.id, { variety: e.target.value })}
-                          placeholder="Ex: BMX Potência RR"
+                          type="date"
+                          value={cfg?.plantingDate ?? ""}
+                          onChange={(e) =>
+                            updateConfig(plot.id, { plantingDate: e.target.value })
+                          }
                         />
-                      )}
-                    </Field>
-                    <Field label="Data de plantio">
-                      <Input
-                        type="date"
-                        value={cfg?.plantingDate ?? ""}
-                        onChange={(e) =>
-                          updateConfig(plot.id, { plantingDate: e.target.value })
-                        }
-                      />
-                    </Field>
-                    <Field label="Ciclo (dias)">
-                      <Input
-                        type="number"
-                        min={1}
-                        value={cfg?.cycleDays ?? ""}
-                        onChange={(e) => updateConfig(plot.id, { cycleDays: e.target.value })}
-                        placeholder="Ex: 115"
-                      />
-                    </Field>
-                    <Field
-                      label="Área a plantar (ha)"
-                      hint={`Talhão tem ${fmt(plot.area_hectares)} ha.`}
-                    >
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={cfg?.plantedArea ?? ""}
-                        onChange={(e) =>
-                          updateConfig(plot.id, { plantedArea: e.target.value })
-                        }
-                      />
-                    </Field>
+                      </Field>
+                      <Field label="Ciclo (dias)">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={cfg?.cycleDays ?? ""}
+                          onChange={(e) => updateConfig(plot.id, { cycleDays: e.target.value })}
+                          placeholder="Ex: 115"
+                        />
+                      </Field>
+                    </div>
                   </div>
                 ) : null}
               </div>
