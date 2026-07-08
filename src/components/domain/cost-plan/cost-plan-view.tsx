@@ -71,6 +71,15 @@ interface EditableItem {
   calc_rule: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
   supplier: string | null;
   stage: string;
+  // Campos que este editor não altera, mas PRECISA preservar no save (o
+  // persist faz DELETE+INSERT; omiti-los zerava sementes/observação/flag).
+  area_note: string | null;
+  thousand_plants_per_ha: number | null;
+  seeds_per_meter: number | null;
+  cycle_days: number | null;
+  seeding_area_ha: number | null;
+  bags_override: number | null;
+  out_of_program: boolean;
 }
 
 export function CostPlanView({
@@ -133,6 +142,13 @@ export function CostPlanView({
         calc_rule: it.calc_rule,
         supplier: it.supplier,
         stage: it.stage,
+        area_note: it.area_note ?? null,
+        thousand_plants_per_ha: it.thousand_plants_per_ha ?? null,
+        seeds_per_meter: it.seeds_per_meter ?? null,
+        cycle_days: it.cycle_days ?? null,
+        seeding_area_ha: it.seeding_area_ha ?? null,
+        bags_override: it.bags_override ?? null,
+        out_of_program: it.out_of_program ?? false,
       })),
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,6 +203,14 @@ export function CostPlanView({
         cost_per_ha_mode: it.cost_per_ha_mode,
         deduct_stock: it.deduct_stock,
         calc_rule: it.calc_rule,
+        // Preserva o que este editor não mexe (senão o DELETE+INSERT apaga).
+        area_note: it.area_note,
+        thousand_plants_per_ha: it.thousand_plants_per_ha,
+        seeds_per_meter: it.seeds_per_meter,
+        cycle_days: it.cycle_days,
+        seeding_area_ha: it.seeding_area_ha,
+        bags_override: it.bags_override,
+        out_of_program: it.out_of_program,
       })),
     });
   };
@@ -258,6 +282,13 @@ export function CostPlanView({
         calc_rule: null,
         supplier: null,
         stage: "Plantio",
+        area_note: null,
+        thousand_plants_per_ha: null,
+        seeds_per_meter: null,
+        cycle_days: null,
+        seeding_area_ha: null,
+        bags_override: null,
+        out_of_program: false,
       },
     ]);
   };

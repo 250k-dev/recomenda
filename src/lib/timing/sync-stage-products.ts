@@ -14,10 +14,16 @@ function parseDose(value: string): number {
   return Number(String(value).replace(",", "."));
 }
 
+/** Produto "pronto" = tem produto escolhido E dose > 0. Só assim ele é
+ *  persistido no mix. Enquanto não estiver pronto (linha vazia, produto sem
+ *  dose, dose sem produto), é um rascunho em aberto que o autosave não deve
+ *  disparar e a re-hidratação não deve apagar. */
+export function isStageProductPersistable(product: StageProductDraft): boolean {
+  return Boolean(product.productId) && parseDose(product.dose) > 0;
+}
+
 function getValidProducts(products: StageProductDraft[]) {
-  return products.filter(
-    (product) => product.productId && parseDose(product.dose) > 0,
-  );
+  return products.filter(isStageProductPersistable);
 }
 
 function hasIncompleteProducts(products: StageProductDraft[]) {

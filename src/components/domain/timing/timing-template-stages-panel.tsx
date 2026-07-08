@@ -21,6 +21,7 @@ import {
   queryKeys,
 } from "@/lib/api/hooks";
 import {
+  isStageProductPersistable,
   mapMixItemsToStageProducts,
   syncStageProducts,
 } from "@/lib/timing/sync-stage-products";
@@ -103,10 +104,22 @@ export function TimingTemplateStagesPanel({
     }
 
     hydratedSignatureRef.current = stageSignature;
-    setEditorStages(
-      sortedStages.map((stage) => {
+    setEditorStages((prev) => {
+      const prevByKey = new Map(prev.map((s) => [s.key, s]));
+      return sortedStages.map((stage) => {
         const mixId = stage.default_mix_template_id;
         const mix = mixId ? mixesById.get(mixId) : undefined;
+        const hydratedProducts = mix?.items
+          ? mapMixItemsToStageProducts(mix.items, catalogProducts)
+          : [];
+        // Preserva linhas de produto ainda EM ABERTO (não prontas: sem produto,
+        // ou produto sem dose) que o usuário está preenchendo — a re-hidratação
+        // após um save não pode apagá-las ("some a linha"). Só as prontas foram
+        // persistidas e já vêm de `hydratedProducts`; as demais viriam a se
+        // perder. Mesmo critério do sync.
+        const inProgress = (prevByKey.get(stage.id)?.products ?? []).filter(
+          (p) => !isStageProductPersistable(p),
+        );
         return {
           key: stage.id,
           name: stage.name,
@@ -116,12 +129,13 @@ export function TimingTemplateStagesPanel({
             stage.window_end_days,
           ),
           notes: stage.notes ?? "",
-          products: mix?.items
-            ? mapMixItemsToStageProducts(mix.items, catalogProducts)
-            : [],
+          products:
+            inProgress.length > 0
+              ? [...hydratedProducts, ...inProgress]
+              : hydratedProducts,
         };
-      }),
-    );
+      });
+    });
   }, [
     catalogProducts,
     isDirty,
@@ -188,15 +202,28 @@ export function TimingTemplateStagesPanel({
     }
   }, [editorStages, invalidateTemplateData, sortedStages, template.crop, template.name]);
 
+  // Há alguma linha de produto ainda EM ABERTO (não pronta: sem produto, ou
+  // produto sem dose)? Enquanto houver, NÃO autosalva. O `sync` não persiste
+  // linhas assim e o save re-hidrataria do servidor apagando a linha — era o
+  // "some a linha" ao Adicionar produto / selecionar produto sem digitar a dose.
+  // Usa o MESMO critério do sync (`isStageProductPersistable`) para não divergir.
+  const hasIncompleteProduct = useMemo(
+    () =>
+      editorStages.some((stage) =>
+        stage.products.some((p) => !isStageProductPersistable(p)),
+      ),
+    [editorStages],
+  );
+
   // Autosave: persiste sozinho após uma pausa na edição (o botão Salvar
   // continua como fallback). Timer reinicia a cada mudança nas etapas.
   useEffect(() => {
-    if (!isDirty || isSaving) return;
+    if (!isDirty || isSaving || hasIncompleteProduct) return;
     const timer = setTimeout(() => {
       void saveAll({ silent: true });
     }, 2500);
     return () => clearTimeout(timer);
-  }, [editorStages, isDirty, isSaving, saveAll]);
+  }, [editorStages, isDirty, isSaving, hasIncompleteProduct, saveAll]);
 
   const ensureSavedBeforeStructureChange = useCallback(async () => {
     if (!isDirty) return;
