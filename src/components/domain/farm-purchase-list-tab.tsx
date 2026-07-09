@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, Eye, FileDown, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, X, Check, Loader2 } from "lucide-react";
+import { Boxes, Eye, FileDown, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, Target, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -44,6 +44,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
+import { PurchaseListTargetsDialog } from "@/components/domain/purchase-list-targets-dialog";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -140,6 +141,8 @@ export function FarmPurchaseListTab({
   const [error, setError] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [targetsOpen, setTargetsOpen] = useState(false);
+  const [savingTargets, setSavingTargets] = useState(false);
   const quotesSectionRef = useRef<HTMLDivElement>(null);
 
   // Rede de segurança do autosave: além de gravar no servidor, guarda os itens em
@@ -290,6 +293,24 @@ export function FarmPurchaseListTab({
       if (!opts?.silent) {
         setError(e instanceof Error ? e.message : "Não foi possível salvar a lista.");
       }
+    }
+  };
+
+  // Salva SÓ as metas por categoria. Envia apenas `category_targets`: sem
+  // `items`/`plots` no payload, o backend não toca nos produtos nem nos talhões.
+  const saveTargets = async (targets: Record<string, number>) => {
+    if (!list) return;
+    setSavingTargets(true);
+    try {
+      await updateMutation.mutateAsync({ category_targets: targets });
+      toast.success("Metas atualizadas.");
+      setTargetsOpen(false);
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Não foi possível salvar as metas.",
+      );
+    } finally {
+      setSavingTargets(false);
     }
   };
 
@@ -474,6 +495,17 @@ export function FarmPurchaseListTab({
                   Editar lista
                 </Button>
               ) : null}
+              {!readOnly ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setTargetsOpen(true)}
+                >
+                  <Target className="h-4 w-4" />
+                  Editar metas
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 size="sm"
@@ -646,6 +678,14 @@ export function FarmPurchaseListTab({
         open={exportOpen}
         onOpenChange={setExportOpen}
         list={list}
+      />
+
+      <PurchaseListTargetsDialog
+        open={targetsOpen}
+        onOpenChange={setTargetsOpen}
+        initialTargets={list.category_targets ?? {}}
+        onSave={saveTargets}
+        saving={savingTargets}
       />
     </div>
   );

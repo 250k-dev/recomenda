@@ -28,6 +28,8 @@ export interface MixTemplateItem {
   dose_per_hectare: number;
   product_name?: string;
   dose_unit?: string;
+  /** Categoria do produto, derivada no servidor (não depende do catálogo local paginado). */
+  category?: string | null;
 }
 
 export interface MixTemplate {
@@ -164,4 +166,19 @@ export async function updateMixTemplateItem(
 
 export async function deleteMixTemplateItem(id: string) {
   await api.delete(`/mix_template_items/${id}`);
+}
+
+/**
+ * Substitui TODOS os itens do mix numa única requisição (transação no servidor).
+ * Evita o N+1 de salvar item a item — 200 produtos = 1 chamada, não 200.
+ */
+export async function replaceMixTemplateItems(
+  templateId: string,
+  items: Array<{ local_product_id: string; dose_per_hectare: number; dose_unit?: string }>,
+) {
+  const { data } = await api.put<MixTemplate & { items: MixTemplateItem[] }>(
+    `/mix_templates/${templateId}/items`,
+    { items },
+  );
+  return data;
 }

@@ -37,7 +37,7 @@ import {
 } from "@/lib/api/hooks";
 import {
   createMixTemplate,
-  createMixTemplateItem,
+  replaceMixTemplateItems,
   createTimingTemplate,
   createTimingStage,
   updateTimingTemplate,
@@ -331,13 +331,15 @@ function StepModel({
             name: `${stage.name.trim()} — ${templateName.trim()}`,
             crop,
           });
-          for (const product of stageProducts) {
-            await createMixTemplateItem(mix.id, {
+          // Uma chamada só para todos os produtos da etapa (sem N+1).
+          await replaceMixTemplateItems(
+            mix.id,
+            stageProducts.map((product) => ({
               local_product_id: product.productId,
               dose_per_hectare: Number(product.dose.replace(",", ".")),
               dose_unit: product.unit,
-            });
-          }
+            })),
+          );
           defaultMixTemplateId = mix.id;
         }
 

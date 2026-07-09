@@ -26,6 +26,13 @@ import {
   syncStageProducts,
 } from "@/lib/timing/sync-stage-products";
 import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@/lib/timing/window-days";
+import {
+  readLocalDraft,
+  clearLocalDraft,
+  useLocalDraft,
+} from "@/lib/use-local-draft";
+import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
+import type { StageProductDraft } from "@/components/domain/timing/timing-stages-editor";
 
 type TimingTemplateStagesPanelProps = {
   template: TimingTemplate & { stages: TimingStage[] };
@@ -93,8 +100,33 @@ export function TimingTemplateStagesPanel({
   const [isSaving, setIsSaving] = useState(false);
   const hydratedSignatureRef = useRef<string | null>(null);
 
+  // Rascunho local (localStorage): guarda o que está sendo editado no navegador,
+  // "por baixo dos panos", para nada se perder ao recarregar/fechar. NÃO é o
+  // salvamento no servidor — esse só acontece no botão Salvar (e antes de
+  // mudanças estruturais). Some quando o modelo é salvo de verdade.
+  const draftKey = `timing-tmpl-draft:${templateId}`;
+
+  // Restaura o rascunho local uma vez por modelo — ajuste de estado durante o
+  // render (padrão recomendado pelo React), não em efeito. Tem prioridade sobre
+  // o servidor: se havia edição não salva (reload/queda), ela volta silenciosa.
+  const [draftRestoredFor, setDraftRestoredFor] = useState<string | null>(null);
+  if (draftRestoredFor !== templateId) {
+    setDraftRestoredFor(templateId);
+    const draft = readLocalDraft<TimingStageField[]>(draftKey);
+    if (draft && draft.length > 0) {
+      // isDirty=true faz o efeito de hidratação retornar cedo — o servidor não
+      // sobrescreve o rascunho restaurado até o próximo Salvar.
+      setEditorStages(draft);
+      setIsDirty(true);
+    }
+  }
+
   useEffect(() => {
-    if (mixesLoading || isDirty) return;
+    if (mixesLoading) return;
+
+    // Enquanto edita (sujo), não re-hidrata do servidor — evita apagar/reordenar
+    // linhas no meio da digitação (era a causa do "some o produto/categoria").
+    if (isDirty) return;
 
     // Hidrata uma única vez por assinatura de etapas. Não depender de
     // `editorStages.length` evita loop quando deps instáveis (ex.: mixesById de
@@ -112,14 +144,17 @@ export function TimingTemplateStagesPanel({
         const hydratedProducts = mix?.items
           ? mapMixItemsToStageProducts(mix.items, catalogProducts)
           : [];
-        // Preserva linhas de produto ainda EM ABERTO (não prontas: sem produto,
-        // ou produto sem dose) que o usuário está preenchendo — a re-hidratação
-        // após um save não pode apagá-las ("some a linha"). Só as prontas foram
-        // persistidas e já vêm de `hydratedProducts`; as demais viriam a se
-        // perder. Mesmo critério do sync.
+        // Preserva linhas ainda EM ABERTO (sem produto ou sem dose) que o usuário
+        // está preenchendo — a re-hidratação não pode apagá-las ("some a linha").
+        // Mescla por `key`: as em aberto sobrescrevem a versão do servidor de
+        // mesma key (evita a CHAVE DUPLICADA quando a dose de um item salvo é
+        // limpa) e as novas (key própria) são anexadas ao fim.
         const inProgress = (prevByKey.get(stage.id)?.products ?? []).filter(
           (p) => !isStageProductPersistable(p),
         );
+        const byKey = new Map<string, StageProductDraft>();
+        for (const p of hydratedProducts) byKey.set(p.key, p);
+        for (const p of inProgress) byKey.set(p.key, p);
         return {
           key: stage.id,
           name: stage.name,
@@ -129,10 +164,7 @@ export function TimingTemplateStagesPanel({
             stage.window_end_days,
           ),
           notes: stage.notes ?? "",
-          products:
-            inProgress.length > 0
-              ? [...hydratedProducts, ...inProgress]
-              : hydratedProducts,
+          products: [...byKey.values()],
         };
       });
     });
@@ -145,16 +177,10 @@ export function TimingTemplateStagesPanel({
     stageSignature,
   ]);
 
-  const invalidateTemplateData = useCallback(
-    async (mixId?: string | null) => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplate(templateId) });
-      if (mixId) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(mixId) });
-      }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplates });
-    },
-    [queryClient, templateId],
-  );
+  // Escreve o rascunho local (debounce) enquanto há edição não salva.
+  useLocalDraft(draftKey, editorStages, isDirty);
+  // Rede de segurança: avisa antes de fechar/recarregar com edição não salva.
+  useUnsavedChangesWarning(isDirty);
 
   const saveAll = useCallback(async (opts?: { silent?: boolean }) => {
     if (editorStages.length === 0) {
@@ -164,6 +190,7 @@ export function TimingTemplateStagesPanel({
 
     setIsSaving(true);
     try {
+      const touchedMixIds = new Set<string>();
       for (const editorStage of editorStages) {
         const stage = sortedStages.find((item) => item.id === editorStage.key);
         if (!stage) continue;
@@ -181,7 +208,7 @@ export function TimingTemplateStagesPanel({
           notes: trimmedNotes.length > 0 ? trimmedNotes : null,
         });
 
-        await syncStageProducts({
+        const mixId = await syncStageProducts({
           stageId: stage.id,
           stageName: editorStage.name.trim() || stage.name,
           templateName: template.name,
@@ -189,45 +216,35 @@ export function TimingTemplateStagesPanel({
           currentMixId: stage.default_mix_template_id,
           products: editorStage.products,
         });
+        if (mixId) touchedMixIds.add(mixId);
       }
 
-      hydratedSignatureRef.current = null;
-      await invalidateTemplateData();
+      // NÃO nula `hydratedSignatureRef`: o estado local (editorStages) já é o
+      // conjunto salvo e correto. Nulá-lo forçava uma re-hidratação a partir do
+      // cache do mix AINDA STALE (o `getMixTemplate` não tinha refetchado), que
+      // apagava os itens recém-salvos da tela até dar F5. Mantemos o que está na
+      // tela e só invalidamos os caches para as próximas leituras/mudança de
+      // estrutura — que re-hidratam já com dado fresco (com gate de loading).
+      clearLocalDraft(draftKey);
       setIsDirty(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplate(templateId) });
+      for (const mixId of touchedMixIds) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(mixId) });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplates });
       if (!opts?.silent) toast.success("Modelo salvo.");
     } catch {
       toast.error("Não foi possível salvar o modelo.");
     } finally {
       setIsSaving(false);
     }
-  }, [editorStages, invalidateTemplateData, sortedStages, template.crop, template.name]);
+  }, [draftKey, editorStages, queryClient, sortedStages, templateId, template.crop, template.name]);
 
-  // Há alguma linha de produto ainda EM ABERTO (não pronta: sem produto, ou
-  // produto sem dose)? Enquanto houver, NÃO autosalva. O `sync` não persiste
-  // linhas assim e o save re-hidrataria do servidor apagando a linha — era o
-  // "some a linha" ao Adicionar produto / selecionar produto sem digitar a dose.
-  // Usa o MESMO critério do sync (`isStageProductPersistable`) para não divergir.
-  const hasIncompleteProduct = useMemo(
-    () =>
-      editorStages.some((stage) =>
-        stage.products.some((p) => !isStageProductPersistable(p)),
-      ),
-    [editorStages],
-  );
-
-  // Autosave: persiste sozinho após uma pausa na edição (o botão Salvar
-  // continua como fallback). Timer reinicia a cada mudança nas etapas.
-  useEffect(() => {
-    if (!isDirty || isSaving || hasIncompleteProduct) return;
-    const timer = setTimeout(() => {
-      void saveAll({ silent: true });
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [editorStages, isDirty, isSaving, hasIncompleteProduct, saveAll]);
-
+  // Persiste as edições pendentes antes de uma mudança estrutural (add/remover/
+  // mover etapa), sem toast próprio — quem avisa é a ação estrutural.
   const ensureSavedBeforeStructureChange = useCallback(async () => {
     if (!isDirty) return;
-    await saveAll();
+    await saveAll({ silent: true });
   }, [isDirty, saveAll]);
 
   const handleStageChange = useCallback(

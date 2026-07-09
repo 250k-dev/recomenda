@@ -1,9 +1,6 @@
 import {
   createMixTemplate,
-  createMixTemplateItem,
-  deleteMixTemplateItem,
-  getMixTemplate,
-  updateMixTemplateItem,
+  replaceMixTemplateItems,
   updateTimingStage,
   type MixTemplateItem,
 } from "@/lib/api/templates";
@@ -43,7 +40,10 @@ export function mapMixItemsToStageProducts(
     return {
       key: item.id,
       mixItemId: item.id,
-      category: product?.category ?? "OTHER",
+      // Prioriza a categoria vinda do servidor (lookup direto do produto). O
+      // catálogo local no cliente é paginado e pode não conter o produto — era
+      // por isso que a categoria "sumia" ao recarregar/salvar.
+      category: item.category ?? product?.category ?? "OTHER",
       productId: item.local_product_id,
       productName: item.product_name ?? product?.name ?? "",
       dose: String(item.dose_per_hectare),
@@ -67,14 +67,22 @@ export async function syncStageProducts({
   currentMixId?: string | null;
   products: StageProductDraft[];
 }) {
-  if (hasIncompleteProducts(products)) {
-    return currentMixId ?? null;
-  }
-
+  // NÃO aborta a etapa toda por causa de uma linha incompleta (produto sem dose).
+  // Salva os produtos válidos e apenas ignora os incompletos — que continuam como
+  // rascunho na tela. Antes, uma linha zerada bloqueava o save e o produto válido
+  // acima nunca era gravado, sumindo na próxima reconciliação com o servidor.
   const validProducts = getValidProducts(products);
 
   if (validProducts.length === 0) {
+    // Sem nenhum produto válido: se ainda há linhas EM ABERTO, o usuário está no
+    // meio da edição — não esvazia o mix. Só esvazia quando a etapa fica de fato
+    // sem produtos.
+    if (hasIncompleteProducts(products)) {
+      return currentMixId ?? null;
+    }
     if (currentMixId) {
+      // Esvazia o mix (1 chamada) e desvincula do estágio.
+      await replaceMixTemplateItems(currentMixId, []);
       await updateTimingStage(stageId, { default_mix_template_id: null });
     }
     return null;
@@ -90,41 +98,21 @@ export async function syncStageProducts({
     await updateTimingStage(stageId, { default_mix_template_id: mixId });
   }
 
-  const existingMix = await getMixTemplate(mixId);
-  const existingItems = existingMix?.items ?? [];
-  const existingByProductId = new Map(
-    existingItems.map((item) => [item.local_product_id, item]),
-  );
-  const seenProductIds = new Set<string>();
-
+  // Dedup por produto (última dose vence) e substitui TODOS os itens numa única
+  // requisição. Antes era um GET + 1 request por item (N+1: 200 itens = 200
+  // chamadas); agora é 1 chamada, atômica no servidor.
+  const byProduct = new Map<
+    string,
+    { local_product_id: string; dose_per_hectare: number; dose_unit: string }
+  >();
   for (const product of validProducts) {
-    const dose = parseDose(product.dose);
-    seenProductIds.add(product.productId);
-    const existing = existingByProductId.get(product.productId);
-
-    if (existing) {
-      const unit = product.unit || existing.dose_unit || "L";
-      if (existing.dose_per_hectare !== dose || (existing.dose_unit ?? "L") !== unit) {
-        await updateMixTemplateItem(existing.id, {
-          dose_per_hectare: dose,
-          dose_unit: unit,
-        });
-      }
-      continue;
-    }
-
-    await createMixTemplateItem(mixId, {
+    byProduct.set(product.productId, {
       local_product_id: product.productId,
-      dose_per_hectare: dose,
+      dose_per_hectare: parseDose(product.dose),
       dose_unit: product.unit,
     });
   }
-
-  for (const item of existingItems) {
-    if (!seenProductIds.has(item.local_product_id)) {
-      await deleteMixTemplateItem(item.id);
-    }
-  }
+  await replaceMixTemplateItems(mixId, [...byProduct.values()]);
 
   return mixId;
 }

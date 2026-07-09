@@ -22,11 +22,11 @@ function sortByCategory<T extends { category: string }>(rows: T[]): T[] {
 /**
  * Painel de categorias no topo da lista de compra / plano de custo.
  *
- * - **Sem metas:** distribuição de gastos (fatia % + valor por segmento, com
- *   toggle R$ / sacas/ha). É o que o plano de custo usa.
- * - **Com metas** (definidas pelo agrônomo antes de montar a lista): vira o
- *   acompanhamento Real × Meta (sc/ha) — uma barra de progresso por categoria,
- *   vermelha ao estourar, com aviso. Sem gasto duplicado, sem toggle (meta é sc/ha).
+ * - **Prop `targets` presente (lista de compra):** tabela Realizado × Meta
+ *   (R$ e sc/ha). Sempre o mesmo layout — sem meta, a coluna Meta fica vazia e a
+ *   barra some; com meta, aparece o progresso (vermelho ao estourar).
+ * - **Prop `targets` ausente (plano de custo):** distribuição de gastos (fatia %
+ *   + valor por segmento, com toggle R$ / sacas/ha).
  */
 export function CategoryDistributionPanel({
   breakdown,
@@ -37,11 +37,10 @@ export function CategoryDistributionPanel({
   targets?: Record<string, number>;
   defaultMode?: "brl" | "sacks";
 }) {
-  const targetMap = targets ?? {};
-  const hasTargets = Object.values(targetMap).some((v) => (v ?? 0) > 0);
-
-  if (hasTargets) {
-    return <MetaView breakdown={breakdown} targets={targetMap} />;
+  // A lista de compra sempre passa `targets` (mesmo vazio) → tabela unificada.
+  // O plano de custo não passa → distribuição de gastos com toggle.
+  if (targets !== undefined) {
+    return <MetaView breakdown={breakdown} targets={targets} />;
   }
   return <SpendView breakdown={breakdown} defaultMode={defaultMode} />;
 }
@@ -55,18 +54,24 @@ function MetaView({
   targets: Record<string, number>;
 }) {
   const byCat = new Map(breakdown.map((b) => [b.category, b]));
+  // Linhas = união das categorias com gasto (breakdown) e com meta definida.
+  // Assim o layout é o mesmo com ou sem metas: sem meta a linha ainda aparece
+  // (Realizado preenchido, Meta vazia); com meta, mostra o progresso.
+  const categories = new Set<string>(breakdown.map((b) => b.category));
+  for (const [category, target] of Object.entries(targets)) {
+    if ((target ?? 0) > 0) categories.add(category);
+  }
+  const hasAnyTarget = Object.values(targets).some((v) => (v ?? 0) > 0);
   const rows = sortByCategory(
-    Object.entries(targets)
-      .filter(([, target]) => (target ?? 0) > 0)
-      .map(([category, target]) => {
-        const b = byCat.get(category);
-        return {
-          category,
-          target,
-          real: b?.sacks_per_ha ?? 0,
-          totalBrl: b?.total_brl ?? 0,
-        };
-      }),
+    [...categories].map((category) => {
+      const b = byCat.get(category);
+      return {
+        category,
+        target: targets[category] ?? 0,
+        real: b?.sacks_per_ha ?? 0,
+        totalBrl: b?.total_brl ?? 0,
+      };
+    }),
   );
 
   return (
@@ -74,7 +79,9 @@ function MetaView({
       <div className="mb-3">
         <h3 className="text-base font-semibold text-foreground">Gastos por categoria</h3>
         <p className="text-xs text-muted-foreground">
-          Realizado em R$ e sc/ha, comparado à meta do agrônomo
+          {hasAnyTarget
+            ? "Realizado em R$ e sc/ha, comparado à meta do agrônomo"
+            : "Realizado em R$ e sc/ha — defina metas para acompanhar o progresso"}
         </p>
       </div>
 
@@ -94,8 +101,9 @@ function MetaView({
           <tbody>
             {rows.map((r) => {
               const color = CATEGORY_COLORS[r.category] ?? CATEGORY_COLORS.OTHER;
-              const overOne = r.real > r.target;
-              const progress = r.target > 0 ? (r.real / r.target) * 100 : 0;
+              const hasTarget = r.target > 0;
+              const overOne = hasTarget && r.real > r.target;
+              const progress = hasTarget ? (r.real / r.target) * 100 : 0;
               return (
                 <tr
                   key={r.category}
@@ -131,45 +139,55 @@ function MetaView({
                     {num(r.real, 1)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-center">
-                    <span className="inline-block rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium tabular-nums text-primary-strong">
-                      {num(r.target)}
-                    </span>
+                    {hasTarget ? (
+                      <span className="inline-block rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium tabular-nums text-primary-strong">
+                        {num(r.target)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/60">—</span>
+                    )}
                   </td>
                   <td className="py-2.5 pl-3">
-                    <div className="flex items-center gap-2.5">
-                      {/* Barra: 100% = meta (marcador à direita); enche até o realizado. */}
-                      <div className="relative min-w-[80px] flex-1">
-                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
+                    {hasTarget ? (
+                      <div className="flex items-center gap-2.5">
+                        {/* Barra: 100% = meta (marcador à direita); enche até o realizado. */}
+                        <div className="relative min-w-[80px] flex-1">
+                          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all",
+                                overOne && "bg-danger-strong",
+                              )}
+                              style={{
+                                width: `${Math.min(100, progress)}%`,
+                                background: overOne ? undefined : color,
+                              }}
+                            />
+                          </div>
+                          <span
                             className={cn(
-                              "h-full rounded-full transition-all",
-                              overOne && "bg-danger-strong",
+                              "absolute top-1/2 h-2.5 w-[2px] -translate-y-1/2 rounded-full",
+                              overOne ? "bg-danger-strong" : "bg-primary-strong",
                             )}
-                            style={{
-                              width: `${Math.min(100, progress)}%`,
-                              background: overOne ? undefined : color,
-                            }}
+                            style={{ left: "calc(100% - 2px)" }}
                           />
                         </div>
                         <span
                           className={cn(
-                            "absolute top-1/2 h-2.5 w-[2px] -translate-y-1/2 rounded-full",
-                            overOne ? "bg-danger-strong" : "bg-primary-strong",
+                            "w-11 shrink-0 text-right text-xs tabular-nums",
+                            overOne
+                              ? "font-semibold text-danger-strong"
+                              : "text-muted-foreground",
                           )}
-                          style={{ left: "calc(100% - 2px)" }}
-                        />
+                        >
+                          {num(progress, 0)}%
+                        </span>
                       </div>
-                      <span
-                        className={cn(
-                          "w-11 shrink-0 text-right text-xs tabular-nums",
-                          overOne
-                            ? "font-semibold text-danger-strong"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {num(progress, 0)}%
+                    ) : (
+                      <span className="text-xs text-muted-foreground/50">
+                        Sem meta definida
                       </span>
-                    </div>
+                    )}
                   </td>
                 </tr>
               );
