@@ -5,25 +5,23 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  Boxes,
   Calculator,
-  CalendarDays,
   Leaf,
   ListChecks,
-  MapPin,
   Plus,
   Rocket,
   Search,
   ShoppingCart,
-  Sprout,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { EntityHero, type HeroStat } from "@/components/domain/entity-hero";
+import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -35,12 +33,11 @@ import {
   useCycle,
   useCyclePurchaseList,
   useFarm,
-  useMe,
   useProducer,
   usePublishCycle,
 } from "@/lib/api/hooks";
+import type { CycleSeasonRow } from "@/lib/api/cycles";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 import { cn } from "@/lib/utils";
 
 type CycleTab = "recommendations" | "purchase" | "cost-plan";
@@ -59,6 +56,18 @@ function parseCycleTab(value: string | null): CycleTab {
   return "recommendations";
 }
 
+/** Nome de exibição da programação: cultura + variedade(s). */
+function seasonDisplayName(season: CycleSeasonRow): string {
+  const varietyNames = (season.varieties ?? [])
+    .map((v) => v.variety)
+    .filter(Boolean);
+  const varietyLabel =
+    varietyNames.length > 0 ? varietyNames.join(" + ") : (season.variety ?? "");
+  return `${CROP_LABELS[season.crop] ?? season.crop}${
+    varietyLabel ? ` — ${varietyLabel}` : ""
+  }`;
+}
+
 export default function CycleDetailPage() {
   const params = useParams<{ id: string; cycleId: string }>();
   const farmId = params.id;
@@ -70,7 +79,6 @@ export default function CycleDetailPage() {
 
   const { data: cycle, isLoading } = useCycle(cycleId);
   const { data: farm } = useFarm(farmId);
-  const { data: me } = useMe();
   const producerId = producerIdParam ?? cycle?.producer_id ?? "";
   const { data: producer } = useProducer(producerId);
   const { data: purchaseList, isLoading: loadingList } = useCyclePurchaseList(cycleId);
@@ -106,9 +114,9 @@ export default function CycleDetailPage() {
     return map;
   }, [seasons]);
   const totalArea = [...areaByPlot.values()].reduce((s, v) => s + v, 0);
-  // Conta as programações realmente listadas (uma por card). areaByPlot deduplica
+  // Conta as programações realmente listadas (uma por linha). areaByPlot deduplica
   // por plot_id — quando o mesmo talhão tem duas culturas/ciclos na safra ele
-  // aparece em dois cards, então o contador precisa bater com o que está na tela
+  // aparece em duas linhas, então o contador precisa bater com o que está na tela
   // (e com o chip do bloco), não com o nº de talhões físicos distintos.
   const plotCount = seasons.length;
   const filteredSeasons = useMemo(() => {
@@ -172,103 +180,86 @@ export default function CycleDetailPage() {
 
   const isPlanning = seasons.length === 0;
 
+  const heroStats: HeroStat[] | undefined =
+    tab === "recommendations"
+      ? [
+          { label: "Talhões", value: plotCount },
+          { label: "Área", value: `${fmtHa(totalArea)} ha` },
+          {
+            label: "Aplicações",
+            value: totalRecs > 0 ? `${doneRecs}/${totalRecs}` : "—",
+            sub: totalRecs > 0 ? `${progressPct}%` : undefined,
+            subClassName: "font-semibold text-primary-strong",
+          },
+          {
+            label: purchaseList?.name ?? "Lista de compra",
+            value: purchaseList ? (purchaseList.items ?? []).length : 0,
+            sub: "produtos",
+            onClick: () => setTab("purchase"),
+          },
+        ]
+      : undefined;
+
   return (
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <section className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-            <Leaf className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-display text-2xl font-semibold text-text-strong">
-                {cycle.name}
-              </h1>
-              {isPlanning ? (
-                <Badge variant="neutral">Em planejamento</Badge>
-              ) : (
-                <Badge variant={cycle.status === "HARVESTED" ? "success" : "info"}>
-                  {CYCLE_STATUS_LABELS[cycle.status] ?? cycle.status}
-                </Badge>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {[
-                cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "),
-                farm?.name,
-                isPlanning
-                  ? "sem talhões programados"
-                  : `${plotCount} ${plotCount === 1 ? "talhão" : "talhões"} · ${fmtHa(totalArea)} ha`,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          </div>
-        </div>
-        {/* Ações de programação (adicionar talhão / publicar) vivem só na aba
-            Recomendações — publicar = finalizar a programação, não faz sentido
-            repetir sobre a lista de compra ou o plano de custo. */}
-        {tab === "recommendations" ? (
-          <div className="flex flex-wrap gap-2">
-            {draftSeasons.length > 0 ? (
+      <EntityHero
+        icon={<Leaf className="size-6" />}
+        eyebrow="Safra"
+        title={cycle.name}
+        titleBadge={
+          isPlanning ? (
+            <Badge variant="neutral">Em planejamento</Badge>
+          ) : (
+            <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"}>
+              {CYCLE_STATUS_LABELS[cycle.status] ?? cycle.status}
+            </Badge>
+          )
+        }
+        meta={[cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "), farm?.name]
+          .filter(Boolean)
+          .join(" · ")}
+        actions={
+          tab === "recommendations" ? (
+            <>
+              {draftSeasons.length > 0 ? (
+                <Button
+                  className="gap-1.5"
+                  onClick={() => setPublishConfirm(true)}
+                  disabled={publishCycle.isPending}
+                >
+                  <Rocket className="size-4" />
+                  {publishCycle.isPending ? "Publicando..." : "Revisar e publicar"}
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 className="gap-1.5"
-                onClick={() => setPublishConfirm(true)}
-                disabled={publishCycle.isPending}
+                onClick={() => setTab("purchase")}
               >
-                <Rocket className="size-4" />
-                {publishCycle.isPending ? "Publicando..." : "Revisar e publicar"}
+                <ShoppingCart className="size-4" />
+                Lista de compra
               </Button>
-            ) : null}
-            <Button
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => setTab("purchase")}
-            >
-              <ShoppingCart className="size-4" />
-              Lista de compra
-            </Button>
-            <Button className="gap-1.5" onClick={() => setWizardOpen(true)}>
-              <Plus className="size-4" />
-              Adicionar talhão
-            </Button>
-          </div>
-        ) : null}
-      </section>
-
-      {/* Resumo da safra: contexto da programação, então só na aba Recomendações.
-          Nas abas Lista de compra / Plano de custo cada uma já traz seus próprios
-          números, e empilhar as duas faixas deixava a tela pesada. */}
-      {tab === "recommendations" ? (
-        <KpiStrip className="mb-6">
-          <KpiCell
-            label="Talhões na safra"
-            value={plotCount}
-            icon={<MapPin className="size-4" />}
-          />
-          <KpiCell
-            label="Área"
-            value={`${fmtHa(totalArea)} ha`}
-            icon={<Sprout className="size-4" />}
-          />
-          <KpiCell
-            label="Aplicações"
-            value={totalRecs > 0 ? `${doneRecs}/${totalRecs}` : "—"}
-            sub={totalRecs > 0 ? `${progressPct}%` : undefined}
-            icon={<CalendarDays className="size-4" />}
-          />
-          <KpiCell
-            label={purchaseList?.name ?? "Lista de compra"}
-            value={purchaseList ? (purchaseList.items ?? []).length : 0}
-            sub="produtos"
-            icon={<ShoppingCart className="size-4" />}
-            onClick={() => setTab("purchase")}
-          />
-        </KpiStrip>
-      ) : null}
+              <Button asChild variant="outline" className="gap-1.5">
+                <Link href={stockHref}>
+                  <Boxes className="size-4" />
+                  Estoque
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setTab("cost-plan")}
+              >
+                <Calculator className="size-4" />
+                Plano de custo
+              </Button>
+            </>
+          ) : undefined
+        }
+        stats={heroStats}
+      />
 
       {/* Nas sub-abas (lista de compra / plano de custo) mostramos só voltar.
           Estoque fica na barra de ações da lista de compra (FarmPurchaseListTab). */}
@@ -340,7 +331,7 @@ export default function CycleDetailPage() {
           onOpenPurchaseList={() => setTab("purchase")}
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {!isPlanning ? (
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex min-w-0 flex-1 flex-wrap gap-2">
@@ -358,15 +349,22 @@ export default function CycleDetailPage() {
                   </span>
                 ))}
               </div>
-              <div className="relative ml-auto w-full min-w-48 max-w-xs sm:w-56">
+              <div className="relative w-full min-w-48 sm:ml-auto sm:w-56 sm:max-w-xs">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={plotFilter}
                   onChange={(e) => setPlotFilter(e.target.value)}
                   placeholder="Filtrar talhão..."
-                  className="h-9 pl-8"
+                  className="h-10 pl-8"
                 />
               </div>
+              <Button
+                className="hidden gap-1.5 sm:inline-flex"
+                onClick={() => setWizardOpen(true)}
+              >
+                <Plus className="size-4" />
+                Adicionar talhão
+              </Button>
             </div>
           ) : null}
 
@@ -399,115 +397,153 @@ export default function CycleDetailPage() {
               description={`Não há talhões com o nome "${plotFilter.trim()}".`}
             />
           ) : (
-            <div className="max-h-[min(60vh,720px)] space-y-4 overflow-y-auto pr-1">
-              {filteredSeasons.map((season) => {
-                const recommendationHref = `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}${
-                  producerId ? `&producer_id=${encodeURIComponent(producerId)}` : ""
-                }`;
-                const costPlanHref = `/seasons/${season.id}?tab=cost-plan&farm_id=${encodeURIComponent(farmId)}${
-                  producerId ? `&producer_id=${encodeURIComponent(producerId)}` : ""
-                }`;
-                const pct =
-                  season.recommendations_total > 0
-                    ? Math.round(
-                        (season.recommendations_done / season.recommendations_total) * 100,
-                      )
-                    : 0;
-                // Um talhão pode ter mais de uma variedade (áreas próprias).
-                const seasonVarieties = season.varieties ?? [];
-                const varietyNames = seasonVarieties
-                  .map((v) => v.variety)
-                  .filter(Boolean);
-                const varietyLabel =
-                  varietyNames.length > 0
-                    ? varietyNames.join(" + ")
-                    : (season.variety ?? "");
-                const displayName = `${CROP_LABELS[season.crop] ?? season.crop}${
-                  varietyLabel ? ` — ${varietyLabel}` : ""
-                }`;
-                return (
-                  <Card key={season.id} className="overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="flex items-start gap-3 px-4 py-4">
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-                          <MapPin className="size-5" />
+            <>
+              {/* Desktop: tabela de talhões da safra */}
+              <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
+                <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_minmax(0,1fr)_14.5rem] items-center gap-4 bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+                  <span>Talhão</span>
+                  <span>Cultura / variedade</span>
+                  <span>Área</span>
+                  <span>Progresso</span>
+                  <span>Status</span>
+                  <span className="text-right">Ações</span>
+                </div>
+                {filteredSeasons.map((season) => {
+                  const row = seasonRowData(season, farmId, producerId);
+                  return (
+                    <div
+                      key={season.id}
+                      className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_minmax(0,1fr)_14.5rem] items-center gap-4 border-t border-border px-5 py-3.5 text-sm"
+                    >
+                      <span className="truncate font-semibold text-text-strong">
+                        Talhão {season.plot_name}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-muted-foreground">
+                          {row.displayName}
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <p className="font-semibold text-foreground">
-                              Talhão {season.plot_name}
-                            </p>
-                            <Badge
-                              className="shrink-0"
-                              variant={STATUS_VARIANTS[season.status] ?? "default"}
-                            >
-                              {STATUS_LABELS[season.status] ?? season.status}
-                            </Badge>
-                          </div>
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            {displayName}
-                            {season.planted_area_ha != null &&
-                            season.planted_area_ha !== season.plot_area_ha
-                              ? ` · ${fmtHa(season.planted_area_ha)} de ${fmtHa(season.plot_area_ha)} ha plantados`
-                              : ` · ${fmtHa(season.plot_area_ha)} ha`}
-                          </p>
-                          {seasonVarieties.length > 1 ? (
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {seasonVarieties
-                                .map(
-                                  (v) =>
-                                    `${v.variety}${
-                                      v.planted_area_ha != null
-                                        ? ` (${fmtHa(v.planted_area_ha)} ha)`
-                                        : ""
-                                    }`,
-                                )
-                                .join(" · ")}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {season.recommendations_total > 0 ? (
-                        <div className="border-t border-border bg-rail px-4 py-3">
-                          <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                            <span className="text-muted-foreground">
-                              {season.recommendations_done}/{season.recommendations_total}{" "}
-                              aplicadas
+                        {row.varietiesBreakdown ? (
+                          <span className="block truncate text-xs text-muted-foreground/80">
+                            {row.varietiesBreakdown}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="tabular-nums">
+                        {fmtHa(row.area)} ha
+                        {row.partialArea ? (
+                          <span className="block text-xs text-muted-foreground">
+                            de {fmtHa(season.plot_area_ha)} ha
+                          </span>
+                        ) : null}
+                      </span>
+                      <span>
+                        {season.recommendations_total > 0 ? (
+                          <span className="flex items-center gap-2">
+                            <ProgressBar
+                              value={row.pct}
+                              className="h-1.5 flex-1 bg-surface-2"
+                            />
+                            <span className="shrink-0 text-xs font-semibold tabular-nums text-primary-strong">
+                              {row.pct}%
                             </span>
-                            <span className="font-semibold tabular-nums text-primary-strong">
-                              {pct}%
-                            </span>
-                          </div>
-                          <ProgressBar value={pct} />
-                        </div>
-                      ) : null}
-
-                      <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-                        <Button asChild variant="outline" size="sm" className="gap-1.5">
-                          <Link href={recommendationHref}>
-                            <CalendarDays className="size-3.5" />
-                            Ver Recomendação
-                          </Link>
-                        </Button>
-                        <Button asChild variant="outline" size="sm" className="gap-1.5">
-                          <Link href={costPlanHref}>
-                            <Calculator className="size-3.5" />
-                            Plano de custo
-                          </Link>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </span>
+                      <span>
+                        <Badge variant={STATUS_VARIANTS[season.status] ?? "default"}>
+                          {STATUS_LABELS[season.status] ?? season.status}
+                        </Badge>
+                      </span>
+                      <span className="flex justify-end gap-1.5">
+                        <Button asChild variant="secondary" size="sm" className="gap-1.5">
+                          <Link href={row.recommendationHref}>Recomendações</Link>
                         </Button>
                         {season.status !== "ARCHIVED" ? (
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="text-danger-strong hover:bg-danger-soft hover:text-danger-strong"
+                            onClick={() =>
+                              setArchiveConfirm({
+                                id: season.id,
+                                name: `${season.plot_name} — ${row.displayName}`,
+                              })
+                            }
+                          >
+                            Remover
+                          </Button>
+                        ) : null}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Mobile: cards */}
+              <div className="flex flex-col gap-2.5 md:hidden">
+                {filteredSeasons.map((season) => {
+                  const row = seasonRowData(season, farmId, producerId);
+                  return (
+                    <div
+                      key={season.id}
+                      className="rounded-xl border border-border bg-card px-4 py-3.5 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-text-strong">
+                            Talhão {season.plot_name}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {row.displayName} · {fmtHa(row.area)}
+                            {row.partialArea
+                              ? ` de ${fmtHa(season.plot_area_ha)}`
+                              : ""}{" "}
+                            ha
+                          </p>
+                        </div>
+                        <Badge
+                          className="shrink-0"
+                          variant={STATUS_VARIANTS[season.status] ?? "default"}
+                        >
+                          {STATUS_LABELS[season.status] ?? season.status}
+                        </Badge>
+                      </div>
+                      {season.recommendations_total > 0 ? (
+                        <div className="mt-3">
+                          <div className="mb-1.5 flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              {season.recommendations_done}/{season.recommendations_total}{" "}
+                              aplicadas
+                            </span>
+                            <span className="font-semibold tabular-nums text-primary-strong">
+                              {row.pct}%
+                            </span>
+                          </div>
+                          <ProgressBar value={row.pct} className="h-1.5" />
+                        </div>
+                      ) : null}
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          asChild
+                          variant="secondary"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          <Link href={row.recommendationHref}>Recomendações</Link>
+                        </Button>
+                        {season.status !== "ARCHIVED" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
                             className={cn(
-                              "ml-auto text-muted-foreground",
-                              deactivateOutlineButtonClass,
+                              "shrink-0 border-danger-border text-danger-strong hover:bg-danger-soft hover:text-danger-strong",
                             )}
                             onClick={() =>
                               setArchiveConfirm({
                                 id: season.id,
-                                name: `${season.plot_name} — ${displayName}`,
+                                name: `${season.plot_name} — ${row.displayName}`,
                               })
                             }
                           >
@@ -515,12 +551,21 @@ export default function CycleDetailPage() {
                           </Button>
                         ) : null}
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
+
+          {!isPlanning ? (
+            <StickyMobileCta>
+              <Button size="lg" className="gap-2" onClick={() => setWizardOpen(true)}>
+                <Plus className="size-4" />
+                Adicionar talhão
+              </Button>
+            </StickyMobileCta>
+          ) : null}
         </div>
       )}
 
@@ -580,4 +625,44 @@ export default function CycleDetailPage() {
       />
     </>
   );
+}
+
+/** Dados derivados de uma linha de talhão (tabela desktop e card mobile). */
+function seasonRowData(
+  season: CycleSeasonRow,
+  farmId: string,
+  producerId: string,
+) {
+  const recommendationHref = `/seasons/${season.id}?tab=recommendations&farm_id=${encodeURIComponent(farmId)}${
+    producerId ? `&producer_id=${encodeURIComponent(producerId)}` : ""
+  }`;
+  const pct =
+    season.recommendations_total > 0
+      ? Math.round(
+          (season.recommendations_done / season.recommendations_total) * 100,
+        )
+      : 0;
+  const seasonVarieties = season.varieties ?? [];
+  const varietiesBreakdown =
+    seasonVarieties.length > 1
+      ? seasonVarieties
+          .map(
+            (v) =>
+              `${v.variety}${
+                v.planted_area_ha != null ? ` (${fmtHa(v.planted_area_ha)} ha)` : ""
+              }`,
+          )
+          .join(" · ")
+      : null;
+  const partialArea =
+    season.planted_area_ha != null &&
+    season.planted_area_ha !== season.plot_area_ha;
+  return {
+    recommendationHref,
+    pct,
+    displayName: seasonDisplayName(season),
+    varietiesBreakdown,
+    partialArea,
+    area: season.planted_area_ha ?? season.plot_area_ha,
+  };
 }

@@ -7,7 +7,7 @@ import { getFarmCycles } from "@/lib/api/cycles";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
-import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { EntityHero, type HeroStat } from "@/components/domain/entity-hero";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
 import { ProducerTimingTemplatesPanel } from "@/components/domain/timing/producer-timing-templates-section";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  useAgronomistAgenda,
   useProducer,
   useProducerFarms,
   useUpdateProducer,
@@ -24,7 +25,6 @@ import { createFarm, grantFarmAccess } from "@/lib/api/client";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -39,16 +39,13 @@ import { ProducerDetailSkeleton } from "@/components/domain/page-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  Tractor,
   Mail,
   Phone,
   Pencil,
-  MapPin,
   Sprout,
-  Leaf,
   CalendarDays,
   Clock,
-  ShoppingCart,
+  TriangleAlert,
 } from "lucide-react";
 
 const fmtHa = (n: number) =>
@@ -88,7 +85,6 @@ export function ProducerDetailView({
   const [cronogramOpen, setCronogramOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
-  
   const router = useRouter();
   const searchParams = useSearchParams();
   const onbFarmId = searchParams.get("farm_id") ?? "";
@@ -102,6 +98,10 @@ export function ProducerDetailView({
     return null;
   });
   const [newCycleOpen, setNewCycleOpen] = useState(false);
+
+  const today = useMemo(() => new Date(), []);
+  const agenda = useAgronomistAgenda(today, producerId);
+  const lateCount = showSeasonActions ? agenda.lateCount : 0;
 
   const newFarmMutation = useMutation({
     mutationFn: async () => {
@@ -190,128 +190,91 @@ export function ProducerDetailView({
 
   const initial = (producer.name.trim().charAt(0) || "?").toUpperCase();
 
+  const statValue = (value: ReactNode) =>
+    loadingFarms ? <Skeleton className="h-6 w-12" /> : value;
+
+  const heroStats: HeroStat[] = [
+    { label: "Fazendas", value: statValue(stats.farms) },
+    { label: "Talhões", value: statValue(stats.plots) },
+    { label: "Hectares", value: statValue(`${fmtHa(stats.hectares)} ha`) },
+    { label: "Safras ativas", value: statValue(stats.activeSeasons) },
+    // No mobile este dado vira o banner de alerta abaixo das métricas.
+    ...(lateCount > 0
+      ? [
+          {
+            label: "Atrasadas",
+            value: lateCount,
+            tone: "danger" as const,
+            hideOnMobile: true,
+            onClick: () => setCronogramOpen(true),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      {/* Hero / identidade do produtor */}
-      <section className="p-5 mb-6 border border-border shadow-sm rounded-xl bg-card sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start min-w-0 gap-4">
-            <div className="flex items-center justify-center w-14 h-14 text-2xl font-bold shrink-0 rounded-xl bg-primary-soft text-primary-strong">
-              {initial}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-                Produtor
-              </p>
-              <h1 className="mt-0.5 truncate font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
-                {producer.name}
-              </h1>
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <ContactChip
-                  icon={<Mail className="h-3.5 w-3.5" />}
-                  value={producer.email}
-                  empty="Sem e-mail"
-                />
-                <ContactChip
-                  icon={<Phone className="h-3.5 w-3.5" />}
-                  value={producer.phone}
-                  empty="Sem telefone"
-                />
-              </div>
-            </div>
+      <EntityHero
+        icon={<span className="text-xl font-semibold">{initial}</span>}
+        eyebrow="Produtor"
+        title={producer.name}
+        meta={
+          <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Mail className="size-3.5 shrink-0" aria-hidden />
+              <span className="truncate">{producer.email?.trim() || "Sem e-mail"}</span>
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Phone className="size-3.5 shrink-0" aria-hidden />
+              <span className="truncate">{producer.phone?.trim() || "Sem telefone"}</span>
+            </span>
           </div>
-
-          <Button
-            variant="outline"
-            size="lg"
-            className="gap-2 shrink-0"
-            onClick={openEdit}
-          >
-            <Pencil className="w-4 h-4" />
-            Editar
-          </Button>
-        </div>
-      </section>
-
-      {/* KPIs — indicadores do produtor */}
-      {loadingFarms ? (
-        <Skeleton className="w-full h-24 mb-6 border rounded-xl border-border" />
-      ) : (
-        <KpiStrip className="mb-6">
-          <KpiCell
-            icon={<Tractor className="size-4" />}
-            label="Fazendas"
-            value={String(stats.farms)}
-          />
-          <KpiCell
-            icon={<MapPin className="size-4" />}
-            label="Talhões"
-            value={String(stats.plots)}
-          />
-          <KpiCell
-            icon={<Sprout className="size-4" />}
-            label="Hectares totais"
-            value={`${fmtHa(stats.hectares)} ha`}
-          />
-          <KpiCell
-            icon={<Leaf className="size-4" />}
-            label="Safras ativas"
-            value={String(stats.activeSeasons)}
-          />
-        </KpiStrip>
-      )}
-
-      {showSeasonActions ? (
-        <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          <Button
+        }
+        actions={
+          <>
+            {showSeasonActions ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setCronogramOpen(true)}
+                >
+                  <CalendarDays className="size-4" />
+                  Cronograma
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setTemplatesOpen(true)}
+                >
+                  <Clock className="size-4" />
+                  Modelos
+                </Button>
+              </>
+            ) : null}
+            <Button variant="outline" className="gap-2" onClick={openEdit}>
+              <Pencil className="size-4" />
+              Editar
+            </Button>
+          </>
+        }
+        stats={heroStats}
+      >
+        {lateCount > 0 ? (
+          <button
             type="button"
-            variant="outline"
-            size="lg"
-            className="h-auto min-h-14 justify-start gap-3 rounded-xl border-primary/15 px-4 py-3 text-left hover:border-primary/30 hover:bg-primary/3"
+            className="mt-3 flex w-full items-center gap-2 rounded-xl border border-danger-border bg-danger-soft px-3.5 py-2.5 text-left text-sm font-medium text-danger-strong sm:hidden"
             onClick={() => setCronogramOpen(true)}
           >
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <CalendarDays className="size-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-                Planejamento
-              </span>
-              <span className="mt-0.5 block font-display text-base font-semibold text-text-strong">
-                Cronograma
-              </span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                Aplicações pendentes e atrasadas
-              </span>
-            </span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="h-auto min-h-14 justify-start gap-3 rounded-xl border-primary/15 px-4 py-3 text-left hover:border-primary/30 hover:bg-primary/3"
-            onClick={() => setTemplatesOpen(true)}
-          >
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Clock className="size-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-                Planejamento
-              </span>
-              <span className="mt-0.5 block font-display text-base font-semibold text-text-strong">
-                Modelos de recomendação
-              </span>
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                Dessecação, fungicidas e janelas
-              </span>
-            </span>
-          </Button>
-        </div>
-      ) : null}
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
+            {lateCount === 1
+              ? "1 aplicação atrasada"
+              : `${lateCount} aplicações atrasadas`}
+          </button>
+        ) : null}
+      </EntityHero>
 
       <ProducerFarmsSection
         producerId={producerId}
@@ -319,7 +282,6 @@ export function ProducerDetailView({
         loadingFarms={loadingFarms}
         showSeasonActions={showSeasonActions}
         onNewFarm={() => setNewFarmOpen(true)}
-        onOpenRecommendationModels={() => setTemplatesOpen(true)}
       />
 
       {showSeasonActions ? (
@@ -524,32 +486,6 @@ export function ProducerDetailView({
           </div>
         </SheetContent>
       </Sheet>
-
     </>
   );
 }
-
-function ContactChip({
-  icon,
-  value,
-  empty,
-}: {
-  icon: ReactNode;
-  value?: string | null;
-  empty: string;
-}) {
-  const hasValue = Boolean(value && value.trim());
-  return (
-    <span
-      className={
-        hasValue
-          ? "inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-foreground"
-          : "inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground"
-      }
-    >
-      {icon}
-      <span className="truncate max-w-55">{hasValue ? value : empty}</span>
-    </span>
-  );
-}
-

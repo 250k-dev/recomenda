@@ -12,6 +12,7 @@ import {
   grantFarmAccess,
   revokeFarmAccess,
   createPlot,
+  updatePlot,
   deletePlot,
 } from "@/lib/api/farms";
 import { queryKeys } from "./queryKeys";
@@ -97,6 +98,23 @@ export function useCreatePlot(farmId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: { name: string; area_hectares: number }) => createPlot(farmId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.farmPlots(farmId) });
+    },
+  });
+}
+
+export function useUpdatePlot(farmId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...payload
+    }: {
+      id: string;
+      name?: string;
+      area_hectares?: number;
+    }) => updatePlot(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.farmPlots(farmId) });
     },

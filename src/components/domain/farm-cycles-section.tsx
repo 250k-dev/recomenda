@@ -1,19 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
-import {
-  Boxes,
-  Calculator,
-  CalendarDays,
-  Check,
-  Leaf,
-  Plus,
-  Share2,
-  ShoppingCart,
-} from "lucide-react";
+import { Check, ChevronRight, Leaf, Plus, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +17,8 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { ProgressBar } from "@/components/ui/progress-bar";
+import { SectionToolbar } from "@/components/domain/section-toolbar";
+import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import {
   queryKeys,
@@ -204,19 +196,25 @@ export function NewCycleDialog({
 export function FarmCyclesSection({
   farmId,
   producerId,
-  stockHref,
 }: {
   farmId: string;
   producerId: string | null;
-  stockHref: string;
 }) {
   const router = useRouter();
   const { data: cycles, isLoading } = useFarmCycles(farmId);
   const [newCycleOpen, setNewCycleOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportCycleId, setExportCycleId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const visibleCycles = (cycles ?? []).filter((c) => c.status !== "ARCHIVED");
+  const filteredCycles = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return visibleCycles;
+    return visibleCycles.filter((cycle) =>
+      cycle.name.toLocaleLowerCase("pt-BR").includes(query),
+    );
+  }, [visibleCycles, search]);
   const exportableCycle = visibleCycles.find((cycle) => cycle.recommendations_total > 0);
   const selectedCycleSummary =
     visibleCycles.find((cycle) => cycle.id === exportCycleId) ?? null;
@@ -283,35 +281,38 @@ export function FarmCyclesSection({
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-display text-lg font-semibold text-text-strong">
-            Safras desta fazenda
-          </h2>
-          <div className="flex items-center gap-2">
-            {exportableCycle ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => openExport(exportableCycle.id)}
-              >
-                <Share2 className="h-4 w-4 text-muted-foreground" />
-                Exportar
-              </Button>
-            ) : null}
-            {producerId ? (
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setNewCycleOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Nova safra
-              </Button>
-            ) : null}
-          </div>
-        </div>
+      <div>
+        <SectionToolbar
+          title="Safras desta fazenda"
+          search={
+            visibleCycles.length > 0
+              ? { value: search, onChange: setSearch, placeholder: "Buscar safra…" }
+              : undefined
+          }
+          actions={
+            <>
+              {exportableCycle ? (
+                <Button
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => openExport(exportableCycle.id)}
+                >
+                  <Share2 className="h-4 w-4 text-muted-foreground" />
+                  Exportar
+                </Button>
+              ) : null}
+              {producerId ? (
+                <Button
+                  className="hidden gap-1.5 sm:inline-flex"
+                  onClick={() => setNewCycleOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova safra
+                </Button>
+              ) : null}
+            </>
+          }
+        />
 
         {visibleCycles.length === 0 ? (
           <EmptyState
@@ -325,24 +326,31 @@ export function FarmCyclesSection({
               ) : undefined
             }
           />
+        ) : filteredCycles.length === 0 ? (
+          <EmptyState
+            variant="inline"
+            title="Nenhuma safra encontrada."
+            description={`Não há safras com o nome "${search.trim()}".`}
+          />
         ) : (
-          <div className="space-y-4">
-            {visibleCycles.map((cycle) => {
+          <div className="space-y-3">
+            {filteredCycles.map((cycle) => {
               const pct = cycle.progress_pct;
+              const showProgress = cycle.recommendations_total > 0;
               return (
-                <Card key={cycle.id} className="overflow-hidden">
+                <Card key={cycle.id} className="gap-0 overflow-hidden p-0 transition-all hover:border-primary/30 hover:shadow-md">
                   <CardContent className="p-0">
                     <button
                       type="button"
-                      className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-hover/30"
+                      className="flex w-full items-center gap-3.5 px-4 py-4 text-left transition-colors hover:bg-hover/30"
                       onClick={() => openCycle(cycle.id)}
                     >
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
                         <Leaf className="size-5" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-semibold text-foreground">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-base font-semibold text-text-strong">
                             {cycle.name}
                           </span>
                           {cycle.is_planning ? (
@@ -351,14 +359,14 @@ export function FarmCyclesSection({
                             </Badge>
                           ) : (
                             <Badge
-                              variant={cycle.status === "HARVESTED" ? "success" : "info"}
+                              variant={cycle.status === "ACTIVE" ? "success" : "neutral"}
                               className="shrink-0"
                             >
                               {CYCLE_STATUS_LABELS[cycle.status] ?? cycle.status}
                             </Badge>
                           )}
                         </span>
-                        <span className="mt-0.5 block text-sm text-muted-foreground">
+                        <span className="mt-0.5 block truncate text-sm text-muted-foreground">
                           {[
                             cycle.crops
                               .map((c) => CROP_LABELS[c] ?? c)
@@ -372,11 +380,25 @@ export function FarmCyclesSection({
                             .join(" · ")}
                         </span>
                       </span>
+                      {showProgress ? (
+                        <span className="hidden w-56 shrink-0 lg:block">
+                          <span className="mb-1.5 flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              {cycle.recommendations_done}/{cycle.recommendations_total} aplicadas
+                            </span>
+                            <span className="font-semibold tabular-nums text-primary-strong">
+                              {pct}%
+                            </span>
+                          </span>
+                          <ProgressBar value={pct} className="h-1.5 bg-surface-2" />
+                        </span>
+                      ) : null}
+                      <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
                     </button>
 
-                    {cycle.recommendations_total > 0 ? (
-                      <div className="border-t border-border bg-rail px-4 py-3">
-                        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                    {showProgress ? (
+                      <div className="border-t border-border bg-rail px-4 py-3 lg:hidden">
+                        <div className="mb-1.5 flex items-center justify-between text-xs">
                           <span className="text-muted-foreground">
                             {cycle.recommendations_done}/{cycle.recommendations_total}{" "}
                             aplicadas
@@ -385,36 +407,9 @@ export function FarmCyclesSection({
                             {pct}%
                           </span>
                         </div>
-                        <ProgressBar value={pct} />
+                        <ProgressBar value={pct} className="h-1.5" />
                       </div>
                     ) : null}
-
-                    <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-                      <Button asChild variant="outline" size="sm" className="gap-1.5">
-                        <Link href={cycleHref(cycle, producerId)}>
-                          <CalendarDays className="size-3.5" />
-                          Talhões
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" size="sm" className="gap-1.5">
-                        <Link href={cycleHref(cycle, producerId, "purchase")}>
-                          <ShoppingCart className="size-3.5" />
-                          Lista de compra
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" size="sm" className="gap-1.5">
-                        <Link href={cycleHref(cycle, producerId, "cost-plan")}>
-                          <Calculator className="size-3.5" />
-                          Plano de custo
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" size="sm" className="gap-1.5">
-                        <Link href={stockHref}>
-                          <Boxes className="size-3.5" />
-                          Estoque
-                        </Link>
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               );
@@ -422,6 +417,15 @@ export function FarmCyclesSection({
           </div>
         )}
       </div>
+
+      {producerId ? (
+        <StickyMobileCta>
+          <Button size="lg" className="gap-2" onClick={() => setNewCycleOpen(true)}>
+            <Plus className="size-4" />
+            Nova safra
+          </Button>
+        </StickyMobileCta>
+      ) : null}
 
       {producerId ? (
         <NewCycleDialog
