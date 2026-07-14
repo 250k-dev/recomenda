@@ -15,18 +15,9 @@ import {
   Type,
   Target,
   Loader2,
-  BookmarkPlus,
   Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   readLocalDraft,
   clearLocalDraft,
@@ -40,8 +31,10 @@ import {
   DEFAULT_GRAIN_PRICE_BRL,
   DEFAULT_SPACING_M,
 } from "@/stores/currency";
-import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
-import { CategoryMetaProgress } from "@/components/domain/category-meta-progress";
+import {
+  CategoryMetaProgress,
+  TOTAL_TARGET_KEY,
+} from "@/components/domain/category-meta-progress";
 import {
   createPurchaseList,
   updatePurchaseList,
@@ -53,9 +46,8 @@ import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 import {
   queryKeys,
   usePurchaseListTemplates,
-  useCreatePurchaseListTemplate,
 } from "@/lib/api/hooks";
-import { apiErrorMessage } from "@/lib/api-error";
+import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
 import { CROP_LABELS } from "@/lib/season-constants";
 import {
   FieldError,
@@ -357,6 +349,7 @@ export function PurchaseListWizard({
         <StepTargets
           targets={targets}
           setTargets={setTargets}
+          totalHa={totalHa}
           onBack={onCancel}
           onNext={() => setStep(2)}
           onSaveDraft={saveDraft}
@@ -659,22 +652,10 @@ function StepList({
   );
 }
 
-/** Categorias que o agrônomo pode orçar — antes de montar a lista (sem crop ainda). */
-const META_CATEGORIES = [
-  "CULTIVAR_SOJA",
-  "HIBRIDO_MILHO",
-  "FERTILIZER",
-  "HERBICIDE",
-  "FUNGICIDE",
-  "INSECTICIDE",
-  "BIOLOGICAL",
-  "FOLIAR",
-  "ADJUVANT",
-];
-
 function StepTargets({
   targets,
   setTargets,
+  totalHa,
   onBack,
   onNext,
   onSaveDraft,
@@ -682,23 +663,33 @@ function StepTargets({
 }: {
   targets: Record<string, number>;
   setTargets: (next: Record<string, number>) => void;
+  totalHa: number;
   onBack: () => void;
   onNext: () => void;
   onSaveDraft: () => void;
   savingDraft: boolean;
 }) {
-  // Pergunta antes de montar a lista: quer definir metas? Se já há metas
-  // (voltou ao passo), abre direto nos campos.
+  // Pergunta antes de montar a lista: quer definir meta? Se já há meta
+  // (voltou ao passo), abre direto no campo.
   const [enabled, setEnabled] = useState(
     Object.values(targets).some((v) => (v ?? 0) > 0),
   );
   const num = (n: number, d = 2) =>
     n.toLocaleString("pt-BR", { maximumFractionDigits: d });
-  const totalDesejado = META_CATEGORIES.reduce((s, c) => s + (targets[c] ?? 0), 0);
 
-  const setOne = (category: string, value: string) => {
+  // Formato antigo (rascunho salvo com metas por categoria em sc/ha): converte
+  // para sacas totais só para pré-preencher o campo — ao editar, grava no
+  // formato novo (chave TOTAL) e as categorias antigas saem.
+  const legacyPerHa = Object.entries(targets)
+    .filter(([category]) => category !== TOTAL_TARGET_KEY)
+    .reduce((s, [, v]) => s + (v ?? 0), 0);
+  const totalTarget =
+    targets[TOTAL_TARGET_KEY] ??
+    (legacyPerHa > 0 && totalHa > 0 ? Math.round(legacyPerHa * totalHa) : 0);
+
+  const setTotal = (value: string) => {
     const n = value === "" ? 0 : Number(value);
-    setTargets({ ...targets, [category]: Number.isFinite(n) ? n : 0 });
+    setTargets({ [TOTAL_TARGET_KEY]: Number.isFinite(n) && n > 0 ? n : 0 });
   };
 
   return (
@@ -712,11 +703,11 @@ function StepTargets({
             Metas
           </p>
           <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
-            Antes de montar a lista, quer definir metas?
+            Antes de montar a lista, quer definir uma meta?
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Diga quanto pretende gastar por categoria (em sacas/ha). Ao montar a lista você
-            acompanha o quanto já comprometeu e recebe um aviso se passar da meta. É opcional.
+            Diga o total de sacas que pretende gastar na lista. Ao montar você acompanha o
+            quanto já comprometeu e recebe um aviso se passar da meta. É opcional.
           </p>
         </div>
       </div>
@@ -727,13 +718,13 @@ function StepTargets({
             <Target className="h-6 w-6" />
           </span>
           <p className="max-w-md text-sm text-muted-foreground">
-            Você pode definir uma meta de gasto por categoria agora, ou seguir direto para
-            montar a lista e definir depois.
+            Você pode definir a meta de sacas agora, ou seguir direto para montar a lista e
+            definir depois.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <Button size="lg" className="gap-2" onClick={() => setEnabled(true)}>
               <Target className="h-4 w-4" />
-              Sim, definir metas
+              Sim, definir meta
             </Button>
             <Button size="lg" variant="outline" className="gap-2" onClick={onNext}>
               Agora não
@@ -742,49 +733,30 @@ function StepTargets({
           </div>
         </section>
       ) : (
-        <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="flex items-center justify-between border-b bg-muted/30 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            <span>Categoria</span>
-            <span>Meta (sc/ha)</span>
-          </div>
-          <div className="flex flex-col gap-3.5 p-5">
-            {META_CATEGORIES.map((category) => {
-              const target = targets[category] ?? 0;
-              const color = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.OTHER;
-              return (
-                <div
-                  key={category}
-                  className="flex items-center justify-between gap-3"
-                >
-                  <span className="flex min-w-0 items-center gap-2 text-sm">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ background: color }}
-                    />
-                    <span className="truncate font-medium text-foreground">
-                      {CATEGORY_LABELS[category] ?? category}
-                    </span>
-                  </span>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={target ? String(target) : ""}
-                    placeholder="meta"
-                    onChange={(e) => setOne(category, e.target.value)}
-                    className="h-8 w-20 px-2 text-right text-sm tabular-nums"
-                  />
-                </div>
-              );
-            })}
-            <div className="mt-1 flex items-center justify-between border-t pt-3 text-sm">
-              <span className="font-semibold text-foreground">Total</span>
-              <span className="tabular-nums">
-                <strong className="text-foreground">
-                  {totalDesejado > 0 ? num(totalDesejado) : "—"}
-                </strong>
-                <span className="text-muted-foreground"> sc/ha</span>
-              </span>
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="max-w-md space-y-2.5">
+            <Label htmlFor="total-target" className="text-sm font-semibold text-foreground">
+              Total de sacas desejadas
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="total-target"
+                type="number"
+                min="0"
+                step="1"
+                value={totalTarget ? String(totalTarget) : ""}
+                placeholder="Ex: 25000"
+                onChange={(e) => setTotal(e.target.value)}
+                className="h-12 max-w-[220px] text-right text-lg font-semibold tabular-nums"
+                autoFocus
+              />
+              <span className="text-sm text-muted-foreground">sacas</span>
             </div>
+            <p className="text-xs text-muted-foreground">
+              {totalTarget > 0 && totalHa > 0
+                ? `≈ ${num(totalTarget / totalHa)} sc/ha nos ${num(totalHa)} ha da safra.`
+                : "Compare com o volume de sacas que a lista calcula conforme você adiciona os produtos."}
+            </p>
           </div>
         </section>
       )}
@@ -852,39 +824,6 @@ function StepReview({
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
-
-  // "Salvar como template": grava os itens atuais como modelo reutilizável
-  // (sem talhões/produtor), sem interferir na lista de compra em si.
-  const createTemplate = useCreatePurchaseListTemplate();
-  const [templateOpen, setTemplateOpen] = useState(false);
-  const [templateName, setTemplateName] = useState("");
-  const [templateError, setTemplateError] = useState<string | null>(null);
-
-  const openTemplateDialog = () => {
-    setTemplateError(null);
-    setTemplateName(listName.trim());
-    setTemplateOpen(true);
-  };
-
-  const saveAsTemplate = async () => {
-    setTemplateError(null);
-    if (!templateName.trim()) {
-      setTemplateError("Dê um nome para o template.");
-      return;
-    }
-    try {
-      await createTemplate.mutateAsync({
-        crop,
-        name: templateName.trim(),
-        plots: [],
-        items: items.map((it) => listItemToPayload(it, crop)),
-      });
-      toast.success("Template salvo.");
-      setTemplateOpen(false);
-    } catch (e) {
-      setTemplateError(apiErrorMessage(e, "Não foi possível salvar o template."));
-    }
-  };
 
   // Marca a lista como salva e atualiza os caches — usado tanto no sucesso quanto
   // quando o backend responde que a lista da safra JÁ existe (envio duplicado).
@@ -1029,6 +968,24 @@ function StepReview({
         className="mt-4"
       />
 
+      {/* Card próprio (fora do rodapé): com 4 botões o rodapé quebrava o layout
+          em telas menores, e o template merece explicação do que ele guarda. */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">Reaproveitar esta lista</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Salve os produtos como template para importar em outras safras.
+          </p>
+        </div>
+        <SavePurchaseListTemplateButton
+          items={items}
+          crop={crop}
+          suggestedName={listName}
+          size="sm"
+          className="shrink-0"
+        />
+      </div>
+
       {error ? (
         <div className="mt-4 max-w-xl">
           <FieldError message={error} />
@@ -1042,19 +999,7 @@ function StepReview({
           </Button>
         }
         secondary={
-          <>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={openTemplateDialog}
-              disabled={items.length === 0}
-              className="gap-2"
-            >
-              <BookmarkPlus className="h-4 w-4" />
-              Salvar como template
-            </Button>
-            <SaveDraftButton onSaveDraft={onSaveDraft} savingDraft={savingDraft} />
-          </>
+          <SaveDraftButton onSaveDraft={onSaveDraft} savingDraft={savingDraft} />
         }
         primary={
           <Button size="lg" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
@@ -1063,40 +1008,6 @@ function StepReview({
           </Button>
         }
       />
-
-      <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Salvar como template</DialogTitle>
-            <DialogDescription>
-              Guarda os produtos desta lista como um modelo reutilizável (sem talhões nem
-              produtor). Você pode importá-lo em outras safras.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="template-name">Nome do template</Label>
-            <Input
-              id="template-name"
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="Ex: Soja — dessecação + plantio"
-            />
-            {templateError ? <FieldError message={templateError} /> : null}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setTemplateOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => void saveAsTemplate()}
-              disabled={createTemplate.isPending}
-              className="gap-2"
-            >
-              {createTemplate.isPending ? "Salvando…" : "Salvar template"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

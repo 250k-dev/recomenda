@@ -3,7 +3,7 @@ import { api } from "@/lib/http/axios";
 export interface Notification {
   id: string;
   user_id: string;
-  type: "INVITATION" | "RECOMMENDATION_DUE" | "RECOMMENDATION_LATE" | "PRODUCT_SUBSTITUTED" | "SEASON_PUBLISHED" | "HARVEST_REGISTERED";
+  type: "INVITATION" | "RECOMMENDATION_DUE" | "RECOMMENDATION_LATE" | "PRODUCT_SUBSTITUTED" | "SEASON_PUBLISHED" | "HARVEST_REGISTERED" | "TEAM_ACTIVITY";
   payload: Record<string, unknown>;
   read_at?: string | null;
   created_at: string;

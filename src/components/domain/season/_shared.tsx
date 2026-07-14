@@ -201,6 +201,9 @@ export function validateListItems(items: ListItem[]): string | null {
       // nenhum dos dois. Assim listas existentes voltam a salvar normalmente.
       if (!Number(it.bagsOverride) && !Number(it.seedingArea))
         return "Informe o volume de bags/sacos nas variedades/híbridos.";
+      // Bag/saco é unidade física fechada: não existe meio bag.
+      if (it.bagsOverride && !Number.isInteger(Number(it.bagsOverride)))
+        return "O volume de bags/sacos deve ser um número inteiro.";
     } else if (!Number(it.dose)) {
       return "Informe a dose/ha em todos os itens.";
     }

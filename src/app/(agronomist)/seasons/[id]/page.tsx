@@ -288,12 +288,15 @@ function AddProductRow({
   onClose,
   catalogProducts,
   listProductIds,
+  listDoseByProductId,
 }: {
   recommendationId: string;
   seasonId: string;
   onClose: () => void;
   catalogProducts: PurchaseListCatalogProduct[];
   listProductIds: Set<string>;
+  /** Dose planejada na lista de compra, por produto — pré-preenche a dose. */
+  listDoseByProductId: Map<string, { dose: number; unit: string }>;
 }) {
   const [category, setCategory] = useState("");
   const [productId, setProductId] = useState("");
@@ -331,9 +334,13 @@ function AddProductRow({
     const product = rowProducts.find((entry) => entry.optionValue === optionValue);
     if (!product) return;
     const apply = (localId: string, name: string, doseUnit?: string) => {
+      // Produto da lista de compra: traz a dose planejada (sem sobrescrever uma
+      // dose já digitada nesta linha).
+      const planned = listDoseByProductId.get(localId);
       setProductId(localId);
       setProductName(name);
-      setUnit(doseUnit ?? "L");
+      setUnit(planned?.unit ?? doseUnit ?? "L");
+      if (!dose && planned) setDose(String(planned.dose));
     };
     if (!product.globalId || !product.isGlobalOnly) {
       apply(product.optionValue, product.name, product.dose_unit);
@@ -708,6 +715,7 @@ function RecommendationCard({
   canReorder,
   catalogProducts,
   listProductIds,
+  listDoseByProductId,
   listReady,
 }: {
   rec: Recommendation;
@@ -721,6 +729,7 @@ function RecommendationCard({
   canReorder: boolean;
   catalogProducts: PurchaseListCatalogProduct[];
   listProductIds: Set<string>;
+  listDoseByProductId: Map<string, { dose: number; unit: string }>;
   listReady: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -1035,6 +1044,7 @@ function RecommendationCard({
                   onClose={() => setAddingProduct(false)}
                   catalogProducts={catalogProducts}
                   listProductIds={listProductIds}
+                  listDoseByProductId={listDoseByProductId}
                 />
               </div>
             ) : null}
@@ -1229,8 +1239,26 @@ function RecommendationsTab({
   const {
     catalogProducts,
     listProductIds,
+    purchaseLists,
     isLoading: catalogLoading,
   } = usePurchaseListCatalogProducts(producerId, crop, farmId);
+  // Dose planejada na lista de compra, por produto — pré-preenche a dose ao
+  // adicionar o produto numa etapa (o agrônomo não digita de novo).
+  const listDoseByProductId = useMemo(() => {
+    const map = new Map<string, { dose: number; unit: string }>();
+    for (const list of purchaseLists) {
+      for (const item of list.items) {
+        if (map.has(item.local_product_id)) continue;
+        if (Number(item.dose_per_hectare) > 0) {
+          map.set(item.local_product_id, {
+            dose: Number(item.dose_per_hectare),
+            unit: item.dose_unit,
+          });
+        }
+      }
+    }
+    return map;
+  }, [purchaseLists]);
   // Só marca item como "fora da programação" depois que a lista carregou —
   // senão todos os itens piscariam em vermelho enquanto a lista não chega.
   const listReady = !catalogLoading;
@@ -1431,6 +1459,7 @@ function RecommendationsTab({
             canReorder={canManageStages}
             catalogProducts={catalogProducts}
             listProductIds={listProductIds}
+            listDoseByProductId={listDoseByProductId}
             listReady={listReady}
           />
         ))}

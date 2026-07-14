@@ -215,9 +215,27 @@ function StageProductsEditor({
   farmId?: string;
   overBudgetProductIds: Set<string>;
 }) {
-  const { catalogProducts, listProductIds, isLoading } =
+  const { catalogProducts, listProductIds, purchaseLists, isLoading } =
     usePurchaseListCatalogProducts(producerId, crop, farmId);
   const cloneGlobal = useCloneGlobalProduct();
+
+  // Dose planejada na lista de compra, por produto — pré-preenche a dose ao
+  // selecionar o produto, para o agrônomo não digitar de novo o que já planejou.
+  const listDoseByProductId = useMemo(() => {
+    const map = new Map<string, { dose: number; unit: string }>();
+    for (const list of purchaseLists) {
+      for (const item of list.items) {
+        if (map.has(item.local_product_id)) continue;
+        if (Number(item.dose_per_hectare) > 0) {
+          map.set(item.local_product_id, {
+            dose: Number(item.dose_per_hectare),
+            unit: item.dose_unit,
+          });
+        }
+      }
+    }
+    return map;
+  }, [purchaseLists]);
   const createLocal = useCreateLocalProduct();
   const [resolvingKey, setResolvingKey] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -255,13 +273,19 @@ function StageProductsEditor({
   ) => {
     const product = rowProducts.find((entry) => entry.optionValue === optionValue);
     if (!product) return;
-    const apply = (localId: string, name: string, unit?: string) =>
+    const apply = (localId: string, name: string, unit?: string) => {
+      // Produto da lista de compra: traz a dose planejada (sem sobrescrever uma
+      // dose que o agrônomo já tenha digitado nesta linha).
+      const planned = listDoseByProductId.get(localId);
+      const currentDose = products.find((item) => item.key === key)?.dose ?? "";
       updateProduct(key, {
         productId: localId,
         productName: name,
-        unit: unit ?? "L",
+        unit: planned?.unit ?? unit ?? "L",
+        dose: currentDose || (planned ? String(planned.dose) : currentDose),
         outOfProgram: !listProductIds.has(localId),
       });
+    };
     if (!product.globalId || !product.isGlobalOnly) {
       apply(product.optionValue, product.name, product.dose_unit);
       return;

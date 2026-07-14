@@ -32,6 +32,7 @@ import {
   useCycleAvailablePlots,
   useCyclePurchaseList,
   useApplyCycleBlock,
+  usePublishCycle,
   useTimingTemplate,
   useTimingTemplates,
 } from "@/lib/api/hooks";
@@ -588,10 +589,14 @@ function StepPlots({
   const { data: availablePlots, isLoading } = useCycleAvailablePlots(cycle.id);
   const { data: purchaseList } = useCyclePurchaseList(cycle.id);
   const applyBlock = useApplyCycleBlock(cycle.id);
+  const publishCycle = usePublishCycle(cycle.id);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [configs, setConfigs] = useState<Record<string, PlotConfig>>({});
   const [error, setError] = useState<string | null>(null);
   const [confirmOtherCycle, setConfirmOtherCycle] = useState(false);
+  // Publica a programação junto com o aplicar (como o wizard antigo fazia com o
+  // "Publicar agora") — sem isso as seasons ficam DRAFT e nada cai no cronograma.
+  const [publishNow, setPublishNow] = useState(true);
 
   const plots = availablePlots ?? [];
   const selectedPlots = plots.filter((p) => selected.has(p.id));
@@ -610,6 +615,32 @@ function StepPlots({
     }
     return [...names].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [purchaseList, crop]);
+
+  /** Área plantada calculada na lista de compra (bags × sementes ÷ população),
+   *  por semente — referência para o agrônomo não alocar mais do que comprou. */
+  const seedAreaByVariety = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of purchaseList?.items ?? []) {
+      if (!SEED_CATEGORIES.includes(item.category)) continue;
+      if (item.crop && item.crop !== crop) continue;
+      const area = Number(item.seeding_area_ha ?? 0);
+      if (area > 0) map.set(item.product_name, area);
+    }
+    return map;
+  }, [purchaseList, crop]);
+
+  /** Soma da área já digitada para uma variedade nos talhões selecionados. */
+  const allocatedForVariety = (name: string): number => {
+    let sum = 0;
+    for (const plot of selectedPlots) {
+      for (const row of configs[plot.id]?.varieties ?? []) {
+        if (row.variety.trim() !== name) continue;
+        const n = row.plantedArea ? Number(row.plantedArea.replace(",", ".")) : NaN;
+        if (Number.isFinite(n) && n > 0) sum += n;
+      }
+    }
+    return sum;
+  };
 
   const toggle = (plotId: string, area: number) => {
     setSelected((prev) => {
@@ -724,6 +755,26 @@ function StepPlots({
                 result.skipped.length === 1 ? "talhão já tinha" : "talhões já tinham"
               } este modelo e ${result.skipped.length === 1 ? "foi pulado" : "foram pulados"}.`,
             );
+          }
+          // Publica os rascunhos da safra na sequência (como o "Publicar agora"
+          // do fluxo antigo). Se falhar (ex.: quota do plano), o trabalho aplicado
+          // não se perde — dá para publicar depois pelo botão do hub.
+          if (publishNow && result.applied.length > 0) {
+            publishCycle.mutate(undefined, {
+              onSuccess: () => {
+                toast.success(
+                  "Programação publicada — o cronograma já mostra as aplicações.",
+                );
+                onDone();
+              },
+              onError: () => {
+                toast.error(
+                  "Talhões aplicados, mas a publicação falhou (verifique a quota do plano). Use o botão \"Revisar e publicar\" na safra.",
+                );
+                onDone();
+              },
+            });
+            return;
           }
           onDone();
         },
@@ -859,6 +910,29 @@ function StepPlots({
                               }
                               aria-label={`Variedade ${index + 1} do talhão ${plot.name}`}
                             />
+                            {(() => {
+                              // Referência da lista de compra: área que os bags
+                              // desta semente cobrem, e aviso se a alocação passar.
+                              const name = row.variety.trim();
+                              const listArea = name ? seedAreaByVariety.get(name) : undefined;
+                              if (listArea == null) return null;
+                              const allocated = allocatedForVariety(name);
+                              const over = allocated > listArea;
+                              return (
+                                <p
+                                  className={
+                                    over
+                                      ? "mt-1 text-xs tabular-nums text-warning-strong"
+                                      : "mt-1 text-xs tabular-nums text-muted-foreground"
+                                  }
+                                >
+                                  Na lista de compra: {fmt(listArea)} ha
+                                  {over
+                                    ? ` — alocado ${fmt(allocated)} ha, acima do que os bags cobrem`
+                                    : ""}
+                                </p>
+                              );
+                            })()}
                           </div>
                           <div className="w-32 shrink-0">
                             <Input
@@ -955,20 +1029,42 @@ function StepPlots({
 
       <FieldError message={error ?? undefined} />
 
-      <div className="mt-6 flex items-center justify-between gap-3">
+      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 shadow-sm">
+        <input
+          type="checkbox"
+          checked={publishNow}
+          onChange={(e) => setPublishNow(e.target.checked)}
+          className="mt-0.5 size-4 accent-primary"
+        />
+        <span>
+          <span className="text-sm font-semibold text-foreground">
+            Publicar programação ao aplicar
+          </span>
+          <span className="mt-0.5 block text-[13px] leading-relaxed text-muted-foreground">
+            As aplicações entram no cronograma e o produtor passa a vê-las. Desmarque
+            para deixar em rascunho e publicar depois pelo botão da safra.
+          </span>
+        </span>
+      </label>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack} className="gap-1.5">
           <ArrowLeft className="h-4 w-4" />
           Voltar
         </Button>
         <Button
           onClick={trySubmit}
-          disabled={applyBlock.isPending || selectedPlots.length === 0}
+          disabled={
+            applyBlock.isPending || publishCycle.isPending || selectedPlots.length === 0
+          }
           className="gap-1.5"
         >
           <Leaf className="h-4 w-4" />
           {applyBlock.isPending
             ? "Aplicando..."
-            : `Aplicar a ${selectedPlots.length} ${selectedPlots.length === 1 ? "talhão" : "talhões"}`}
+            : publishCycle.isPending
+              ? "Publicando..."
+              : `Aplicar a ${selectedPlots.length} ${selectedPlots.length === 1 ? "talhão" : "talhões"}`}
         </Button>
       </div>
 

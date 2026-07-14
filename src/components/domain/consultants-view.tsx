@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Check, Copy, Tractor, Trash2, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  useConsultantFarmActions,
-  useConsultantFarms,
   useConsultants,
   useCreateInvitation,
   useFarms,
@@ -30,7 +29,6 @@ import type { ConsultantRow } from "@/lib/api/consultants";
 export function ConsultantsView() {
   const { data: consultants, isLoading } = useConsultants();
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [managing, setManaging] = useState<ConsultantRow | null>(null);
   const [toRemove, setToRemove] = useState<ConsultantRow | null>(null);
   const removeMutation = useRemoveConsultant();
 
@@ -76,52 +74,45 @@ export function ConsultantsView() {
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {consultants.map((c) => (
-            <li
-              key={c.user_id}
-              className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-text-strong">{c.name ?? "Consultor"}</p>
-                  <p className="truncate text-xs text-muted-foreground">{c.email ?? "—"}</p>
+            <li key={c.user_id} className="relative">
+              <Link
+                href={`/consultants/${c.user_id}`}
+                className="flex w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-2 pr-8">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-text-strong">{c.name ?? "Consultor"}</p>
+                    <p className="truncate text-xs text-muted-foreground">{c.email ?? "—"}</p>
+                  </div>
+                  {!c.is_active ? (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      Inativo
+                    </span>
+                  ) : null}
                 </div>
-                {!c.is_active ? (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                    Inativo
-                  </span>
-                ) : null}
-              </div>
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Tractor className="h-3.5 w-3.5" />
-                {c.farm_count} {c.farm_count === 1 ? "fazenda" : "fazendas"}
-              </p>
-              <div className="flex justify-end gap-1.5">
-                <Button variant="outline" size="sm" onClick={() => setManaging(c)}>
-                  Gerenciar fazendas
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  title="Remover consultor"
-                  className="text-muted-foreground hover:text-danger-strong"
-                  onClick={() => setToRemove(c)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Tractor className="h-3.5 w-3.5" />
+                  {c.farm_count} {c.farm_count === 1 ? "fazenda" : "fazendas"}
+                  <span>·</span>
+                  <span className="text-primary-strong">ver atividade e gerenciar</span>
+                </p>
+              </Link>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="Remover consultor"
+                className="absolute right-3 top-3 text-muted-foreground hover:text-danger-strong"
+                onClick={() => setToRemove(c)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
             </li>
           ))}
         </ul>
       )}
 
       <InviteConsultantDialog open={inviteOpen} onOpenChange={setInviteOpen} />
-      {managing ? (
-        <ManageFarmsDialog
-          consultant={managing}
-          open={managing != null}
-          onOpenChange={(open) => !open && setManaging(null)}
-        />
-      ) : null}
 
       <ConfirmDialog
         open={toRemove != null}
@@ -282,68 +273,3 @@ function InviteConsultantDialog({
   );
 }
 
-function ManageFarmsDialog({
-  consultant,
-  open,
-  onOpenChange,
-}: {
-  consultant: ConsultantRow;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { data: farmsData } = useFarms();
-  const farms = farmsData?.data ?? [];
-  const { data: consultantFarms } = useConsultantFarms(consultant.user_id, open);
-  const { grant, revoke } = useConsultantFarmActions(consultant.user_id);
-
-  const sharedIds = new Set((consultantFarms ?? []).map((f) => f.id));
-
-  const toggle = (farmId: string, on: boolean) => {
-    const mut = on ? revoke : grant;
-    mut.mutate(farmId, {
-      onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível atualizar.")),
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Fazendas de {consultant.name ?? "consultor"}</DialogTitle>
-          <DialogDescription>
-            Marque as fazendas que este consultor pode acessar.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="px-6 py-5">
-          {farms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Você ainda não tem fazendas.</p>
-          ) : (
-            <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
-              {farms.map((f) => {
-                const on = sharedIds.has(f.id);
-                return (
-                  <li key={f.id}>
-                    <label
-                      className={cn(
-                        "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm",
-                        on ? "border-primary/40 bg-primary/5" : "border-border bg-card",
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={on}
-                        onChange={() => toggle(f.id, on)}
-                      />
-                      <span className="font-medium text-text-strong">{f.name}</span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}

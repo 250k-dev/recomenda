@@ -88,6 +88,11 @@ export function NotificationsBell({
                   <p className="text-sm font-medium text-foreground">
                     {getNotificationTitle(notification)}
                   </p>
+                  {getNotificationBody(notification) ? (
+                    <p className="mt-0.5 text-xs leading-relaxed text-foreground/80">
+                      {getNotificationBody(notification)}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
                     {new Date(notification.created_at).toLocaleDateString(
                       "pt-BR",
@@ -123,8 +128,19 @@ function getNotificationTitle(notification: Notification): string {
     PRODUCT_SUBSTITUTED: "Produto substituído",
     SEASON_PUBLISHED: "Safra publicada",
     HARVEST_REGISTERED: "Colheita registrada",
+    TEAM_ACTIVITY: "Atividade da equipe",
   };
   return typeMap[notification.type] || "Nova notificação";
+}
+
+/** Linha descritiva ("quem fez o quê") — hoje só a atividade da equipe usa. */
+function getNotificationBody(notification: Notification): string | null {
+  if (notification.type !== "TEAM_ACTIVITY") return null;
+  const p = notification.payload ?? {};
+  const actor = typeof p.actor_name === "string" ? p.actor_name : "Alguém";
+  const summary = typeof p.summary === "string" ? p.summary : "fez uma alteração";
+  const farm = typeof p.farm_name === "string" && p.farm_name ? ` · ${p.farm_name}` : "";
+  return `${actor} ${summary}${farm}`;
 }
 
 function payloadSeasonId(
@@ -145,6 +161,10 @@ function getNotificationPath(notification: Notification): string | null {
     case "RECOMMENDATION_LATE":
     case "PRODUCT_SUBSTITUTED":
       return seasonId ? `/seasons/${seasonId}` : null;
+    case "TEAM_ACTIVITY": {
+      const farmId = payload?.farm_id;
+      return typeof farmId === "string" && farmId ? `/farms/${farmId}` : null;
+    }
     case "INVITATION":
     default:
       return null;

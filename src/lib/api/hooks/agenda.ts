@@ -49,6 +49,8 @@ export type AgronomistAgendaResult = {
   totalEventCount: number;
   todayCount: number;
   lateCount: number;
+  /** Programações em rascunho (não publicadas) — invisíveis no cronograma. */
+  draftCount: number;
   isLoading: boolean;
   isError: boolean;
 };
@@ -170,6 +172,12 @@ async function fetchAgendaEvents(
     seasons = seasons.filter((s) => s.producer_id === producerId);
   }
 
+  // Rascunhos não aparecem no cronograma — contamos para poder explicar um
+  // calendário vazio ("publique a safra") em vez de sumir com o trabalho.
+  const draftCount = allSeasons.filter(
+    (s) => s.status === "DRAFT" && (!producerId || s.producer_id === producerId),
+  ).length;
+
   const pendingCandidates: {
     season: AgendaSeasonRow;
     r: Recommendation;
@@ -262,6 +270,7 @@ async function fetchAgendaEvents(
     totalEventCount: ordered.length,
     todayCount,
     lateCount,
+    draftCount,
   };
 }
 
@@ -303,6 +312,7 @@ export function useAgronomistAgenda(month: Date, producerId?: string) {
     totalEventCount: query.data?.totalEventCount ?? 0,
     todayCount: query.data?.todayCount ?? 0,
     lateCount: query.data?.lateCount ?? 0,
+    draftCount: query.data?.draftCount ?? 0,
     isLoading: query.isLoading,
     isError: query.isError,
   } satisfies AgronomistAgendaResult;

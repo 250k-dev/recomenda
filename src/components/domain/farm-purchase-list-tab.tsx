@@ -27,6 +27,10 @@ import {
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
 import {
+  CategoryMetaProgress,
+  TOTAL_TARGET_KEY,
+} from "@/components/domain/category-meta-progress";
+import {
   useFarmAggregatedShoppingList,
   useUpdatePurchaseList,
 } from "@/lib/api/hooks";
@@ -45,6 +49,7 @@ import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
 import { PurchaseListTargetsDialog } from "@/components/domain/purchase-list-targets-dialog";
+import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -506,6 +511,16 @@ export function FarmPurchaseListTab({
                   Editar metas
                 </Button>
               ) : null}
+              {/* Sempre disponível: a lista muda com o tempo e o agrônomo precisa
+                  poder salvar as alterações como template (antes só na criação). */}
+              {!readOnly && hasItems ? (
+                <SavePurchaseListTemplateButton
+                  items={viewItems}
+                  crop={list.crop ?? "ANY"}
+                  suggestedName={list.name}
+                  size="sm"
+                />
+              ) : null}
               <Button
                 variant="outline"
                 size="sm"
@@ -624,11 +639,25 @@ export function FarmPurchaseListTab({
               {fmtQty(totalHa)} ha × nº de aplicações.
             </p>
           ) : null}
+          {/* Meta nova (TOTAL em sacas): barra única Real × Meta; a distribuição
+              por categoria continua abaixo, sem coluna de meta. Metas antigas
+              (por categoria) seguem na tabela Realizado × Meta de sempre. */}
+          {Number(list.category_targets?.[TOTAL_TARGET_KEY] ?? 0) > 0 ? (
+            <CategoryMetaProgress
+              items={editing ? draftItems : viewItems}
+              totalHa={totalHa}
+              targets={list.category_targets ?? {}}
+            />
+          ) : null}
           {kpis.categoryBreakdown.length > 0 ||
           Object.values(list.category_targets ?? {}).some((v) => (v ?? 0) > 0) ? (
             <CategoryDistributionPanel
               breakdown={kpis.categoryBreakdown}
-              targets={list.category_targets ?? {}}
+              targets={
+                Number(list.category_targets?.[TOTAL_TARGET_KEY] ?? 0) > 0
+                  ? undefined
+                  : (list.category_targets ?? {})
+              }
             />
           ) : null}
           <PurchaseListItemsEditor
@@ -684,6 +713,7 @@ export function FarmPurchaseListTab({
         open={targetsOpen}
         onOpenChange={setTargetsOpen}
         initialTargets={list.category_targets ?? {}}
+        totalHa={totalHa}
         onSave={saveTargets}
         saving={savingTargets}
       />

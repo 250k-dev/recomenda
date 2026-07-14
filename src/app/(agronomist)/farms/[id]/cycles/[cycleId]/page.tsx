@@ -221,18 +221,22 @@ export default function CycleDetailPage() {
           .filter(Boolean)
           .join(" · ")}
         actions={
-          tab === "recommendations" ? (
+          <>
+            {/* Enquanto houver talhão em rascunho, publicar fica visível em TODAS
+                as abas — sem isso a programação não aparece no cronograma e o
+                botão passava despercebido. */}
+            {draftSeasons.length > 0 ? (
+              <Button
+                className="gap-1.5"
+                onClick={() => setPublishConfirm(true)}
+                disabled={publishCycle.isPending}
+              >
+                <Rocket className="size-4" />
+                {publishCycle.isPending ? "Publicando..." : "Revisar e publicar"}
+              </Button>
+            ) : null}
+            {tab === "recommendations" ? (
             <>
-              {draftSeasons.length > 0 ? (
-                <Button
-                  className="gap-1.5"
-                  onClick={() => setPublishConfirm(true)}
-                  disabled={publishCycle.isPending}
-                >
-                  <Rocket className="size-4" />
-                  {publishCycle.isPending ? "Publicando..." : "Revisar e publicar"}
-                </Button>
-              ) : null}
               <Button
                 variant="outline"
                 className="gap-1.5"
@@ -256,7 +260,8 @@ export default function CycleDetailPage() {
                 Plano de custo
               </Button>
             </>
-          ) : undefined
+            ) : null}
+          </>
         }
         stats={heroStats}
       />

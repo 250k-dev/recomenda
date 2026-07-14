@@ -199,12 +199,14 @@ export function PurchaseListItemsEditor({
 
   // Volume de bags/sacos é digitado à mão pelo agrônomo (o produtor diz "faço
   // com 10 bags"). NÃO calcula sozinho — ao informar, a área plantada recalcula.
+  // Bag é unidade fechada: só inteiros (decimais digitados/colados são cortados).
   const setBags = (key: string, value: string) => {
     const item = items.find((i) => i.key === key);
     const pop = Number(item?.thousandPlants || 0);
+    const whole = value.replace(/[.,].*$/, "").replace(/\D/g, "");
     updateItem(key, {
-      bagsOverride: value === "" ? undefined : value,
-      seedingArea: areaString(Number(value || 0), pop, item?.category ?? ""),
+      bagsOverride: whole === "" ? undefined : whole,
+      seedingArea: areaString(Number(whole || 0), pop, item?.category ?? ""),
     });
   };
 
@@ -550,7 +552,8 @@ export function PurchaseListItemsEditor({
               ) : (
                 <Input
                   type="number"
-                  step="0.0001"
+                  step="1"
+                  min="0"
                   placeholder={seedQuantityUnitAbbrev(it.category)}
                   value={it.bagsOverride ?? ""}
                   onChange={(e) => setBags(it.key, e.target.value)}
@@ -758,6 +761,7 @@ export function PurchaseListItemsEditor({
     id: string;
     title: string;
     seed: boolean;
+    out?: boolean;
     items: ListItem[];
   }) => {
     const seedBand = band.seed;
@@ -818,19 +822,31 @@ export function PurchaseListItemsEditor({
             )}
           </colgroup>
           <tbody className="divide-y">
-            <tr className={seedBand ? "bg-primary/10" : "bg-rail"}>
+            <tr
+              className={
+                band.out ? "bg-destructive/10" : seedBand ? "bg-primary/10" : "bg-rail"
+              }
+            >
               <td
                 colSpan={colCount}
                 className={cn(
                   "px-3 py-2 text-[11px] font-semibold uppercase tracking-wide",
-                  seedBand ? "text-primary-strong" : "text-muted-foreground",
+                  band.out
+                    ? "text-destructive"
+                    : seedBand
+                      ? "text-primary-strong"
+                      : "text-muted-foreground",
                 )}
               >
                 <span className="inline-flex items-center gap-2">
                   <span
                     className={cn(
                       "h-2 w-2 rounded-sm",
-                      seedBand ? "bg-primary" : "bg-muted-foreground/50",
+                      band.out
+                        ? "bg-destructive"
+                        : seedBand
+                          ? "bg-primary"
+                          : "bg-muted-foreground/50",
                     )}
                   />
                   {band.title} · {band.items.length}{" "}
@@ -871,18 +887,85 @@ export function PurchaseListItemsEditor({
     );
   };
 
+  // Soma da área plantada das sementes × hectares da safra, POR CULTURA (soja e
+  // milho podem ocupar a área total cada um). Avisa ao chegar perto (≥90%) e ao
+  // passar — os bags são digitados à mão e é fácil estourar a área sem notar.
+  const renderSeedAreaSummary = (seedItems: ListItem[]) => {
+    if (totalHa <= 0) return null;
+    const byCategory = new Map<string, number>();
+    for (const it of seedItems) {
+      const area = Number(it.seedingArea || 0);
+      if (area <= 0) continue;
+      byCategory.set(it.category, (byCategory.get(it.category) ?? 0) + area);
+    }
+    if (byCategory.size === 0) return null;
+    return (
+      <div className="flex flex-col gap-1.5">
+        {[...byCategory.entries()].map(([category, sum]) => {
+          const pct = (sum / totalHa) * 100;
+          const over = pct > 100;
+          const near = !over && pct >= 90;
+          const label =
+            PRODUCT_CATEGORY_LABELS[category as keyof typeof PRODUCT_CATEGORY_LABELS] ??
+            category;
+          return (
+            <div
+              key={category}
+              className={cn(
+                "flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm",
+                over
+                  ? "border-danger-border bg-danger-soft text-danger-strong"
+                  : near
+                    ? "border-warning-border bg-warning-soft text-warning-strong"
+                    : "border-border bg-card text-muted-foreground",
+              )}
+            >
+              <span className="flex items-center gap-1.5 font-medium">
+                {over || near ? (
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Sprout className="h-4 w-4 shrink-0" />
+                )}
+                Área plantada · {label}
+              </span>
+              <span className="tabular-nums">
+                {fmtArea(sum)} de {fmtArea(totalHa)} ha ({fmt(pct)}%)
+                {over
+                  ? ` — passou ${fmtArea(sum - totalHa)} ha da safra`
+                  : near
+                    ? " — quase atingindo a área da safra"
+                    : ""}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const bands = [
     {
       id: "seed",
       title: "Sementes · variedades e híbridos",
       seed: true,
+      out: false,
       items: items.filter((it) => isSeedItem(it)),
     },
     {
       id: "dose",
       title: "Defensivos e fertilizantes",
       seed: false,
-      items: items.filter((it) => !isSeedItem(it)),
+      out: false,
+      items: items.filter((it) => !isSeedItem(it) && !it.outOfProgram),
+    },
+    // Produtos recomendados nas etapas sem estar na lista — entram aqui para o
+    // custo não virar fantasma. O agrônomo completa preço/estoque ou remove.
+    {
+      id: "out",
+      title: "Fora da programação · vindos da recomendação",
+      seed: false,
+      out: true,
+      items: items.filter((it) => !isSeedItem(it) && Boolean(it.outOfProgram)),
     },
   ].filter((b) => b.items.length > 0);
 
@@ -1035,10 +1118,20 @@ export function PurchaseListItemsEditor({
           Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
         </div>
       ) : (
-        <div className="hidden space-y-4 lg:block">{bands.map(renderBandTable)}</div>
+        <div className="hidden space-y-4 lg:block">
+          {bands.map((band) => (
+            <div key={band.id} className="space-y-2">
+              {renderBandTable(band)}
+              {band.seed ? renderSeedAreaSummary(band.items) : null}
+            </div>
+          ))}
+        </div>
       )}
 
       <div className="mt-6 space-y-3 lg:hidden">
+        {items.some((it) => isSeedItem(it))
+          ? renderSeedAreaSummary(items.filter((it) => isSeedItem(it)))
+          : null}
         {items.length === 0 ? (
           <div className="rounded-xl border border-dashed bg-card px-4 py-8 text-center text-sm text-muted-foreground">
             Nenhum produto adicionado.
@@ -1060,6 +1153,11 @@ export function PurchaseListItemsEditor({
               <div key={it.key} className="rounded-xl border bg-card p-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {catLabel}
+                  {it.outOfProgram ? (
+                    <span className="ml-2 inline-flex items-center rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-destructive">
+                      Fora da programação
+                    </span>
+                  ) : null}
                 </p>
                 <p className="mt-1 text-base font-medium text-foreground">{it.productName || "—"}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -1118,6 +1216,11 @@ export function PurchaseListItemsEditor({
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Insumo
+                    {it.outOfProgram ? (
+                      <span className="ml-2 inline-flex items-center rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-destructive">
+                        Fora da programação
+                      </span>
+                    ) : null}
                   </p>
                   <button
                     type="button"
@@ -1178,7 +1281,8 @@ export function PurchaseListItemsEditor({
                       <Field label={`Volume BAG's (${seedQuantityUnitLabel(it.category)})`}>
                         <Input
                           type="number"
-                          step="0.0001"
+                          step="1"
+                          min="0"
                           placeholder={seedQuantityUnitLabel(it.category)}
                           value={it.bagsOverride ?? ""}
                           onChange={(e) => setBags(it.key, e.target.value)}

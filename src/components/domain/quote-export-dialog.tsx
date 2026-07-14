@@ -17,6 +17,7 @@ import type { QuoteComparison } from "@/lib/api/quotes";
 import {
   buildQuoteWhatsappMessage,
   printQuoteComparison,
+  type QuoteExportMode,
   type QuotePrintContext,
 } from "@/lib/quotes/quote-print-document";
 
@@ -34,22 +35,28 @@ export function QuoteExportDialog({
   const [copied, setCopied] = useState(false);
   const [shareAll, setShareAll] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Padrão: exporta só o melhor preço de cada produto. Marcar "exportar tudo"
+  // volta à comparação completa (todas as lojas por produto), como era antes.
+  const [mode, setMode] = useState<QuoteExportMode>("best");
 
   const allIds = useMemo(() => data.responses.map((r) => r.id), [data.responses]);
 
-  // Ao abrir, volta para "todas as lojas" com tudo marcado.
+  // Ao abrir, volta para "todas as lojas" com tudo marcado e só melhores preços.
   const [prevOpen, setPrevOpen] = useState(false);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
       setShareAll(true);
       setSelected(new Set(allIds));
+      setMode("best");
     }
   }
 
   const storeIds = shareAll ? null : selected;
   const hasSelection = shareAll || selected.size > 0;
-  const message = hasSelection ? buildQuoteWhatsappMessage(data, storeIds, context) : "";
+  const message = hasSelection
+    ? buildQuoteWhatsappMessage(data, storeIds, context, mode)
+    : "";
   const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
 
   const toggle = (id: string) => {
@@ -78,7 +85,7 @@ export function QuoteExportDialog({
 
   const handlePrint = () => {
     onOpenChange(false);
-    window.setTimeout(() => printQuoteComparison(data, storeIds, context), 250);
+    window.setTimeout(() => printQuoteComparison(data, storeIds, context, mode), 250);
   };
 
   return (
@@ -92,6 +99,26 @@ export function QuoteExportDialog({
         </DialogHeader>
 
         <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto px-6 py-5">
+          <section className="rounded-xl border border-border bg-surface-2 p-4">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-primary"
+                checked={mode === "full"}
+                onChange={(e) => setMode(e.target.checked ? "full" : "best")}
+              />
+              <span>
+                <span className="text-sm font-semibold text-text-strong">
+                  Exportar a comparação completa
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Por padrão sai só o melhor preço de cada produto (com a loja).
+                  Marque para incluir o preço de todas as lojas por produto.
+                </span>
+              </span>
+            </label>
+          </section>
+
           <section className="rounded-xl border border-border bg-surface-2 p-4">
             <label className="flex cursor-pointer items-center gap-2.5">
               <input

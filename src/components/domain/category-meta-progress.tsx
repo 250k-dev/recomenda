@@ -9,13 +9,21 @@ import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
 import type { ListItem } from "@/components/domain/season/_shared";
 import { cn } from "@/lib/utils";
 
+/** Chave reservada no jsonb `category_targets` para a meta ÚNICA da lista, em
+ *  sacas TOTAIS (formato novo). Sem essa chave, valem as metas por categoria
+ *  em sc/ha (formato antigo — listas já criadas continuam funcionando). */
+export const TOTAL_TARGET_KEY = "TOTAL";
+
 const num = (n: number, d = 2) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: d });
 
 /**
- * Progresso das metas por categoria (Real × Meta em sc/ha) com aviso ao estourar.
- * Só aparece quando o agrônomo definiu ao menos uma meta — sem metas, a lista de
- * compra fica normal (o componente não renderiza nada).
+ * Progresso das metas da lista de compra, com aviso ao estourar.
+ *
+ * - Meta nova (`TOTAL`, sacas totais): barra única Real × Meta.
+ * - Metas antigas (por categoria, sc/ha): tabela de progresso por categoria.
+ *
+ * Só aparece quando há meta definida — sem meta, não renderiza nada.
  */
 export function CategoryMetaProgress({
   items,
@@ -37,14 +45,66 @@ export function CategoryMetaProgress({
     [items, totalHa, fx, saca],
   );
 
-  // Parte de TODAS as metas configuradas (não só das categorias que já têm item):
-  // assim toda meta aparece desde o começo e o "Real" sobe de 0 conforme o
-  // agrônomo vai preenchendo produtos/sementes e seus preços.
+  // Formato novo: meta única em sacas totais — compara direto com o volume de
+  // sacas que a lista já calcula (mesmo número do KPI "Volume de sacas").
+  const totalTarget = Number(targets[TOTAL_TARGET_KEY] ?? 0);
+  if (totalTarget > 0) {
+    const real = metrics.totalSacks;
+    const over = real > totalTarget;
+    const pct = Math.min(100, (real / totalTarget) * 100);
+    return (
+      <section className={cn("rounded-xl border bg-card p-4 shadow-sm", className)}>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Target className="h-4 w-4 text-primary-strong" />
+          <h3 className="text-sm font-semibold text-foreground">Meta de sacas</h3>
+          <span className="text-xs text-muted-foreground">· Real / Meta (sacas totais)</span>
+        </div>
+
+        {over ? (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Você ultrapassou a meta em{" "}
+              <strong>{num(real - totalTarget)} sacas</strong>.
+            </span>
+          </div>
+        ) : null}
+
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-medium text-foreground">Total da lista</span>
+            <span
+              className={cn(
+                "shrink-0 tabular-nums",
+                over ? "font-semibold text-danger-strong" : "text-foreground",
+              )}
+            >
+              {num(real)}{" "}
+              <span className="text-muted-foreground">/ {num(totalTarget)} sc</span>
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn(
+                "h-full rounded-full bg-primary transition-all",
+                over && "bg-danger-strong",
+              )}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Formato antigo (por categoria, sc/ha). Parte de TODAS as metas configuradas
+  // (não só das categorias que já têm item): assim toda meta aparece desde o
+  // começo e o "Real" sobe de 0 conforme o agrônomo vai preenchendo produtos.
   const realByCategory = new Map(
     metrics.categoryBreakdown.map((r) => [r.category, r.sacks_per_ha]),
   );
   const rows = Object.entries(targets)
-    .filter(([, target]) => (target ?? 0) > 0)
+    .filter(([category, target]) => category !== TOTAL_TARGET_KEY && (target ?? 0) > 0)
     .map(([category, target]) => ({
       category,
       target,

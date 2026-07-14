@@ -1,11 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileDown, RotateCcw, Share2, Store, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { FileDown, Loader2, PencilLine, RotateCcw, Share2, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import {
@@ -13,12 +24,15 @@ import {
   usePurchaseListQuotes,
   useQuoteTrashActions,
 } from "@/lib/api/hooks";
+import { queryKeys } from "@/lib/api/hooks/queryKeys";
 import { apiErrorMessage } from "@/lib/api-error";
 import { QuoteExportDialog } from "@/components/domain/quote-export-dialog";
-import type {
-  QuoteAvailability,
-  QuoteComparisonResponse,
-  QuotePaymentTerm,
+import {
+  createQuoteRequest,
+  createQuoteResponse,
+  type QuoteAvailability,
+  type QuoteComparisonResponse,
+  type QuotePaymentTerm,
 } from "@/lib/api/quotes";
 
 const fmtQty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -63,10 +77,93 @@ export function QuoteComparisonSection({
   const { data, isLoading } = usePurchaseListQuotes(listId);
   const { data: trash } = usePurchaseListQuoteTrash(listId);
   const actions = useQuoteTrashActions(listId);
+  const queryClient = useQueryClient();
 
   const [showTrash, setShowTrash] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [pendingPermanent, setPendingPermanent] = useState<PendingPermanent | null>(null);
+
+  // Cotação manual: o agrônomo recebeu os preços por telefone/WhatsApp e
+  // preenche ele mesmo — reusa a MESMA tela pública que a loja usaria, então a
+  // cotação entra na comparação como qualquer outra.
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualStoreName, setManualStoreName] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
+
+  const startManualQuote = async () => {
+    const name = manualStoreName.trim();
+    if (!name) {
+      toast.error("Dê um nome à loja (ex: Agro Norte).");
+      return;
+    }
+    setManualSaving(true);
+    try {
+      // Sem link de cotação ainda? Cria na hora (mesmo request das lojas).
+      const token = data?.request?.token ?? (await createQuoteRequest(listId)).token;
+      const created = await createQuoteResponse(token, { store_name: name });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.purchaseListQuotes(listId),
+      });
+      setManualOpen(false);
+      setManualStoreName("");
+      window.open(
+        `/cotacao/${token}/loja/${created.response_token}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      toast.success(`Cotação de ${name} criada — preencha os preços na aba que abriu.`);
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Não foi possível criar a cotação manual."));
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
+  const manualQuoteButton = (
+    <Button variant="outline" size="sm" onClick={() => setManualOpen(true)}>
+      <PencilLine className="size-3.5" />
+      Cotação manual
+    </Button>
+  );
+
+  const manualQuoteDialog = (
+    <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PencilLine className="h-5 w-5 text-primary" />
+            Preencher cotação manualmente
+          </DialogTitle>
+          <DialogDescription>
+            Recebeu os preços por telefone ou WhatsApp? Dê um nome à loja e preencha
+            você mesmo — a cotação entra na comparação igual às respondidas pelo link.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1.5">
+          <Label htmlFor="manual-store-name">Nome da loja</Label>
+          <Input
+            id="manual-store-name"
+            value={manualStoreName}
+            onChange={(e) => setManualStoreName(e.target.value)}
+            placeholder="Ex: Agro Norte"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void startManualQuote();
+            }}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setManualOpen(false)} disabled={manualSaving}>
+            Cancelar
+          </Button>
+          <Button onClick={() => void startManualQuote()} disabled={manualSaving} className="gap-2">
+            {manualSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Criar e preencher
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   const itemUnitById = useMemo(() => {
     const map = new Map<string, string>();
@@ -130,10 +227,15 @@ export function QuoteComparisonSection({
 
   if (!data || !data.request) {
     return (
-      <EmptyState
-        variant="inline"
-        title="Gere o link de cotação para começar a receber preços das lojas."
-      />
+      <>
+        <EmptyState
+          variant="inline"
+          title="Gere o link de cotação para começar a receber preços das lojas."
+          description="Recebeu preços por telefone ou WhatsApp? Você também pode preencher uma cotação manualmente."
+          action={manualQuoteButton}
+        />
+        {manualQuoteDialog}
+      </>
     );
   }
 
@@ -253,8 +355,10 @@ export function QuoteComparisonSection({
         <EmptyState
           variant="inline"
           title="Nenhuma loja respondeu ainda."
-          description="Assim que uma loja preencher a cotação pelo link, os preços aparecem aqui."
+          description="Assim que uma loja preencher a cotação pelo link, os preços aparecem aqui. Recebeu preços por telefone? Preencha uma cotação manual."
+          action={manualQuoteButton}
         />
+        {manualQuoteDialog}
         {confirmDialog}
       </div>
     );
@@ -311,6 +415,7 @@ export function QuoteComparisonSection({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-end gap-1.5">
+        {manualQuoteButton}
         <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
           <FileDown className="size-3.5" />
           Exportar
@@ -322,6 +427,7 @@ export function QuoteComparisonSection({
           </Button>
         ) : null}
       </div>
+      {manualQuoteDialog}
       {trashPanel}
       {data ? (
         <QuoteExportDialog

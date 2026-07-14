@@ -101,7 +101,7 @@ export function MonthCalendar({
     [producersData],
   );
 
-  const { eventsByDay, calendarMarkersByDay, totalEventCount, todayCount, lateCount, isLoading, isError } =
+  const { eventsByDay, calendarMarkersByDay, totalEventCount, todayCount, lateCount, draftCount, isLoading, isError } =
     useAgronomistAgenda(month, producerId);
 
   const today = new Date();
@@ -268,6 +268,20 @@ export function MonthCalendar({
 
       {/* Coluna direita: agenda do dia / mês / filtro */}
       <main className="min-w-0 flex-1">
+        {/* Programação existe mas está em rascunho: explica o calendário vazio
+            em vez de deixar parecer que o trabalho sumiu. */}
+        {!isLoading && !isError && totalEventCount === 0 && draftCount > 0 ? (
+          <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {draftCount === 1
+                ? "Há 1 programação em rascunho que não aparece aqui."
+                : `Há ${draftCount} programações em rascunho que não aparecem aqui.`}{" "}
+              Abra a safra na fazenda e use <strong>Revisar e publicar</strong> para
+              as aplicações entrarem no cronograma.
+            </span>
+          </div>
+        ) : null}
         <Card className="flex max-h-[min(72vh,calc(100vh-11rem))] flex-col gap-0 overflow-hidden border py-0 shadow-sm">
           <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b bg-muted/20 px-4 py-4 sm:px-5">
             <div className="min-w-0">
