@@ -16,6 +16,9 @@ const HOP_BY_HOP = new Set([
   "host",
   "cookie",
   "content-length",
+  // fetch() já descomprime o body; repassar esses headers causa ERR_CONTENT_DECODING_FAILED
+  "content-encoding",
+  "accept-encoding",
 ]);
 
 async function proxyToNest(
@@ -36,6 +39,9 @@ async function proxyToNest(
     }
   });
 
+  // Evita gzip/br do Nest: o undici descomprime e o browser quebraria no Content-Encoding.
+  headers.set("Accept-Encoding", "identity");
+
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
   } else {
@@ -55,10 +61,14 @@ async function proxyToNest(
 
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP.has(key.toLowerCase()) && key.toLowerCase() !== "set-cookie") {
-      responseHeaders.set(key, value);
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP.has(lower) || lower === "set-cookie") {
+      return;
     }
+    responseHeaders.set(key, value);
   });
+  responseHeaders.delete("content-encoding");
+  responseHeaders.delete("content-length");
 
   return new NextResponse(upstream.body, {
     status: upstream.status,
