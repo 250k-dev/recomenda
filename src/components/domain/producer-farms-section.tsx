@@ -16,6 +16,7 @@ import { queryKeys } from "@/lib/api/hooks";
 import { getTimeline, type Recommendation } from "@/lib/api/seasons";
 import { getFarmCycles } from "@/lib/api/cycles";
 import type { ProducerFarm } from "@/lib/api/client";
+import { useCan } from "@/lib/auth/use-can";
 
 const RUNNING_SEASON_STATUSES = new Set(["PUBLISHED", "IN_PROGRESS"]);
 
@@ -57,6 +58,7 @@ export function ProducerFarmsSection({
   onNewFarm: () => void;
 }) {
   const router = useRouter();
+  const canCreateFarm = useCan("FARM_CREATE");
   const [search, setSearch] = useState("");
 
   const runningSeasonIds = useMemo(() => {
@@ -134,10 +136,12 @@ export function ProducerFarmsSection({
             : undefined
         }
         actions={
-          <Button className="hidden gap-2 sm:inline-flex" onClick={onNewFarm}>
-            <Plus className="size-4" />
-            Nova fazenda
-          </Button>
+          canCreateFarm ? (
+            <Button className="hidden gap-2 sm:inline-flex" onClick={onNewFarm}>
+              <Plus className="size-4" />
+              Nova fazenda
+            </Button>
+          ) : undefined
         }
       />
 
@@ -160,10 +164,12 @@ export function ProducerFarmsSection({
                 Cadastre a primeira fazenda para iniciar o acompanhamento das safras.
               </p>
             </div>
-            <Button size="sm" className="mt-2 gap-1.5" onClick={onNewFarm}>
-              <Plus className="size-4" />
-              Cadastrar primeira fazenda
-            </Button>
+            {canCreateFarm ? (
+              <Button size="sm" className="mt-2 gap-1.5" onClick={onNewFarm}>
+                <Plus className="size-4" />
+                Cadastrar primeira fazenda
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : filteredFarms.length === 0 ? (
@@ -196,12 +202,14 @@ export function ProducerFarmsSection({
         </div>
       )}
 
-      <StickyMobileCta>
-        <Button size="lg" className="gap-2" onClick={onNewFarm}>
-          <Plus className="size-4" />
-          Nova fazenda
-        </Button>
-      </StickyMobileCta>
+      {canCreateFarm ? (
+        <StickyMobileCta>
+          <Button size="lg" className="gap-2" onClick={onNewFarm}>
+            <Plus className="size-4" />
+            Nova fazenda
+          </Button>
+        </StickyMobileCta>
+      ) : null}
     </section>
   );
 }

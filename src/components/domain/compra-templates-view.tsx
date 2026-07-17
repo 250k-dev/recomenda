@@ -15,6 +15,7 @@ import {
   usePurchaseListTemplates,
   useUpdatePurchaseListTemplate,
 } from "@/lib/api/hooks";
+import { useCan } from "@/lib/auth/use-can";
 import { apiErrorMessage } from "@/lib/api-error";
 import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
 import { CROP_LABELS } from "@/lib/season-constants";
@@ -49,6 +50,7 @@ function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem
 }
 
 export function CompraTemplatesView() {
+  const canTemplateCrud = useCan("TEMPLATE_CRUD");
   const { data: templates, isLoading } = usePurchaseListTemplates();
   const [editing, setEditing] = useState<PurchaseListDetail | "new" | null>(null);
   const [toDelete, setToDelete] = useState<PurchaseListDetail | null>(null);
@@ -91,10 +93,12 @@ export function CompraTemplatesView() {
             </p>
           </div>
         </div>
+        {canTemplateCrud ? (
         <Button onClick={() => setEditing("new")} className="gap-2">
           <Plus className="h-4 w-4" />
           Novo template
         </Button>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -125,6 +129,7 @@ export function CompraTemplatesView() {
                   {t.items.length === 1 ? "produto" : "produtos"}
                 </span>
               </button>
+              {canTemplateCrud ? (
               <div className="flex justify-end gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => setEditing(t)}>
                   Editar
@@ -139,6 +144,7 @@ export function CompraTemplatesView() {
                   <Trash2 className="size-4" />
                 </Button>
               </div>
+              ) : null}
             </li>
           ))}
         </ul>

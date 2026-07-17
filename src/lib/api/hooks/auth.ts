@@ -10,7 +10,6 @@ import {
   impersonateProducer,
   exitImpersonation,
 } from "@/lib/api/auth";
-import { setAccessToken, setUserRole } from "@/lib/auth/token-store";
 import { useImpersonationStore } from "@/stores/impersonation";
 import { queryKeys } from "./queryKeys";
 
@@ -49,17 +48,7 @@ export function useLogin() {
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       login(email, password),
     onSuccess: (result) => {
-      if (result.user.role === "PRODUCER") {
-        throw new Error("Produtores devem acessar o Recomenda App, não este painel.");
-      }
-      setAccessToken(result.access_token);
-      setUserRole(result.user.role);
       window.location.assign(result.user.role === "ADMIN" ? "/admin" : "/dashboard");
-    },
-    onError: (error) => {
-      if (error instanceof Error && error.message.includes("Produtores")) {
-        throw error;
-      }
     },
   });
 }
@@ -70,9 +59,7 @@ export function useImpersonateProducer() {
 
   return useMutation({
     mutationFn: (producerId: string) => impersonateProducer(producerId),
-    onSuccess: (result, producerId) => {
-      setAccessToken(result.access_token);
-      setUserRole("PRODUCER");
+    onSuccess: (_result, producerId) => {
       startImpersonation({ producerId, producerName: "Produtor" });
       queryClient.invalidateQueries();
     },
@@ -85,11 +72,7 @@ export function useExitImpersonation() {
 
   return useMutation({
     mutationFn: exitImpersonation,
-    onSuccess: (data) => {
-      setAccessToken(data.access_token);
-      if (data.role) {
-        setUserRole(data.role);
-      }
+    onSuccess: () => {
       clearImpersonation();
       queryClient.invalidateQueries();
     },

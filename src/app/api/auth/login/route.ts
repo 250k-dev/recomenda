@@ -1,10 +1,17 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/config/env";
+import { clearAuthCookies, setAuthCookies } from "@/lib/auth/session-cookies";
+
+type LoginPayload = {
+  access_token: string;
+  refresh_token: string;
+  user: { role: string; [key: string]: unknown };
+};
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const response = await fetch(`${env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, {
+  const response = await fetch(`${env.API_INTERNAL_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -17,32 +24,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(err, { status: response.status });
   }
 
-  const payload = await response.json();
+  const payload = (await response.json()) as LoginPayload;
   const cookieStore = await cookies();
 
-  cookieStore.set("refresh_token", payload.refresh_token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+  if (payload.user.role === "PRODUCER") {
+    clearAuthCookies(cookieStore);
+    return NextResponse.json(
+      {
+        error: {
+          code: "PRODUCER_WEB_FORBIDDEN",
+          message:
+            "Produtores não têm acesso ao painel web. Entre em contato com o suporte.",
+        },
+      },
+      { status: 403 },
+    );
+  }
+
+  setAuthCookies(cookieStore, {
+    access_token: payload.access_token,
+    refresh_token: payload.refresh_token,
+    role: payload.user.role,
   });
 
-  cookieStore.set("access_token", payload.access_token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60,
-  });
-
-  cookieStore.set("role", payload.user.role, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-
-  return NextResponse.json(payload);
+  return NextResponse.json({ user: payload.user });
 }

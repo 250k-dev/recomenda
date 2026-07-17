@@ -31,9 +31,13 @@ export interface QuotePrintContext {
   agronomistName?: string | null;
 }
 
-/** O que exportar: só o melhor preço de cada produto (padrão) ou a comparação
- *  completa com a coluna de cada loja. */
-export type QuoteExportMode = "best" | "full";
+/**
+ * O que exportar:
+ * - `best` — melhor preço de cada produto misturando as lojas selecionadas
+ * - `store` — preços da(s) loja(s) selecionada(s), seção por loja (sem misturar)
+ * - `full` — comparação completa (matriz produto × lojas)
+ */
+export type QuoteExportMode = "best" | "store" | "full";
 
 const QUOTE_CSS = `
   .cmp { font-size: 10.5px; }
@@ -263,6 +267,103 @@ function buildBestPricesBody(
   </div>`;
 }
 
+/** Preços por loja: uma seção por loja selecionada, com os preços dela
+ *  (sem misturar com outras). Ex.: loja 1 marcada → só a lista da loja 1. */
+function buildStorePricesBody(
+  data: QuoteComparison,
+  responses: QuoteComparisonResponse[],
+  ctx: QuotePrintContext,
+): string {
+  const emittedAt = new Date().toLocaleDateString("pt-BR");
+
+  const sections = responses
+    .map((r) => {
+      let storeTotal = 0;
+      const rows = data.items
+        .map((it) => {
+          const cell = r.items.find(
+            (ci) => ci.purchase_list_item_id === it.purchase_list_item_id,
+          );
+          if (!cell) return null;
+          const eff = effPrice(cell);
+          if (eff == null) {
+            if (cell.availability === "UNAVAILABLE") {
+              return `
+                <tr>
+                  <td>${escapeHtml(it.product_name)}<span class="cell-term">${escapeHtml(it.stage ?? "")}</span></td>
+                  <td class="num">${fmtQty(it.quantity_to_buy)} ${escapeHtml(it.dose_unit)}</td>
+                  <td class="num muted">Não tem</td>
+                  <td class="num muted">&mdash;</td>
+                </tr>`;
+            }
+            return null;
+          }
+          const lineTotal = eff * it.quantity_to_buy;
+          storeTotal += lineTotal;
+          const term = cell.payment_term
+            ? `<span class="cell-term">${TERM_LABEL[cell.payment_term]}</span>`
+            : "";
+          const sub = cell.substitute_product_name
+            ? `<span class="cell-sub">↪ ${escapeHtml(cell.substitute_product_name)}</span>`
+            : "";
+          return `
+            <tr>
+              <td>${escapeHtml(it.product_name)}<span class="cell-term">${escapeHtml(it.stage ?? "")}</span>${sub}</td>
+              <td class="num">${fmtQty(it.quantity_to_buy)} ${escapeHtml(it.dose_unit)}</td>
+              <td class="num"><span class="best">${fmtBrl(eff)}</span>${term}</td>
+              <td class="num">${fmtBrl(lineTotal)}</td>
+            </tr>`;
+        })
+        .filter((row): row is string => row != null)
+        .join("");
+
+      if (!rows) {
+        return `
+          <section>
+            <h2 class="section-title">${escapeHtml(r.store_name)}</h2>
+            <p class="empty">Sem preços cotados nesta loja.</p>
+          </section>`;
+      }
+
+      return `
+        <section>
+          <h2 class="section-title">${escapeHtml(r.store_name)}</h2>
+          <table class="data-table cmp">
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th class="num">Qtd</th>
+                <th class="num">Preço</th>
+                <th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+            <tfoot>
+              <tr>
+                <td>Total da loja</td>
+                <td></td>
+                <td></td>
+                <td class="num"><span class="best">${storeTotal > 0 ? fmtBrl(storeTotal) : "&mdash;"}</span></td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>`;
+    })
+    .join("");
+
+  return `
+  <div class="doc">
+    ${headerHtml(emittedAt)}
+    <div class="title-block">
+      <p class="kicker">Preços por loja</p>
+      <h1 class="title">${escapeHtml(ctx.listName || "Cotações das lojas")}</h1>
+      ${titleTags(ctx)}
+    </div>
+    ${sections || `<p class="empty">Sem cotações para exibir.</p>`}
+    ${footerHtml(ctx.agronomistName)}
+  </div>`;
+}
+
 export function printQuoteComparison(
   data: QuoteComparison,
   storeIds: Set<string> | null,
@@ -274,7 +375,9 @@ export function printQuoteComparison(
   const body =
     mode === "best"
       ? buildBestPricesBody(data, responses, ctx)
-      : buildComparisonBody(data, responses, ctx);
+      : mode === "store"
+        ? buildStorePricesBody(data, responses, ctx)
+        : buildComparisonBody(data, responses, ctx);
   printHtml(htmlShell(title, body, QUOTE_CSS));
 }
 
@@ -293,6 +396,27 @@ export function buildQuoteWhatsappMessage(
   lines.push(`*Cotações — ${ctx.listName || "lojas"}*`);
   if (ctx.producerName) lines.push(`Produtor: ${ctx.producerName}`);
   lines.push("");
+
+  if (mode === "store") {
+    for (const r of responses) {
+      lines.push(`*${r.store_name}*`);
+      let storeTotal = 0;
+      for (const it of data.items) {
+        const cell = r.items.find(
+          (ci) => ci.purchase_list_item_id === it.purchase_list_item_id,
+        );
+        const eff = cell ? effPrice(cell) : null;
+        if (eff == null) continue;
+        storeTotal += eff * it.quantity_to_buy;
+        lines.push(
+          `• ${it.product_name}: ${fmtBrl(eff)} (${fmtQty(it.quantity_to_buy)} ${it.dose_unit})`,
+        );
+      }
+      if (storeTotal > 0) lines.push(`Total: ${fmtBrl(storeTotal)}`);
+      lines.push("");
+    }
+    return lines.join("\n").trimEnd();
+  }
 
   if (mode === "full") {
     lines.push("*Preços por produto:*");

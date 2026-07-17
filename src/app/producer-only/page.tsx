@@ -4,14 +4,18 @@ import { useRouter } from "next/navigation";
 import { ShieldOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { clearAccessToken } from "@/lib/auth/token-store";
+import { logout } from "@/lib/api/auth";
 
 export default function ProducerOnlyPage() {
   const router = useRouter();
 
-  const handleLogout = () => {
-    clearAccessToken();
-    router.push("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      /* ignore */
+    }
+    router.push("/login?force=1");
   };
 
   return (
@@ -22,8 +26,8 @@ export default function ProducerOnlyPage() {
         </span>
         <h1 className="mb-2 text-2xl font-semibold text-foreground">Acesso negado</h1>
         <p className="mb-6 text-sm text-muted-foreground">
-          Produtores não podem acessar o painel administrativo. Use o{" "}
-          <strong className="text-foreground">Recomenda App</strong> para continuar.
+          Contas de produtor não têm acesso ao painel web neste momento. Entre em
+          contato com o agrônomo responsável ou com o suporte.
         </p>
         <Button onClick={handleLogout} className="w-full">
           Sair e voltar ao login

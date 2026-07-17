@@ -29,6 +29,8 @@ export interface AgronomistProducerListRow {
   email: string;
   is_active: boolean;
   account_status: AdminProducerAccountStatus;
+  /** Quem cadastrou o produtor (null = agrônomo / legado). Usado no gate de exclusão do Gestor. */
+  created_by_user_id?: string | null;
   total_hectares?: number;
   farms_count?: number | null;
   plots_count?: number | null;
@@ -70,6 +72,7 @@ export interface InvitationPreview {
   expires_at: string;
   agronomist_id: string;
   kind?: "PRODUCER" | "CONSULTANT";
+  access_level?: "MANAGER" | "ASSISTANT";
 }
 
 export interface Invitation {
@@ -143,8 +146,12 @@ export async function acceptInvitation(token: string, payload: { name: string; p
 
 export async function createInvitation(payload: {
   email?: string;
-  farm_ids: string[];
+  farm_ids?: string[];
   kind?: "PRODUCER" | "CONSULTANT";
+  /** Só para kind=CONSULTANT: Gestor ou Consultor. */
+  access_level?: "MANAGER" | "ASSISTANT";
+  /** Só para ASSISTANT criado pelo agrônomo: vínculo sob um gestor (null = direto). */
+  manager_user_id?: string | null;
 }) {
   const { data } = await api.post<Invitation>("/invitations", payload);
   return data;

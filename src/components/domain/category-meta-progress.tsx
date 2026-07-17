@@ -9,18 +9,53 @@ import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
 import type { ListItem } from "@/components/domain/season/_shared";
 import { cn } from "@/lib/utils";
 
-/** Chave reservada no jsonb `category_targets` para a meta ÚNICA da lista, em
- *  sacas TOTAIS (formato novo). Sem essa chave, valem as metas por categoria
- *  em sc/ha (formato antigo — listas já criadas continuam funcionando). */
+/** Formato correto: meta única da lista em sc/ha. */
+export const TOTAL_SC_HA_KEY = "TOTAL_SC_HA";
+
+/**
+ * Formato intermediário (14/07): meta única em sacas TOTAIS.
+ * Mantido só para leitura/migração ao editar — ao salvar vira `TOTAL_SC_HA`.
+ */
 export const TOTAL_TARGET_KEY = "TOTAL";
+
+const RESERVED_TARGET_KEYS = new Set([TOTAL_SC_HA_KEY, TOTAL_TARGET_KEY]);
 
 const num = (n: number, d = 2) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: d });
 
 /**
+ * Resolve a meta única em sc/ha a partir do jsonb `category_targets`.
+ *
+ * Ordem: `TOTAL_SC_HA` → `TOTAL` (÷ ha) → soma das metas por categoria (sc/ha).
+ */
+export function resolveTotalTargetScHa(
+  targets: Record<string, number>,
+  totalHa: number,
+): number {
+  const scHa = Number(targets[TOTAL_SC_HA_KEY] ?? 0);
+  if (scHa > 0) return scHa;
+
+  const totalSacks = Number(targets[TOTAL_TARGET_KEY] ?? 0);
+  if (totalSacks > 0 && totalHa > 0) return totalSacks / totalHa;
+
+  const legacyPerHa = Object.entries(targets)
+    .filter(([category]) => !RESERVED_TARGET_KEYS.has(category))
+    .reduce((s, [, v]) => s + (v ?? 0), 0);
+  return legacyPerHa > 0 ? legacyPerHa : 0;
+}
+
+/** Indica se a lista usa meta única (sc/ha ou legado TOTAL em sacas). */
+export function hasSingleTotalTarget(targets: Record<string, number>): boolean {
+  return (
+    Number(targets[TOTAL_SC_HA_KEY] ?? 0) > 0 ||
+    Number(targets[TOTAL_TARGET_KEY] ?? 0) > 0
+  );
+}
+
+/**
  * Progresso das metas da lista de compra, com aviso ao estourar.
  *
- * - Meta nova (`TOTAL`, sacas totais): barra única Real × Meta.
+ * - Meta única (`TOTAL_SC_HA` ou legado `TOTAL`): barra Real × Meta em sc/ha.
  * - Metas antigas (por categoria, sc/ha): tabela de progresso por categoria.
  *
  * Só aparece quando há meta definida — sem meta, não renderiza nada.
@@ -45,19 +80,18 @@ export function CategoryMetaProgress({
     [items, totalHa, fx, saca],
   );
 
-  // Formato novo: meta única em sacas totais — compara direto com o volume de
-  // sacas que a lista já calcula (mesmo número do KPI "Volume de sacas").
-  const totalTarget = Number(targets[TOTAL_TARGET_KEY] ?? 0);
-  if (totalTarget > 0) {
-    const real = metrics.totalSacks;
-    const over = real > totalTarget;
-    const pct = Math.min(100, (real / totalTarget) * 100);
+  // Meta única em sc/ha — compara com o KPI "Custo (sc/ha)".
+  const totalTargetScHa = resolveTotalTargetScHa(targets, totalHa);
+  if (hasSingleTotalTarget(targets) && totalTargetScHa > 0) {
+    const real = metrics.costSacksPerHa;
+    const over = real > totalTargetScHa;
+    const pct = Math.min(100, (real / totalTargetScHa) * 100);
     return (
       <section className={cn("rounded-xl border bg-card p-4 shadow-sm", className)}>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Target className="h-4 w-4 text-primary-strong" />
           <h3 className="text-sm font-semibold text-foreground">Meta de sacas</h3>
-          <span className="text-xs text-muted-foreground">· Real / Meta (sacas totais)</span>
+          <span className="text-xs text-muted-foreground">· Real / Meta (sc/ha)</span>
         </div>
 
         {over ? (
@@ -65,14 +99,14 @@ export function CategoryMetaProgress({
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               Você ultrapassou a meta em{" "}
-              <strong>{num(real - totalTarget)} sacas</strong>.
+              <strong>{num(real - totalTargetScHa)} sc/ha</strong>.
             </span>
           </div>
         ) : null}
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-foreground">Total da lista</span>
+            <span className="font-medium text-foreground">Custo da lista</span>
             <span
               className={cn(
                 "shrink-0 tabular-nums",
@@ -80,7 +114,7 @@ export function CategoryMetaProgress({
               )}
             >
               {num(real)}{" "}
-              <span className="text-muted-foreground">/ {num(totalTarget)} sc</span>
+              <span className="text-muted-foreground">/ {num(totalTargetScHa)} sc/ha</span>
             </span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -92,6 +126,11 @@ export function CategoryMetaProgress({
               style={{ width: `${pct}%` }}
             />
           </div>
+          {totalHa > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              ≈ {num(totalTargetScHa * totalHa)} sacas totais nos {num(totalHa)} ha da lista.
+            </p>
+          ) : null}
         </div>
       </section>
     );
@@ -104,7 +143,10 @@ export function CategoryMetaProgress({
     metrics.categoryBreakdown.map((r) => [r.category, r.sacks_per_ha]),
   );
   const rows = Object.entries(targets)
-    .filter(([category, target]) => category !== TOTAL_TARGET_KEY && (target ?? 0) > 0)
+    .filter(
+      ([category, target]) =>
+        !RESERVED_TARGET_KEYS.has(category) && (target ?? 0) > 0,
+    )
     .map(([category, target]) => ({
       category,
       target,

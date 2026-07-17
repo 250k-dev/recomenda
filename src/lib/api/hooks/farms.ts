@@ -125,8 +125,33 @@ export function useDeletePlot(farmId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deletePlot,
-    onSuccess: () => {
+    // Remove o talhão da lista na hora (sem esperar refetch / F5).
+    onMutate: async (plotId: string) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.farmPlots(farmId) });
+      const previous = queryClient.getQueryData<
+        Awaited<ReturnType<typeof getFarmPlots>>
+      >(queryKeys.farmPlots(farmId));
+      if (previous) {
+        queryClient.setQueryData(
+          queryKeys.farmPlots(farmId),
+          previous.filter((p) => p.id !== plotId),
+        );
+      }
+      return { previous };
+    },
+    onError: (_err, _plotId, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(queryKeys.farmPlots(farmId), ctx.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.farmPlots(farmId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.farm(farmId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.farms });
+      queryClient.invalidateQueries({ queryKey: queryKeys.farmSeasons(farmId) });
+      // Contagens de talhão na carteira do produtor / cards de fazenda.
+      queryClient.invalidateQueries({ queryKey: ["producer-farms"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producers });
     },
   });
 }

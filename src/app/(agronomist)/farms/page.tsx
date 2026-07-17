@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCreateFarm, useFarms } from "@/lib/api/hooks";
+import { useCan } from "@/lib/auth/use-can";
 import { Building2, Info, Plus } from "lucide-react";
 
 const createSchema = z.object({
@@ -29,6 +30,7 @@ export default function FarmsPage() {
   const router = useRouter();
   const { data, isLoading } = useFarms();
   const createMutation = useCreateFarm();
+  const canCreateFarm = useCan("FARM_CREATE");
   const [open, setOpen] = useState(false);
   const [filterName, setFilterName] = useState("");
   const [filterLocation, setFilterLocation] = useState("");
@@ -96,6 +98,7 @@ export default function FarmsPage() {
         </AlertDescription>
       </Alert>
 
+      {canCreateFarm ? (
       <div className="mb-6 flex justify-end">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
@@ -138,6 +141,7 @@ export default function FarmsPage() {
           </SheetContent>
         </Sheet>
       </div>
+      ) : null}
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <Input
@@ -168,7 +172,7 @@ export default function FarmsPage() {
               : "Ajuste os filtros para encontrar a fazenda desejada."
           }
           action={
-            data?.data?.length === 0 ? (
+            data?.data?.length === 0 && canCreateFarm ? (
               <Button onClick={() => setOpen(true)}>
                 <Plus className="h-4 w-4" />
                 Nova fazenda

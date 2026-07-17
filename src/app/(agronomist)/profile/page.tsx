@@ -7,7 +7,6 @@ import { AccountSettingsPanel } from "@/components/domain/account-settings-panel
 import { PlanQuotaPanel } from "@/components/domain/plan-quota-panel";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/api/client";
-import { clearAccessToken } from "@/lib/auth/token-store";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -18,8 +17,7 @@ export default function ProfilePage() {
     } catch {
       /* ignore server errors */
     }
-    clearAccessToken();
-    router.push("/login");
+    router.push("/login?force=1");
   };
 
   return (

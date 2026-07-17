@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { useCan, usePrincipal } from "@/lib/auth/use-can";
 
 type Tab = "active" | "archived";
 type SortMode = "name" | "hectares-desc" | "hectares-asc";
@@ -58,6 +59,10 @@ export default function ProducersPage() {
   const setActive = useSetProducerActive();
   const deleteMutation = useDeleteProducer();
   const revokeInvitationMutation = useRevokeInvitation();
+  const canCreateProducer = useCan("PRODUCER_CREATE");
+  const canDeleteProducer = useCan("PRODUCER_DELETE");
+  const canEditProducer = useCan("PRODUCER_EDIT");
+  const { id: meId, role } = usePrincipal();
   const [tab, setTab] = useState<Tab>("active");
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortMode>("name");
@@ -180,12 +185,14 @@ export default function ProducersPage() {
           title="Produtores"
           description={`${fmt(totalProducers)} produtor${totalProducers === 1 ? "" : "es"} cadastrado${totalProducers === 1 ? "" : "s"}. Acompanhe fazendas, safras e aplicações de cada um.`}
           action={
-            <Button asChild variant="clay">
-              <Link href="/producers/new">
-                <Plus className="h-4 w-4" />
-                Cadastrar produtor
-              </Link>
-            </Button>
+            canCreateProducer ? (
+              <Button asChild variant="clay">
+                <Link href="/producers/new">
+                  <Plus className="h-4 w-4" />
+                  Cadastrar produtor
+                </Link>
+              </Button>
+            ) : undefined
           }
         />
       </div>
@@ -283,12 +290,19 @@ export default function ProducersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginated.map((p) => (
+                  {paginated.map((p) => {
+                    // Gestor só arquiva/exclui o que criou; agrônomo faz tudo; consultor nada.
+                    const owns =
+                      role !== "STAFF" ||
+                      (p.created_by_user_id != null && p.created_by_user_id === meId);
+                    return (
                     <ProducerRow
                       key={rowKey(p)}
                       producer={p}
                       tab={tab}
                       actionPending={actionPending}
+                      canArchive={canEditProducer && owns}
+                      canHardDelete={canDeleteProducer && owns}
                       onOpen={() =>
                         p.producer_id ? router.push(`/producers/${p.producer_id}`) : null
                       }
@@ -297,7 +311,8 @@ export default function ProducersPage() {
                       onDelete={() => p.producer_id && onDelete(p.producer_id, p.name)}
                       onRevokeInvitation={() => p.invitation_id && onRevokeInvitation(p.invitation_id, p.name)}
                     />
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -349,6 +364,8 @@ function ProducerRow({
   producer,
   tab,
   actionPending,
+  canArchive = true,
+  canHardDelete = true,
   onOpen,
   onArchive,
   onReactivate,
@@ -358,6 +375,8 @@ function ProducerRow({
   producer: AgronomistProducerListRow;
   tab: Tab;
   actionPending: boolean;
+  canArchive?: boolean;
+  canHardDelete?: boolean;
   onOpen: () => void;
   onArchive: () => void;
   onReactivate: () => void;
@@ -425,7 +444,7 @@ function ProducerRow({
       </td>
       <td className="px-2 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
-          {canManage && tab === "active" ? (
+          {canManage && tab === "active" && canArchive ? (
             <Button
               variant="ghost"
               size="sm"
@@ -437,8 +456,9 @@ function ProducerRow({
               <span className="hidden sm:inline">Remover</span>
             </Button>
           ) : null}
-          {canManage && tab === "archived" ? (
+          {canManage && tab === "archived" && (canArchive || canHardDelete) ? (
             <>
+              {canArchive ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -449,6 +469,8 @@ function ProducerRow({
                 <RotateCcw className="h-4 w-4" />
                 <span className="hidden sm:inline">Reativar</span>
               </Button>
+              ) : null}
+              {canHardDelete ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -459,9 +481,10 @@ function ProducerRow({
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Excluir</span>
               </Button>
+              ) : null}
             </>
           ) : null}
-          {isInvitation && producer.invitation_id ? (
+          {isInvitation && producer.invitation_id && canArchive ? (
             <Button
               variant="ghost"
               size="sm"

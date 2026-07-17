@@ -25,8 +25,8 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { useMe, usePlanQuota } from "@/lib/api/hooks";
-import { navByRole } from "@/config/nav";
-import type { UserRole } from "@/types/auth";
+import { navFor } from "@/config/nav";
+import type { AccessLevel, UserRole } from "@/types/auth";
 import { Logo } from "@/assets/logo";
 import { NotificationsBell } from "./notifications-bell";
 import { Badge } from "../ui/badge";
@@ -36,6 +36,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "/producers": <Users className="size-4" />,
   "/catalog": <Package className="size-4" />,
   "/reports": <BarChart3 className="size-4" />,
+  "/consultants": <UsersRound className="size-4" />,
   "/admin": <LayoutDashboard className="size-4" />,
   "/admin/plans": <CreditCard className="size-4" />,
   "/admin/agronomists": <Users className="size-4" />,
@@ -48,7 +49,17 @@ export function AppSidebar({ role }: { role: UserRole }) {
   const { data: currentUser } = useMe();
   const { data: planData } = usePlanQuota({ enabled: role === "AGRONOMIST" });
 
-  const items = navByRole[role];
+  const accessLevel = (currentUser?.access_level ?? null) as AccessLevel | null;
+  const items = navFor(role, accessLevel);
+  // Subtítulo da sidebar por papel/nível.
+  const roleLabel =
+    role === "ADMIN"
+      ? "Administrador"
+      : role === "STAFF"
+        ? accessLevel === "MANAGER"
+          ? "Gestor"
+          : "Consultor"
+        : "Agronomista";
 
   const profileName =
     role === "ADMIN" ? "Administrador" : currentUser?.name?.trim() || "";
@@ -68,7 +79,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
               Recomenda
             </span>
             <span className="text-[10px] text-sidebar-foreground/70">
-              {role === "ADMIN" ? "Administrador" : "Agronomista"}
+              {roleLabel}
             </span>
           </div>
           <NotificationsBell

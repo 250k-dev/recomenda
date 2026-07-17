@@ -39,6 +39,7 @@ import {
 import type { CycleSeasonRow } from "@/lib/api/cycles";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
 import { cn } from "@/lib/utils";
+import { useCan } from "@/lib/auth/use-can";
 
 type CycleTab = "recommendations" | "purchase" | "cost-plan";
 
@@ -69,6 +70,7 @@ function seasonDisplayName(season: CycleSeasonRow): string {
 }
 
 export default function CycleDetailPage() {
+  const canListCrud = useCan("LIST_CRUD");
   const params = useParams<{ id: string; cycleId: string }>();
   const farmId = params.id;
   const cycleId = params.cycleId;
@@ -289,12 +291,14 @@ export default function CycleDetailPage() {
             title="Esta safra ainda não tem lista de compra."
             description="Monte a lista com tudo que a safra vai precisar — soja e milho juntos — e entregue ao produtor antes mesmo de montar a programação."
             action={
+              canListCrud ? (
               <Button asChild size="sm" className="gap-1.5">
                 <Link href={newPurchaseListHref}>
                   <Plus className="size-4" />
                   Montar lista de compra
                 </Link>
               </Button>
+              ) : undefined
             }
           />
         ) : listIsDraft ? (
@@ -380,7 +384,7 @@ export default function CycleDetailPage() {
               description="Adicione os talhões escolhendo um modelo de recomendação — você pode aplicar modelos diferentes a grupos de talhões diferentes antes de publicar."
               action={
                 <div className="flex flex-wrap justify-center gap-2">
-                  {!purchaseList ? (
+                  {!purchaseList && canListCrud ? (
                     <Button asChild size="sm" variant="outline" className="gap-1.5">
                       <Link href={newPurchaseListHref}>
                         <ShoppingCart className="size-4" />

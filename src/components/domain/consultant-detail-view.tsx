@@ -6,11 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   Activity,
   Check,
-  Leaf,
+  Info,
   Loader2,
   Search,
   Trash2,
-  Tractor,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,15 +20,24 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useConsultantActivity,
-  useConsultantFarmActions,
   useConsultantSummary,
-  useFarms,
+  useConsultants,
+  useMemberProducerActions,
+  useShareableProducers,
   useRemoveConsultant,
 } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
+import { useCan } from "@/lib/auth/use-can";
 import { cn } from "@/lib/utils";
 
 const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "short",
@@ -37,344 +45,326 @@ const fmtDate = (iso: string) =>
     minute: "2-digit",
   });
 
-function sameSet(a: Set<string>, b: Set<string>) {
-  if (a.size !== b.size) return false;
-  for (const id of a) if (!b.has(id)) return false;
-  return true;
-}
-
 /**
- * Dashboard do consultor em tela cheia: fazendas (seleção + Salvar),
- * produtores alcançáveis e feed de ações.
+ * Detalhe do membro de equipe: checklist de produtores compartilhados,
+ * stats e feed de ações.
  */
 export function ConsultantDetailView({ userId }: { userId: string }) {
   const router = useRouter();
+  const canManage = useCan("TEAM_MANAGE");
   const { data: summary, isLoading: summaryLoading, isError } = useConsultantSummary(userId);
   const { data: activity, isLoading: activityLoading } = useConsultantActivity(userId);
-  const { data: farmsData } = useFarms();
-  const { grant, revoke } = useConsultantFarmActions(userId);
+  const { data: shareable } = useShareableProducers(canManage);
+  const { data: team } = useConsultants();
+  const { grant, revoke } = useMemberProducerActions(userId);
   const removeMutation = useRemoveConsultant();
 
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [farmFilter, setFarmFilter] = useState("");
-  /** null = espelha o servidor; Set = edição local ainda não salva. */
-  const [draftOverride, setDraftOverride] = useState<Set<string> | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [producerFilter, setProducerFilter] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const allFarms = useMemo(() => farmsData?.data ?? [], [farmsData?.data]);
+  const isManager = summary?.access_level === "MANAGER";
+  const roleLabel = isManager ? "Gestor" : "Consultor";
 
-  const savedKey = (summary?.farms ?? []).map((f) => f.id).sort().join(",");
-  const savedIds = useMemo(
-    () => new Set(savedKey ? savedKey.split(",") : []),
-    [savedKey],
+  const sharedIds = useMemo(
+    () => new Set((summary?.producers ?? []).map((p) => p.id)),
+    [summary?.producers],
   );
-  const draftIds = draftOverride ?? savedIds;
-  const dirty = draftOverride != null && !sameSet(draftOverride, savedIds);
 
-  const filteredFarms = useMemo(() => {
-    const q = farmFilter.trim().toLowerCase();
-    if (!q) return allFarms;
-    return allFarms.filter((f) => f.name.toLowerCase().includes(q));
-  }, [allFarms, farmFilter]);
+  const allProducers = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const p of shareable ?? []) map.set(p.id, p);
+    for (const p of summary?.producers ?? []) map.set(p.id, p);
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [shareable, summary?.producers]);
 
-  const toGrant = useMemo(
-    () => [...draftIds].filter((id) => !savedIds.has(id)),
-    [draftIds, savedIds],
-  );
-  const toRevoke = useMemo(
-    () => [...savedIds].filter((id) => !draftIds.has(id)),
-    [draftIds, savedIds],
-  );
-  const changeCount = toGrant.length + toRevoke.length;
+  const filteredProducers = useMemo(() => {
+    const q = producerFilter.trim().toLowerCase();
+    if (!q) return allProducers;
+    return allProducers.filter((p) => p.name.toLowerCase().includes(q));
+  }, [allProducers, producerFilter]);
 
-  const toggleFarm = (farmId: string) => {
-    const next = new Set(draftIds);
-    if (next.has(farmId)) next.delete(farmId);
-    else next.add(farmId);
-    setDraftOverride(sameSet(next, savedIds) ? null : next);
-  };
+  const linkedAssistants = useMemo(() => {
+    if (!isManager || !team) return [];
+    return (team.assistants ?? []).filter((a) => a.manager_user_id === userId);
+  }, [isManager, team, userId]);
 
-  const discardChanges = () => setDraftOverride(null);
-
-  const saveFarms = async () => {
-    if (changeCount === 0) return;
-    setSaving(true);
+  const toggleProducer = async (producerId: string) => {
+    if (!canManage || togglingId) return;
+    const on = sharedIds.has(producerId);
+    setTogglingId(producerId);
     try {
-      await Promise.all([
-        ...toGrant.map((id) => grant.mutateAsync(id)),
-        ...toRevoke.map((id) => revoke.mutateAsync(id)),
-      ]);
-      setDraftOverride(null);
-      toast.success(
-        changeCount === 1
-          ? "Acesso à fazenda atualizado."
-          : `${changeCount} fazendas atualizadas.`,
-      );
+      if (on) await revoke.mutateAsync(producerId);
+      else await grant.mutateAsync(producerId);
     } catch (e) {
-      toast.error(apiErrorMessage(e, "Não foi possível salvar as fazendas."));
+      toast.error(apiErrorMessage(e, "Não foi possível atualizar o compartilhamento."));
     } finally {
-      setSaving(false);
+      setTogglingId(null);
     }
   };
 
-  const onRemove = async () => {
+  const confirmRemoveMember = async () => {
     try {
       await removeMutation.mutateAsync(userId);
-      toast.success("Consultor removido.");
+      toast.success(`${roleLabel} removido.`);
       router.push("/consultants");
     } catch (e) {
-      toast.error(apiErrorMessage(e, "Não foi possível remover o consultor."));
+      toast.error(apiErrorMessage(e, `Não foi possível remover o ${roleLabel.toLowerCase()}.`));
     }
   };
 
-  if (isError) {
+  if (summaryLoading) {
     return (
-      <div className="flex flex-col gap-4">
-        <BreadcrumbBack
-          items={[
-            { label: "Consultores", href: "/consultants" },
-            { label: "Consultor" },
-          ]}
-        />
-        <p className="rounded-xl border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger-strong">
-          Consultor não encontrado ou sem permissão.
+      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (isError || !summary) {
+    return (
+      <div className="mx-auto max-w-[1240px]">
+        <BreadcrumbBack items={[{ label: "Equipe", href: "/consultants" }]} />
+        <p className="mt-6 text-sm text-muted-foreground">
+          Membro não encontrado ou sem permissão para visualizar.
         </p>
       </div>
     );
   }
 
-  const name = summary?.name ?? "Consultor";
+  const initial = (summary.name ?? "?").trim().charAt(0).toUpperCase();
+  const selectedCount = sharedIds.size;
+  const totalCount = allProducers.length;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
       <BreadcrumbBack
         items={[
-          { label: "Consultores", href: "/consultants" },
-          { label: name },
+          { label: "Equipe", href: "/consultants" },
+          { label: summary.name ?? roleLabel },
         ]}
       />
 
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Users className="h-5 w-5" />
+        <div className="flex items-start gap-4">
+          <span
+            className={cn(
+              "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-xl font-bold",
+              isManager ? "bg-[#1E5C40] text-white" : "bg-[#EDE9E2] text-[#5C564E]",
+            )}
+          >
+            {initial}
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              {summaryLoading ? (
-                <Skeleton className="h-7 w-40" />
-              ) : (
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                  {name}
-                </h1>
-              )}
-              {summary && !summary.is_active ? (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  Inativo
-                </span>
+              <h1 className="text-[26px] font-extrabold tracking-tight text-[#2B2723]">
+                {summary.name ?? roleLabel}
+              </h1>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide",
+                  isManager
+                    ? "bg-[#E4EEE7] text-[#1E6B4A]"
+                    : "bg-[#EDE9E2] text-[#5C564E]",
+                )}
+              >
+                {roleLabel}
+              </span>
+              {!isManager ? (
+                summary.manager_user_id && summary.manager_name ? (
+                  <span className="rounded-full bg-[#E4EEE7] px-2.5 py-0.5 text-[12px] font-medium text-[#1E6B4A]">
+                    via {summary.manager_name}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#F3EEDD] px-2.5 py-0.5 text-[12px] font-medium text-[#7A6B3F]">
+                    direto com você
+                  </span>
+                )
               ) : null}
             </div>
-            {summaryLoading ? (
-              <Skeleton className="mt-1 h-4 w-56" />
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {summary?.email ?? "—"}
-                {summary
-                  ? ` · consultor desde ${new Date(summary.created_at).toLocaleDateString("pt-BR")}`
-                  : null}
-              </p>
-            )}
+            <p className="mt-1 text-sm text-[#8A857D]">
+              {summary.email ?? "—"}
+              {summary.created_at ? ` · desde ${fmtDate(summary.created_at)}` : null}
+            </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2 text-danger-strong hover:bg-danger-soft hover:text-danger-strong"
-          onClick={() => setConfirmRemove(true)}
-        >
-          <Trash2 className="size-4" />
-          Remover consultor
-        </Button>
+        {canManage ? (
+          <Button
+            variant="outline"
+            className="gap-2 border-[#EBD9D4] text-[#B23A28] hover:bg-[#FBF3F1]"
+            onClick={() => setConfirmRemove(true)}
+          >
+            <Trash2 className="size-4" />
+            Remover {roleLabel.toLowerCase()}
+          </Button>
+        ) : null}
       </div>
 
-      {summaryLoading || !summary ? (
-        <Skeleton className="h-20 w-full rounded-xl" />
-      ) : (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border bg-card px-4 py-3 text-center shadow-sm">
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {summary.farms.length}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {summary.farms.length === 1 ? "fazenda" : "fazendas"}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-card px-4 py-3 text-center shadow-sm">
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {summary.producers.length}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {summary.producers.length === 1 ? "produtor" : "produtores"}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-card px-4 py-3 text-center shadow-sm">
-            <p className="text-2xl font-bold tabular-nums text-foreground">
-              {summary.activity_count_30d}
-            </p>
-            <p className="text-xs text-muted-foreground">ações · 30 dias</p>
-          </div>
-        </div>
-      )}
+      <div
+        className={cn(
+          "grid gap-4",
+          isManager ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3",
+        )}
+      >
+        {isManager ? (
+          <StatCard value={summary.assistant_count ?? 0} label="consultores" />
+        ) : null}
+        <StatCard value={summary.producers.length} label="produtores" />
+        <StatCard value={summary.activity_count_30d} label="ações · 30 dias" />
+        {summary.last_activity_at ? (
+          <StatCard
+            value={fmtDate(summary.last_activity_at)}
+            label="última ação"
+            small
+          />
+        ) : (
+          <StatCard value="—" label="última ação" small />
+        )}
+      </div>
 
-      {/* Fazendas: largura total, grade compacta, salvar em lote */}
-      <section className="rounded-xl border bg-card shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
-          <div>
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <Tractor className="h-4 w-4 text-primary-strong" />
-              Fazendas compartilhadas
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {draftIds.size} de {allFarms.length} selecionada
-              {draftIds.size === 1 ? "" : "s"}
-              {dirty
-                ? ` · ${changeCount} alteração${changeCount === 1 ? "" : "ões"} pendente${changeCount === 1 ? "" : "s"}`
-                : ""}
-            </p>
+      {!isManager ? (
+        <div className="flex gap-3 rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-5 py-4">
+          <Info className="mt-0.5 size-5 shrink-0 text-[#1E6B4A]" />
+          <p className="text-sm text-[#2B2723]">
+            Consultores têm acesso somente-leitura: veem os produtores e fazendas
+            compartilhados e podem apenas registrar aplicações das recomendações (e trocar
+            produto/dose na etapa).
+          </p>
+        </div>
+      ) : null}
+
+      {isManager && linkedAssistants.length > 0 ? (
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="size-5 text-[#1E6B4A]" />
+            <div>
+              <h2 className="text-base font-extrabold text-[#2B2723]">
+                Consultores deste gestor
+              </h2>
+              <p className="text-xs text-[#8A857D]">
+                Criados e gerenciados por {(summary.name ?? "").split(" ")[0] || "este gestor"}.
+              </p>
+            </div>
           </div>
-          {allFarms.length > 6 ? (
-            <div className="relative w-full sm:w-56">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <ul className="flex flex-col gap-2">
+            {linkedAssistants.map((a) => (
+              <li key={a.user_id}>
+                <Link
+                  href={`/consultants/${a.user_id}`}
+                  className="flex items-center justify-between rounded-xl bg-[#F7F5F1] px-4 py-3 transition hover:bg-[#EFEBE4]"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[#2B2723]">
+                      {a.name ?? "Consultor"}
+                    </p>
+                    <p className="truncate text-xs text-[#8A857D]">{a.email ?? "—"}</p>
+                  </div>
+                  <span className="text-sm font-bold text-[#1E6B4A]">abrir</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {canManage ? (
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-extrabold text-[#2B2723]">
+                Produtores compartilhados
+              </h2>
+              <p className="text-xs text-[#8A857D]">
+                {selectedCount} de {totalCount} selecionados
+              </p>
+            </div>
+            <div className="relative w-full max-w-[260px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#A39D93]" />
               <Input
-                value={farmFilter}
-                onChange={(e) => setFarmFilter(e.target.value)}
-                placeholder="Buscar fazenda…"
-                className="h-8 pl-8 text-sm"
+                value={producerFilter}
+                onChange={(e) => setProducerFilter(e.target.value)}
+                placeholder="Buscar produtor…"
+                className="rounded-xl border-[#E3DFD8] pl-9"
               />
             </div>
-          ) : null}
-        </div>
-
-        <div className="p-4">
-          {allFarms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Você ainda não tem fazendas.</p>
-          ) : filteredFarms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma fazenda com esse nome.</p>
+          </div>
+          {allProducers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum produtor disponível para compartilhar.
+            </p>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredFarms.map((f) => {
-                const on = draftIds.has(f.id);
-                const wasShared = savedIds.has(f.id);
-                const pendingAdd = on && !wasShared;
-                const pendingRemove = !on && wasShared;
+            <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredProducers.map((p) => {
+                const on = sharedIds.has(p.id);
+                const busy = togglingId === p.id;
                 return (
-                  <li key={f.id}>
-                    <label
+                  <li key={p.id}>
+                    <div
                       className={cn(
-                        "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors",
+                        "flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition",
                         on
-                          ? "border-primary/40 bg-primary/5"
-                          : "border-border bg-background hover:bg-muted/40",
-                        pendingAdd && "ring-1 ring-primary/30",
-                        pendingRemove && "opacity-60",
+                          ? "border-[#BFD7C8] bg-[#F2F7F3]"
+                          : "border-transparent bg-[#F7F5F1]",
                       )}
                     >
-                      <input
-                        type="checkbox"
-                        className="size-4 shrink-0 accent-primary"
-                        checked={on}
-                        onChange={() => toggleFarm(f.id)}
-                        disabled={saving}
-                      />
-                      <span className="min-w-0 flex-1 truncate font-medium text-text-strong">
-                        {f.name}
-                      </span>
-                      {pendingAdd ? (
-                        <span className="shrink-0 text-[10px] font-medium text-primary-strong">
-                          + novo
+                      <button
+                        type="button"
+                        disabled={busy || grant.isPending || revoke.isPending}
+                        onClick={() => toggleProducer(p.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-90"
+                      >
+                        <span
+                          className={cn(
+                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border-2",
+                            on ? "border-[#1E6B4A] bg-[#1E6B4A]" : "border-[#C9C4BB] bg-white",
+                          )}
+                        >
+                          {busy ? (
+                            <Loader2 className="size-3 animate-spin text-white" />
+                          ) : on ? (
+                            <Check className="size-3 text-white" strokeWidth={3} />
+                          ) : null}
                         </span>
-                      ) : null}
-                      {pendingRemove ? (
-                        <span className="shrink-0 text-[10px] font-medium text-danger-strong">
-                          remover
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#2B2723]">
+                          {p.name}
                         </span>
-                      ) : null}
-                      {on && wasShared && !pendingAdd ? (
+                      </button>
+                      {on ? (
                         <Link
-                          href={`/farms/${f.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="shrink-0 text-xs font-medium text-primary-strong hover:underline"
+                          href={`/producers/${p.id}`}
+                          className="shrink-0 text-xs font-bold text-[#1E6B4A] hover:underline"
                         >
                           abrir
                         </Link>
                       ) : null}
-                    </label>
+                    </div>
                   </li>
                 );
               })}
             </ul>
           )}
-        </div>
-
-        {dirty ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/30 px-4 py-3">
-            <p className="text-xs text-muted-foreground">
-              {toGrant.length > 0
-                ? `+${toGrant.length} acesso${toGrant.length === 1 ? "" : "s"}`
-                : null}
-              {toGrant.length > 0 && toRevoke.length > 0 ? " · " : null}
-              {toRevoke.length > 0
-                ? `−${toRevoke.length} acesso${toRevoke.length === 1 ? "" : "s"}`
-                : null}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={discardChanges}
-                disabled={saving}
-              >
-                Descartar
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="gap-1.5"
-                onClick={saveFarms}
-                disabled={saving || changeCount === 0}
-              >
-                {saving ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Check className="size-3.5" />
-                )}
-                {saving ? "Salvando…" : "Salvar alterações"}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <Leaf className="h-4 w-4 text-primary-strong" />
-            Produtores que ele atende
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="mb-3 text-base font-extrabold text-[#2B2723]">
+            Produtores que {isManager ? "ele gerencia" : "ele atende"}
           </h2>
-          {!summary || summary.producers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhum produtor alcançável pelas fazendas compartilhadas.
-            </p>
+          {summary.producers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum produtor compartilhado ainda.</p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col gap-2">
               {summary.producers.map((p) => (
                 <li key={p.id}>
                   <Link
                     href={`/producers/${p.id}`}
-                    className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+                    className="flex items-center justify-between rounded-xl bg-[#F7F5F1] px-4 py-3 transition hover:bg-[#EFEBE4]"
                   >
-                    {p.name}
-                    <span className="text-xs text-primary-strong">abrir</span>
+                    <span className="text-sm font-medium text-[#2B2723]">{p.name}</span>
+                    <span className="text-sm font-bold text-[#1E6B4A]">abrir</span>
                   </Link>
                 </li>
               ))}
@@ -382,46 +372,26 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
           )}
         </section>
 
-        <section className="rounded-xl border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <Activity className="h-4 w-4 text-primary-strong" />
-            Últimas ações
-          </h2>
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <Activity className="size-4 text-[#1E6B4A]" />
+            <h2 className="text-base font-extrabold text-[#2B2723]">Últimas ações</h2>
+          </div>
           {activityLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-14 w-full rounded-lg" />
-              <Skeleton className="h-14 w-full rounded-lg" />
-              <Skeleton className="h-14 w-full rounded-lg" />
-            </div>
+            <p className="text-sm text-muted-foreground">Carregando…</p>
           ) : !activity || activity.length === 0 ? (
-            <p className="rounded-lg border border-dashed bg-background px-3 py-6 text-center text-sm text-muted-foreground">
-              Nenhuma ação registrada ainda. As ações do consultor nas fazendas
-              compartilhadas (listas, recomendações, safras, estoque) aparecem aqui.
+            <p className="text-sm text-muted-foreground">
+              Nenhuma ação registrada ainda. Os registros de aplicação aparecem aqui.
             </p>
           ) : (
-            <ul className="flex max-h-[28rem] flex-col gap-2 overflow-y-auto">
-              {activity.map((row) => (
-                <li
-                  key={row.id}
-                  className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                >
-                  <p className="leading-snug text-foreground">{row.summary}</p>
-                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    {row.farm_name ? (
-                      row.farm_id ? (
-                        <Link
-                          href={`/farms/${row.farm_id}`}
-                          className="font-medium text-primary-strong hover:underline"
-                        >
-                          {row.farm_name}
-                        </Link>
-                      ) : (
-                        <span className="font-medium">{row.farm_name}</span>
-                      )
-                    ) : null}
-                    {row.farm_name ? <span>·</span> : null}
-                    <span>{fmtDate(row.created_at)}</span>
-                  </p>
+            <ul className="flex flex-col gap-3">
+              {activity.slice(0, 20).map((row) => (
+                <li key={row.id} className="flex gap-3">
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#1E6B4A]" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-[#2B2723]">{row.summary}</p>
+                    <p className="text-xs text-[#8A857D]">{fmtDateTime(row.created_at)}</p>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -432,13 +402,36 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
       <ConfirmDialog
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
-        title="Remover consultor?"
-        description={`${name} perderá o acesso e o login será desativado.`}
+        title={`Remover ${roleLabel.toLowerCase()}?`}
+        description={
+          summary.name
+            ? `${summary.name} perderá o acesso e o login será desativado.`
+            : undefined
+        }
         tone="destructive"
         confirmLabel="Remover"
         loading={removeMutation.isPending}
-        onConfirm={onRemove}
+        onConfirm={confirmRemoveMember}
       />
+    </div>
+  );
+}
+
+function StatCard({
+  value,
+  label,
+  small,
+}: {
+  value: string | number;
+  label: string;
+  small?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl bg-white px-5 py-4 shadow-sm">
+      <p className={cn("font-extrabold text-[#2B2723]", small ? "text-lg" : "text-[26px]")}>
+        {value}
+      </p>
+      <p className="text-[13px] text-[#8A857D]">{label}</p>
     </div>
   );
 }

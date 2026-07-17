@@ -1,36 +1,24 @@
-const TOKEN_KEY = "access_token";
-const ROLE_KEY = "user_role";
+/**
+ * Tokens ficam em cookies httpOnly gerenciados pelo BFF `/api/auth/*`.
+ * Este módulo mantém helpers no-op para não quebrar imports legados.
+ */
 
-export function setAccessToken(token: string | null) {
-  if (typeof window === "undefined") return;
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
-  } else {
-    localStorage.removeItem(TOKEN_KEY);
-  }
+export function setAccessToken(_token: string | null) {
+  /* cookies httpOnly — sem storage no browser */
 }
 
-export function getAccessToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+export function getAccessToken(): string | null {
+  return null;
 }
 
-export function setUserRole(role: string | null) {
-  if (typeof window === "undefined") return;
-  if (role) {
-    localStorage.setItem(ROLE_KEY, role);
-  } else {
-    localStorage.removeItem(ROLE_KEY);
-  }
+export function setUserRole(_role: string | null) {
+  /* role vem do cookie /auth/me */
 }
 
-export function getUserRole() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ROLE_KEY);
+export function getUserRole(): string | null {
+  return null;
 }
 
 export function clearAccessToken() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(ROLE_KEY);
+  /* use POST /api/auth/logout */
 }

@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Copy, Tractor, Trash2, UserPlus, Users } from "lucide-react";
+import { Check, ChevronRight, Copy, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -16,168 +15,265 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  useConsultants,
-  useCreateInvitation,
-  useFarms,
-  useRemoveConsultant,
-} from "@/lib/api/hooks";
+import { useConsultants, useCreateInvitation, useMe } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
+import { useCan } from "@/lib/auth/use-can";
 import { cn } from "@/lib/utils";
-import type { ConsultantRow } from "@/lib/api/consultants";
+import type { TeamMemberRow } from "@/lib/api/consultants";
+import type { AccessLevel } from "@/types/auth";
 
 export function ConsultantsView() {
-  const { data: consultants, isLoading } = useConsultants();
+  const { data: team, isLoading } = useConsultants();
+  const canManage = useCan("TEAM_MANAGE");
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [toRemove, setToRemove] = useState<ConsultantRow | null>(null);
-  const removeMutation = useRemoveConsultant();
 
-  const confirmRemove = async () => {
-    if (!toRemove) return;
-    try {
-      await removeMutation.mutateAsync(toRemove.user_id);
-      toast.success("Consultor removido.");
-      setToRemove(null);
-    } catch (e) {
-      toast.error(apiErrorMessage(e, "Não foi possível remover o consultor."));
-    }
-  };
+  const managers = team?.managers ?? [];
+  const assistants = team?.assistants ?? [];
+  const empty = !isLoading && managers.length === 0 && assistants.length === 0;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Users className="h-5 w-5" />
+          <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] bg-[#E4EEE7] text-[#1E5C40]">
+            <Users className="h-6 w-6" />
           </span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Consultores</h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Convide consultores e compartilhe fazendas específicas. Eles acessam apenas as
-              fazendas liberadas, podendo gerenciar tudo nelas como você.
+            <h1 className="text-[28px] font-extrabold tracking-tight text-[#2B2723]">Equipe</h1>
+            <p className="mt-1 max-w-2xl text-[15px] text-[#6B655C]">
+              Gestores criam e gerenciam produtores. Consultores acompanham e registram
+              aplicações nos produtores compartilhados.
             </p>
           </div>
         </div>
-        <Button onClick={() => setInviteOpen(true)} className="gap-2">
-          <UserPlus className="h-4 w-4" />
-          Convidar consultor
-        </Button>
+        {canManage ? (
+          <Button onClick={() => setInviteOpen(true)} className="gap-2 rounded-xl px-5 py-3">
+            <UserPlus className="h-4 w-4" />
+            Convidar
+          </Button>
+        ) : null}
       </div>
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Carregando…</p>
-      ) : !consultants || consultants.length === 0 ? (
+      ) : empty ? (
         <EmptyState
-          title="Nenhum consultor ainda."
-          description="Convide um consultor e compartilhe as fazendas que ele deve acompanhar."
+          title="Nenhum membro na equipe ainda."
+          description="Convide um gestor ou consultor e compartilhe os produtores que ele deve acompanhar."
         />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {consultants.map((c) => (
-            <li key={c.user_id} className="relative">
-              <Link
-                href={`/consultants/${c.user_id}`}
-                className="flex w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-2 pr-8">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-text-strong">{c.name ?? "Consultor"}</p>
-                    <p className="truncate text-xs text-muted-foreground">{c.email ?? "—"}</p>
-                  </div>
-                  {!c.is_active ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      Inativo
-                    </span>
-                  ) : null}
-                </div>
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Tractor className="h-3.5 w-3.5" />
-                  {c.farm_count} {c.farm_count === 1 ? "fazenda" : "fazendas"}
-                  <span>·</span>
-                  <span className="text-primary-strong">ver atividade e gerenciar</span>
-                </p>
-              </Link>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                title="Remover consultor"
-                className="absolute right-3 top-3 text-muted-foreground hover:text-danger-strong"
-                onClick={() => setToRemove(c)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-10">
+          {managers.length > 0 ? (
+            <TeamSection
+              title="Gestores"
+              microcopy="criam produtores, fazendas e recomendações"
+              members={managers}
+              variant="manager"
+            />
+          ) : null}
+          <TeamSection
+            title="Consultores"
+            microcopy="visualizam produtores compartilhados e registram aplicações"
+            members={assistants}
+            variant="assistant"
+            emptyLabel={
+              managers.length > 0
+                ? "Nenhum consultor ainda. Convide um ou peça a um gestor para criar."
+                : undefined
+            }
+          />
+        </div>
       )}
 
-      <InviteConsultantDialog open={inviteOpen} onOpenChange={setInviteOpen} />
-
-      <ConfirmDialog
-        open={toRemove != null}
-        onOpenChange={(open) => !open && setToRemove(null)}
-        title="Remover consultor?"
-        description={
-          toRemove
-            ? `${toRemove.name ?? "O consultor"} perderá o acesso e o login será desativado.`
-            : undefined
-        }
-        tone="destructive"
-        confirmLabel="Remover"
-        loading={removeMutation.isPending}
-        onConfirm={confirmRemove}
-      />
+      {canManage ? (
+        <InviteTeamDialog
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+          managers={managers}
+        />
+      ) : null}
     </div>
   );
 }
 
-function InviteConsultantDialog({
+function TeamSection({
+  title,
+  microcopy,
+  members,
+  variant,
+  emptyLabel,
+}: {
+  title: string;
+  microcopy: string;
+  members: TeamMemberRow[];
+  variant: "manager" | "assistant";
+  emptyLabel?: string;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-extrabold text-[#2B2723]">
+          {title}{" "}
+          <span className="font-semibold text-[#8A857D]">({members.length})</span>
+        </h2>
+        <p className="text-sm text-[#8A857D]">· {microcopy}</p>
+      </div>
+      {members.length === 0 ? (
+        emptyLabel ? (
+          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+        ) : null
+      ) : (
+        <ul className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(360px,1fr))]">
+          {members.map((m) => (
+            <li key={m.user_id}>
+              <MemberCard member={m} variant={variant} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function MemberCard({
+  member,
+  variant,
+}: {
+  member: TeamMemberRow;
+  variant: "manager" | "assistant";
+}) {
+  const initial = (member.name ?? "?").trim().charAt(0).toUpperCase();
+  const isManager = variant === "manager";
+
+  return (
+    <Link
+      href={`/consultants/${member.user_id}`}
+      className="group flex w-full flex-col gap-3 rounded-2xl border border-transparent bg-white px-[22px] py-5 shadow-sm transition-all hover:border-[#CBDDD2] hover:shadow-[0_4px_14px_rgba(30,92,64,0.08)]"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-bold",
+            isManager ? "bg-[#1E5C40] text-white" : "bg-[#EDE9E2] text-[#5C564E]",
+          )}
+        >
+          {initial}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[17px] font-bold text-[#2B2723]">
+              {member.name ?? (isManager ? "Gestor" : "Consultor")}
+            </p>
+            {isManager ? (
+              <span className="rounded-full bg-[#E4EEE7] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1E6B4A]">
+                Gestor
+              </span>
+            ) : null}
+            {!member.is_active ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                Inativo
+              </span>
+            ) : null}
+          </div>
+          <p className="truncate text-[13px] text-[#8A857D]">{member.email ?? "—"}</p>
+        </div>
+        <ChevronRight className="mt-1 size-5 shrink-0 text-[#B5AFA5] transition group-hover:text-[#1E6B4A]" />
+      </div>
+      <div className="flex items-center justify-between border-t border-[#F1EEE8] pt-3 text-[13px] text-[#6B655C]">
+        {isManager ? (
+          <p>
+            <strong className="text-[#2B2723]">{member.assistant_count}</strong>{" "}
+            {member.assistant_count === 1 ? "consultor" : "consultores"}
+            {" · "}
+            <strong className="text-[#2B2723]">{member.producer_count}</strong>{" "}
+            {member.producer_count === 1 ? "produtor" : "produtores"}
+          </p>
+        ) : (
+          <>
+            <p>
+              <strong className="text-[#2B2723]">{member.producer_count}</strong>{" "}
+              {member.producer_count === 1 ? "produtor" : "produtores"}
+            </p>
+            <VinculoChip
+              managerName={member.manager_name}
+              managerUserId={member.manager_user_id}
+            />
+          </>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function VinculoChip({
+  managerName,
+  managerUserId,
+}: {
+  managerName: string | null;
+  managerUserId: string | null;
+}) {
+  if (managerUserId && managerName) {
+    return (
+      <span className="rounded-full bg-[#E4EEE7] px-2.5 py-0.5 text-[12px] font-medium text-[#1E6B4A]">
+        via {managerName}
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full bg-[#F3EEDD] px-2.5 py-0.5 text-[12px] font-medium text-[#7A6B3F]">
+      direto com você
+    </span>
+  );
+}
+
+function InviteTeamDialog({
   open,
   onOpenChange,
+  managers,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  managers: TeamMemberRow[];
 }) {
-  const { data: farmsData } = useFarms();
-  const farms = farmsData?.data ?? [];
+  const { data: me } = useMe();
   const createInvitation = useCreateInvitation();
+  const isStaffManager = me?.role === "STAFF" && me?.access_level === "MANAGER";
 
   const [email, setEmail] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [role, setRole] = useState<AccessLevel>("MANAGER");
+  const [vinculo, setVinculo] = useState<"direto" | string>("direto");
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  // E-mail é obrigatório: é por ele que o consultor faz login.
+
   const emailValid = /.+@.+\..+/.test(email.trim());
+  const effectiveRole: AccessLevel = isStaffManager ? "ASSISTANT" : role;
 
   const [prevOpen, setPrevOpen] = useState(false);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
       setEmail("");
-      setSelected(new Set());
+      setRole(isStaffManager ? "ASSISTANT" : "MANAGER");
+      setVinculo("direto");
       setLink(null);
     }
   }
 
-  const toggle = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
   const submit = async () => {
     try {
-      const res = await createInvitation.mutateAsync({
+      const payload: Parameters<typeof createInvitation.mutateAsync>[0] = {
         email: email.trim(),
-        farm_ids: [...selected],
         kind: "CONSULTANT",
-      });
+        access_level: effectiveRole,
+        farm_ids: [],
+      };
+      if (effectiveRole === "ASSISTANT" && !isStaffManager) {
+        payload.manager_user_id = vinculo === "direto" ? null : vinculo;
+      }
+      const res = await createInvitation.mutateAsync(payload);
       const full = `${window.location.origin}/invite/${res.token}`;
       setLink(full);
-      toast.success("Convite criado. Envie o link ao consultor.");
+      toast.success("Convite criado. Envie o link ao membro.");
     } catch (e) {
       toast.error(apiErrorMessage(e, "Não foi possível criar o convite."));
     }
@@ -192,14 +288,15 @@ function InviteConsultantDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Convidar consultor</DialogTitle>
+      <DialogContent className="max-w-[560px] rounded-[20px] p-0">
+        <DialogHeader className="px-7 pt-7">
+          <DialogTitle className="text-[21px] font-extrabold">Convidar para a equipe</DialogTitle>
           <DialogDescription>
-            Gere um link de convite. O consultor cria a senha e acessa só as fazendas liberadas.
+            Escolha o papel e envie o convite por e-mail. O compartilhamento de produtores é
+            feito depois, no detalhe do membro.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-4 px-6 py-5">
+        <div className="flex flex-col gap-5 px-7 py-5">
           {link ? (
             <div className="flex flex-col gap-2">
               <Label>Link de convite</Label>
@@ -209,62 +306,75 @@ function InviteConsultantDialog({
                   {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Envie este link ao consultor para ele criar o acesso.
-              </p>
             </div>
           ) : (
             <>
+              {!isStaffManager ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <RoleCard
+                    selected={effectiveRole === "MANAGER"}
+                    title="Gestor"
+                    description="Cria e gerencia produtores, fazendas, listas e recomendações. Pode convidar consultores."
+                    onClick={() => setRole("MANAGER")}
+                  />
+                  <RoleCard
+                    selected={effectiveRole === "ASSISTANT"}
+                    title="Consultor"
+                    description="Visualiza produtores compartilhados e registra aplicações das recomendações."
+                    onClick={() => setRole("ASSISTANT")}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-4 py-3 text-sm text-[#2B2723]">
+                  Você está convidando um <strong>Consultor</strong>, que ficará vinculado a você.
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="consultant-email">E-mail</Label>
+                <Label htmlFor="team-email">E-mail</Label>
                 <Input
-                  id="consultant-email"
+                  id="team-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="consultor@exemplo.com"
+                  placeholder="nome@empresa.com"
+                  className="rounded-xl"
                 />
-                <p className="text-xs text-muted-foreground">
-                  É com este e-mail que o consultor vai fazer login.
-                </p>
               </div>
-              <div className="space-y-2">
-                <Label>Fazendas compartilhadas</Label>
-                {farms.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Você ainda não tem fazendas.</p>
-                ) : (
-                  <ul className="flex max-h-52 flex-col gap-1 overflow-y-auto">
-                    {farms.map((f) => {
-                      const on = selected.has(f.id);
-                      return (
-                        <li key={f.id}>
-                          <label
-                            className={cn(
-                              "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm",
-                              on ? "border-primary/40 bg-primary/5" : "border-border bg-card",
-                            )}
-                          >
-                            <input
-                              type="checkbox"
-                              className="size-4 accent-primary"
-                              checked={on}
-                              onChange={() => toggle(f.id)}
-                            />
-                            <span className="font-medium text-text-strong">{f.name}</span>
-                          </label>
-                        </li>
-                      );
-                    })}
+
+              {effectiveRole === "ASSISTANT" && !isStaffManager ? (
+                <div className="space-y-2">
+                  <Label>Vínculo</Label>
+                  <ul className="flex flex-col gap-2">
+                    <VinculoOption
+                      selected={vinculo === "direto"}
+                      label="Direto com você"
+                      onClick={() => setVinculo("direto")}
+                    />
+                    {managers.map((m) => (
+                      <VinculoOption
+                        key={m.user_id}
+                        selected={vinculo === m.user_id}
+                        label={`Sob o gestor ${m.name ?? m.email ?? "—"}`}
+                        onClick={() => setVinculo(m.user_id)}
+                      />
+                    ))}
                   </ul>
-                )}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={submit}
+                  disabled={createInvitation.isPending || !emailValid}
+                  className="gap-2"
+                >
+                  {createInvitation.isPending ? "Enviando…" : "Enviar convite"}
+                </Button>
               </div>
-              <Button
-                onClick={submit}
-                disabled={createInvitation.isPending || selected.size === 0 || !emailValid}
-                className="gap-2"
-              >
-                {createInvitation.isPending ? "Gerando…" : "Gerar convite"}
-              </Button>
             </>
           )}
         </div>
@@ -273,3 +383,65 @@ function InviteConsultantDialog({
   );
 }
 
+function RoleCard({
+  selected,
+  title,
+  description,
+  onClick,
+}: {
+  selected: boolean;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-[14px] border-2 p-4 text-left transition",
+        selected
+          ? "border-[#1E6B4A] bg-[#F2F7F3]"
+          : "border-[#EDEAE4] bg-white hover:border-[#CBDDD2]",
+      )}
+    >
+      <p className="text-sm font-bold text-[#2B2723]">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-[#6B655C]">{description}</p>
+    </button>
+  );
+}
+
+function VinculoOption({
+  selected,
+  label,
+  onClick,
+}: {
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition",
+          selected
+            ? "border-[#1E6B4A] bg-[#F2F7F3] text-[#2B2723]"
+            : "border-[#EDEAE4] bg-white text-[#6B655C] hover:border-[#CBDDD2]",
+        )}
+      >
+        <span
+          className={cn(
+            "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
+            selected ? "border-[#1E6B4A]" : "border-[#C9C4BB]",
+          )}
+        >
+          {selected ? <span className="h-2 w-2 rounded-full bg-[#1E6B4A]" /> : null}
+        </span>
+        {label}
+      </button>
+    </li>
+  );
+}

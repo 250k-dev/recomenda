@@ -12,7 +12,6 @@ export async function login(email: string, password: string) {
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    // O backend envelopa o erro em `error: { code, message }`; aceita também o formato plano.
     const err = body?.error ?? body;
     const e = new Error(err?.message ?? "Login failed") as Error & { code?: string };
     e.code = err?.code;
@@ -27,6 +26,20 @@ export async function logout() {
     method: "POST",
     credentials: "include",
   });
+}
+
+export async function getAuthSession() {
+  const response = await fetch("/api/auth/session", {
+    method: "GET",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    return { authenticated: false, role: null as string | null };
+  }
+  return (await response.json()) as {
+    authenticated: boolean;
+    role: string | null;
+  };
 }
 
 export async function getMe() {
@@ -59,26 +72,26 @@ export async function getPlanQuota() {
 }
 
 export async function impersonateProducer(producerId: string) {
-  const { data } = await api.post<{ access_token: string }>(
-    `/auth/impersonate/${producerId}`,
-  );
-  return data;
-}
-
-function jwtPayloadRole(accessToken: string): string | null {
-  try {
-    const parts = accessToken.split(".");
-    if (parts.length < 2) return null;
-    let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    while (base64.length % 4) base64 += "=";
-    const payload = JSON.parse(atob(base64)) as { role?: unknown };
-    return typeof payload.role === "string" ? payload.role : null;
-  } catch {
-    return null;
+  const response = await fetch(`/api/auth/impersonate/${producerId}`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? body?.error?.message ?? "Impersonation failed");
   }
+  return { ok: true as const };
 }
 
-export async function exitImpersonation(): Promise<{ access_token: string; role: string | null }> {
-  const { data } = await api.post<{ access_token: string }>("/auth/impersonate/exit");
-  return { access_token: data.access_token, role: jwtPayloadRole(data.access_token) };
+export async function exitImpersonation(): Promise<{ ok: true; role: string | null }> {
+  const response = await fetch("/api/auth/impersonate/exit", {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? body?.error?.message ?? "Exit impersonation failed");
+  }
+  const data = (await response.json()) as { ok: true; role: string | null };
+  return data;
 }

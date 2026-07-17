@@ -1,30 +1,26 @@
 import axios, { AxiosError } from "axios";
-import { env } from "@/config/env";
-import { getAccessToken, setAccessToken } from "@/lib/auth/token-store";
 import type { ApiError, ApiErrorPayload } from "@/lib/api/types";
 
 type PendingRequest = {
-  resolve: (token: string | null) => void;
+  resolve: () => void;
   reject: (error: unknown) => void;
 };
 
 let isRefreshing = false;
 let pendingRequests: PendingRequest[] = [];
 
-function flushPendingRequests(error?: unknown, token?: string | null) {
+function flushPendingRequests(error?: unknown) {
   pendingRequests.forEach((request) => {
     if (error) {
       request.reject(error);
       return;
     }
-
-    request.resolve(token ?? null);
+    request.resolve();
   });
-
   pendingRequests = [];
 }
 
-async function refreshAccessToken() {
+async function refreshSession() {
   const response = await fetch("/api/auth/refresh", {
     method: "POST",
     credentials: "include",
@@ -33,30 +29,31 @@ async function refreshAccessToken() {
   if (!response.ok) {
     throw new Error("Failed to refresh session");
   }
+}
 
-  const payload = (await response.json()) as { access_token: string };
-  setAccessToken(payload.access_token);
-  return payload.access_token;
+async function clearSessionAndRedirect() {
+  await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+  }).catch(() => null);
+
+  if (typeof window !== "undefined") {
+    window.location.href = "/login?force=1";
+  }
 }
 
 export const api = axios.create({
-  baseURL: env.NEXT_PUBLIC_API_BASE_URL,
+  baseURL: "/api/v1",
   withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
   if (
     config.method &&
     ["post", "put", "patch", "delete"].includes(config.method.toLowerCase())
   ) {
     config.headers["Idempotency-Key"] = crypto.randomUUID();
   }
-
   return config;
 });
 
@@ -69,12 +66,7 @@ api.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           pendingRequests.push({
-            resolve: (token) => {
-              if (token && originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-              }
-              resolve(api(originalRequest));
-            },
+            resolve: () => resolve(api(originalRequest)),
             reject,
           });
         });
@@ -84,18 +76,13 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const token = await refreshAccessToken();
-        flushPendingRequests(undefined, token);
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-        }
+        await refreshSession();
+        flushPendingRequests();
         return api(originalRequest);
       } catch (refreshError) {
-        setAccessToken(null);
-        flushPendingRequests(refreshError, null);
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
+        flushPendingRequests(refreshError);
+        await clearSessionAndRedirect();
+        throw refreshError;
       } finally {
         isRefreshing = false;
       }

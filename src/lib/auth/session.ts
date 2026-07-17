@@ -8,7 +8,7 @@ export async function getSessionRole(): Promise<UserRole | null> {
     role === "ADMIN" ||
     role === "AGRONOMIST" ||
     role === "PRODUCER" ||
-    role === "CONSULTANT"
+    role === "STAFF"
   ) {
     return role;
   }

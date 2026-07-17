@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { Search, Users, Plus, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useProducers } from "@/lib/api/hooks";
+import { useCan } from "@/lib/auth/use-can";
 import { cn } from "@/lib/utils";
 
 const MAX_MATCHES = 8;
@@ -33,6 +34,7 @@ const normalize = (value: string) =>
 export function ProducerSearch() {
   const router = useRouter();
   const { data } = useProducers();
+  const canCreateProducer = useCan("PRODUCER_CREATE");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -275,21 +277,23 @@ export function ProducerSearch() {
               <Package className="size-4 shrink-0 text-muted-foreground" />
               Ver todos os produtos
             </button>
-            <button
-              type="button"
-              role="option"
-              data-option
-              aria-selected={activeKey === "new"}
-              onFocus={() => setActiveKey("new")}
-              onMouseEnter={() => setActiveKey("new")}
-              onKeyDown={onOptionKeyDown}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => go("/producers/new")}
-              className={optionClass("new", "font-medium text-primary")}
-            >
-              <Plus className="size-4 shrink-0" />
-              Cadastrar produtor
-            </button>
+            {canCreateProducer ? (
+              <button
+                type="button"
+                role="option"
+                data-option
+                aria-selected={activeKey === "new"}
+                onFocus={() => setActiveKey("new")}
+                onMouseEnter={() => setActiveKey("new")}
+                onKeyDown={onOptionKeyDown}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => go("/producers/new")}
+                className={optionClass("new", "font-medium text-primary")}
+              >
+                <Plus className="size-4 shrink-0" />
+                Cadastrar produtor
+              </button>
+            ) : null}
           </div>
         </div>
       )}

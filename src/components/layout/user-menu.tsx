@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, usePlanQuota } from "@/lib/api/hooks";
 import { logout } from "@/lib/api/client";
-import { clearAccessToken } from "@/lib/auth/token-store";
 import { cn } from "@/lib/utils";
 
 export function UserMenu() {
@@ -39,8 +38,7 @@ export function UserMenu() {
     } catch {
       /* ignore server errors */
     }
-    clearAccessToken();
-    router.push("/login");
+    router.push("/login?force=1");
   };
 
   return (

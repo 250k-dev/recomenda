@@ -38,6 +38,7 @@ import {
   formatDosePerHa,
 } from "@/lib/timing/purchase-list-budget";
 import { cn } from "@/lib/utils";
+import { useCan } from "@/lib/auth/use-can";
 
 export const TIMING_TRIGGER_TYPES = [
   { value: "PRE_PLANTING", label: "Pré-plantio" },
@@ -559,6 +560,7 @@ export function TimingStagesEditor({
   saveDisabled?: boolean;
   showSaveButton?: boolean;
 }) {
+  const canTemplateCrud = useCan("TEMPLATE_CRUD");
   const { purchaseLists } = usePurchaseListCatalogProducts(producerId, crop, farmId);
 
   const overages = useMemo(
@@ -595,17 +597,19 @@ export function TimingStagesEditor({
               {isSaving ? "Salvando…" : saveDisabled ? "Salvo ✓" : "Salvar"}
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={isAdding || isSaving}
-            onClick={() => onAdd()}
-          >
-            <Plus className="h-4 w-4" />
-            {isAdding ? "Adicionando…" : "Adicionar etapa"}
-          </Button>
+          {canTemplateCrud ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={isAdding || isSaving}
+              onClick={() => onAdd()}
+            >
+              <Plus className="h-4 w-4" />
+              {isAdding ? "Adicionando…" : "Adicionar etapa"}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -669,7 +673,7 @@ export function TimingStagesEditor({
                     Etapa {index + 1}
                   </span>
                 </div>
-                {stages.length > minStages ? (
+                {canTemplateCrud && stages.length > minStages ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -747,17 +751,19 @@ export function TimingStagesEditor({
                 {isSaving ? "Salvando…" : saveDisabled ? "Salvo ✓" : "Salvar"}
               </Button>
             ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5 rounded-full"
-              disabled={isAdding || isSaving}
-              onClick={() => onAdd()}
-            >
-              <Plus className="h-4 w-4" />
-              Adicionar etapa
-            </Button>
+            {canTemplateCrud ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-full"
+                disabled={isAdding || isSaving}
+                onClick={() => onAdd()}
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar etapa
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}

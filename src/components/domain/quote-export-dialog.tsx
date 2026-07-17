@@ -41,14 +41,15 @@ export function QuoteExportDialog({
 
   const allIds = useMemo(() => data.responses.map((r) => r.id), [data.responses]);
 
-  // Ao abrir, volta para "todas as lojas" com tudo marcado e só melhores preços.
+  // Ao abrir, volta para "todas as lojas" e modo "melhores preços por loja"
+  // (pedido: exportar os preços da loja selecionada, sem misturar).
   const [prevOpen, setPrevOpen] = useState(false);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
       setShareAll(true);
       setSelected(new Set(allIds));
-      setMode("best");
+      setMode("store");
     }
   }
 
@@ -100,23 +101,67 @@ export function QuoteExportDialog({
 
         <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto px-6 py-5">
           <section className="rounded-xl border border-border bg-surface-2 p-4">
-            <label className="flex cursor-pointer items-start gap-2.5">
-              <input
-                type="checkbox"
-                className="mt-0.5 size-4 accent-primary"
-                checked={mode === "full"}
-                onChange={(e) => setMode(e.target.checked ? "full" : "best")}
-              />
-              <span>
-                <span className="text-sm font-semibold text-text-strong">
-                  Exportar a comparação completa
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Por padrão sai só o melhor preço de cada produto (com a loja).
-                  Marque para incluir o preço de todas as lojas por produto.
-                </span>
-              </span>
-            </label>
+            <p className="mb-3 text-sm font-semibold text-text-strong">O que exportar</p>
+            <ul className="flex flex-col gap-2.5">
+              <li>
+                <label className="flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="radio"
+                    name="quote-export-mode"
+                    className="mt-0.5 size-4 accent-primary"
+                    checked={mode === "best"}
+                    onChange={() => setMode("best")}
+                  />
+                  <span>
+                    <span className="text-sm font-medium text-text-strong">
+                      Melhores preços (misturando lojas)
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Para cada produto, o menor preço entre as lojas selecionadas.
+                    </span>
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label className="flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="radio"
+                    name="quote-export-mode"
+                    className="mt-0.5 size-4 accent-primary"
+                    checked={mode === "store"}
+                    onChange={() => setMode("store")}
+                  />
+                  <span>
+                    <span className="text-sm font-medium text-text-strong">
+                      Melhores preços por loja
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Exporta os preços de cada loja selecionada, sem misturar.
+                      Ex.: só a Loja 1 → sai apenas a lista de preços dela.
+                    </span>
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label className="flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="radio"
+                    name="quote-export-mode"
+                    className="mt-0.5 size-4 accent-primary"
+                    checked={mode === "full"}
+                    onChange={() => setMode("full")}
+                  />
+                  <span>
+                    <span className="text-sm font-medium text-text-strong">
+                      Comparação completa
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Matriz com o preço de todas as lojas por produto.
+                    </span>
+                  </span>
+                </label>
+              </li>
+            </ul>
           </section>
 
           <section className="rounded-xl border border-border bg-surface-2 p-4">

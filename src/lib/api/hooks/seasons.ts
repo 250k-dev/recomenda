@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import {
   getSeasons,
   getSeason,
@@ -23,6 +28,16 @@ import {
   deleteRecommendationItem,
 } from "@/lib/api/seasons";
 import { queryKeys } from "./queryKeys";
+
+/** Lista de compra espelha produtos "fora da programação" no servidor — invalida
+ *  o cache da lista para a UI atualizar sem F5 (prefix match do React Query). */
+function invalidatePurchaseListsAfterRecommendationChange(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: ["cycle-purchase-list"] });
+  void queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
+  void queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
+  void queryClient.invalidateQueries({ queryKey: ["cycle-cost-plan"] });
+  void queryClient.invalidateQueries({ queryKey: ["season-cost-plan"] });
+}
 
 export function useSeasons() {
   return useQuery({ queryKey: queryKeys.seasons, queryFn: getSeasons });
@@ -179,6 +194,7 @@ export function useCreateRecommendationItem(seasonId: string) {
     mutationFn: createRecommendationItem,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      invalidatePurchaseListsAfterRecommendationChange(queryClient);
     },
   });
 }
@@ -190,6 +206,7 @@ export function useUpdateRecommendationItem(seasonId: string) {
       updateRecommendationItem(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      invalidatePurchaseListsAfterRecommendationChange(queryClient);
     },
   });
 }

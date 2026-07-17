@@ -3,29 +3,37 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getConsultantActivity,
-  getConsultantFarms,
-  getConsultants,
   getConsultantSummary,
-  grantConsultantFarm,
+  getMemberProducers,
+  getShareableProducers,
+  getTeam,
+  grantMemberProducer,
   removeConsultant,
-  revokeConsultantFarm,
+  revokeMemberProducer,
 } from "@/lib/api/consultants";
 
-const consultantsKey = ["consultants"] as const;
-const consultantFarmsKey = (userId: string) => ["consultant-farms", userId] as const;
-const consultantSummaryKey = (userId: string) =>
-  ["consultant-summary", userId] as const;
-const consultantActivityKey = (userId: string) =>
-  ["consultant-activity", userId] as const;
+const teamKey = ["consultants"] as const;
+const shareableProducersKey = ["consultants-shareable-producers"] as const;
+const memberProducersKey = (userId: string) => ["consultant-producers", userId] as const;
+const consultantSummaryKey = (userId: string) => ["consultant-summary", userId] as const;
+const consultantActivityKey = (userId: string) => ["consultant-activity", userId] as const;
 
 export function useConsultants() {
-  return useQuery({ queryKey: consultantsKey, queryFn: getConsultants });
+  return useQuery({ queryKey: teamKey, queryFn: getTeam });
 }
 
-export function useConsultantFarms(userId: string, enabled = true) {
+export function useShareableProducers(enabled = true) {
   return useQuery({
-    queryKey: consultantFarmsKey(userId),
-    queryFn: () => getConsultantFarms(userId),
+    queryKey: shareableProducersKey,
+    queryFn: getShareableProducers,
+    enabled,
+  });
+}
+
+export function useMemberProducers(userId: string, enabled = true) {
+  return useQuery({
+    queryKey: memberProducersKey(userId),
+    queryFn: () => getMemberProducers(userId),
     enabled: Boolean(userId) && enabled,
   });
 }
@@ -46,19 +54,20 @@ export function useConsultantActivity(userId: string, enabled = true) {
   });
 }
 
-export function useConsultantFarmActions(userId: string) {
+export function useMemberProducerActions(userId: string) {
   const queryClient = useQueryClient();
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: consultantsKey });
-    queryClient.invalidateQueries({ queryKey: consultantFarmsKey(userId) });
+    queryClient.invalidateQueries({ queryKey: teamKey });
+    queryClient.invalidateQueries({ queryKey: memberProducersKey(userId) });
     queryClient.invalidateQueries({ queryKey: consultantSummaryKey(userId) });
+    queryClient.invalidateQueries({ queryKey: shareableProducersKey });
   };
   const grant = useMutation({
-    mutationFn: (farmId: string) => grantConsultantFarm(userId, farmId),
+    mutationFn: (producerId: string) => grantMemberProducer(userId, producerId),
     onSuccess: invalidate,
   });
   const revoke = useMutation({
-    mutationFn: (farmId: string) => revokeConsultantFarm(userId, farmId),
+    mutationFn: (producerId: string) => revokeMemberProducer(userId, producerId),
     onSuccess: invalidate,
   });
   return { grant, revoke };
@@ -68,6 +77,6 @@ export function useRemoveConsultant() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) => removeConsultant(userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: consultantsKey }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKey }),
   });
 }

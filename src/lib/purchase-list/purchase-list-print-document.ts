@@ -5,6 +5,10 @@
 import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
 import { CATEGORY_LABELS } from "@/lib/cost-plan/categories";
 import {
+  SEED_CATEGORIES,
+  seedQuantityUnitLabel,
+} from "@/components/domain/season/_shared";
+import {
   escapeHtml,
   fmtBrl,
   footerHtml,
@@ -13,11 +17,31 @@ import {
   printHtml,
 } from "@/lib/print/print-core";
 
+type PurchaseListItem = PurchaseListDetail["items"][number];
+
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
 const categoryLabel = (code: string): string =>
   (CATEGORY_LABELS as Record<string, string>)[code] ?? code;
+
+const isSeedCategory = (category: string) => SEED_CATEGORIES.includes(category);
+
+/** Dose/ha; sementes sem dose usam travessão. */
+function formatDose(it: PurchaseListItem): string {
+  if (isSeedCategory(it.category) && !(it.dose_per_hectare > 0)) {
+    return "—";
+  }
+  return `${fmtQty(it.dose_per_hectare)} ${it.dose_unit}/ha`;
+}
+
+/** Volume a comprar (quantity_to_buy) com unidade adequada. */
+function formatVolume(it: PurchaseListItem): string {
+  const unit = isSeedCategory(it.category)
+    ? seedQuantityUnitLabel(it.category)
+    : it.dose_unit;
+  return `${fmtQty(it.quantity_to_buy)} ${unit}`;
+}
 
 const LIST_CSS = `
   .area-note { display: block; font-size: 9.5px; color: #9a5a16; margin-top: 1px; }
@@ -76,11 +100,14 @@ function itemsTableHtml(list: PurchaseListDetail): string {
       const areaLine = areaBits.length
         ? `<span class="area-note">${areaBits.join(" · ")}</span>`
         : "";
+      const dose = formatDose(it);
+      const volume = formatVolume(it);
       return `
         <tr>
           <td>${escapeHtml(it.product_name)}${areaLine}</td>
-          <td>${escapeHtml(categoryLabel(it.category))}${it.stage ? ` · ${escapeHtml(it.stage)}` : ""}</td>
-          <td class="num">${fmtQty(it.quantity_to_buy)} ${escapeHtml(it.dose_unit)}</td>
+          <td>${escapeHtml(categoryLabel(it.category))}</td>
+          <td class="num">${dose === "—" ? "&mdash;" : escapeHtml(dose)}</td>
+          <td class="num">${escapeHtml(volume)}</td>
           <td class="num">${it.unit_price_brl > 0 ? fmtBrl(it.unit_price_brl) : "&mdash;"}</td>
           <td class="num">${it.total_brl > 0 ? fmtBrl(it.total_brl) : "&mdash;"}</td>
         </tr>`;
@@ -90,7 +117,7 @@ function itemsTableHtml(list: PurchaseListDetail): string {
   const total = list.cost_summary?.grand_total_brl ?? 0;
   const foot = `
     <tr>
-      <td colspan="4">Total estimado</td>
+      <td colspan="5">Total estimado</td>
       <td class="num">${fmtBrl(total)}</td>
     </tr>`;
 
@@ -99,8 +126,9 @@ function itemsTableHtml(list: PurchaseListDetail): string {
       <thead>
         <tr>
           <th>Produto</th>
-          <th>Categoria · Estágio</th>
-          <th class="num">Comprar</th>
+          <th>Categoria</th>
+          <th class="num">Dose</th>
+          <th class="num">Volume</th>
           <th class="num">Custo unit.</th>
           <th class="num">Total</th>
         </tr>
@@ -161,7 +189,7 @@ export function buildPurchaseListWhatsappMessage(
     if (it.area_note) bits.push(it.area_note);
     const suffix = bits.length ? ` (${bits.join(" · ")})` : "";
     lines.push(
-      `• ${it.product_name}: ${fmtQty(it.quantity_to_buy)} ${it.dose_unit}${suffix}`,
+      `• ${it.product_name} — Dose: ${formatDose(it)} · Volume: ${formatVolume(it)}${suffix}`,
     );
   }
 

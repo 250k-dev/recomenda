@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/api/client";
-import { clearAccessToken } from "@/lib/auth/token-store";
 
 export default function AdminProfilePage() {
   const router = useRouter();
@@ -24,8 +23,7 @@ export default function AdminProfilePage() {
     } catch {
       /* ignore server errors */
     }
-    clearAccessToken();
-    router.push("/login");
+    router.push("/login?force=1");
   };
 
   return (

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { getAuthSession, login, logout } from "@/lib/api/auth";
 import { useAcceptInvitation, useInvitationByToken } from "@/lib/api/hooks";
 import type { InvitationPreview } from "@/lib/api/producers";
 
@@ -30,8 +32,14 @@ const acceptSchema = z
 
 type AcceptFormValues = z.infer<typeof acceptSchema>;
 
-function invitationRoleLabel(kind?: InvitationPreview["kind"]): string {
-  return kind === "CONSULTANT" ? "consultor" : "produtor";
+function invitationRoleLabel(
+  kind?: InvitationPreview["kind"],
+  accessLevel?: InvitationPreview["access_level"],
+): string {
+  if (kind === "CONSULTANT") {
+    return accessLevel === "ASSISTANT" ? "consultor" : "gestor";
+  }
+  return "produtor";
 }
 
 const INVITATION_STATUS_LABELS: Record<string, string> = {
@@ -49,6 +57,8 @@ export default function InviteTokenPage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
   const router = useRouter();
+  const [activeSessionRole, setActiveSessionRole] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { data: invitation, isLoading, isError } = useInvitationByToken(token);
   const acceptMutation = useAcceptInvitation(token);
@@ -58,13 +68,44 @@ export default function InviteTokenPage() {
     defaultValues: { name: "", password: "", confirmPassword: "" },
   });
 
-  const onSubmit = form.handleSubmit(({ name, password }) => {
-    acceptMutation.mutate(
-      { name, password },
-      {
-        onSuccess: () => router.push("/login"),
-      },
-    );
+  useEffect(() => {
+    let cancelled = false;
+    getAuthSession().then((session) => {
+      if (!cancelled && session.authenticated) {
+        setActiveSessionRole(session.role);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onSubmit = form.handleSubmit(async ({ name, password }) => {
+    setSubmitError(null);
+    try {
+      await logout();
+      await acceptMutation.mutateAsync({ name, password });
+
+      const email = invitation?.email;
+      if (!email) {
+        router.push("/login?force=1");
+        return;
+      }
+
+      if (invitation.kind === "CONSULTANT") {
+        const result = await login(email, password);
+        window.location.assign(
+          result.user.role === "ADMIN" ? "/admin" : "/dashboard",
+        );
+        return;
+      }
+
+      router.push("/login?force=1");
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Não foi possível concluir o cadastro.",
+      );
+    }
   });
 
   if (isLoading) {
@@ -104,15 +145,20 @@ export default function InviteTokenPage() {
             Convite já utilizado
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Status: <strong className="text-text-strong">{invitationStatusLabel(invitation.status)}</strong>
+            Status:{" "}
+            <strong className="text-text-strong">
+              {invitationStatusLabel(invitation.status)}
+            </strong>
           </p>
           <Button asChild className="mt-5 w-full" size="lg">
-            <Link href="/login">Fazer login</Link>
+            <Link href="/login?force=1">Fazer login</Link>
           </Button>
         </Card>
       </AuthShell>
     );
   }
+
+  const isSubmitting = acceptMutation.isPending || form.formState.isSubmitting;
 
   return (
     <AuthShell>
@@ -121,15 +167,28 @@ export default function InviteTokenPage() {
           Criar sua conta
         </h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Você foi convidado para acessar {invitation.farm_ids.length} fazenda(s)
-          como {invitationRoleLabel(invitation.kind)}.
+          Você foi convidado para acessar como{" "}
+          {invitationRoleLabel(invitation.kind, invitation.access_level)}.
         </p>
 
+        {activeSessionRole ? (
+          <Alert className="mt-4">
+            <AlertTitle>Sessão ativa detectada</AlertTitle>
+            <AlertDescription>
+              Há uma conta logada neste navegador ({activeSessionRole}). Ao
+              continuar, essa sessão será encerrada e você entrará com a nova
+              conta.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         <form onSubmit={onSubmit} className="mt-5 space-y-4">
-          {acceptMutation.isError ? (
+          {submitError || acceptMutation.isError ? (
             <Alert variant="destructive">
               <AlertTitle>Erro ao aceitar</AlertTitle>
-              <AlertDescription>Tente novamente em instantes.</AlertDescription>
+              <AlertDescription>
+                {submitError ?? "Tente novamente em instantes."}
+              </AlertDescription>
             </Alert>
           ) : null}
           <div className="space-y-2">
@@ -171,13 +230,8 @@ export default function InviteTokenPage() {
               </p>
             ) : null}
           </div>
-          <Button
-            className="w-full"
-            size="lg"
-            type="submit"
-            disabled={acceptMutation.isPending}
-          >
-            {acceptMutation.isPending ? (
+          <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
               <>
                 <Loader2 className="size-4 animate-spin" /> Criando conta...
               </>

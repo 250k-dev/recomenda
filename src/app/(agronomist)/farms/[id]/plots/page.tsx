@@ -443,20 +443,17 @@ export default function FarmPlotsPage() {
         loading={deletePlot.isPending}
         onConfirm={async () => {
           if (!deleteConfirm) return;
-          await new Promise<void>((resolve, reject) =>
-            deletePlot.mutate(deleteConfirm.id, {
-              onSuccess: () => {
-                setDeleteConfirm(null);
-                resolve();
-              },
-              onError: (err) => {
-                toast.error(
-                  "Não foi possível excluir o talhão. Verifique se ele não está em uso em alguma safra.",
-                );
-                reject(err);
-              },
-            }),
-          );
+          const id = deleteConfirm.id;
+          // Fecha o dialog na hora — a lista já some via update otimista do hook.
+          setDeleteConfirm(null);
+          try {
+            await deletePlot.mutateAsync(id);
+            toast.success("Talhão excluído.");
+          } catch {
+            toast.error(
+              "Não foi possível excluir o talhão. Verifique se ele não está em uso em alguma safra.",
+            );
+          }
         }}
       />
     </>

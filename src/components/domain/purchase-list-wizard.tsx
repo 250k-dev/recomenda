@@ -33,7 +33,8 @@ import {
 } from "@/stores/currency";
 import {
   CategoryMetaProgress,
-  TOTAL_TARGET_KEY,
+  resolveTotalTargetScHa,
+  TOTAL_SC_HA_KEY,
 } from "@/components/domain/category-meta-progress";
 import {
   createPurchaseList,
@@ -677,19 +678,19 @@ function StepTargets({
   const num = (n: number, d = 2) =>
     n.toLocaleString("pt-BR", { maximumFractionDigits: d });
 
-  // Formato antigo (rascunho salvo com metas por categoria em sc/ha): converte
-  // para sacas totais só para pré-preencher o campo — ao editar, grava no
-  // formato novo (chave TOTAL) e as categorias antigas saem.
-  const legacyPerHa = Object.entries(targets)
-    .filter(([category]) => category !== TOTAL_TARGET_KEY)
-    .reduce((s, [, v]) => s + (v ?? 0), 0);
-  const totalTarget =
-    targets[TOTAL_TARGET_KEY] ??
-    (legacyPerHa > 0 && totalHa > 0 ? Math.round(legacyPerHa * totalHa) : 0);
+  // Pré-preenche em sc/ha a partir de TOTAL_SC_HA, TOTAL legado (÷ ha) ou
+  // soma das metas por categoria. Ao editar, grava só TOTAL_SC_HA.
+  const targetScHa = resolveTotalTargetScHa(targets, totalHa);
+  const displayScHa =
+    targetScHa > 0
+      ? Number.isInteger(targetScHa)
+        ? String(targetScHa)
+        : String(Number(targetScHa.toFixed(2)))
+      : "";
 
-  const setTotal = (value: string) => {
+  const setTargetScHa = (value: string) => {
     const n = value === "" ? 0 : Number(value);
-    setTargets({ [TOTAL_TARGET_KEY]: Number.isFinite(n) && n > 0 ? n : 0 });
+    setTargets({ [TOTAL_SC_HA_KEY]: Number.isFinite(n) && n > 0 ? n : 0 });
   };
 
   return (
@@ -706,8 +707,8 @@ function StepTargets({
             Antes de montar a lista, quer definir uma meta?
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Diga o total de sacas que pretende gastar na lista. Ao montar você acompanha o
-            quanto já comprometeu e recebe um aviso se passar da meta. É opcional.
+            Diga a meta de custo em sacas por hectare. Ao montar você acompanha o quanto já
+            comprometeu e recebe um aviso se passar da meta. É opcional.
           </p>
         </div>
       </div>
@@ -718,7 +719,7 @@ function StepTargets({
             <Target className="h-6 w-6" />
           </span>
           <p className="max-w-md text-sm text-muted-foreground">
-            Você pode definir a meta de sacas agora, ou seguir direto para montar a lista e
+            Você pode definir a meta em sc/ha agora, ou seguir direto para montar a lista e
             definir depois.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
@@ -736,26 +737,26 @@ function StepTargets({
         <section className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="max-w-md space-y-2.5">
             <Label htmlFor="total-target" className="text-sm font-semibold text-foreground">
-              Total de sacas desejadas
+              Meta desejada (sc/ha)
             </Label>
             <div className="flex items-center gap-2">
               <Input
                 id="total-target"
                 type="number"
                 min="0"
-                step="1"
-                value={totalTarget ? String(totalTarget) : ""}
-                placeholder="Ex: 25000"
-                onChange={(e) => setTotal(e.target.value)}
+                step="0.01"
+                value={displayScHa}
+                placeholder="Ex: 45"
+                onChange={(e) => setTargetScHa(e.target.value)}
                 className="h-12 max-w-[220px] text-right text-lg font-semibold tabular-nums"
                 autoFocus
               />
-              <span className="text-sm text-muted-foreground">sacas</span>
+              <span className="text-sm text-muted-foreground">sc/ha</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {totalTarget > 0 && totalHa > 0
-                ? `≈ ${num(totalTarget / totalHa)} sc/ha nos ${num(totalHa)} ha da safra.`
-                : "Compare com o volume de sacas que a lista calcula conforme você adiciona os produtos."}
+              {targetScHa > 0 && totalHa > 0
+                ? `≈ ${num(targetScHa * totalHa)} sacas totais nos ${num(totalHa)} ha da safra.`
+                : "Compare com o custo em sc/ha que a lista calcula conforme você adiciona os produtos."}
             </p>
           </div>
         </section>

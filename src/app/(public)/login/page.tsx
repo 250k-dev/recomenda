@@ -46,17 +46,18 @@ export default function LoginPage() {
           <form onSubmit={onSubmit} className="space-y-5">
             {loginMutation.isError ? (
               (() => {
-                const isProducer = loginMutation.error?.message?.includes("Produtores");
-                const isDisabled =
-                  (loginMutation.error as { code?: string } | null)?.code ===
-                  "ACCOUNT_DISABLED";
+                const err = loginMutation.error as { code?: string; message?: string } | null;
+                const isProducer =
+                  err?.code === "PRODUCER_WEB_FORBIDDEN" ||
+                  err?.message?.includes("Produtores");
+                const isDisabled = err?.code === "ACCOUNT_DISABLED";
                 const title = isProducer
                   ? "Acesso restrito"
                   : isDisabled
                     ? "Conta desativada"
                     : "Não foi possível entrar";
                 const description = isProducer
-                  ? "Produtores devem acessar o Recomenda App, não este painel."
+                  ? "Contas de produtor não têm acesso ao painel web."
                   : isDisabled
                     ? "Sua conta foi desativada. Contate o suporte."
                     : "Verifique e-mail e senha ou tente novamente em instantes.";

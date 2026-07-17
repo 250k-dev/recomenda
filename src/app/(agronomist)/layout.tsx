@@ -5,8 +5,9 @@ import { getSessionRole } from "@/lib/auth/session";
 
 export default async function AgronomistLayout({ children }: { children: ReactNode }) {
   const role = await getSessionRole();
-  // Consultor usa a mesma área do agrônomo (com escopo aplicado no backend).
-  if (role !== "AGRONOMIST" && role !== "CONSULTANT") {
+  // Membro de equipe (Gestor/Consultor) usa a mesma área do agrônomo (com escopo
+  // e permissões aplicados no backend).
+  if (role !== "AGRONOMIST" && role !== "STAFF") {
     redirect(
       role === "ADMIN" ? "/admin" : role === "PRODUCER" ? "/producer-only" : "/login",
     );

@@ -55,7 +55,7 @@ export interface PurchaseListInput {
   grain_price_brl?: number | null;
   /** Preço da saca por cultura (CropType → R$/saca) — listas multi-cultura. */
   grain_prices_brl?: Record<string, number>;
-  /** Real × Desejado: meta de sacas/ha por categoria. */
+  /** Real × Desejado: meta única em sc/ha (`TOTAL_SC_HA`) ou legado por categoria. */
   category_targets?: Record<string, number>;
   /** Espaçamento entre linhas (m) — parâmetro único da lista (semente). */
   spacing_m?: number | null;

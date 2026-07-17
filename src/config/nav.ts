@@ -1,26 +1,49 @@
-import type { UserRole } from "@/types/auth";
+import type { AccessLevel, UserRole } from "@/types/auth";
 
-export const navByRole: Record<UserRole, Array<{ label: string; href: string }>> = {
-  ADMIN: [
-    { label: "Dashboard", href: "/admin" },
-    { label: "Planos", href: "/admin/plans" },
-    { label: "Agrônomos", href: "/admin/agronomists" },
-    { label: "Produtores", href: "/admin/producers" },
-    { label: "Produtos", href: "/admin/global-catalog" },
-  ],
-  AGRONOMIST: [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Produtores", href: "/producers" },
-    { label: "Produtos", href: "/catalog" },
-    { label: "Relatórios", href: "/reports" },
-  ],
-  // Consultor usa a mesma navegação do agrônomo (escopo aplicado no backend).
-  // Sem "Relatórios": o comparativo agrega TODAS as fazendas do agrônomo e
-  // vazaria dados fora do escopo compartilhado (o endpoint também bloqueia).
-  CONSULTANT: [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Produtores", href: "/producers" },
-    { label: "Produtos", href: "/catalog" },
-  ],
-  PRODUCER: [],
-};
+export type NavItem = { label: string; href: string };
+
+const ADMIN_NAV: NavItem[] = [
+  { label: "Dashboard", href: "/admin" },
+  { label: "Planos", href: "/admin/plans" },
+  { label: "Agrônomos", href: "/admin/agronomists" },
+  { label: "Produtores", href: "/admin/producers" },
+  { label: "Produtos", href: "/admin/global-catalog" },
+];
+
+const AGRONOMIST_NAV: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "Produtores", href: "/producers" },
+  { label: "Produtos", href: "/catalog" },
+  { label: "Relatórios", href: "/reports" },
+  { label: "Equipe", href: "/consultants" },
+];
+
+// Gestor: mesma navegação do agrônomo (menos Relatórios, que agrega TODAS as
+// fazendas e vazaria escopo), incluindo Equipe (gerencia seus consultores).
+const MANAGER_NAV: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "Produtores", href: "/producers" },
+  { label: "Produtos", href: "/catalog" },
+  { label: "Equipe", href: "/consultants" },
+];
+
+// Consultor: só acompanha e registra — sem Equipe, sem Relatórios.
+const ASSISTANT_NAV: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "Produtores", href: "/producers" },
+  { label: "Produtos", href: "/catalog" },
+];
+
+/** Navegação por papel + nível de acesso (o nível só importa para STAFF). */
+export function navFor(role: UserRole, accessLevel?: AccessLevel | null): NavItem[] {
+  switch (role) {
+    case "ADMIN":
+      return ADMIN_NAV;
+    case "AGRONOMIST":
+      return AGRONOMIST_NAV;
+    case "STAFF":
+      return accessLevel === "MANAGER" ? MANAGER_NAV : ASSISTANT_NAV;
+    default:
+      return [];
+  }
+}

@@ -93,6 +93,13 @@ export function useApplyCycleBlock(id: string) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.farmSeasons(result.cycle.farm_id),
       });
+      // Mixes podem espelhar produtos fora da programação na lista de compra.
+      queryClient.invalidateQueries({ queryKey: queryKeys.cyclePurchaseList(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycleCostPlan(id) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.farmPurchaseLists(result.cycle.farm_id),
+      });
+      void queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
     },
   });
 }

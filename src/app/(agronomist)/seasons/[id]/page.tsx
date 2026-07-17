@@ -39,6 +39,7 @@ import {
   useCloneGlobalProduct,
   useMe,
 } from "@/lib/api/hooks";
+import { useCan } from "@/lib/auth/use-can";
 import { usePurchaseListCatalogProducts } from "@/components/domain/timing/timing-stages-editor";
 import {
   productsForPurchaseListCategory,
@@ -176,11 +177,13 @@ function ProductRow({
   seasonId,
   onDelete,
   outOfProgram,
+  canDelete = true,
 }: {
   item: RecommendationItem;
   seasonId: string;
   onDelete: (id: string) => void;
   outOfProgram?: boolean;
+  canDelete?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [dose, setDose] = useState(String(item.dose_per_hectare));
@@ -268,14 +271,16 @@ function ProductRow({
           >
             <Pencil className="h-3 w-3" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            onClick={() => onDelete(item.id)}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          {canDelete ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={() => onDelete(item.id)}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          ) : null}
         </div>
       )}
     </div>
@@ -585,9 +590,11 @@ function AddStagePanel({
 function SeedRow({
   item,
   onDelete,
+  canDelete = true,
 }: {
   item: RecommendationItem;
   onDelete: (id: string) => void;
+  canDelete?: boolean;
 }) {
   const seedsPerUnit = item.dose_unit === "SACA" ? 60000 : 5000000;
   const population = Number(item.dose_per_hectare) * seedsPerUnit;
@@ -602,14 +609,16 @@ function SeedRow({
           ? ` · ${item.total_quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unitLabel}`
           : ""}
       </span>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-7 w-7 text-muted-foreground hover:text-danger-strong"
-        onClick={() => onDelete(item.id)}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+      {canDelete ? (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground hover:text-danger-strong"
+          onClick={() => onDelete(item.id)}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -713,6 +722,7 @@ function RecommendationCard({
   onMoveDown,
   isReordering,
   canReorder,
+  canEditStructure = true,
   catalogProducts,
   listProductIds,
   listDoseByProductId,
@@ -727,6 +737,7 @@ function RecommendationCard({
   onMoveDown: () => void;
   isReordering: boolean;
   canReorder: boolean;
+  canEditStructure?: boolean;
   catalogProducts: PurchaseListCatalogProduct[];
   listProductIds: Set<string>;
   listDoseByProductId: Map<string, { dose: number; unit: string }>;
@@ -953,9 +964,9 @@ function RecommendationCard({
             <RecommendationStageFields
               draft={stageDraft}
               onChange={(patch) => setStageDraft((prev) => ({ ...prev, ...patch }))}
-              readOnly={!isPending}
+              readOnly={!isPending || !canEditStructure}
             />
-            {isPending ? (
+            {isPending && canEditStructure ? (
               <div className="mt-3 flex gap-2">
                 <Button
                   size="sm"
@@ -986,6 +997,7 @@ function RecommendationCard({
                     item={item}
                     seasonId={seasonId}
                     onDelete={handleDeleteItem}
+                    canDelete={canEditStructure}
                     outOfProgram={listReady && !listProductIds.has(item.local_product_id)}
                   />
                 ))}
@@ -1005,12 +1017,14 @@ function RecommendationCard({
                       key={item.id}
                       item={item}
                       onDelete={handleDeleteItem}
+                      canDelete={canEditStructure}
                     />
                   ))}
                 </div>
               </>
             ) : null}
 
+            {canEditStructure ? (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {!addingProduct && !addingSeed ? (
                 <>
@@ -1035,8 +1049,9 @@ function RecommendationCard({
                 </>
               ) : null}
             </div>
+            ) : null}
 
-            {addingProduct ? (
+            {canEditStructure && addingProduct ? (
               <div className="mt-2">
                 <AddProductRow
                   recommendationId={rec.id}
@@ -1048,7 +1063,7 @@ function RecommendationCard({
                 />
               </div>
             ) : null}
-            {addingSeed ? (
+            {canEditStructure && addingSeed ? (
               <div className="mt-2">
                 <AddSeedRow
                   recommendationId={rec.id}
@@ -1277,8 +1292,10 @@ function RecommendationsTab({
     Array.isArray(data) ? data : (data as { data?: unknown[] } | undefined)?.data ?? []
   ) as Recommendation[];
 
+  const canEditStructurePerm = useCan("RECOMMENDATION_EDIT_STRUCTURE");
   const canManageStages =
-    seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS";
+    (seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS") &&
+    canEditStructurePerm;
 
   const moveStage = (index: number, direction: "up" | "down") => {
     const targetIndex = direction === "up" ? index - 1 : index + 1;
@@ -1457,6 +1474,7 @@ function RecommendationsTab({
             onMoveDown={() => moveStage(i, "down")}
             isReordering={reorderMut.isPending}
             canReorder={canManageStages}
+            canEditStructure={canManageStages}
             catalogProducts={catalogProducts}
             listProductIds={listProductIds}
             listDoseByProductId={listDoseByProductId}

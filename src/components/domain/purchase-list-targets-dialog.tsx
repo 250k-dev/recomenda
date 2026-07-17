@@ -13,17 +13,19 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TOTAL_TARGET_KEY } from "@/components/domain/category-meta-progress";
+import {
+  resolveTotalTargetScHa,
+  TOTAL_SC_HA_KEY,
+} from "@/components/domain/category-meta-progress";
 
 const num = (n: number, d = 2) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: d });
 
 /**
- * Modal para definir/editar a meta da lista de compra: um único total de sacas
- * desejadas (chave `TOTAL` em `category_targets`). Listas antigas com metas por
- * categoria (sc/ha) abrem com o campo pré-preenchido pela conversão
- * `soma(sc/ha) × hectares`; ao salvar, o formato novo substitui o antigo.
- * Salva só `category_targets` (sem tocar em itens/talhões).
+ * Modal para definir/editar a meta da lista de compra: um único valor em sc/ha
+ * (chave `TOTAL_SC_HA`). Listas com `TOTAL` (sacas totais) ou metas por categoria
+ * abrem com o campo pré-preenchido em sc/ha; ao salvar, o formato novo substitui
+ * o antigo. Salva só `category_targets` (sem tocar em itens/talhões).
  */
 export function PurchaseListTargetsDialog({
   open,
@@ -40,19 +42,14 @@ export function PurchaseListTargetsDialog({
   onSave: (targets: Record<string, number>) => Promise<void> | void;
   saving?: boolean;
 }) {
-  const initialTotal = (): string => {
-    const total = initialTargets[TOTAL_TARGET_KEY] ?? 0;
-    if (total > 0) return String(total);
-    // Formato antigo: converte as metas por categoria (sc/ha) em sacas totais.
-    const legacyPerHa = Object.entries(initialTargets)
-      .filter(([category]) => category !== TOTAL_TARGET_KEY)
-      .reduce((s, [, v]) => s + (v ?? 0), 0);
-    return legacyPerHa > 0 && totalHa > 0
-      ? String(Math.round(legacyPerHa * totalHa))
-      : "";
+  const initialScHa = (): string => {
+    const scHa = resolveTotalTargetScHa(initialTargets, totalHa);
+    if (scHa <= 0) return "";
+    // Mantém decimais quando veio de TOTAL÷ha; inteiro quando já era sc/ha.
+    return Number.isInteger(scHa) ? String(scHa) : String(Number(scHa.toFixed(2)));
   };
 
-  const [total, setTotal] = useState(initialTotal);
+  const [scHa, setScHa] = useState(initialScHa);
 
   // Ao (re)abrir, recarrega a meta salva atual e descarta edições não
   // confirmadas — ajuste de estado durante o render (padrão recomendado pelo
@@ -60,15 +57,15 @@ export function PurchaseListTargetsDialog({
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setTotal(initialTotal());
+    if (open) setScHa(initialScHa());
   }
 
-  const parsed = Number(total);
-  const totalValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  const parsed = Number(scHa);
+  const scHaValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 
   const handleSave = async () => {
-    // Meta zerada/vazia = sem meta (limpa também metas antigas por categoria).
-    await onSave(totalValue > 0 ? { [TOTAL_TARGET_KEY]: totalValue } : {});
+    // Meta zerada/vazia = sem meta (limpa também TOTAL legado e metas por categoria).
+    await onSave(scHaValue > 0 ? { [TOTAL_SC_HA_KEY]: scHaValue } : {});
   };
 
   return (
@@ -80,31 +77,31 @@ export function PurchaseListTargetsDialog({
             Meta de sacas da lista
           </DialogTitle>
           <DialogDescription>
-            Diga o total de sacas que pretende gastar. A lista mostra o realizado
+            Diga a meta de custo em sacas por hectare. A lista mostra o realizado
             comparado à meta e avisa quando passar. Deixe em branco para não definir meta.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2.5">
-          <Label htmlFor="dialog-total-target">Total de sacas desejadas</Label>
+          <Label htmlFor="dialog-total-target">Meta desejada (sc/ha)</Label>
           <div className="flex items-center gap-2">
             <Input
               id="dialog-total-target"
               type="number"
               min="0"
-              step="1"
-              value={total}
-              placeholder="Ex: 25000"
-              onChange={(e) => setTotal(e.target.value)}
+              step="0.01"
+              value={scHa}
+              placeholder="Ex: 45"
+              onChange={(e) => setScHa(e.target.value)}
               className="h-11 max-w-[200px] text-right text-base font-semibold tabular-nums"
               autoFocus
             />
-            <span className="text-sm text-muted-foreground">sacas</span>
+            <span className="text-sm text-muted-foreground">sc/ha</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {totalValue > 0 && totalHa > 0
-              ? `≈ ${num(totalValue / totalHa)} sc/ha nos ${num(totalHa)} ha da lista.`
-              : "Compare com o KPI “Volume de sacas” da lista."}
+            {scHaValue > 0 && totalHa > 0
+              ? `≈ ${num(scHaValue * totalHa)} sacas totais nos ${num(totalHa)} ha da lista.`
+              : "Compare com o KPI “Custo (sc/ha)” da lista."}
           </p>
         </div>
 

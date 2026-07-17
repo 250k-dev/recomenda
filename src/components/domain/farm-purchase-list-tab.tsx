@@ -28,7 +28,7 @@ import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
 import {
   CategoryMetaProgress,
-  TOTAL_TARGET_KEY,
+  hasSingleTotalTarget,
 } from "@/components/domain/category-meta-progress";
 import {
   useFarmAggregatedShoppingList,
@@ -48,6 +48,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
+import { useCan } from "@/lib/auth/use-can";
 import { PurchaseListTargetsDialog } from "@/components/domain/purchase-list-targets-dialog";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
 
@@ -133,6 +134,9 @@ export function FarmPurchaseListTab({
   onOpenCostPlan,
   stockHref,
 }: FarmPurchaseListTabProps) {
+  const canListCrud = useCan("LIST_CRUD");
+  const canQuoteCrud = useCan("QUOTE_CRUD");
+  const effectiveReadOnly = readOnly || !canListCrud;
   const { data: producerStock } = useProducerStock(producerId ?? "");
   const stockByProductId = useMemo(
     () =>
@@ -406,12 +410,14 @@ export function FarmPurchaseListTab({
               </p>
             </div>
           </div>
+          {canListCrud ? (
           <Button asChild size="sm" variant="outline" className="gap-1.5">
             <Link href={newPurchaseListHref}>
               <Plus className="h-4 w-4" />
               Montar lista
             </Link>
           </Button>
+          ) : null}
         </div>
 
         {fallbackSeasonIds.length > 0 ? (
@@ -494,13 +500,13 @@ export function FarmPurchaseListTab({
             </>
           ) : (
             <>
-              {!readOnly ? (
+              {!effectiveReadOnly ? (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
                   <Pencil className="h-4 w-4" />
                   Editar lista
                 </Button>
               ) : null}
-              {!readOnly ? (
+              {!effectiveReadOnly ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -513,7 +519,7 @@ export function FarmPurchaseListTab({
               ) : null}
               {/* Sempre disponível: a lista muda com o tempo e o agrônomo precisa
                   poder salvar as alterações como template (antes só na criação). */}
-              {!readOnly && hasItems ? (
+              {!effectiveReadOnly && hasItems ? (
                 <SavePurchaseListTemplateButton
                   items={viewItems}
                   crop={list.crop ?? "ANY"}
@@ -530,7 +536,10 @@ export function FarmPurchaseListTab({
                 <FileDown className="h-4 w-4" />
                 Exportar
               </Button>
-              <ShareQuoteSheet listId={list.id} listName={list.name} />
+              {canQuoteCrud ? (
+                <ShareQuoteSheet listId={list.id} listName={list.name} />
+              ) : null}
+              {canQuoteCrud ? (
               <Button
                 variant={showComparison ? "clay" : "outline"}
                 size="sm"
@@ -540,6 +549,7 @@ export function FarmPurchaseListTab({
                 <Store className="h-4 w-4" />
                 Cotações das lojas
               </Button>
+              ) : null}
               {/* Sem barra de abas, este é o caminho para o plano de custo da
                   safra. Embutido usa o callback (troca de view sem recarregar);
                   no modo avulso, o link direto para o plano do talhão. */}
@@ -574,7 +584,7 @@ export function FarmPurchaseListTab({
         </div>
       </div>
 
-      {restoreItems && !editing && !readOnly ? (
+      {restoreItems && !editing && !effectiveReadOnly ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
           <span className="flex items-center gap-2">
             Há alterações desta lista <strong>não salvas</strong> guardadas neste
@@ -639,10 +649,10 @@ export function FarmPurchaseListTab({
               {fmtQty(totalHa)} ha × nº de aplicações.
             </p>
           ) : null}
-          {/* Meta nova (TOTAL em sacas): barra única Real × Meta; a distribuição
-              por categoria continua abaixo, sem coluna de meta. Metas antigas
-              (por categoria) seguem na tabela Realizado × Meta de sempre. */}
-          {Number(list.category_targets?.[TOTAL_TARGET_KEY] ?? 0) > 0 ? (
+          {/* Meta única (sc/ha): barra Real × Meta; a distribuição por categoria
+              continua abaixo, sem coluna de meta. Metas antigas por categoria
+              seguem na tabela Realizado × Meta de sempre. */}
+          {hasSingleTotalTarget(list.category_targets ?? {}) ? (
             <CategoryMetaProgress
               items={editing ? draftItems : viewItems}
               totalHa={totalHa}
@@ -654,7 +664,7 @@ export function FarmPurchaseListTab({
             <CategoryDistributionPanel
               breakdown={kpis.categoryBreakdown}
               targets={
-                Number(list.category_targets?.[TOTAL_TARGET_KEY] ?? 0) > 0
+                hasSingleTotalTarget(list.category_targets ?? {})
                   ? undefined
                   : (list.category_targets ?? {})
               }
@@ -678,7 +688,7 @@ export function FarmPurchaseListTab({
         <EmptyState
           title={`A lista "${list.name}" ainda não tem produtos cadastrados.`}
           action={
-            !readOnly ? (
+            !effectiveReadOnly ? (
               <Button size="sm" className="gap-1.5" onClick={startEditing}>
                 <Pencil className="h-4 w-4" />
                 Adicionar produtos

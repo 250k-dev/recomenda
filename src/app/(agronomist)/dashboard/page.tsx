@@ -38,6 +38,7 @@ import {
   usePlanQuota,
   usePortfolioPriceCoverage,
 } from "@/lib/api/hooks";
+import { useCan } from "@/lib/auth/use-can";
 import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
 import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
 
@@ -56,6 +57,8 @@ export default function DashboardPage() {
   const { data: me } = useMe();
   const { data: planData, isLoading: planLoading } = usePlanQuota();
   const agenda = useAgronomistAgenda(new Date());
+  const canManageTeam = useCan("TEAM_MANAGE");
+  const canCreateProducer = useCan("PRODUCER_CREATE");
 
   const [tab, setTab] = useState<AttentionTab>("late");
 
@@ -169,18 +172,20 @@ export default function DashboardPage() {
               <FileText className="size-4" /> Templates de compra
             </Link>
           </Button>
-          {me?.role === "AGRONOMIST" ? (
+          {canManageTeam ? (
             <Button asChild variant="outline">
               <Link href="/consultants">
-                <UserCog className="size-4" /> Consultores
+                <UserCog className="size-4" /> Equipe
               </Link>
             </Button>
           ) : null}
-          <Button asChild variant="clay">
-            <Link href="/producers/new">
-              <Plus className="size-4" /> Cadastrar produtor
-            </Link>
-          </Button>
+          {canCreateProducer ? (
+            <Button asChild variant="clay">
+              <Link href="/producers/new">
+                <Plus className="size-4" /> Cadastrar produtor
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 
