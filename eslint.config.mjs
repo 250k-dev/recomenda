@@ -6,12 +6,16 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
+  // Os padrões são resolvidos a partir da raiz do monorepo (onde vive este
+  // arquivo), por isso o `**/` — sem ele, `.next/**` não casaria com
+  // `apps/web/.next/`.
   globalIgnores([
+    "**/node_modules/**",
     // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
+    "**/next-env.d.ts",
   ]),
 ]);
 
