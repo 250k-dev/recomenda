@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import {
   useEffect,
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useProducers } from "@/lib/api/hooks";
 import { useCan } from "@/lib/auth/use-can";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 const MAX_MATCHES = 8;
 

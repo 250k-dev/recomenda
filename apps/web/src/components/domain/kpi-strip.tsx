@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 /**
  * Connected KPI band (mockup: grid-auto-flow column with hairline dividers).

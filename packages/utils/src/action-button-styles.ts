@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "./cn";
 
 /** Desativar ou remover da lista ativa — sempre `variant="outline"` (laranja). */
 export const deactivateOutlineButtonClass = cn(

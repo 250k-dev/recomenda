@@ -7,14 +7,14 @@ import { useState } from "react";
 import { ArrowRight, Clock, Pencil } from "lucide-react";
 
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import { TemplateEditorSkeleton } from "@/components/domain/page-skeletons";
 import { TimingTemplateStagesPanel } from "@/components/domain/timing/timing-template-stages-panel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProducer, useTimingTemplate, useUpdateTimingTemplate } from "@/lib/api/hooks";
-import { CROP_LABELS } from "@/lib/season-constants";
+import { CROP_LABELS } from "@recomenda/utils";
 
 export default function ProducerTimingTemplateDetailPage() {
   const params = useParams<{ id: string; templateId: string }>();

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { duplicatePurchaseList } from "@/lib/api/client";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import { getCommodities } from "@/lib/api/market";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,7 @@ import {
   RefreshCw,
   ChevronDown,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", {

@@ -10,8 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { usePublishSeason } from "@/lib/api/hooks";
 import { useSeasonPage } from "@/components/domain/season/use-season-page";
-import { STATUS_VARIANTS } from "@/lib/season-constants";
-import { cn } from "@/lib/utils";
+import { cn, STATUS_VARIANTS } from "@recomenda/utils";
 
 /**
  * Moldura das telas da safra do talhão: breadcrumb + navegação entre as

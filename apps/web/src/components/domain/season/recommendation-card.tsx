@@ -7,10 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SearchableSelect } from "@/components/ui/select";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
-import {
-  GLOBAL_PRODUCT_CATEGORIES,
-  PRODUCT_CATEGORY_LABELS,
-} from "@/lib/catalog-global-options";
+import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import {
   useApplyRecommendation,
   useCloneGlobalProduct,
@@ -54,7 +51,6 @@ import {
   recommendedYmdToWindow,
   todayLocalYmd,
 } from "@/lib/timing/window-days";
-import { cn } from "@/lib/utils";
 import { SEED_CATEGORIES } from "@/lib/purchase-list/list-item";
 import { displayRecStatus, fmtDate } from "@/lib/recommendations/format";
 

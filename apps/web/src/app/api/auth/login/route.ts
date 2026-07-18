@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "@/config/env";
+import { serverEnv } from "@recomenda/config/server";
 import { clearAuthCookies, setAuthCookies } from "@/lib/auth/session-cookies";
 
 type LoginPayload = {
@@ -11,7 +11,7 @@ type LoginPayload = {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const response = await fetch(`${env.API_INTERNAL_URL}/auth/login`, {
+  const response = await fetch(`${serverEnv.API_INTERNAL_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

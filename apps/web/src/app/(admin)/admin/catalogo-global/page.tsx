@@ -20,11 +20,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalCatalogImportResult, GlobalProduct } from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api-error";
 import {
+  deactivateOutlineButtonClass,
   DOSE_UNIT_LABELS,
   GLOBAL_DOSE_UNITS,
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
-} from "@/lib/catalog-global-options";
+} from "@recomenda/utils";
 import {
   useCreateGlobalProduct,
   useDeleteGlobalProduct,
@@ -38,7 +39,6 @@ import {
   useResolveCustomLink,
   usePromoteCustomToGlobal,
 } from "@/lib/api/hooks";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
 
 const CATALOG_PAGE_SIZE = 15;
 

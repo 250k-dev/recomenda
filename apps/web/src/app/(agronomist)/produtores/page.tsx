@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,8 +29,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { cn, deactivateOutlineButtonClass } from "@recomenda/utils";
 import { useCan, usePrincipal } from "@/lib/auth/use-can";
 
 type Tab = "active" | "archived";

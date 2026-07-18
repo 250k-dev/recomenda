@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Logo } from "@/assets/logo";
 import { Logo250K } from "@/assets/logo-250K";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 /**
  * Centered branded frame for the access screens (login / recuperar senha /

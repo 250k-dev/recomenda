@@ -7,7 +7,7 @@ import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcr
 import { SeasonWizard } from "@/components/domain/season-wizard";
 import { Button } from "@/components/ui/button";
 import { useFarm, useFarmPlots, useProducer } from "@/lib/api/hooks";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 export default function FarmSeasonNewPage() {
   const params = useParams<{ id: string }>();

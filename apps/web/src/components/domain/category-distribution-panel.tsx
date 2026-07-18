@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 import { CATEGORY_ORDER } from "@/lib/cost-plan/calculate";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
 import type { CategoryBreakdown } from "@/lib/cost-plan/calculate";

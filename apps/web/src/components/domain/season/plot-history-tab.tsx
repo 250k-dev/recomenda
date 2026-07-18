@@ -2,9 +2,8 @@
 
 import { CheckCircle2, AlertTriangle, Clock, SkipForward, Leaf } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, CROP_LABELS } from "@recomenda/utils";
 import { usePlotHistory } from "@/lib/api/hooks";
-import { CROP_LABELS } from "@/lib/season-constants";
 import type { PlotHistorySeason, PlotHistoryRec } from "@/lib/api/seasons";
 
 const STATUS_LABEL: Record<string, string> = {

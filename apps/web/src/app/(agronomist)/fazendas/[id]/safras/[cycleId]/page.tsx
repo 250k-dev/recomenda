@@ -34,8 +34,8 @@ import {
   CROP_LABELS,
   STATUS_LABELS,
   STATUS_VARIANTS,
-} from "@/lib/season-constants";
-import { routes } from "@/config/routes";
+} from "@recomenda/utils";
+import { routes } from "@recomenda/config";
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });

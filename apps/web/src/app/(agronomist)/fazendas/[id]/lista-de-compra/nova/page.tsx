@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import { PurchaseListWizard } from "@/components/domain/purchase-list-wizard";
 import { Button } from "@/components/ui/button";
 import {

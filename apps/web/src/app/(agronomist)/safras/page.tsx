@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -21,9 +21,7 @@ import {
   useHardDeleteSeason,
   useSeasons,
 } from "@/lib/api/hooks";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
-import { cn } from "@/lib/utils";
-import { CROP_LABELS, STATUS_LABELS } from "@/lib/season-constants";
+import { cn, CROP_LABELS, deactivateOutlineButtonClass, STATUS_LABELS } from "@recomenda/utils";
 
 const STATUS_CLASSES: Record<string, string> = {
   DRAFT: "bg-muted text-muted-foreground",

@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
@@ -20,7 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/select";
-import { maskPhoneBR } from "@/lib/utils/phone";
+import {
+  BRAZIL_STATES,
+  cn,
+  fetchCitiesByState,
+  formatFarmLocation,
+  maskPhoneBR,
+} from "@recomenda/utils";
 import {
   createProducer,
   createFarm,
@@ -29,12 +35,6 @@ import {
   deletePlot,
   grantFarmAccess,
 } from "@/lib/api/client";
-import {
-  BRAZIL_STATES,
-  fetchCitiesByState,
-  formatFarmLocation,
-} from "@/lib/brazil-locations";
-import { cn } from "@/lib/utils";
 
 type Producer = { id: string; name: string };
 type Farm = { id: string; name: string };

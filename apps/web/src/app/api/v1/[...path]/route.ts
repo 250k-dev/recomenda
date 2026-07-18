@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "@/config/env";
+import { serverEnv } from "@recomenda/config/server";
 
 export const runtime = "nodejs";
 
@@ -26,7 +26,7 @@ async function proxyToNest(
   pathSegments: string[],
 ): Promise<NextResponse> {
   const path = pathSegments.join("/");
-  const target = new URL(`${env.API_INTERNAL_URL}/${path}`);
+  const target = new URL(`${serverEnv.API_INTERNAL_URL}/${path}`);
   target.search = request.nextUrl.search;
 
   const cookieStore = await cookies();

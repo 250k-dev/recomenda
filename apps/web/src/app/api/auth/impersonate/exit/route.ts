@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { env } from "@/config/env";
+import { serverEnv } from "@recomenda/config/server";
 import { setAccessCookie } from "@/lib/auth/session-cookies";
 
 function jwtPayloadRole(accessToken: string): string | null {
@@ -24,7 +24,7 @@ export async function POST() {
     return NextResponse.json({ message: "Unauthenticated" }, { status: 401 });
   }
 
-  const response = await fetch(`${env.API_INTERNAL_URL}/auth/impersonate/exit`, {
+  const response = await fetch(`${serverEnv.API_INTERNAL_URL}/auth/impersonate/exit`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

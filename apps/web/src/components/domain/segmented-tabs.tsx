@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 export type SegmentedTabItem<T extends string = string> = {
   value: T;

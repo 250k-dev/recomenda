@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCycle, useFarm, useProducer, usePublishCycle } from "@/lib/api/hooks";
 import type { CycleSeasonRow } from "@/lib/api/cycles";
-import { CROP_LABELS } from "@/lib/season-constants";
-import { routes } from "@/config/routes";
+import { CROP_LABELS } from "@recomenda/utils";
+import { routes } from "@recomenda/config";
 
 const CYCLE_STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Ativa",

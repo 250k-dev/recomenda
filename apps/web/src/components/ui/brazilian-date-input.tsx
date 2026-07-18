@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import {
+  cn,
   dateToLocalYmd,
   formatTimingPreviewDate,
   localYmdToDate,
   maskBrazilianDateInput,
   parseBrazilianDate,
-} from "@/lib/utils/dates";
+} from "@recomenda/utils";
 
 type BrazilianDateInputProps = {
   value: string;

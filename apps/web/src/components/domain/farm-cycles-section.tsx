@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import { useQueries } from "@tanstack/react-query";
 import { Check, ChevronRight, Leaf, Plus, Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,8 +35,7 @@ import {
   FarmSeasonsExportDialog,
   type FarmExportItem,
 } from "@/components/domain/farm-seasons-export-dialog";
-import { CROP_LABELS, STATUS_LABELS } from "@/lib/season-constants";
-import { cn } from "@/lib/utils";
+import { cn, CROP_LABELS, STATUS_LABELS } from "@recomenda/utils";
 
 const CROP_CHOICES = [
   { value: "SOYBEAN", label: "Soja" },

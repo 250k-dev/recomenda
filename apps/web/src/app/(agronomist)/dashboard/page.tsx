@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import type { Route } from "next";
 import Link from "next/link";
@@ -41,7 +41,7 @@ import {
 import { useCan } from "@/lib/auth/use-can";
 import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
 import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 type AttentionTab = "late" | "today" | "pending" | "week";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -31,7 +31,7 @@ import {
 } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { useCan } from "@/lib/auth/use-can";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", {

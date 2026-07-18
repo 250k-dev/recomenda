@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -51,7 +51,7 @@ import {
   usePurchaseListTemplates,
 } from "@/lib/api/hooks";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
-import { CROP_LABELS } from "@/lib/season-constants";
+import { CROP_LABELS } from "@recomenda/utils";
 import {
   FieldError,
   StepFooter,

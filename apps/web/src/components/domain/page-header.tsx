@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 interface PageHeaderProps {
   /** Ícone exibido à esquerda — se passado, ativa o layout estilo "plano de custo" */

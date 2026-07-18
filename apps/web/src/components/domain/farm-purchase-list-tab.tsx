@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import type { Route } from "next";
 import Link from "next/link";
@@ -44,7 +44,7 @@ import {
   validateListItems,
 } from "@/lib/purchase-list/list-item";
 import type { PurchaseListDetail, PurchaseListItemInput } from "@/lib/api/client";
-import { CROP_LABELS } from "@/lib/season-constants";
+import { CROP_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";

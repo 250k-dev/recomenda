@@ -18,10 +18,7 @@ import {
   useProducerPurchaseLists,
   useFarmPurchaseLists,
 } from "@/lib/api/hooks";
-import {
-  GLOBAL_PRODUCT_CATEGORIES,
-  PRODUCT_CATEGORY_LABELS,
-} from "@/lib/catalog-global-options";
+import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 import {
   buildPurchaseListCatalog,
@@ -38,7 +35,6 @@ import {
   findPurchaseListOverages,
   formatDosePerHa,
 } from "@/lib/timing/purchase-list-budget";
-import { cn } from "@/lib/utils";
 import { useCan } from "@/lib/auth/use-can";
 
 export const TIMING_TRIGGER_TYPES = [

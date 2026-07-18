@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { BaseSelect } from "@/components/ui/searchable-select";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 export type SelectOption = {
   value: string;

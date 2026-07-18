@@ -16,10 +16,7 @@ import {
   useGlobalCatalog,
   usePlatformCatalog,
 } from "@/lib/api/hooks";
-import {
-  GLOBAL_PRODUCT_CATEGORIES,
-  PRODUCT_CATEGORY_LABELS,
-} from "@/lib/catalog-global-options";
+import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import {
   buildPurchaseListCatalog,
   productsForPurchaseListCategory,
@@ -27,7 +24,6 @@ import {
   type PurchaseListCatalogProduct,
   type PurchaseListCrop,
 } from "@/lib/catalog/purchase-list-catalog";
-import { cn } from "@/lib/utils";
 import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
 import {
   areaFromBags,

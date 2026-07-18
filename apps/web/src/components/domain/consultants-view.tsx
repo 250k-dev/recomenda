@@ -19,8 +19,8 @@ import { PageHero } from "@/components/domain/page-hero";
 import { useConsultants, useCreateInvitation, useMe } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { useCan } from "@/lib/auth/use-can";
-import { cn } from "@/lib/utils";
-import { routes } from "@/config/routes";
+import { cn } from "@recomenda/utils";
+import { routes } from "@recomenda/config";
 import type { TeamMemberRow } from "@/lib/api/consultants";
 import type { AccessLevel } from "@/types/auth";
 

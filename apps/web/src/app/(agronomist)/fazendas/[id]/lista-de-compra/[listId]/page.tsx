@@ -14,7 +14,7 @@ import {
   useFarmPurchaseLists,
   useProducerPurchaseLists,
 } from "@/lib/api/hooks";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import type { PurchaseListDetail } from "@/lib/api/client";
 
 export default function PurchaseListViewPage() {

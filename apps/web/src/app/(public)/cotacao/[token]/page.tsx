@@ -18,9 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreateQuoteResponse, useQuoteByToken } from "@/lib/api/hooks";
 import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
-import { CROP_LABELS } from "@/lib/season-constants";
-import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
-import { maskPhoneBR } from "@/lib/utils/phone";
+import { CROP_LABELS, maskPhoneBR, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 
 const fmtQty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });

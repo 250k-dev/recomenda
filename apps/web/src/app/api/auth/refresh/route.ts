@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { env } from "@/config/env";
+import { serverEnv } from "@recomenda/config/server";
 import { clearAuthCookies, setAuthCookies } from "@/lib/auth/session-cookies";
 
 export async function POST() {
@@ -12,7 +12,7 @@ export async function POST() {
     return NextResponse.json({ message: "No refresh token" }, { status: 401 });
   }
 
-  const response = await fetch(`${env.API_INTERNAL_URL}/auth/refresh`, {
+  const response = await fetch(`${serverEnv.API_INTERNAL_URL}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: refreshToken }),

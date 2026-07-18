@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -33,7 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
 import { useAgronomistAgenda, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@/lib/api/hooks";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 const MINI_WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
 

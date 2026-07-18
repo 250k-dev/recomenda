@@ -12,7 +12,7 @@ import {
   useProducer,
   useResolvedFarmProducerId,
 } from "@/lib/api/hooks";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 /** Estoque do produtor no contexto da fazenda (era `?tab=stock` na fazenda). */
 export default function FarmStockPage() {

@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useBreadcrumbSetter } from "@/components/layout/breadcrumbs-context";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 export type BreadcrumbItem = {
   label: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -22,7 +22,7 @@ import { Select } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { deactivateOutlineButtonClass } from "@recomenda/utils";
 import type { AdminAgronomist } from "@/lib/api/client";
 import {
   useAdminAgronomists,

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 type Particle = {
   x: number;

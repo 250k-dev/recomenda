@@ -2,11 +2,12 @@
 
 import { RailCard } from "@/components/domain/rail-card";
 import type { ReportCategoryBreakdown } from "@/lib/api/reports";
-import { categoryBarClass, categoryToken } from "@/lib/categories";
 import {
-  PRODUCT_CATEGORY_LABELS,
+  categoryBarClass,
+  categoryToken,
   type GlobalProductCategory,
-} from "@/lib/catalog-global-options";
+  PRODUCT_CATEGORY_LABELS,
+} from "@recomenda/utils";
 
 function categoryLabel(category: string): string {
   return (

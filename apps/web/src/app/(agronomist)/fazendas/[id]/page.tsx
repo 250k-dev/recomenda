@@ -25,7 +25,7 @@ import {
   useResolvedFarmProducerId,
   useUpdateFarm,
 } from "@/lib/api/hooks";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import { FarmCyclesSection } from "@/components/domain/farm-cycles-section";
 import { toast } from "sonner";
 import { Boxes, MapPin, Pencil, Tractor } from "lucide-react";
