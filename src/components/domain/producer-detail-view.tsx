@@ -32,6 +32,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -42,6 +43,7 @@ import {
   Mail,
   Phone,
   Pencil,
+  UserRound,
   Sprout,
   CalendarDays,
   Clock,
@@ -91,12 +93,14 @@ export function ProducerDetailView({
   const onbCycleId = searchParams.get("cycle_id") ?? "";
   // Fluxo por safra: "season" (criar safra) → lista de compra → "recommendation"
   // (programação). "purchase-list" é legado e cai no início do fluxo novo.
-  const [onbStage, setOnbStage] = useState<"season" | "recommendation" | null>(() => {
-    const s = searchParams.get("onboarding");
-    if (s === "season" || s === "purchase-list") return "season";
-    if (s === "recommendation") return "recommendation";
-    return null;
-  });
+  const [onbStage, setOnbStage] = useState<"season" | "recommendation" | null>(
+    () => {
+      const s = searchParams.get("onboarding");
+      if (s === "season" || s === "purchase-list") return "season";
+      if (s === "recommendation") return "recommendation";
+      return null;
+    },
+  );
   const [newCycleOpen, setNewCycleOpen] = useState(false);
 
   const today = useMemo(() => new Date(), []);
@@ -147,7 +151,8 @@ export function ProducerDetailView({
       );
     }
     const activeSeasons = cycleQueries.reduce(
-      (sum, q) => sum + (q.data ?? []).filter((c) => c.status === "ACTIVE").length,
+      (sum, q) =>
+        sum + (q.data ?? []).filter((c) => c.status === "ACTIVE").length,
       0,
     );
     return { farms: farmsList.length, plots, hectares, activeSeasons };
@@ -188,10 +193,8 @@ export function ProducerDetailView({
     { label: producer.name },
   ];
 
-  const initial = (producer.name.trim().charAt(0) || "?").toUpperCase();
-
   const statValue = (value: ReactNode) =>
-    loadingFarms ? <Skeleton className="h-6 w-12" /> : value;
+    loadingFarms ? <Skeleton className="w-12 h-6" /> : value;
 
   const heroStats: PageHeroStat[] = [
     { label: "Fazendas", value: statValue(stats.farms) },
@@ -217,48 +220,59 @@ export function ProducerDetailView({
       <BreadcrumbBack items={breadcrumbs} />
 
       <PageHero
-        icon={<span className="text-xl font-semibold">{initial}</span>}
+        variant="inverted"
+        icon={<UserRound className="size-6" />}
         eyebrow="Produtor"
         title={producer.name}
+        titleAction={
+          <Button
+            variant="secondary"
+            size="icon-xs"
+            className="border-white/30 bg-white/10 text-primary-foreground hover:bg-white/20"
+            onClick={openEdit}
+          >
+            <Pencil />
+          </Button>
+        }
         meta={
           <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
             <span className="inline-flex min-w-0 items-center gap-1.5">
-              <Mail className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{producer.email?.trim() || "Sem e-mail"}</span>
-            </span>
-            <span className="inline-flex min-w-0 items-center gap-1.5">
               <Phone className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{producer.phone?.trim() || "Sem telefone"}</span>
+              <span className="truncate">
+                {producer.phone?.trim() || "Sem telefone"}
+              </span>
             </span>
+            {producer.email && (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <Mail className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">
+                  {producer.email?.trim() || "Sem e-mail"}
+                </span>
+              </span>
+            )}
           </div>
         }
         actions={
-          <>
-            {showSeasonActions ? (
-              <>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => setCronogramOpen(true)}
-                >
-                  <CalendarDays className="size-4" />
-                  Cronograma
-                </Button>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => setTemplatesOpen(true)}
-                >
-                  <Clock className="size-4" />
-                  Modelos
-                </Button>
-              </>
-            ) : null}
-            <Button variant="outline" className="gap-2" onClick={openEdit}>
-              <Pencil className="size-4" />
-              Editar
-            </Button>
-          </>
+          showSeasonActions ? (
+            <>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setTemplatesOpen(true)}
+              >
+                <Clock className="size-4" />
+                Modelos
+              </Button>
+              <Button
+                variant="clay"
+                className="gap-2"
+                onClick={() => setCronogramOpen(true)}
+              >
+                <CalendarDays className="size-4" />
+                Cronograma
+              </Button>
+            </>
+          ) : null
         }
         stats={heroStats}
       >
@@ -294,7 +308,7 @@ export function ProducerDetailView({
                   Aplicações pendentes e atrasadas deste produtor
                 </DialogDescription>
               </DialogHeader>
-              <div className="overflow-y-auto px-6 pt-6 pb-8">
+              <div className="px-6 pt-6 pb-8 overflow-y-auto">
                 <MonthCalendar
                   producerId={producerId}
                   showHeader={false}
@@ -312,7 +326,7 @@ export function ProducerDetailView({
                   Modelos reutilizáveis de {producer.name}
                 </DialogDescription>
               </DialogHeader>
-              <div className="overflow-y-auto px-6 pt-6 pb-8">
+              <div className="px-6 pt-6 pb-8 overflow-y-auto">
                 <ProducerTimingTemplatesPanel
                   producerId={producerId}
                   producerName={producer.name}
@@ -378,12 +392,12 @@ export function ProducerDetailView({
       ) : null}
 
       {/* Editar produtor */}
-      <Sheet open={editOpen} onOpenChange={setEditOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Editar produtor</SheetTitle>
-          </SheetHeader>
-          <div className="px-4 pb-4 space-y-4">
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar produtor</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="edit-name">Nome</Label>
               <Input
@@ -417,21 +431,20 @@ export function ProducerDetailView({
                 onKeyDown={(e) => e.key === "Enter" && saveEdit()}
               />
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button
-                className="flex-1"
-                disabled={!editName.trim() || updateProducer.isPending}
-                onClick={saveEdit}
-              >
-                {updateProducer.isPending ? "Salvando..." : "Salvar"}
-              </Button>
-              <Button variant="outline" onClick={() => setEditOpen(false)}>
-                Cancelar
-              </Button>
-            </div>
           </div>
-        </SheetContent>
-      </Sheet>
+          <DialogFooter className="sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!editName.trim() || updateProducer.isPending}
+              onClick={saveEdit}
+            >
+              {updateProducer.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Nova fazenda — formulário em página (sem navegar) */}
       <Sheet open={newFarmOpen} onOpenChange={setNewFarmOpen}>

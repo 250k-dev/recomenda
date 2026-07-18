@@ -5,13 +5,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  Boxes,
   Calculator,
   Leaf,
-  ListChecks,
   Plus,
   Rocket,
-  Search,
   ShoppingCart,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
+import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { CycleBlockWizard } from "@/components/domain/cycle-block-wizard";
 import { CycleCostPlanView } from "@/components/domain/cycle-cost-plan-view";
 import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
@@ -37,7 +34,11 @@ import {
   usePublishCycle,
 } from "@/lib/api/hooks";
 import type { CycleSeasonRow } from "@/lib/api/cycles";
-import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
+import {
+  CROP_LABELS,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+} from "@/lib/season-constants";
 import { cn } from "@/lib/utils";
 import { useCan } from "@/lib/auth/use-can";
 
@@ -83,15 +84,17 @@ export default function CycleDetailPage() {
   const { data: farm } = useFarm(farmId);
   const producerId = producerIdParam ?? cycle?.producer_id ?? "";
   const { data: producer } = useProducer(producerId);
-  const { data: purchaseList, isLoading: loadingList } = useCyclePurchaseList(cycleId);
+  const { data: purchaseList, isLoading: loadingList } =
+    useCyclePurchaseList(cycleId);
   const publishCycle = usePublishCycle(cycleId);
   const archiveSeason = useArchiveSeason();
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [publishConfirm, setPublishConfirm] = useState(false);
-  const [archiveConfirm, setArchiveConfirm] = useState<{ id: string; name: string } | null>(
-    null,
-  );
+  const [archiveConfirm, setArchiveConfirm] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [plotFilter, setPlotFilter] = useState("");
 
   const setTab = useCallback(
@@ -105,9 +108,13 @@ export default function CycleDetailPage() {
 
   const seasons = useMemo(() => cycle?.seasons ?? [], [cycle]);
   const draftSeasons = seasons.filter((s) => s.status === "DRAFT");
-  const totalRecs = seasons.reduce((s, row) => s + row.recommendations_total, 0);
+  const totalRecs = seasons.reduce(
+    (s, row) => s + row.recommendations_total,
+    0,
+  );
   const doneRecs = seasons.reduce((s, row) => s + row.recommendations_done, 0);
-  const progressPct = totalRecs > 0 ? Math.round((doneRecs / totalRecs) * 100) : 0;
+  const progressPct =
+    totalRecs > 0 ? Math.round((doneRecs / totalRecs) * 100) : 0;
   const areaByPlot = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of seasons) {
@@ -169,7 +176,9 @@ export default function CycleDetailPage() {
   if (wizardOpen) {
     return (
       <>
-        <BreadcrumbBack items={[...breadcrumbs.slice(0, -1), { label: cycle.name }]} />
+        <BreadcrumbBack
+          items={[...breadcrumbs.slice(0, -1), { label: cycle.name }]}
+        />
         <CycleBlockWizard
           cycle={cycle}
           producerId={producerId}
@@ -191,7 +200,6 @@ export default function CycleDetailPage() {
             label: "Aplicações",
             value: totalRecs > 0 ? `${doneRecs}/${totalRecs}` : "—",
             sub: totalRecs > 0 ? `${progressPct}%` : undefined,
-            subClassName: "font-semibold text-primary-strong",
           },
           {
             label: purchaseList?.name ?? "Lista de compra",
@@ -207,6 +215,7 @@ export default function CycleDetailPage() {
       <BreadcrumbBack items={breadcrumbs} />
 
       <PageHero
+        variant="inverted"
         icon={<Leaf className="size-6" />}
         eyebrow="Safra"
         title={cycle.name}
@@ -219,7 +228,10 @@ export default function CycleDetailPage() {
             </Badge>
           )
         }
-        meta={[cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "), farm?.name]
+        meta={[
+          cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "),
+          farm?.name,
+        ]
           .filter(Boolean)
           .join(" · ")}
         actions={
@@ -234,34 +246,30 @@ export default function CycleDetailPage() {
                 disabled={publishCycle.isPending}
               >
                 <Rocket className="size-4" />
-                {publishCycle.isPending ? "Publicando..." : "Revisar e publicar"}
+                {publishCycle.isPending
+                  ? "Publicando..."
+                  : "Revisar e publicar"}
               </Button>
             ) : null}
             {tab === "recommendations" ? (
-            <>
-              <Button
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => setTab("purchase")}
-              >
-                <ShoppingCart className="size-4" />
-                Lista de compra
-              </Button>
-              <Button asChild variant="outline" className="gap-1.5">
-                <Link href={stockHref}>
-                  <Boxes className="size-4" />
-                  Estoque
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => setTab("cost-plan")}
-              >
-                <Calculator className="size-4" />
-                Plano de custo
-              </Button>
-            </>
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setTab("cost-plan")}
+                >
+                  <Calculator className="size-4" />
+                  Plano de custo
+                </Button>
+                <Button
+                  variant="clay"
+                  className="gap-1.5"
+                  onClick={() => setTab("purchase")}
+                >
+                  <ShoppingCart className="size-4" />
+                  Lista de compra
+                </Button>
+              </>
             ) : null}
           </>
         }
@@ -292,12 +300,12 @@ export default function CycleDetailPage() {
             description="Monte a lista com tudo que a safra vai precisar — soja e milho juntos — e entregue ao produtor antes mesmo de montar a programação."
             action={
               canListCrud ? (
-              <Button asChild size="sm" className="gap-1.5">
-                <Link href={newPurchaseListHref}>
-                  <Plus className="size-4" />
-                  Montar lista de compra
-                </Link>
-              </Button>
+                <Button asChild size="sm" className="gap-1.5">
+                  <Link href={newPurchaseListHref}>
+                    <Plus className="size-4" />
+                    Montar lista de compra
+                  </Link>
+                </Button>
               ) : undefined
             }
           />
@@ -342,39 +350,23 @@ export default function CycleDetailPage() {
       ) : (
         <div className="space-y-4">
           {!isPlanning ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-                {cycle.blocks.map((block) => (
-                  <span
-                    key={block.timing_template_id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground"
-                  >
-                    <ListChecks className="size-3.5 text-primary-strong" />
-                    {block.template_name}
-                    <span className="text-muted-foreground">
-                      → {block.plots_count}{" "}
-                      {block.plots_count === 1 ? "talhão" : "talhões"}
-                    </span>
-                  </span>
-                ))}
-              </div>
-              <div className="relative w-full min-w-48 sm:ml-auto sm:w-56 sm:max-w-xs">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={plotFilter}
-                  onChange={(e) => setPlotFilter(e.target.value)}
-                  placeholder="Filtrar talhão..."
-                  className="h-10 pl-8"
-                />
-              </div>
-              <Button
-                className="hidden gap-1.5 sm:inline-flex"
-                onClick={() => setWizardOpen(true)}
-              >
-                <Plus className="size-4" />
-                Adicionar talhão
-              </Button>
-            </div>
+            <SectionToolbar
+              title="Talhões desta safra"
+              search={{
+                value: plotFilter,
+                onChange: setPlotFilter,
+                placeholder: "Filtrar talhão…",
+              }}
+              actions={
+                <Button
+                  className="hidden gap-1.5 sm:inline-flex"
+                  onClick={() => setWizardOpen(true)}
+                >
+                  <Plus className="size-4" />
+                  Adicionar talhão
+                </Button>
+              }
+            />
           ) : null}
 
           {isPlanning ? (
@@ -385,14 +377,23 @@ export default function CycleDetailPage() {
               action={
                 <div className="flex flex-wrap justify-center gap-2">
                   {!purchaseList && canListCrud ? (
-                    <Button asChild size="sm" variant="outline" className="gap-1.5">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                    >
                       <Link href={newPurchaseListHref}>
                         <ShoppingCart className="size-4" />
                         Montar lista de compra
                       </Link>
                     </Button>
                   ) : null}
-                  <Button size="sm" className="gap-1.5" onClick={() => setWizardOpen(true)}>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setWizardOpen(true)}
+                  >
                     <Plus className="size-4" />
                     Adicionar talhão
                   </Button>
@@ -408,7 +409,7 @@ export default function CycleDetailPage() {
           ) : (
             <>
               {/* Desktop: tabela de talhões da safra */}
-              <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
+              <div className="hidden overflow-hidden border shadow-sm rounded-xl border-border bg-card md:block">
                 <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_minmax(0,1fr)_14.5rem] items-center gap-4 bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
                   <span>Talhão</span>
                   <span>Cultura / variedade</span>
@@ -424,7 +425,7 @@ export default function CycleDetailPage() {
                       key={season.id}
                       className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_minmax(0,1fr)_14.5rem] items-center gap-4 border-t border-border px-5 py-3.5 text-sm"
                     >
-                      <span className="truncate font-semibold text-text-strong">
+                      <span className="font-semibold truncate text-text-strong">
                         Talhão {season.plot_name}
                       </span>
                       <span className="min-w-0">
@@ -432,7 +433,7 @@ export default function CycleDetailPage() {
                           {row.displayName}
                         </span>
                         {row.varietiesBreakdown ? (
-                          <span className="block truncate text-xs text-muted-foreground/80">
+                          <span className="block text-xs truncate text-muted-foreground/80">
                             {row.varietiesBreakdown}
                           </span>
                         ) : null}
@@ -452,7 +453,7 @@ export default function CycleDetailPage() {
                               value={row.pct}
                               className="h-1.5 flex-1 bg-surface-2"
                             />
-                            <span className="shrink-0 text-xs font-semibold tabular-nums text-primary-strong">
+                            <span className="text-xs font-semibold shrink-0 tabular-nums text-primary-strong">
                               {row.pct}%
                             </span>
                           </span>
@@ -461,13 +462,22 @@ export default function CycleDetailPage() {
                         )}
                       </span>
                       <span>
-                        <Badge variant={STATUS_VARIANTS[season.status] ?? "default"}>
+                        <Badge
+                          variant={STATUS_VARIANTS[season.status] ?? "default"}
+                        >
                           {STATUS_LABELS[season.status] ?? season.status}
                         </Badge>
                       </span>
                       <span className="flex justify-end gap-1.5">
-                        <Button asChild variant="secondary" size="sm" className="gap-1.5">
-                          <Link href={row.recommendationHref}>Recomendações</Link>
+                        <Button
+                          asChild
+                          variant="secondary"
+                          size="sm"
+                          className="gap-1.5"
+                        >
+                          <Link href={row.recommendationHref}>
+                            Recomendações
+                          </Link>
                         </Button>
                         {season.status !== "ARCHIVED" ? (
                           <Button
@@ -501,7 +511,7 @@ export default function CycleDetailPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-text-strong">
+                          <p className="text-sm font-semibold truncate text-text-strong">
                             Talhão {season.plot_name}
                           </p>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -523,8 +533,8 @@ export default function CycleDetailPage() {
                         <div className="mt-3">
                           <div className="mb-1.5 flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">
-                              {season.recommendations_done}/{season.recommendations_total}{" "}
-                              aplicadas
+                              {season.recommendations_done}/
+                              {season.recommendations_total} aplicadas
                             </span>
                             <span className="font-semibold tabular-nums text-primary-strong">
                               {row.pct}%
@@ -533,14 +543,16 @@ export default function CycleDetailPage() {
                           <ProgressBar value={row.pct} className="h-1.5" />
                         </div>
                       ) : null}
-                      <div className="mt-3 flex gap-2">
+                      <div className="flex gap-2 mt-3">
                         <Button
                           asChild
                           variant="secondary"
                           size="sm"
                           className="flex-1"
                         >
-                          <Link href={row.recommendationHref}>Recomendações</Link>
+                          <Link href={row.recommendationHref}>
+                            Recomendações
+                          </Link>
                         </Button>
                         {season.status !== "ARCHIVED" ? (
                           <Button
@@ -569,7 +581,11 @@ export default function CycleDetailPage() {
 
           {!isPlanning ? (
             <StickyMobileCta>
-              <Button size="lg" className="gap-2" onClick={() => setWizardOpen(true)}>
+              <Button
+                size="lg"
+                className="gap-2"
+                onClick={() => setWizardOpen(true)}
+              >
                 <Plus className="size-4" />
                 Adicionar talhão
               </Button>
@@ -598,7 +614,9 @@ export default function CycleDetailPage() {
                 resolve();
               },
               onError: (err) => {
-                toast.error("Não foi possível publicar. Verifique a quota do plano.");
+                toast.error(
+                  "Não foi possível publicar. Verifique a quota do plano.",
+                );
                 reject(err);
               },
             }),
@@ -658,7 +676,9 @@ function seasonRowData(
           .map(
             (v) =>
               `${v.variety}${
-                v.planted_area_ha != null ? ` (${fmtHa(v.planted_area_ha)} ha)` : ""
+                v.planted_area_ha != null
+                  ? ` (${fmtHa(v.planted_area_ha)} ha)`
+                  : ""
               }`,
           )
           .join(" · ")

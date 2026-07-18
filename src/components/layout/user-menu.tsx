@@ -1,20 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, BarChart3, LogOut, UserCircle } from "lucide-react";
+import { BarChart3, Bell, Check, LogOut, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, usePlanQuota } from "@/lib/api/hooks";
 import { logout } from "@/lib/api/client";
-import { cn } from "@/lib/utils";
+import { NotificationsPanel, useNotificationsList } from "./notifications-bell";
 
 export function UserMenu() {
   const router = useRouter();
@@ -22,9 +26,11 @@ export function UserMenu() {
   const { data: planData, isLoading: planLoading } = usePlanQuota({
     enabled: true,
   });
+  const { unreadCount } = useNotificationsList();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   const name = currentUser?.name?.trim() || "";
-  const initial = name ? name.charAt(0).toUpperCase() : "U";
   const planName = planData?.plan.name;
 
   const current = planData?.quota_usage.current ?? 0;
@@ -42,72 +48,74 @@ export function UserMenu() {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-lg p-1 pr-2 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-        {userLoading ? (
-          <>
-            <Skeleton className="rounded-lg size-9" />
-            <div className="flex-col hidden gap-1 sm:flex">
-              <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="w-16 h-3" />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-center text-sm font-bold rounded-lg size-9 shrink-0 bg-primary text-primary-foreground">
-              {initial}
-            </div>
-            <div className="flex-col hidden min-w-0 leading-tight sm:flex">
-              <span className="text-sm font-semibold truncate max-w-36 text-foreground">
-                {name}
-              </span>
-              {planLoading ? (
-                <Skeleton className="mt-0.5 h-3 w-14" />
-              ) : planName ? (
-                <span className="text-xs truncate max-w-36 text-muted-foreground">
-                  {planName}
-                </span>
-              ) : null}
-            </div>
-          </>
-        )}
+    <DropdownMenu
+      open={menuOpen}
+      onOpenChange={(open) => {
+        setMenuOpen(open);
+        if (!open) setNotifOpen(false);
+      }}
+    >
+      <DropdownMenuTrigger
+        aria-label="Menu do usuário"
+        disabled={userLoading}
+        className="transition-shadow rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <div className="relative flex items-center justify-center rounded-lg size-11 shrink-0 bg-primary text-primary-foreground">
+          <User className="size-5" />
+          {unreadCount > 0 && (
+            <span
+              aria-hidden
+              className="absolute -top-0.5 -right-0.5 size-3 rounded-full border-2 border-canvas bg-destructive"
+            />
+          )}
+        </div>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-64">
-        <div className="flex flex-col gap-1 px-1.5 py-1.5">
-          {userLoading ? (
-            <Skeleton className="w-32 h-4" />
-          ) : (
-            <p className="text-sm font-semibold truncate text-foreground">
-              {name}
-            </p>
-          )}
-
-          {planLoading ? (
-            <div className="space-y-1.5">
-              <Skeleton className="w-20 h-4" />
-              <Skeleton className="h-1.5 w-full" />
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="p-0 overflow-hidden w-80 rounded-2xl"
+      >
+        {/* Card hero: identidade + plano + quota */}
+        <div className="p-4 m-2 rounded-xl bg-linear-160 from-primary to-primary-strong text-primary-foreground">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-[0.65rem] bg-white/15">
+              <User className="size-5" />
             </div>
-          ) : planData ? (
-            <div className="space-y-1.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold tracking-tight truncate">
+                {name}
+              </p>
               {planName && (
-                <Badge className="w-fit gap-0.5 bg-sky-100 px-1.5 text-[0.6rem] leading-none text-sky-700">
-                  <BadgeCheck className="size-2.5!" />
+                <Badge className="mt-1 gap-1 border-none bg-white/20 px-1.5 text-[0.65rem] font-semibold text-primary-foreground">
+                  <Check className="size-3!" />
                   {planName}
                 </Badge>
               )}
-              <div className="flex items-baseline justify-between text-xs">
-                <span className="text-muted-foreground">Talhões em uso</span>
-                <span className="font-semibold tabular-nums text-foreground">
-                  {current} / {limit}
+            </div>
+          </div>
+
+          {planLoading ? (
+            <div className="mt-3.5 space-y-2">
+              <Skeleton className="w-24 h-3 bg-white/20" />
+              <Skeleton className="h-1.5 w-full rounded-full bg-white/20" />
+            </div>
+          ) : planData ? (
+            <div className="mt-3.5">
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <span className="text-xs text-primary-foreground/80">
+                  Talhões em uso
+                </span>
+                <span className="text-xs font-semibold tabular-nums">
+                  {current}{" "}
+                  <span className="font-normal text-primary-foreground/60">
+                    / {limit}
+                  </span>
                 </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/25">
                 <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    pct >= 90 ? "bg-amber-500" : "bg-primary",
-                  )}
+                  className="h-full transition-all bg-white rounded-full"
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -115,27 +123,72 @@ export function UserMenu() {
           ) : null}
         </div>
 
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/profile" className="mt-2">
-            <UserCircle className="size-4" />
-            Meu perfil
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/reports">
-            <BarChart3 className="size-4" />
-            Relatórios
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          variant="destructive"
-          onSelect={handleLogout}
-          className="mb-1 mt-1"
-        >
-          <LogOut className="size-4" />
-          Sair
-        </DropdownMenuItem>
+        <div className="px-2 pb-2">
+          <DropdownMenuSub open={notifOpen} onOpenChange={setNotifOpen}>
+            {/* preventDefault nos eventos de pointer desativa o abrir/fechar por
+                hover do Radix — o submenu só abre/fecha no clique (ou teclado).
+                svg:last-child esconde o chevron embutido no SubTrigger. */}
+            <DropdownMenuSubTrigger
+              onClick={(event) => {
+                event.preventDefault();
+                setNotifOpen((open) => !open);
+              }}
+              onPointerMove={(event) => event.preventDefault()}
+              onPointerLeave={(event) => event.preventDefault()}
+              className="gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium [&>svg:last-child]:hidden"
+            >
+              <Bell className="size-4.5" />
+              Notificações
+              {unreadCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-[0.7rem] leading-none text-white! tabular-nums"
+                >
+                  {unreadCount}
+                </Badge>
+              )}
+            </DropdownMenuSubTrigger>
+            {/* alignOffset alinha o topo do painel ao topo do menu (145px = altura do card hero) */}
+            <DropdownMenuSubContent
+              sideOffset={10}
+              alignOffset={-145}
+              className="p-0 overflow-hidden w-84 rounded-2xl"
+            >
+              <NotificationsPanel onNavigate={() => setMenuOpen(false)} />
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem
+            asChild
+            className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
+          >
+            <Link href="/profile">
+              <User className="size-4.5" />
+              Meu perfil
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            asChild
+            className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
+          >
+            <Link href="/reports">
+              <BarChart3 className="size-4.5" />
+              Relatórios
+            </Link>
+          </DropdownMenuItem>
+        </div>
+
+        <DropdownMenuSeparator className="mx-4 my-0" />
+
+        <div className="p-2">
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={handleLogout}
+            className="gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium"
+          >
+            <LogOut className="size-4.5" />
+            Sair
+          </DropdownMenuItem>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

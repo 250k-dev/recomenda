@@ -75,16 +75,23 @@ import {
   recommendationToStageDraft,
   type RecommendationStageDraft,
 } from "@/components/domain/recommendation-stage-fields";
-import { recommendedYmdToWindow, todayLocalYmd } from "@/lib/timing/window-days";
+import {
+  recommendedYmdToWindow,
+  todayLocalYmd,
+} from "@/lib/timing/window-days";
 import { cn } from "@/lib/utils";
 import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
-import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
-import { extractError, SEED_CATEGORIES } from "@/components/domain/season/_shared";
-import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
 import {
-  displayRecStatus,
-  fmtDate,
-} from "@/lib/recommendations/format";
+  CROP_LABELS,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+} from "@/lib/season-constants";
+import {
+  extractError,
+  SEED_CATEGORIES,
+} from "@/components/domain/season/_shared";
+import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
+import { displayRecStatus, fmtDate } from "@/lib/recommendations/format";
 
 type TabValue = "recommendations" | "cost-plan" | "plot-history";
 
@@ -105,8 +112,10 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_BADGE_CLASS: Record<string, string> = {
   PENDING: "bg-surface-2 text-muted-foreground border border-border",
   OVERDUE: "bg-warning-soft text-warning-strong border border-warning-border",
-  APPLIED_ON_TIME: "bg-success-soft text-success-strong border border-success-border",
-  APPLIED_LATE: "bg-warning-soft text-warning-strong border border-warning-border",
+  APPLIED_ON_TIME:
+    "bg-success-soft text-success-strong border border-success-border",
+  APPLIED_LATE:
+    "bg-warning-soft text-warning-strong border border-warning-border",
   SKIPPED: "bg-clay-soft text-clay-strong border border-clay-border",
 };
 
@@ -142,8 +151,7 @@ function StageDateBadge({
   } as const;
 
   const showOriginal =
-    originalDate &&
-    originalDate.slice(0, 10) !== date.slice(0, 10);
+    originalDate && originalDate.slice(0, 10) !== date.slice(0, 10);
 
   return (
     <div
@@ -158,7 +166,7 @@ function StageDateBadge({
           labelClasses[tone],
         )}
       >
-        <CalendarDays className="h-3 w-3 shrink-0" />
+        <CalendarDays className="w-3 h-3 shrink-0" />
         {label}
       </span>
       <span className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
@@ -214,14 +222,16 @@ function ProductRow({
       )}
     >
       <FlaskConical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 font-medium text-foreground">
+      <span className="flex-1 min-w-0 font-medium text-foreground">
         {item.product_name}
         {item.is_substitution && (
-          <span className="ml-1.5 text-[10px] text-warning-strong">(substituído)</span>
+          <span className="ml-1.5 text-[10px] text-warning-strong">
+            (substituído)
+          </span>
         )}
         {outOfProgram ? (
           <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive align-middle">
-            <CircleAlert className="h-3 w-3" />
+            <CircleAlert className="w-3 h-3" />
             Fora da programação
           </span>
         ) : null}
@@ -232,10 +242,14 @@ function ProductRow({
           <Input
             value={dose}
             onChange={(e) => setDose(e.target.value)}
-            className="h-7 w-20 text-right text-xs tabular-nums"
+            className="w-20 text-xs text-right h-7 tabular-nums"
           />
-          <DoseUnitSelect value={unit} onChange={setUnit} className="h-7 text-xs" />
-          <span className="shrink-0 text-xs text-muted-foreground">/ha</span>
+          <DoseUnitSelect
+            value={unit}
+            onChange={setUnit}
+            className="text-xs h-7"
+          />
+          <span className="text-xs shrink-0 text-muted-foreground">/ha</span>
           <Button
             size="icon"
             variant="ghost"
@@ -249,19 +263,27 @@ function ProductRow({
             size="icon"
             variant="ghost"
             className="h-7 w-7 text-muted-foreground"
-            onClick={() => { setEditing(false); setDose(String(item.dose_per_hectare)); setUnit(item.dose_unit ?? "L"); }}
+            onClick={() => {
+              setEditing(false);
+              setDose(String(item.dose_per_hectare));
+              setUnit(item.dose_unit ?? "L");
+            }}
           >
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="shrink-0 tabular-nums text-muted-foreground text-xs">
+          <span className="text-xs shrink-0 tabular-nums text-muted-foreground">
             {item.dose_per_hectare} {item.dose_unit}/ha
           </span>
           {item.total_quantity > 0 && (
-            <span className="hidden shrink-0 tabular-nums text-muted-foreground text-xs sm:inline">
-              · {item.total_quantity.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} {item.dose_unit} total
+            <span className="hidden text-xs shrink-0 tabular-nums text-muted-foreground sm:inline">
+              ·{" "}
+              {item.total_quantity.toLocaleString("pt-BR", {
+                maximumFractionDigits: 1,
+              })}{" "}
+              {item.dose_unit} total
             </span>
           )}
           <Button
@@ -270,7 +292,7 @@ function ProductRow({
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={() => setEditing(true)}
           >
-            <Pencil className="h-3 w-3" />
+            <Pencil className="w-3 h-3" />
           </Button>
           {canDelete ? (
             <Button
@@ -279,7 +301,7 @@ function ProductRow({
               className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={() => onDelete(item.id)}
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="w-3 h-3" />
             </Button>
           ) : null}
         </div>
@@ -317,7 +339,10 @@ function AddProductRow({
   // Por padrão só a lista de compra; ao expandir, o catálogo completo (global +
   // local). Produtos fora da lista entram marcados como "fora da programação".
   const listCatalog = useMemo(
-    () => catalogProducts.filter((product) => listProductIds.has(product.optionValue)),
+    () =>
+      catalogProducts.filter((product) =>
+        listProductIds.has(product.optionValue),
+      ),
     [catalogProducts, listProductIds],
   );
   const rowProducts = productsForPurchaseListCategory(
@@ -337,7 +362,9 @@ function AddProductRow({
   };
 
   const resolveProduct = async (optionValue: string) => {
-    const product = rowProducts.find((entry) => entry.optionValue === optionValue);
+    const product = rowProducts.find(
+      (entry) => entry.optionValue === optionValue,
+    );
     if (!product) return;
     const apply = (localId: string, name: string, doseUnit?: string) => {
       // Produto da lista de compra: traz a dose planejada (sem sobrescrever uma
@@ -355,7 +382,11 @@ function AddProductRow({
     setResolving(true);
     try {
       const cloned = await cloneGlobal.mutateAsync(product.globalId);
-      apply(cloned.id, cloned.name ?? product.name, cloned.dose_unit ?? product.dose_unit);
+      apply(
+        cloned.id,
+        cloned.name ?? product.name,
+        cloned.dose_unit ?? product.dose_unit,
+      );
     } catch {
       toast.error("Não foi possível adicionar o produto da plataforma.");
     } finally {
@@ -402,7 +433,9 @@ function AddProductRow({
         outOfProgram && "border-destructive/40 bg-destructive/5",
       )}
     >
-      <p className="mb-2 text-xs font-semibold text-foreground">Adicionar produto</p>
+      <p className="mb-2 text-xs font-semibold text-foreground">
+        Adicionar produto
+      </p>
       <div className="flex flex-col gap-3">
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
@@ -458,9 +491,9 @@ function AddProductRow({
                       setExpanded(true);
                       close();
                     }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/8"
+                    className="flex items-center w-full gap-2 px-2 py-2 text-sm font-medium text-left transition-colors rounded-md text-primary hover:bg-primary/8"
                   >
-                    <Plus className="h-4 w-4 shrink-0" />
+                    <Plus className="w-4 h-4 shrink-0" />
                     Adicionar produto fora da lista de compra
                   </button>
                 )
@@ -468,7 +501,7 @@ function AddProductRow({
             />
             {outOfProgram ? (
               <span className="mt-1 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive">
-                <CircleAlert className="h-3 w-3" />
+                <CircleAlert className="w-3 h-3" />
                 Fora da programação
               </span>
             ) : null}
@@ -485,7 +518,7 @@ function AddProductRow({
               placeholder="0"
               value={dose}
               onChange={(e) => setDose(e.target.value)}
-              className="h-8 w-28 text-sm"
+              className="h-8 text-sm w-28"
             />
           </div>
           <div className="space-y-1">
@@ -493,7 +526,7 @@ function AddProductRow({
             <DoseUnitSelect value={unit} onChange={setUnit} className="h-8" />
           </div>
           <span className="pb-1 text-xs text-muted-foreground">/ha</span>
-          <div className="ml-auto flex gap-1">
+          <div className="flex gap-1 ml-auto">
             <Button
               size="sm"
               onClick={handleAdd}
@@ -563,13 +596,13 @@ function AddStagePanel({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-surface-2 p-4">
+    <div className="p-4 border rounded-xl border-border bg-surface-2">
       <p className="mb-3 text-sm font-semibold text-foreground">Nova etapa</p>
       <RecommendationStageFields
         draft={draft}
         onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
       />
-      <div className="mt-3 flex gap-2">
+      <div className="flex gap-2 mt-3">
         <Button
           size="sm"
           onClick={handleSubmit}
@@ -601,10 +634,12 @@ function SeedRow({
   const population = Number(item.dose_per_hectare) * seedsPerUnit;
   const unitLabel = item.dose_unit === "SACA" ? "sacos" : "Big Bags";
   return (
-    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
+    <div className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg bg-card">
       <Sprout className="h-3.5 w-3.5 shrink-0 text-primary-strong" />
-      <span className="min-w-0 flex-1 font-medium text-foreground">{item.product_name}</span>
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+      <span className="flex-1 min-w-0 font-medium text-foreground">
+        {item.product_name}
+      </span>
+      <span className="text-xs shrink-0 tabular-nums text-muted-foreground">
         {population.toLocaleString("pt-BR")} plantas/ha
         {item.total_quantity
           ? ` · ${item.total_quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unitLabel}`
@@ -646,7 +681,8 @@ function AddSeedRow({
 
   const handleAdd = () => {
     if (!selected) return toast.error("Selecione a semente.");
-    const seedsPerUnit = selected.category === "HIBRIDO_MILHO" ? 60000 : 5000000;
+    const seedsPerUnit =
+      selected.category === "HIBRIDO_MILHO" ? 60000 : 5000000;
     const unit = selected.category === "HIBRIDO_MILHO" ? "SACA" : "BAG";
     const pop = selected.thousand_plants_per_ha ?? 0;
     createMut.mutate(
@@ -667,8 +703,10 @@ function AddSeedRow({
   };
 
   return (
-    <div className="rounded-xl border border-dashed bg-muted/20 p-3">
-      <p className="mb-2 text-xs font-semibold text-foreground">Adicionar semente</p>
+    <div className="p-3 border border-dashed rounded-xl bg-muted/20">
+      <p className="mb-2 text-xs font-semibold text-foreground">
+        Adicionar semente
+      </p>
       {listSeeds.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           Nenhuma semente na lista de compra desta safra. Adicione a semente no{" "}
@@ -677,7 +715,9 @@ function AddSeedRow({
       ) : (
         <div className="flex flex-col gap-3">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Semente (da lista de compra)</Label>
+            <Label className="text-xs text-muted-foreground">
+              Semente (da lista de compra)
+            </Label>
             <SearchableSelect
               value={selectedId}
               onValueChange={setSelectedId}
@@ -778,7 +818,8 @@ function RecommendationCard({
     undoMut.isPending;
 
   const isPending = rec.status === "PENDING";
-  const isDone = rec.status === "APPLIED_ON_TIME" || rec.status === "APPLIED_LATE";
+  const isDone =
+    rec.status === "APPLIED_ON_TIME" || rec.status === "APPLIED_LATE";
   const isSkipped = rec.status === "SKIPPED";
 
   const handleSaveStage = () => {
@@ -788,7 +829,9 @@ function RecommendationCard({
       return;
     }
     // Ao corrigir a data, recalcula a janela (centrada na nova data ± tolerância).
-    const win = recommendedYmdToWindow(stageDraft.recommended_date || todayLocalYmd());
+    const win = recommendedYmdToWindow(
+      stageDraft.recommended_date || todayLocalYmd(),
+    );
     patchMut.mutate(
       {
         id: rec.id,
@@ -815,9 +858,16 @@ function RecommendationCard({
 
   const handleApply = () => {
     applyMut.mutate(
-      { id: rec.id, executed_date: executedDate, notes: execNotes || undefined },
       {
-        onSuccess: () => { toast.success("Etapa registrada como aplicada."); setRegistering(false); },
+        id: rec.id,
+        executed_date: executedDate,
+        notes: execNotes || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Etapa registrada como aplicada.");
+          setRegistering(false);
+        },
         onError: () => toast.error("Não foi possível registrar."),
       },
     );
@@ -827,7 +877,10 @@ function RecommendationCard({
     skipMut.mutate(
       { id: rec.id, notes: execNotes || undefined },
       {
-        onSuccess: () => { toast.success("Etapa marcada como pulada."); setRegistering(false); },
+        onSuccess: () => {
+          toast.success("Etapa marcada como pulada.");
+          setRegistering(false);
+        },
         onError: () => toast.error("Não foi possível marcar como pulada."),
       },
     );
@@ -864,12 +917,12 @@ function RecommendationCard({
           isPending ? "hover:bg-primary/5" : "hover:bg-accent/40",
         )}
       >
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {canReorder ? (
             <div
               role="group"
               aria-label="Reordenar etapa"
-              className="flex shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
+              className="flex flex-col overflow-hidden border rounded-lg shadow-sm shrink-0 border-border bg-surface"
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
@@ -878,9 +931,9 @@ function RecommendationCard({
                 onClick={onMoveUp}
                 disabled={!canMoveUp || isReordering}
                 aria-label="Mover etapa para cima"
-                className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                className="flex items-center justify-center transition-colors h-7 w-7 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
               >
-                <ChevronUp className="h-4 w-4" />
+                <ChevronUp className="w-4 h-4" />
               </button>
               <div className="h-px bg-border" aria-hidden="true" />
               <button
@@ -888,9 +941,9 @@ function RecommendationCard({
                 onClick={onMoveDown}
                 disabled={!canMoveDown || isReordering}
                 aria-label="Mover etapa para baixo"
-                className="flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                className="flex items-center justify-center transition-colors h-7 w-7 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
               >
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="w-4 h-4" />
               </button>
             </div>
           ) : null}
@@ -908,13 +961,16 @@ function RecommendationCard({
           </span>
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-base font-semibold text-foreground">{rec.name}</span>
+            <span className="text-base font-semibold text-foreground">
+              {rec.name}
+            </span>
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold",
-                STATUS_BADGE_CLASS[displayRecStatus(rec)] ?? "bg-muted text-muted-foreground",
+                STATUS_BADGE_CLASS[displayRecStatus(rec)] ??
+                  "bg-muted text-muted-foreground",
               )}
             >
               {STATUS_ICON[displayRecStatus(rec)]}
@@ -923,16 +979,23 @@ function RecommendationCard({
           </div>
           {rec.items.length > 0 ? (
             <p className="mt-1 text-xs font-medium text-muted-foreground">
-              {rec.items.length} {rec.items.length === 1 ? "produto" : "produtos"} na receita
+              {rec.items.length}{" "}
+              {rec.items.length === 1 ? "produto" : "produtos"} na receita
             </p>
           ) : (
-            <p className="mt-1 text-xs text-muted-foreground">Sem produtos vinculados</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sem produtos vinculados
+            </p>
           )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2.5">
           {isDone && rec.executed_date ? (
-            <StageDateBadge label="Aplicado" date={rec.executed_date} tone="success" />
+            <StageDateBadge
+              label="Aplicado"
+              date={rec.executed_date}
+              tone="success"
+            />
           ) : isSkipped ? null : rec.predicted_date_current ? (
             <StageDateBadge
               label="Previsto"
@@ -959,16 +1022,20 @@ function RecommendationCard({
       </div>
 
       {open && (
-        <div className="flex flex-col gap-4 border-t px-4 pb-4 pt-3">
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <p className="mb-3 text-sm font-semibold text-foreground">Dados da etapa</p>
+        <div className="flex flex-col gap-4 px-4 pt-3 pb-4 border-t">
+          <div className="p-4 border shadow-sm rounded-xl border-border bg-card">
+            <p className="mb-3 text-sm font-semibold text-foreground">
+              Dados da etapa
+            </p>
             <RecommendationStageFields
               draft={stageDraft}
-              onChange={(patch) => setStageDraft((prev) => ({ ...prev, ...patch }))}
+              onChange={(patch) =>
+                setStageDraft((prev) => ({ ...prev, ...patch }))
+              }
               readOnly={!isPending || !canEditStructure}
             />
             {isPending && canEditStructure ? (
-              <div className="mt-3 flex gap-2">
+              <div className="flex gap-2 mt-3">
                 <Button
                   size="sm"
                   onClick={handleSaveStage}
@@ -986,7 +1053,7 @@ function RecommendationCard({
             )}
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="p-4 border shadow-sm rounded-xl bg-card">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Produtos recomendados
             </p>
@@ -999,12 +1066,16 @@ function RecommendationCard({
                     seasonId={seasonId}
                     onDelete={handleDeleteItem}
                     canDelete={canEditStructure}
-                    outOfProgram={listReady && !listProductIds.has(item.local_product_id)}
+                    outOfProgram={
+                      listReady && !listProductIds.has(item.local_product_id)
+                    }
                   />
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Nenhum produto vinculado.</p>
+              <p className="text-xs text-muted-foreground">
+                Nenhum produto vinculado.
+              </p>
             )}
 
             {seedItems.length > 0 ? (
@@ -1026,30 +1097,30 @@ function RecommendationCard({
             ) : null}
 
             {canEditStructure ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {!addingProduct && !addingSeed ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setAddingProduct(true)}
-                    className="h-8 gap-1.5 text-xs"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Adicionar produto
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setAddingSeed(true)}
-                    className="h-8 gap-1.5 text-xs"
-                  >
-                    <Sprout className="h-3.5 w-3.5" />
-                    Adicionar semente
-                  </Button>
-                </>
-              ) : null}
-            </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {!addingProduct && !addingSeed ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAddingProduct(true)}
+                      className="h-8 gap-1.5 text-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Adicionar produto
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAddingSeed(true)}
+                      className="h-8 gap-1.5 text-xs"
+                    >
+                      <Sprout className="h-3.5 w-3.5" />
+                      Adicionar semente
+                    </Button>
+                  </>
+                ) : null}
+              </div>
             ) : null}
 
             {canEditStructure && addingProduct ? (
@@ -1124,7 +1195,9 @@ function RecommendationCard({
                     </span>
                   ) : null}
                   {rec.notes ? (
-                    <span className="text-sm text-muted-foreground">· {rec.notes}</span>
+                    <span className="text-sm text-muted-foreground">
+                      · {rec.notes}
+                    </span>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1156,15 +1229,17 @@ function RecommendationCard({
                 </div>
               </div>
             ) : registering ? (
-              <div className="rounded-xl border border-border bg-surface-2 p-4">
+              <div className="p-4 border rounded-xl border-border bg-surface-2">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5 rounded-lg border border-primary/25 bg-surface p-3">
-                    <Label className="text-xs font-semibold text-primary">Data de execução</Label>
+                    <Label className="text-xs font-semibold text-primary">
+                      Data de execução
+                    </Label>
                     <Input
                       type="date"
                       value={executedDate}
                       onChange={(e) => setExecutedDate(e.target.value)}
-                      className="h-10 border-primary/30 bg-card text-sm font-semibold"
+                      className="h-10 text-sm font-semibold border-primary/30 bg-card"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -1173,11 +1248,11 @@ function RecommendationCard({
                       value={execNotes}
                       onChange={(e) => setExecNotes(e.target.value)}
                       placeholder="Ex: aplicado 10% a menos por chuva"
-                      className="h-10 bg-card text-sm"
+                      className="h-10 text-sm bg-card"
                     />
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-3">
                   <Button
                     size="sm"
                     onClick={handleApply}
@@ -1201,7 +1276,7 @@ function RecommendationCard({
                     size="sm"
                     variant="ghost"
                     onClick={() => setRegistering(false)}
-                    className="ml-auto h-8"
+                    className="h-8 ml-auto"
                   >
                     Cancelar
                   </Button>
@@ -1293,7 +1368,9 @@ function RecommendationsTab({
   if (isLoading) return <TimelineCardsSkeleton count={5} />;
 
   const recommendations = (
-    Array.isArray(data) ? data : (data as { data?: unknown[] } | undefined)?.data ?? []
+    Array.isArray(data)
+      ? data
+      : ((data as { data?: unknown[] } | undefined)?.data ?? [])
   ) as Recommendation[];
 
   const canManageStages =
@@ -1304,17 +1381,28 @@ function RecommendationsTab({
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= recommendations.length) return;
     const reordered = [...recommendations];
-    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
-    reorderMut.mutate(reordered.map((rec) => rec.id), {
-      onError: () => toast.error("Não foi possível reordenar as etapas."),
-    });
+    [reordered[index], reordered[targetIndex]] = [
+      reordered[targetIndex],
+      reordered[index],
+    ];
+    reorderMut.mutate(
+      reordered.map((rec) => rec.id),
+      {
+        onError: () => toast.error("Não foi possível reordenar as etapas."),
+      },
+    );
   };
 
   if (!recommendations.length) {
     const emptyAction =
       seasonStatus === "DRAFT" && onPublish ? (
-        <Button size="sm" className="gap-2" onClick={onPublish} disabled={isPublishing}>
-          <Send className="h-4 w-4" />
+        <Button
+          size="sm"
+          className="gap-2"
+          onClick={onPublish}
+          disabled={isPublishing}
+        >
+          <Send className="w-4 h-4" />
           {isPublishing ? "Publicando…" : "Publicar safra"}
         </Button>
       ) : canManageStages ? (
@@ -1324,7 +1412,7 @@ function RecommendationsTab({
           className="gap-1.5"
           onClick={() => setAddingStage(true)}
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="w-4 h-4" />
           Adicionar etapa
         </Button>
       ) : producerId ? (
@@ -1350,7 +1438,10 @@ function RecommendationsTab({
           action={emptyAction}
         />
         {addingStage && canManageStages ? (
-          <AddStagePanel seasonId={seasonId} onClose={() => setAddingStage(false)} />
+          <AddStagePanel
+            seasonId={seasonId}
+            onClose={() => setAddingStage(false)}
+          />
         ) : null}
       </div>
     );
@@ -1384,7 +1475,10 @@ function RecommendationsTab({
         meta={
           plotName ? (
             <span className="inline-flex items-center gap-1.5">
-              <Sprout className="size-4 shrink-0 text-primary-strong" aria-hidden />
+              <Sprout
+                className="size-4 shrink-0 text-primary-strong"
+                aria-hidden
+              />
               <span>
                 Talhão <strong className="text-text-strong">{plotName}</strong>
               </span>
@@ -1405,11 +1499,15 @@ function RecommendationsTab({
         ]}
       >
         <div className="mt-4 rounded-xl border border-border bg-rail px-4 py-3.5 sm:mt-5">
-          <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-            <span className="font-medium text-text-strong">Progresso das aplicações</span>
+          <div className="flex items-center justify-between gap-3 mb-2 text-sm">
+            <span className="font-medium text-text-strong">
+              Progresso das aplicações
+            </span>
             <span className="font-semibold tabular-nums text-primary-strong">
               {done}/{total} aplicadas
-              <span className="ml-1 text-muted-foreground">({progressPct}%)</span>
+              <span className="ml-1 text-muted-foreground">
+                ({progressPct}%)
+              </span>
             </span>
           </div>
           <ProgressBar value={progressPct} />
@@ -1417,7 +1515,9 @@ function RecommendationsTab({
       </PageHero>
 
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-display text-base font-semibold text-text-strong">Etapas do cronograma</h2>
+        <h2 className="text-base font-semibold font-display text-text-strong">
+          Etapas do cronograma
+        </h2>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -1425,25 +1525,28 @@ function RecommendationsTab({
             className="gap-1.5 print:hidden"
             onClick={() => setExportOpen(true)}
           >
-            <Share2 className="h-4 w-4 text-muted-foreground" />
+            <Share2 className="w-4 h-4 text-muted-foreground" />
             Exportar
           </Button>
           {canManageStages ? (
             <Button
-              size="icon"
               variant="outline"
-              className="h-9 w-9 shrink-0"
+              size="sm"
               aria-label="Adicionar etapa"
               onClick={() => setAddingStage((v) => !v)}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="w-4 h-4" />
+              Adicionar etapa
             </Button>
           ) : null}
         </div>
       </div>
 
       {addingStage ? (
-        <AddStagePanel seasonId={seasonId} onClose={() => setAddingStage(false)} />
+        <AddStagePanel
+          seasonId={seasonId}
+          onClose={() => setAddingStage(false)}
+        />
       ) : null}
 
       <ul className="flex flex-col gap-3">
@@ -1473,15 +1576,18 @@ function RecommendationsTab({
           rolar de volta ao topo. */}
       {canManageStages && recommendations.length >= 4 ? (
         addingStageBottom ? (
-          <AddStagePanel seasonId={seasonId} onClose={() => setAddingStageBottom(false)} />
+          <AddStagePanel
+            seasonId={seasonId}
+            onClose={() => setAddingStageBottom(false)}
+          />
         ) : (
           <button
             type="button"
             onClick={() => setAddingStageBottom(true)}
-            className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/30 py-8 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary-soft/30 hover:text-primary-strong"
+            className="flex flex-col items-center justify-center w-full gap-2 py-8 transition-colors border-2 border-dashed rounded-xl border-border bg-card/30 text-muted-foreground hover:border-primary/50 hover:bg-primary-soft/30 hover:text-primary-strong"
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-current">
-              <Plus className="h-5 w-5" />
+            <span className="flex items-center justify-center border-2 border-current border-dashed rounded-full h-11 w-11">
+              <Plus className="w-5 h-5" />
             </span>
             <span className="text-sm font-medium">Adicionar etapa</span>
           </button>
@@ -1515,11 +1621,15 @@ export default function SeasonDetailPage() {
   const { data: producer } = useProducer(producerId);
 
   if (!seasonId) {
-    return <p className="text-sm text-destructive">ID da safra não encontrado.</p>;
+    return (
+      <p className="text-sm text-destructive">ID da safra não encontrado.</p>
+    );
   }
 
-  const cropLabel = season ? CROP_LABELS[season.crop] ?? season.crop : "";
-  const statusLabel = season ? STATUS_LABELS[season.status] ?? season.status : "";
+  const cropLabel = season ? (CROP_LABELS[season.crop] ?? season.crop) : "";
+  const statusLabel = season
+    ? (STATUS_LABELS[season.status] ?? season.status)
+    : "";
   const title = season
     ? season.variety
       ? `${cropLabel} — ${season.variety}`
@@ -1529,7 +1639,8 @@ export default function SeasonDetailPage() {
     publishMutation.mutate([], {
       onSuccess: () => toast.success("Safra publicada com sucesso!"),
       onError: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : "Falha ao publicar safra";
+        const msg =
+          error instanceof Error ? error.message : "Falha ao publicar safra";
         toast.error(`Erro: ${msg || "Falha ao publicar safra"}`);
       },
     });
@@ -1567,7 +1678,7 @@ export default function SeasonDetailPage() {
       <BreadcrumbBack items={breadcrumbs} />
 
       {/* Tab navigation */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
         <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-2 p-0.5">
           {(
             [
@@ -1604,7 +1715,7 @@ export default function SeasonDetailPage() {
               onClick={handlePublish}
               disabled={publishMutation.isPending}
             >
-              <Send className="h-4 w-4" />
+              <Send className="w-4 h-4" />
               {publishMutation.isPending ? "Publicando..." : "Publicar safra"}
             </Button>
           ) : null}

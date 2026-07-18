@@ -109,6 +109,7 @@ export function PageHero({
   eyebrow,
   title,
   titleBadge,
+  titleAction,
   meta,
   actions,
   stats,
@@ -120,6 +121,11 @@ export function PageHero({
   eyebrow: string;
   title: ReactNode;
   titleBadge?: ReactNode;
+  /**
+   * Ação compacta colada ao título (ex.: "Editar"), em vez de disputar espaço na
+   * barra de `actions`. Renderiza uma única vez — serve desktop e mobile.
+   */
+  titleAction?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
   stats?: PageHeroStat[];
@@ -145,10 +151,10 @@ export function PageHero({
         <div className="flex min-w-[14rem] flex-1 items-start gap-3.5 sm:items-center sm:gap-4">
           <span
             className={cn(
-              "flex size-12 shrink-0 items-center justify-center rounded-2xl sm:size-13",
+              "flex size-12 shrink-0 items-center justify-center rounded-lg sm:size-13",
               inverted
                 ? "bg-white/15 text-white"
-                : "bg-primary-soft text-primary-strong",
+                : "bg-primary text-primary-foreground",
             )}
           >
             {icon}
@@ -172,6 +178,7 @@ export function PageHero({
                 {title}
               </h1>
               {titleBadge}
+              {titleAction}
             </div>
             {meta ? (
               <div

@@ -173,9 +173,7 @@ export default function ProducersPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <BreadcrumbBack
-          items={[{ label: "Início", href: "/dashboard" }, { label: "Produtores" }]}
-        />
+        <BreadcrumbBack items={[{ label: "Produtores" }]} />
         <PageHero
           className="mb-0"
           icon={<UsersRound className="size-6" />}

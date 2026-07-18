@@ -12,11 +12,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   useFarm,
   useFarmAccess,
@@ -28,7 +29,7 @@ import {
 import { FarmCyclesSection } from "@/components/domain/farm-cycles-section";
 import { ProducerStockSection } from "@/components/domain/producer-stock-section";
 import { toast } from "sonner";
-import { MapPin, Pencil, Tractor } from "lucide-react";
+import { Boxes, MapPin, Pencil, Tractor } from "lucide-react";
 
 const farmSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -102,10 +103,7 @@ export default function FarmDetailPage() {
 
   const totalHectares = useMemo(
     () =>
-      (plots ?? []).reduce(
-        (acc, p) => acc + (Number(p.area_hectares) || 0),
-        0,
-      ),
+      (plots ?? []).reduce((acc, p) => acc + (Number(p.area_hectares) || 0), 0),
     [plots],
   );
 
@@ -142,22 +140,33 @@ export default function FarmDetailPage() {
         icon={<Tractor className="size-6" />}
         eyebrow="Fazenda"
         title={farm?.name ?? "Detalhes da fazenda"}
+        titleAction={
+          <Button
+            variant="secondary"
+            size="icon-xs"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil />
+          </Button>
+        }
         meta={farm?.location?.trim() || "Sem localização cadastrada"}
         actions={
           <>
-            <Button asChild variant="outline" className="gap-2">
+            {tabFromUrl !== "stock" ? (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setFarmViewWithUrl("stock")}
+              >
+                <Boxes className="size-4" />
+                Estoque
+              </Button>
+            ) : null}
+            <Button asChild variant="clay" className="gap-2">
               <Link href={plotsHref}>
                 <MapPin className="size-4" />
                 Gerenciar talhões
               </Link>
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => setEditOpen(true)}
-            >
-              <Pencil className="size-4" />
-              Editar
             </Button>
           </>
         }
@@ -200,62 +209,57 @@ export default function FarmDetailPage() {
         </section>
       ) : (
         <section>
-          <FarmCyclesSection
-            farmId={farmId}
-            producerId={resolvedProducerId}
-          />
+          <FarmCyclesSection farmId={farmId} producerId={resolvedProducerId} />
         </section>
       )}
 
       {/* Editar fazenda */}
-      <Sheet open={editOpen} onOpenChange={setEditOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Editar fazenda</SheetTitle>
-          </SheetHeader>
-          <form onSubmit={onUpdateFarm} className="space-y-4 px-4 pb-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground">
-                Nome
-              </label>
-              <Input
-                {...farmForm.register("name")}
-                placeholder="Nome da fazenda"
-              />
-              {farmForm.formState.errors.name && (
-                <p className="mt-1 text-xs text-destructive">
-                  {farmForm.formState.errors.name.message}
-                </p>
-              )}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar fazenda</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={onUpdateFarm}>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Nome
+                </label>
+                <Input
+                  {...farmForm.register("name")}
+                  placeholder="Nome da fazenda"
+                />
+                {farmForm.formState.errors.name && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {farmForm.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Endereço
+                </label>
+                <Input
+                  {...farmForm.register("location")}
+                  placeholder="Ex: Município, Estado"
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground">
-                Endereço
-              </label>
-              <Input
-                {...farmForm.register("location")}
-                placeholder="Ex: Município, Estado"
-              />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button
-                type="submit"
-                disabled={updateFarm.isPending}
-                className="flex-1"
-              >
-                {updateFarm.isPending ? "Salvando..." : "Salvar"}
-              </Button>
+            <DialogFooter className="sm:flex-row sm:justify-end">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => setEditOpen(false)}
               >
                 Cancelar
               </Button>
-            </div>
+              <Button type="submit" disabled={updateFarm.isPending}>
+                {updateFarm.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </DialogFooter>
           </form>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

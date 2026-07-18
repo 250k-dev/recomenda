@@ -9,7 +9,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Users, Plus, Package } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useProducers } from "@/lib/api/hooks";
 import { useCan } from "@/lib/auth/use-can";
 import { cn } from "@/lib/utils";
@@ -31,14 +32,18 @@ const normalize = (value: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
-export function ProducerSearch() {
+/**
+ * Busca de produtores do header (⌘K). Ocupa o espaço livre da linha: enquanto
+ * sobra largura (≥14rem) mostra o input; quando o breadcrumb ou a tela
+ * apertam, recolhe para o botão de ícone. Medido por container query.
+ */
+export function ProducerSearchButton() {
   const router = useRouter();
   const { data } = useProducers();
   const canCreateProducer = useCan("PRODUCER_CREATE");
-  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const isMac = useSyncExternalStore(subscribeNoop, getIsMac, () => false);
@@ -63,31 +68,24 @@ export function ProducerSearch() {
       .slice(0, MAX_MATCHES);
   }, [selectable, query]);
 
+  const setDialogOpen = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setQuery("");
+      setActiveKey(null);
+    }
+  };
+
   const go = (path: string) => {
-    setOpen(false);
-    setQuery("");
-    setActiveKey(null);
-    // Drop focus so the search box isn't left focused on the destination page.
-    inputRef.current?.blur();
+    setDialogOpen(false);
     router.push(path);
   };
 
-  // Close on outside click.
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [open]);
-
-  // Global ⌘K / Ctrl+K shortcut to focus the search.
+  // Global ⌘K / Ctrl+K shortcut to open the search modal.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        inputRef.current?.focus();
         setOpen(true);
       }
     };
@@ -108,14 +106,13 @@ export function ProducerSearch() {
   };
 
   // Keyboard from the input: arrows enter the list, Enter picks the top match.
+  // Escape fecha o modal via Radix.
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setOpen(true);
       requestAnimationFrame(() => focusOption(0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setOpen(true);
       requestAnimationFrame(() => focusOption(-1));
     } else if (e.key === "Enter") {
       // Quick-select the top result only when actively searching.
@@ -124,9 +121,6 @@ export function ProducerSearch() {
         e.preventDefault();
         go(`/producers/${top.producer_id}`);
       }
-    } else if (e.key === "Escape") {
-      setOpen(false);
-      inputRef.current?.blur();
     }
   };
 
@@ -142,161 +136,182 @@ export function ProducerSearch() {
       e.preventDefault();
       if (idx <= 0) inputRef.current?.focus();
       else els[idx - 1]?.focus();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      setOpen(false);
-      inputRef.current?.focus();
-    }
-  };
-
-  // Close when focus leaves the whole widget (e.g. Tab past the last option).
-  const onContainerBlur = (e: React.FocusEvent<HTMLDivElement>) => {
-    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
-      setOpen(false);
-      setActiveKey(null);
     }
   };
 
   const optionClass = (key: string, extra?: string) =>
     cn(
-      "flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-sm outline-none transition-colors",
+      "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm outline-none transition-colors",
       activeKey === key ? "bg-accent" : "hover:bg-accent/60",
       extra,
     );
 
   return (
-    <div
-      ref={containerRef}
-      onBlur={onContainerBlur}
-      className="relative w-full"
-    >
-      <Search className="absolute -translate-y-1/2 pointer-events-none left-3 top-1/2 size-4 text-muted-foreground" />
-      <Input
-        ref={inputRef}
-        type="text"
-        role="combobox"
-        aria-label="Buscar produtor"
-        aria-expanded={open}
-        aria-controls="producer-search-list"
-        aria-autocomplete="list"
-        autoComplete="off"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-          setActiveKey(null);
-        }}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onKeyDown={onInputKeyDown}
-        placeholder="Buscar produtor…"
-        className="pr-16 h-11 pl-9"
-      />
-      {!query && (
-        <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground sm:flex">
-          {isMac ? "⌘K" : "Ctrl K"}
-        </kbd>
-      )}
-
-      {open && (
-        <div
-          ref={listRef}
-          id="producer-search-list"
-          role="listbox"
-          aria-label="Produtores"
-          className="absolute left-0 right-0 z-50 py-1 mt-1 overflow-hidden border rounded-lg shadow-md border-border bg-popover text-popover-foreground"
+    <>
+      {/* flex-1 absorve a sobra da linha; a container query decide o formato.
+          min-w-11 garante o ícone mesmo com o breadcrumb espremendo tudo. */}
+      <div className="flex h-11 min-w-11 flex-1 items-center justify-end @container">
+        <Button
+          type="button"
+          size="icon-lg"
+          variant="outline"
+          aria-label={
+            isMac ? "Buscar produtor (⌘K)" : "Buscar produtor (Ctrl+K)"
+          }
+          onClick={() => setOpen(true)}
+          className="@min-[14rem]:hidden"
         >
-          {results.length > 0 ? (
-            <div role="none" className="overflow-y-auto max-h-72">
-              {results.map((p) => {
-                const key = `p-${p.producer_id}`;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="option"
-                    data-option
-                    aria-selected={activeKey === key}
-                    onFocus={() => setActiveKey(key)}
-                    onMouseEnter={() => setActiveKey(key)}
-                    onKeyDown={onOptionKeyDown}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => go(`/producers/${p.producer_id}`)}
-                    className={optionClass(key)}
-                  >
-                    <div className="flex items-center justify-center text-xs font-semibold rounded-full size-7 shrink-0 bg-primary/10 text-primary">
-                      {(p.name?.trim().charAt(0) || "?").toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-foreground">
-                        {p.name}
-                      </p>
-                      <p className="text-xs truncate text-muted-foreground">
-                        {p.email}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : query.trim() !== "" ? (
-            <p className="px-3 py-3 text-sm text-muted-foreground">
-              Nenhum produtor encontrado.
-            </p>
-          ) : null}
+          <Search />
+        </Button>
+        <button
+          type="button"
+          aria-label={
+            isMac ? "Buscar produtor (⌘K)" : "Buscar produtor (Ctrl+K)"
+          }
+          onClick={() => setOpen(true)}
+          className="hidden h-11 w-full max-w-72 items-center gap-2.5 rounded-lg border border-border-strong bg-search px-3.5 text-sm shadow-xs outline-none transition-colors hover:bg-hover focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 @min-[14rem]:flex"
+        >
+          <Search className="size-4 shrink-0 text-muted-foreground" />
+          <span className="flex-1 truncate text-left text-placeholder">
+            Buscar produtor…
+          </span>
+          <kbd className="pointer-events-none flex select-none items-center rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground">
+            {isMac ? "⌘K" : "Ctrl K"}
+          </kbd>
+        </button>
+      </div>
 
-          {/* Footer actions — always available */}
-          <div role="none" className="pt-1 border-t border-border">
-            <button
-              type="button"
-              role="option"
-              data-option
-              aria-selected={activeKey === "all"}
-              onFocus={() => setActiveKey("all")}
-              onMouseEnter={() => setActiveKey("all")}
-              onKeyDown={onOptionKeyDown}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => go("/producers")}
-              className={optionClass("all")}
-            >
-              <Users className="size-4 shrink-0 text-muted-foreground" />
-              Ver todos os produtores
-            </button>
-            <button
-              type="button"
-              role="option"
-              data-option
-              aria-selected={activeKey === "catalog"}
-              onFocus={() => setActiveKey("catalog")}
-              onMouseEnter={() => setActiveKey("catalog")}
-              onKeyDown={onOptionKeyDown}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => go("/catalog")}
-              className={optionClass("catalog")}
-            >
-              <Package className="size-4 shrink-0 text-muted-foreground" />
-              Ver todos os produtos
-            </button>
-            {canCreateProducer ? (
+      <Dialog open={open} onOpenChange={setDialogOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="top-24 max-w-xl translate-y-0 gap-0 p-0"
+        >
+          <DialogTitle className="sr-only">Buscar produtor</DialogTitle>
+
+          <div className="relative border-b border-border">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              ref={inputRef}
+              type="text"
+              role="combobox"
+              aria-label="Buscar produtor"
+              aria-expanded
+              aria-controls="producer-search-list"
+              aria-autocomplete="list"
+              autoComplete="off"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActiveKey(null);
+              }}
+              onKeyDown={onInputKeyDown}
+              placeholder="Buscar produtor…"
+              className="h-13 w-full bg-transparent pl-11 pr-14 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+            <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground sm:flex">
+              Esc
+            </kbd>
+          </div>
+
+          <div
+            ref={listRef}
+            id="producer-search-list"
+            role="listbox"
+            aria-label="Produtores"
+            className="py-1"
+          >
+            {results.length > 0 ? (
+              <div role="none" className="max-h-72 overflow-y-auto">
+                {results.map((p) => {
+                  const key = `p-${p.producer_id}`;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="option"
+                      data-option
+                      aria-selected={activeKey === key}
+                      onFocus={() => setActiveKey(key)}
+                      onMouseEnter={() => setActiveKey(key)}
+                      onKeyDown={onOptionKeyDown}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => go(`/producers/${p.producer_id}`)}
+                      className={optionClass(key)}
+                    >
+                      <div className="flex items-center justify-center text-xs font-semibold rounded-full size-7 shrink-0 bg-primary/10 text-primary">
+                        {(p.name?.trim().charAt(0) || "?").toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate text-foreground">
+                          {p.name}
+                        </p>
+                        <p className="text-xs truncate text-muted-foreground">
+                          {p.email}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : query.trim() !== "" ? (
+              <p className="px-4 py-3 text-sm text-muted-foreground">
+                Nenhum produtor encontrado.
+              </p>
+            ) : null}
+
+            {/* Footer actions — always available */}
+            <div role="none" className="pt-1 border-t border-border">
               <button
                 type="button"
                 role="option"
                 data-option
-                aria-selected={activeKey === "new"}
-                onFocus={() => setActiveKey("new")}
-                onMouseEnter={() => setActiveKey("new")}
+                aria-selected={activeKey === "all"}
+                onFocus={() => setActiveKey("all")}
+                onMouseEnter={() => setActiveKey("all")}
                 onKeyDown={onOptionKeyDown}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => go("/producers/new")}
-                className={optionClass("new", "font-medium text-primary")}
+                onClick={() => go("/producers")}
+                className={optionClass("all")}
               >
-                <Plus className="size-4 shrink-0" />
-                Cadastrar produtor
+                <Users className="size-4 shrink-0 text-muted-foreground" />
+                Ver todos os produtores
               </button>
-            ) : null}
+              <button
+                type="button"
+                role="option"
+                data-option
+                aria-selected={activeKey === "catalog"}
+                onFocus={() => setActiveKey("catalog")}
+                onMouseEnter={() => setActiveKey("catalog")}
+                onKeyDown={onOptionKeyDown}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => go("/catalog")}
+                className={optionClass("catalog")}
+              >
+                <Package className="size-4 shrink-0 text-muted-foreground" />
+                Ver todos os produtos
+              </button>
+              {canCreateProducer ? (
+                <button
+                  type="button"
+                  role="option"
+                  data-option
+                  aria-selected={activeKey === "new"}
+                  onFocus={() => setActiveKey("new")}
+                  onMouseEnter={() => setActiveKey("new")}
+                  onKeyDown={onOptionKeyDown}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => go("/producers/new")}
+                  className={optionClass("new", "font-medium text-primary")}
+                >
+                  <Plus className="size-4 shrink-0" />
+                  Cadastrar produtor
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

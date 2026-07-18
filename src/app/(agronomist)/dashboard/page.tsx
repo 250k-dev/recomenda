@@ -3,12 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
-import { ptBR } from "date-fns/locale/pt-BR";
 import {
   Users,
-  Building2,
   Leaf,
-  CircleAlert,
   CalendarDays,
   Plus,
   ArrowRight,
@@ -17,9 +14,9 @@ import {
   Info,
   FileText,
   UserCog,
+  type LucideIcon,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { RailCard, RailRow } from "@/components/domain/rail-card";
 import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -27,34 +24,87 @@ import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  CompactListSkeleton,
-  DashboardKpiSkeleton,
-} from "@/components/domain/page-skeletons";
+import { CompactListSkeleton } from "@/components/domain/page-skeletons";
 import {
   useFarms,
   useProducers,
-  useMe,
   usePlanQuota,
   usePortfolioPriceCoverage,
 } from "@/lib/api/hooks";
 import { useCan } from "@/lib/auth/use-can";
 import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
 import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
+import { cn } from "@/lib/utils";
 
 type AttentionTab = "late" | "today" | "pending" | "week";
 
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Bom dia";
-  if (h < 18) return "Boa tarde";
-  return "Boa noite";
+/** Atalho de funcionalidade em formato de card clicável (variante `accent` em terracota). */
+function ShortcutCard({
+  href,
+  icon: Icon,
+  title,
+  sub,
+  accent = false,
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  sub: string;
+  accent?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group flex flex-col gap-3 rounded-xl border p-4.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
+        accent
+          ? "border-clay-border bg-clay-soft"
+          : "border-border bg-card hover:border-border-strong",
+      )}
+    >
+      <div className="flex items-start justify-between">
+        <span
+          className={cn(
+            "grid size-11 place-items-center rounded-xl",
+            accent
+              ? "bg-clay text-clay-ink shadow-(--clay-shadow)"
+              : "bg-primary-soft text-primary-strong",
+          )}
+        >
+          <Icon className="size-5" />
+        </span>
+        <ArrowRight
+          className={cn(
+            "size-4 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100",
+            accent ? "text-clay-strong" : "text-primary-strong",
+          )}
+        />
+      </div>
+      <div>
+        <div
+          className={cn(
+            "font-display text-[0.95rem] font-semibold leading-snug",
+            accent ? "text-clay-strong" : "text-text-strong",
+          )}
+        >
+          {title}
+        </div>
+        <p
+          className={cn(
+            "mt-0.5 text-xs",
+            accent ? "text-clay-strong/80" : "text-muted-foreground",
+          )}
+        >
+          {sub}
+        </p>
+      </div>
+    </Link>
+  );
 }
 
 export default function DashboardPage() {
   const farms = useFarms();
   const producers = useProducers();
-  const { data: me } = useMe();
   const { data: planData, isLoading: planLoading } = usePlanQuota();
   const agenda = useAgronomistAgenda(new Date());
   const canManageTeam = useCan("TEAM_MANAGE");
@@ -91,7 +141,6 @@ export default function DashboardPage() {
   );
 
   const statsLoading = farms.isLoading || producers.isLoading;
-  const kpiLoading = statsLoading || agenda.isLoading;
 
   // Dedupe agenda events (one per recommendation) and bucket by state.
   const buckets = useMemo(() => {
@@ -121,106 +170,47 @@ export default function DashboardPage() {
   }, [agenda.eventsByDay]);
 
   const list = buckets[tab];
-  const firstName = me?.name?.trim().split(/\s+/)[0] ?? "";
-  const dateLabel = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
 
   return (
     <>
-      {/* Greeting + actions */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-ta-soft text-ta">
-            <CalendarDays className="size-5" />
-          </span>
-          <div>
-            <p className="font-display text-xs font-bold uppercase tracking-[0.12em] text-primary-strong">
-              {dateLabel}
-            </p>
-            <h1 className="mt-0.5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong md:text-[1.7rem]">
-              {greeting()}
-              {firstName ? `, ${firstName}` : ""}
-            </h1>
-            <div className="mt-1 text-sm text-muted-foreground">
-              {agenda.isLoading ? (
-                <Skeleton className="mt-0.5 h-4 w-72 max-w-full" />
-              ) : (
-                <p>
-                  Você tem{" "}
-                  <b className="text-text-strong">
-                    {agenda.lateCount} aplicaç{agenda.lateCount === 1 ? "ão" : "ões"}{" "}
-                    atrasada{agenda.lateCount === 1 ? "" : "s"}
-                  </b>{" "}
-                  e <b className="text-text-strong">{agenda.todayCount} para hoje</b>.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          <Button asChild variant="outline">
-            <Link href="/cronograma">
-              <CalendarDays className="size-4" /> Cronograma
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/producers">
-              <Users className="size-4" /> Produtores
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/compra-templates">
-              <FileText className="size-4" /> Templates de compra
-            </Link>
-          </Button>
-          {canManageTeam ? (
-            <Button asChild variant="outline">
-              <Link href="/consultants">
-                <UserCog className="size-4" /> Equipe
-              </Link>
-            </Button>
-          ) : null}
-          {canCreateProducer ? (
-            <Button asChild variant="clay">
-              <Link href="/producers/new">
-                <Plus className="size-4" /> Cadastrar produtor
-              </Link>
-            </Button>
-          ) : null}
-        </div>
+      {/* Atalhos de funcionalidades */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-flow-col lg:auto-cols-fr">
+        <ShortcutCard
+          href="/cronograma"
+          icon={CalendarDays}
+          title="Cronograma"
+          sub="Agenda de aplicações"
+        />
+        <ShortcutCard
+          href="/producers"
+          icon={Users}
+          title="Produtores"
+          sub="Carteira completa"
+        />
+        <ShortcutCard
+          href="/compra-templates"
+          icon={FileText}
+          title="Templates de compra"
+          sub="Modelos de lista"
+        />
+        {canManageTeam ? (
+          <ShortcutCard
+            href="/consultants"
+            icon={UserCog}
+            title="Equipe"
+            sub="Consultores da conta"
+          />
+        ) : null}
+        {canCreateProducer ? (
+          <ShortcutCard
+            href="/producers/new"
+            icon={Plus}
+            title="Cadastrar produtor"
+            sub="Adicionar à carteira"
+            accent
+          />
+        ) : null}
       </div>
-
-      {/* KPI strip */}
-      {kpiLoading ? (
-        <DashboardKpiSkeleton cards={4} className="mb-6" />
-      ) : (
-        <KpiStrip className="mb-6">
-          <KpiCell
-            label="Produtores"
-            value={producerCount}
-            sub="na carteira"
-            icon={<Users className="size-4" />}
-          />
-          <KpiCell
-            label="Fazendas"
-            value={farms.data?.pagination?.total ?? 0}
-            sub="mapeadas"
-            icon={<Building2 className="size-4" />}
-          />
-          <KpiCell
-            label="Safras ativas"
-            value={activeCyclesCount}
-            sub="em andamento"
-            icon={<Leaf className="size-4" />}
-          />
-          <KpiCell
-            label="Atrasadas"
-            value={agenda.lateCount}
-            sub="exigem ação"
-            icon={<CircleAlert className="size-4" />}
-            alert
-          />
-        </KpiStrip>
-      )}
 
       {/* Attention panel + rail */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
