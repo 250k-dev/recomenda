@@ -4,7 +4,7 @@ import {
   updateTimingStage,
   type MixTemplateItem,
 } from "@/lib/api/templates";
-import type { StageProductDraft } from "@/components/domain/timing/timing-stages-editor";
+import type { StageProductDraft } from "@/lib/timing/types";
 import type { Product } from "@/lib/api/catalog";
 
 function parseDose(value: string): number {

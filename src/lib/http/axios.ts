@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-import type { ApiError, ApiErrorPayload } from "@/lib/api/types";
+import type { ApiError, ApiErrorPayload } from "./types";
 
 type PendingRequest = {
   resolve: () => void;

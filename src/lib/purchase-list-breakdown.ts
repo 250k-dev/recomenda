@@ -10,7 +10,7 @@ import {
   isSeedItem,
   listItemQuantity,
   type ListItem,
-} from "@/components/domain/season/_shared";
+} from "@/lib/purchase-list/list-item";
 import { CATEGORY_ORDER, type CategoryBreakdown } from "@/lib/cost-plan/calculate";
 import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
 

@@ -38,7 +38,8 @@ import {
   newTimingStageField,
   type TimingStageField,
 } from "@/components/domain/timing/timing-stages-editor";
-import { formatTimingPreviewDate, recommendedYmdToWindow, windowToRecommendedYmd } from "@/lib/timing/window-days";
+import { recommendedYmdToWindow, windowToRecommendedYmd } from "@/lib/timing/window-days";
+import { formatTimingPreviewDate } from "@/lib/utils/dates";
 import {
   Field,
   FieldError,

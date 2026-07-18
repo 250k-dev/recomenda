@@ -55,7 +55,7 @@ import {
   todayLocalYmd,
 } from "@/lib/timing/window-days";
 import { cn } from "@/lib/utils";
-import { SEED_CATEGORIES } from "@/components/domain/season/_shared";
+import { SEED_CATEGORIES } from "@/lib/purchase-list/list-item";
 import { displayRecStatus, fmtDate } from "@/lib/recommendations/format";
 
 const STATUS_LABEL: Record<string, string> = {

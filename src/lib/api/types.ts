@@ -1,18 +1,6 @@
-export interface ApiErrorPayload {
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-    request_id?: string;
-  };
-}
-
-export interface ApiError extends Error {
-  status?: number;
-  code?: string;
-  details?: unknown;
-  requestId?: string;
-}
+// Declarados em `lib/http/types` (camada de baixo). Re-exportados aqui para os
+// consumidores que já importam deste caminho.
+export type { ApiError, ApiErrorPayload } from "@/lib/http/types";
 
 export interface Pagination {
   page: number;

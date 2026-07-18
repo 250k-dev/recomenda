@@ -6,7 +6,7 @@ import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
 import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
 import { CATEGORY_ORDER } from "@/lib/cost-plan/calculate";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
-import type { ListItem } from "@/components/domain/season/_shared";
+import type { ListItem } from "@/lib/purchase-list/list-item";
 import { cn } from "@/lib/utils";
 
 /** Formato correto: meta única da lista em sc/ha. */

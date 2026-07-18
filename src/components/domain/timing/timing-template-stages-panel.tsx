@@ -32,7 +32,7 @@ import {
   useLocalDraft,
 } from "@/lib/use-local-draft";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
-import type { StageProductDraft } from "@/components/domain/timing/timing-stages-editor";
+import type { StageProductDraft } from "@/lib/timing/types";
 
 type TimingTemplateStagesPanelProps = {
   template: TimingTemplate & { stages: TimingStage[] };

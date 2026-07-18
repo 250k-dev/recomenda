@@ -58,12 +58,14 @@ import {
   SummaryCard,
   fmt,
   extractError,
+  type WizardPlot,
+} from "@/components/domain/season/_shared";
+import {
   listItemToBuy,
   listItemToPayload,
   validateListItems,
   type ListItem,
-  type WizardPlot,
-} from "@/components/domain/season/_shared";
+} from "@/lib/purchase-list/list-item";
 
 export type PurchaseListWizardProps = {
   producerId: string;

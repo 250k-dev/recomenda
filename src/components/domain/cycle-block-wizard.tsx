@@ -54,10 +54,10 @@ import { recommendedYmdToWindow } from "@/lib/timing/window-days";
 import {
   Field,
   FieldError,
-  SEED_CATEGORIES,
   extractError,
   fmt,
 } from "@/components/domain/season/_shared";
+import { SEED_CATEGORIES } from "@/lib/purchase-list/list-item";
 
 type CronogramMode = "template" | "custom";
 
