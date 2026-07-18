@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AgronomistShell } from "@/components/layout/agronomist-shell";
 import { getSessionRole } from "@/lib/auth/session";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 export default async function AgronomistLayout({ children }: { children: ReactNode }) {
   const role = await getSessionRole();

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { ArrowRight, Clock, Pencil } from "lucide-react";
 
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import { TemplateEditorSkeleton } from "@/components/domain/page-skeletons";
 import { TimingTemplateStagesPanel } from "@/components/domain/timing/timing-template-stages-panel";
 import { EmptyState } from "@/components/ui/empty-state";

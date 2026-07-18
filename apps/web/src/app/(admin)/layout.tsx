@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { getSessionRole } from "@/lib/auth/session";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const role = await getSessionRole();

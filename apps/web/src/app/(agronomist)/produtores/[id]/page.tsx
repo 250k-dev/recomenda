@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import { useParams } from "next/navigation";
 import { ProducerDetailView } from "@/components/domain/producer-detail-view";

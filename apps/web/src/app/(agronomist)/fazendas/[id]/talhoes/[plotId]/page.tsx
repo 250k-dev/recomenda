@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { Route } from "next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import {
   useFarm,
   useFarmPlots,

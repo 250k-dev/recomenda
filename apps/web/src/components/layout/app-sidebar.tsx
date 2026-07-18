@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useMe, usePlanQuota } from "@/lib/api/hooks";
 import { navFor } from "@/config/nav";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import type { AccessLevel, UserRole } from "@/types/auth";
 import { Logo } from "@/assets/logo";
 import { NotificationsBell } from "./notifications-bell";

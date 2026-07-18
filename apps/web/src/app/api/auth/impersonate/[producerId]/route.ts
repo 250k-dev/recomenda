@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "@/config/env";
+import { serverEnv } from "@recomenda/config/server";
 import { setAccessCookie } from "@/lib/auth/session-cookies";
 
 export async function POST(
@@ -16,7 +16,7 @@ export async function POST(
   }
 
   const response = await fetch(
-    `${env.API_INTERNAL_URL}/auth/impersonate/${producerId}`,
+    `${serverEnv.API_INTERNAL_URL}/auth/impersonate/${producerId}`,
     {
       method: "POST",
       headers: {

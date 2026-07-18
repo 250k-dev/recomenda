@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 import { useQueries } from "@tanstack/react-query";
 import { Check, ChevronRight, Leaf, Plus, Share2 } from "lucide-react";
 import { toast } from "sonner";

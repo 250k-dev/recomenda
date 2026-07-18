@@ -35,7 +35,7 @@ import {
   STATUS_LABELS,
   STATUS_VARIANTS,
 } from "@recomenda/utils";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });

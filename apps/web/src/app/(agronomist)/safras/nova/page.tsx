@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 export default function SeasonsNewRedirectPage() {
   const router = useRouter();

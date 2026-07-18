@@ -1,7 +1,7 @@
 "use client";
 
 import type { Route } from "next";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";

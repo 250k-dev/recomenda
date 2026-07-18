@@ -28,7 +28,7 @@ import { extractError } from "@/components/domain/season/_shared";
 import { RecommendationCard } from "@/components/domain/season/recommendation-card";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
 import { fmtDate } from "@/lib/recommendations/format";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 function AddStagePanel({
   seasonId,

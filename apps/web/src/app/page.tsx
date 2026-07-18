@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionRole } from "@/lib/auth/session";
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 export default async function Home() {
   const role = await getSessionRole();

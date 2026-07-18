@@ -1,6 +1,6 @@
 "use client";
 
-import { routes } from "@/config/routes";
+import { routes } from "@recomenda/config";
 
 import type { Route } from "next";
 import { useMemo, useState, type ReactNode } from "react";
