@@ -614,25 +614,23 @@ function PlanHeader({
   const cropLabel = crop === "CORN" ? "Milho" : "Soja";
   const title =
     producerName && farmName ? `${producerName} · ${farmName}` : producerName ?? planTitle;
-  const meta = [cropLabel, variety, `${num(area)} ha`, `${plotsCount} talhões`].filter(Boolean) as string[];
   const updatedLabel = updatedAt
     ? formatRelative(updatedAt)
     : null;
 
   return (
     <PageHero
-      className="mb-0"
+      className="mb-7"
       icon={<Wheat className="size-6" />}
       eyebrow={`Plano de custo · ${planTitle}`}
       title={title}
-      meta={
-        <>
-          {meta.join(" · ")}
-          {updatedLabel ? (
-            <span className="text-muted-foreground/70"> · atualizado {updatedLabel}</span>
-          ) : null}
-        </>
-      }
+      stats={[
+        ...(cropLabel ? [{ label: "Cultura", value: cropLabel }] : []),
+        ...(variety ? [{ label: "Variedade", value: variety }] : []),
+        { label: "Área", value: `${num(area)} ha` },
+        { label: "Talhões", value: plotsCount },
+        ...(updatedLabel ? [{ label: "Atualizado", value: updatedLabel }] : []),
+      ]}
       actions={
         <>
           <CropToggle crop={crop} />

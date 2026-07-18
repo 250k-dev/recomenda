@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useMe, useUpdateProfile, useChangePassword } from "@/lib/api/hooks";
 import { SettingsFormSkeleton } from "@/components/domain/page-skeletons";
+import { maskPhoneBR } from "@/lib/utils/phone";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -55,12 +56,12 @@ export function AccountSettingsPanel() {
     defaultValues: {
       name: user?.name ?? "",
       email: user?.email ?? "",
-      phone: user?.phone ?? "",
+      phone: maskPhoneBR(user?.phone),
     },
     values: {
       name: user?.name ?? "",
       email: user?.email ?? "",
-      phone: user?.phone ?? "",
+      phone: maskPhoneBR(user?.phone),
     },
   });
 
@@ -159,9 +160,15 @@ export function AccountSettingsPanel() {
               </Label>
               <Input
                 id="account-phone"
+                inputMode="tel"
                 placeholder="(11) 99999-9999"
                 className="h-[46px] rounded-xl"
                 {...profileForm.register("phone")}
+                onChange={(e) =>
+                  profileForm.setValue("phone", maskPhoneBR(e.target.value), {
+                    shouldDirty: true,
+                  })
+                }
               />
             </div>
           </div>

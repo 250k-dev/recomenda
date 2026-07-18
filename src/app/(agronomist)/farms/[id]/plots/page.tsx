@@ -211,12 +211,8 @@ export default function FarmPlotsPage() {
         icon={<MapPin className="size-6" />}
         eyebrow="Fazenda · Base"
         title="Talhões da fazenda"
-        meta={
-          farm?.name
-            ? `${farm.name} · Base usada nas safras`
-            : "Base usada nas safras"
-        }
         stats={[
+          ...(farm?.name ? [{ label: "Fazenda", value: farm.name }] : []),
           { label: "Talhões", value: plots?.length ?? 0 },
           { label: "Área total", value: `${fmtHa(totalHectares)} ha` },
           { label: "Em uso", value: inUseCount },

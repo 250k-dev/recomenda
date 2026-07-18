@@ -175,11 +175,10 @@ export default function ProducersPage() {
       <div>
         <BreadcrumbBack items={[{ label: "Produtores" }]} />
         <PageHero
-          className="mb-0"
+          className="mb-6"
           icon={<UsersRound className="size-6" />}
           eyebrow="Carteira"
           title="Produtores"
-          meta="Acompanhe fazendas, safras e aplicações de cada produtor."
           actions={
             canCreateProducer ? (
               <Button asChild variant="clay">

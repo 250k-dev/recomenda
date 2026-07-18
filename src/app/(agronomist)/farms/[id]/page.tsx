@@ -149,7 +149,6 @@ export default function FarmDetailPage() {
             <Pencil />
           </Button>
         }
-        meta={farm?.location?.trim() || "Sem localização cadastrada"}
         actions={
           <>
             {tabFromUrl !== "stock" ? (
@@ -170,8 +169,12 @@ export default function FarmDetailPage() {
             </Button>
           </>
         }
-        stats={
-          tabFromUrl !== "stock"
+        stats={[
+          {
+            label: "Localização",
+            value: farm?.location?.trim() || "Não cadastrada",
+          },
+          ...(tabFromUrl !== "stock"
             ? [
                 {
                   label: "Talhões",
@@ -181,8 +184,8 @@ export default function FarmDetailPage() {
                 { label: "Área total", value: `${fmtHa(totalHectares)} ha` },
                 { label: "Safras ativas", value: activeSeasonsCount },
               ]
-            : undefined
-        }
+            : []),
+        ]}
       />
 
       {tabFromUrl === "stock" ? (

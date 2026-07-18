@@ -20,6 +20,7 @@ import { useCreateQuoteResponse, useQuoteByToken } from "@/lib/api/hooks";
 import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
 import { CROP_LABELS } from "@/lib/season-constants";
 import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
+import { maskPhoneBR } from "@/lib/utils/phone";
 import { toast } from "sonner";
 
 const fmtQty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -157,6 +158,11 @@ export default function QuoteEntryPage() {
                     inputMode="tel"
                     placeholder="(00) 00000-0000"
                     {...form.register("phone")}
+                    onChange={(e) =>
+                      form.setValue("phone", maskPhoneBR(e.target.value), {
+                        shouldDirty: true,
+                      })
+                    }
                   />
                 </div>
               </div>

@@ -23,15 +23,17 @@ function PageHeroStatCell({
   const interactive = Boolean(stat.onClick);
   const className = cn(
     // Mobile: mini-card na grade 2 colunas; desktop: célula da faixa com divisores.
+    // O divisor/gutter é uniforme (sem `first:`): quem cancela o da primeira
+    // célula de cada linha é o recuo negativo do contêiner — ver PageHero.
     "rounded-xl border px-3.5 py-3 text-left",
-    "sm:rounded-none sm:border-0 sm:border-l sm:px-7 sm:py-0 sm:first:border-l-0 sm:first:pl-0",
+    "sm:rounded-none sm:border-0 sm:border-l sm:px-5 sm:py-0 lg:px-7",
     inverted
       ? "border-white/15 bg-white/10 sm:border-white/25 sm:bg-transparent"
-      : "border-border bg-card sm:bg-transparent",
+      : "border-border bg-surface-2 sm:bg-transparent",
     stat.hideOnMobile && "hidden sm:block",
     interactive &&
       "cursor-pointer transition-colors sm:hover:bg-transparent " +
-        (inverted ? "hover:bg-white/15" : "hover:bg-hover/60"),
+        (inverted ? "hover:bg-white/15" : "hover:bg-hover"),
   );
 
   const dangerClass = inverted ? "text-red-200" : "text-danger";
@@ -90,14 +92,19 @@ function PageHeroStatCell({
 
 /**
  * Cabeçalho-herói das telas (design "Refactor Recomendações"): o bloco de
- * identidade que abre a página — ícone + eyebrow + título + meta + ações, com a
- * faixa de métricas embutida (divisores verticais). Serve tanto telas de lista
+ * identidade que abre a página — ícone + eyebrow + título + ações, com a faixa
+ * de métricas embutida (divisores verticais). Serve tanto telas de lista
  * (Produtores, Equipe, Templates) quanto de detalhe (Produtor, Fazenda, Safra).
- * No mobile o cartão "dissolve": identidade direto no fundo da página, métricas
- * em grade de 2 colunas e ações em linha própria.
+ * É cartão em todas as larguras; no mobile só o arranjo muda — métricas em grade
+ * de 2 colunas e ações em linha própria.
  *
  * `variant="inverted"` usa o verde primário como fundo (herói em destaque, ex.:
- * abertura de dashboard) — permanece cartão também no mobile.
+ * abertura de dashboard).
+ *
+ * Reserva 3rem (`mb-12`) até o conteúdo abaixo — o respiro que separa o herói
+ * do corpo da página. Dentro de um contêiner flex com `gap`, a margem soma ao
+ * gap: passe `className="mb-*"` com a diferença para chegar nos mesmos 3rem
+ * (ex.: `gap-6` + `mb-6`), em vez de mexer no gap, que também afeta os irmãos.
  *
  * O cabeçalho quebra a linha das ações para baixo quando elas não cabem ao lado
  * do título (barras de ação densas, ex.: Lista de compra), em vez de espremer o
@@ -110,7 +117,6 @@ export function PageHero({
   title,
   titleBadge,
   titleAction,
-  meta,
   actions,
   stats,
   children,
@@ -126,7 +132,6 @@ export function PageHero({
    * barra de `actions`. Renderiza uma única vez — serve desktop e mobile.
    */
   titleAction?: ReactNode;
-  meta?: ReactNode;
   actions?: ReactNode;
   stats?: PageHeroStat[];
   /** Conteúdo extra após as métricas (ex.: banner de alerta no mobile). */
@@ -138,10 +143,11 @@ export function PageHero({
   return (
     <section
       className={cn(
-        "mb-6",
+        "mb-12",
+        "rounded-xl p-5 shadow-sm sm:p-6",
         inverted
-          ? "rounded-xl bg-primary p-5 text-primary-foreground shadow-sm sm:p-6"
-          : "sm:rounded-xl sm:border sm:border-border sm:bg-card sm:p-6 sm:shadow-sm",
+          ? "bg-primary text-primary-foreground"
+          : "border border-border bg-card",
         className,
       )}
     >
@@ -154,7 +160,7 @@ export function PageHero({
               "flex size-12 shrink-0 items-center justify-center rounded-lg sm:size-13",
               inverted
                 ? "bg-white/15 text-white"
-                : "bg-primary text-primary-foreground",
+                : "bg-primary-soft text-primary-strong",
             )}
           >
             {icon}
@@ -163,7 +169,9 @@ export function PageHero({
             <p
               className={cn(
                 "text-[11px] font-bold uppercase tracking-[0.12em]",
-                inverted ? "text-primary-foreground/80" : "text-primary-strong",
+                inverted
+                  ? "text-primary-foreground/80"
+                  : "text-muted-foreground",
               )}
             >
               {eyebrow}
@@ -180,18 +188,6 @@ export function PageHero({
               {titleBadge}
               {titleAction}
             </div>
-            {meta ? (
-              <div
-                className={cn(
-                  "mt-1 text-sm",
-                  inverted
-                    ? "text-primary-foreground/75"
-                    : "text-muted-foreground",
-                )}
-              >
-                {meta}
-              </div>
-            ) : null}
           </div>
         </div>
         {actions ? (
@@ -201,20 +197,27 @@ export function PageHero({
         ) : null}
       </div>
 
+      {/* A faixa quebra em várias linhas quando há muitas métricas. Para que as
+          linhas seguintes não comecem com divisor e recuo sobrando, a régua
+          inteira é deslocada para a esquerda pelo tamanho do gutter e o pai
+          recorta o excesso — assim toda primeira célula de linha encosta na
+          margem e só os divisores internos aparecem. */}
       {stats && stats.length > 0 ? (
         <div
           className={cn(
-            "mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:flex sm:flex-wrap sm:gap-0 sm:border-t sm:pt-4.5",
+            "mt-4 sm:mt-5 sm:overflow-x-clip sm:border-t sm:pt-4.5",
             inverted ? "sm:border-white/20" : "sm:border-border",
           )}
         >
-          {stats.map((stat, idx) => (
-            <PageHeroStatCell
-              key={`${idx}-${stat.label}`}
-              stat={stat}
-              inverted={inverted}
-            />
-          ))}
+          <div className="grid grid-cols-2 gap-2.5 sm:-ml-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4 lg:-ml-7">
+            {stats.map((stat, idx) => (
+              <PageHeroStatCell
+                key={`${idx}-${stat.label}`}
+                stat={stat}
+                inverted={inverted}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
 

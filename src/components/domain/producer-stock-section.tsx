@@ -58,7 +58,6 @@ export function ProducerStockSection({ producerId }: { producerId: string }) {
         icon={<Boxes className="size-6" />}
         eyebrow="Estoque"
         title="Estoque do produtor"
-        meta="Cadastre o que o produtor já tem em estoque. Esses valores entram automaticamente na coluna “Estoque” ao montar a lista de compra."
         stats={[
           {
             label: "Produtos em estoque",

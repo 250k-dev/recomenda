@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/select";
+import { maskPhoneBR } from "@/lib/utils/phone";
 import {
   createProducer,
   createFarm,
@@ -369,16 +370,8 @@ function StepProducer({
             <Input
               id="phone"
               value={phone}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, "");
-                if (value.length <= 11) {
-                  let formatted = value;
-                  if (value.length > 0) formatted = `(${value.slice(0, 2)}`;
-                  if (value.length > 2) formatted += `) ${value.slice(2, 7)}`;
-                  if (value.length > 7) formatted += `-${value.slice(7)}`;
-                  setPhone(formatted);
-                }
-              }}
+              inputMode="tel"
+              onChange={(e) => setPhone(maskPhoneBR(e.target.value))}
               placeholder="(00) 00000-0000"
               className="h-[46px] rounded-xl"
             />

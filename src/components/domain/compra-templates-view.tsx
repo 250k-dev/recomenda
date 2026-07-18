@@ -80,11 +80,10 @@ export function CompraTemplatesView() {
   return (
     <div className="flex flex-col gap-6">
       <PageHero
-        className="mb-0"
+        className="mb-6"
         icon={<FileText className="size-6" />}
         eyebrow="Biblioteca"
         title="Templates de compra"
-        meta="Crie listas de compra modelo e reutilize ao montar a lista de qualquer produtor — sem refazer do zero."
         actions={
           canTemplateCrud ? (
             <Button onClick={() => setEditing("new")} className="gap-2">

@@ -149,7 +149,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
       />
 
       <PageHero
-        className="mb-0"
+        className="mb-6"
         icon={<span className="text-xl font-semibold">{initial}</span>}
         eyebrow={roleLabel}
         title={summary.name ?? roleLabel}
@@ -166,12 +166,6 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
             )
           ) : null
         }
-        meta={
-          <>
-            {summary.email ?? "—"}
-            {summary.created_at ? ` · desde ${fmtDate(summary.created_at)}` : null}
-          </>
-        }
         actions={
           canManage ? (
             <Button
@@ -185,6 +179,10 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
           ) : undefined
         }
         stats={[
+          { label: "E-mail", value: summary.email ?? "—" },
+          ...(summary.created_at
+            ? [{ label: "Desde", value: fmtDate(summary.created_at) }]
+            : []),
           ...(isManager
             ? [{ label: "Consultores", value: summary.assistant_count ?? 0 }]
             : []),

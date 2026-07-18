@@ -12,11 +12,14 @@ import { cn } from "@/lib/utils";
  */
 export function SectionToolbar({
   title,
+  titleAction,
   search,
   actions,
   className,
 }: {
   title: ReactNode;
+  /** Ação colada ao título (ex.: exportar), antes do espaçador. */
+  titleAction?: ReactNode;
   search?: {
     value: string;
     onChange: (value: string) => void;
@@ -27,9 +30,12 @@ export function SectionToolbar({
 }) {
   return (
     <div className={cn("mb-4 flex flex-wrap items-center gap-3", className)}>
-      <h2 className="min-w-0 flex-none font-display text-lg font-semibold text-text-strong">
-        {title}
-      </h2>
+      <div className="flex min-w-0 flex-none items-center gap-2">
+        <h2 className="min-w-0 font-display text-lg font-semibold text-text-strong">
+          {title}
+        </h2>
+        {titleAction}
+      </div>
       <div className="hidden min-w-4 flex-1 sm:block" />
       {search ? (
         <div className="relative order-last w-full sm:order-none sm:w-60 lg:w-72">

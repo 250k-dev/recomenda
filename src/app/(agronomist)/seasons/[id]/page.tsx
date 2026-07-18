@@ -1468,24 +1468,12 @@ function RecommendationsTab({
   return (
     <div className="flex flex-col gap-5">
       <PageHero
-        className="mb-0"
+        className="mb-7"
         icon={<Leaf className="size-6" />}
         eyebrow="Safra em execução"
         title={title}
-        meta={
-          plotName ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Sprout
-                className="size-4 shrink-0 text-primary-strong"
-                aria-hidden
-              />
-              <span>
-                Talhão <strong className="text-text-strong">{plotName}</strong>
-              </span>
-            </span>
-          ) : undefined
-        }
         stats={[
+          ...(plotName ? [{ label: "Talhão", value: plotName }] : []),
           ...(plantingDate
             ? [{ label: "Plantio", value: fmtDate(plantingDate) }]
             : []),
@@ -1515,10 +1503,10 @@ function RecommendationsTab({
       </PageHero>
 
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold font-display text-text-strong">
-          Etapas do cronograma
-        </h2>
         <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold font-display text-text-strong">
+            Etapas do cronograma
+          </h2>
           <Button
             variant="outline"
             size="sm"
@@ -1528,6 +1516,8 @@ function RecommendationsTab({
             <Share2 className="w-4 h-4 text-muted-foreground" />
             Exportar
           </Button>
+        </div>
+        <div className="flex items-center gap-2">
           {canManageStages ? (
             <Button
               variant="outline"

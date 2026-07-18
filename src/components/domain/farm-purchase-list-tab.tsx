@@ -394,11 +394,10 @@ export function FarmPurchaseListTab({
     return (
       <div className="flex flex-col gap-5">
         <PageHero
-          className="mb-0"
+          className="mb-7"
           icon={<Leaf className="size-6" />}
           eyebrow="Lista de compra"
           title="Nenhuma lista cadastrada"
-          meta="Monte uma lista fixa para esta fazenda ou use as safras ativas abaixo."
           actions={
             canListCrud ? (
               <Button asChild size="sm" variant="outline" className="gap-1.5">
@@ -444,13 +443,12 @@ export function FarmPurchaseListTab({
       ) : null}
 
       <PageHero
-        className="mb-0"
+        className="mb-7"
         icon={<Leaf className="size-6" />}
         eyebrow={`Lista de compra · ${list.name}`}
         title={`${CROP_LABELS[list.crop ?? "ANY"] ?? list.crop ?? "Multi-cultura"}${
           list.variety ? ` · ${list.variety}` : ""
         }`}
-        meta={`${fmtQty(totalHa)} ha · ${(list.plots ?? []).length} talhões`}
         actions={
           editing ? (
             <>
@@ -578,6 +576,7 @@ export function FarmPurchaseListTab({
           },
           { label: "Produtos", value: String(kpis.productsCount) },
           { label: "Hectares", value: `${fmtQty(totalHa)} ha` },
+          { label: "Talhões", value: (list.plots ?? []).length },
         ]}
       />
 

@@ -38,10 +38,9 @@ import {
 } from "@/components/ui/dialog";
 import { ProducerDetailSkeleton } from "@/components/domain/page-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatPhoneBR, maskPhoneBR } from "@/lib/utils/phone";
 import { toast } from "sonner";
 import {
-  Mail,
-  Phone,
   Pencil,
   UserRound,
   Sprout,
@@ -52,13 +51,6 @@ import {
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-
-function formatPhone(raw: string) {
-  const d = raw.replace(/\D/g, "").slice(0, 11);
-  return d.length <= 10
-    ? d.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3").replace(/-$/, "")
-    : d.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3").replace(/-$/, "");
-}
 
 export type ProducerDetailViewProps = {
   producerId: string;
@@ -162,7 +154,7 @@ export function ProducerDetailView({
     if (!producer) return;
     setEditName(producer.name);
     setEditEmail(producer.email ?? "");
-    setEditPhone(producer.phone ?? "");
+    setEditPhone(maskPhoneBR(producer.phone));
     setEditOpen(true);
   };
 
@@ -197,6 +189,10 @@ export function ProducerDetailView({
     loadingFarms ? <Skeleton className="w-12 h-6" /> : value;
 
   const heroStats: PageHeroStat[] = [
+    { label: "Telefone", value: formatPhoneBR(producer.phone) },
+    ...(producer.email?.trim()
+      ? [{ label: "E-mail", value: producer.email.trim() }]
+      : []),
     { label: "Fazendas", value: statValue(stats.farms) },
     { label: "Talhões", value: statValue(stats.plots) },
     { label: "Hectares", value: statValue(`${fmtHa(stats.hectares)} ha`) },
@@ -233,24 +229,6 @@ export function ProducerDetailView({
           >
             <Pencil />
           </Button>
-        }
-        meta={
-          <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-            <span className="inline-flex min-w-0 items-center gap-1.5">
-              <Phone className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">
-                {producer.phone?.trim() || "Sem telefone"}
-              </span>
-            </span>
-            {producer.email && (
-              <span className="inline-flex min-w-0 items-center gap-1.5">
-                <Mail className="size-3.5 shrink-0" aria-hidden />
-                <span className="truncate">
-                  {producer.email?.trim() || "Sem e-mail"}
-                </span>
-              </span>
-            )}
-          </div>
         }
         actions={
           showSeasonActions ? (
@@ -426,7 +404,7 @@ export function ProducerDetailView({
                 id="edit-phone"
                 type="tel"
                 value={editPhone}
-                onChange={(e) => setEditPhone(formatPhone(e.target.value))}
+                onChange={(e) => setEditPhone(maskPhoneBR(e.target.value))}
                 placeholder="(00) 00000-0000"
                 onKeyDown={(e) => e.key === "Enter" && saveEdit()}
               />

@@ -35,11 +35,10 @@ export function ConsultantsView() {
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-8">
       <PageHero
-        className="mb-0"
+        className="mb-4"
         icon={<Users className="size-6" />}
         eyebrow="Organização"
         title="Equipe"
-        meta="Gestores criam e gerenciam produtores. Consultores acompanham e registram aplicações nos produtores compartilhados."
         actions={
           canManage ? (
             <Button onClick={() => setInviteOpen(true)} className="gap-2">

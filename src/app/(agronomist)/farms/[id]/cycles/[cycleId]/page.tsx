@@ -191,8 +191,13 @@ export default function CycleDetailPage() {
 
   const isPlanning = seasons.length === 0;
 
-  const heroStats: PageHeroStat[] | undefined =
-    tab === "recommendations"
+  const heroStats: PageHeroStat[] = [
+    {
+      label: "Culturas",
+      value: cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "),
+    },
+    ...(farm?.name ? [{ label: "Fazenda", value: farm.name }] : []),
+    ...(tab === "recommendations"
       ? [
           { label: "Talhões", value: plotCount },
           { label: "Área", value: `${fmtHa(totalArea)} ha` },
@@ -208,7 +213,8 @@ export default function CycleDetailPage() {
             onClick: () => setTab("purchase"),
           },
         ]
-      : undefined;
+      : []),
+  ];
 
   return (
     <>
@@ -228,12 +234,6 @@ export default function CycleDetailPage() {
             </Badge>
           )
         }
-        meta={[
-          cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "),
-          farm?.name,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
         actions={
           <>
             {/* Enquanto houver talhão em rascunho, publicar fica visível em TODAS

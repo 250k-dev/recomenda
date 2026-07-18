@@ -46,10 +46,11 @@ export function AppHeader() {
 
   // Trilha/saudação com largura natural e prioridade sobre a busca: a busca
   // (flex-1) fica com a sobra da linha e decide sozinha, por container query,
-  // se cabe como input ou recolhe para ícone.
+  // se cabe como input ou recolhe para ícone. O min-h dá um piso à linha para
+  // que a trilha (uma linha) não deixe o header mais baixo que a saudação (duas).
   return (
-    <header className="px-4 pt-5 md:px-8">
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-2">
+    <header className="px-4 pt-4 pb-2 sm:pt-6 md:px-8">
+      <div className="flex items-center w-full gap-2 mx-auto min-h-14 max-w-7xl">
         <div className="min-w-0">
           {isHome ? <DashboardGreeting /> : <BreadcrumbTrail items={items} />}
         </div>

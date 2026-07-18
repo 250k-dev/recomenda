@@ -109,7 +109,9 @@ export function NewCycleDialog({
       { producer_id: producerId, name: name.trim(), crops: [...crops] },
       {
         onSuccess: (cycle) => {
-          toast.success("Safra criada! Agora monte a lista de compra e a programação.");
+          toast.success(
+            "Safra criada! Agora monte a lista de compra e a programação.",
+          );
           onOpenChange(false);
           onCreated?.(cycle.id);
         },
@@ -124,7 +126,7 @@ export function NewCycleDialog({
         <DialogHeader>
           <DialogTitle>Nova safra</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 px-6 py-5">
+        <div className="px-6 py-5 space-y-4">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-foreground">
               Nome da safra
@@ -141,7 +143,8 @@ export function NewCycleDialog({
               Culturas da safra
             </label>
             <p className="mb-2 text-xs text-muted-foreground">
-              A safra pode ter mais de uma cultura — cada talhão recebe uma delas.
+              A safra pode ter mais de uma cultura — cada talhão recebe uma
+              delas.
             </p>
             <div className="flex flex-col gap-2">
               {CROP_CHOICES.map((crop) => {
@@ -215,7 +218,9 @@ export function FarmCyclesSection({
       cycle.name.toLocaleLowerCase("pt-BR").includes(query),
     );
   }, [visibleCycles, search]);
-  const exportableCycle = visibleCycles.find((cycle) => cycle.recommendations_total > 0);
+  const exportableCycle = visibleCycles.find(
+    (cycle) => cycle.recommendations_total > 0,
+  );
   const selectedCycleSummary =
     visibleCycles.find((cycle) => cycle.id === exportCycleId) ?? null;
   const { data: selectedCycle, isLoading: loadingCycleExport } = useCycle(
@@ -237,14 +242,21 @@ export function FarmCyclesSection({
   const exportItems = useMemo<FarmExportItem[]>(() => {
     if (!selectedCycle) return [];
 
-    return selectedCycle.seasons.reduce<FarmExportItem[]>((acc, season, index) => {
+    return selectedCycle.seasons.reduce<FarmExportItem[]>(
+      (acc, season, index) => {
         const rows = timelineQueries[index]?.data;
-        const recommendations = (Array.isArray(rows) ? rows : []) as Recommendation[];
+        const recommendations = (
+          Array.isArray(rows) ? rows : []
+        ) as Recommendation[];
         if (recommendations.length === 0) return acc;
 
         const cropLabel = CROP_LABELS[season.crop] ?? season.crop;
-        const title = season.variety ? `${cropLabel} — ${season.variety}` : cropLabel;
-        const done = recommendations.filter((rec) => APPLIED.has(rec.status)).length;
+        const title = season.variety
+          ? `${cropLabel} — ${season.variety}`
+          : cropLabel;
+        const done = recommendations.filter((rec) =>
+          APPLIED.has(rec.status),
+        ).length;
 
         acc.push({
           id: season.id,
@@ -263,13 +275,13 @@ export function FarmCyclesSection({
         });
 
         return acc;
-      }, []);
+      },
+      [],
+    );
   }, [me?.name, producer?.name, selectedCycle, timelineQueries]);
 
   const openCycle = (cycleId: string) => {
-    router.push(
-      cycleHref({ id: cycleId, farm_id: farmId }, producerId),
-    );
+    router.push(cycleHref({ id: cycleId, farm_id: farmId }, producerId));
   };
 
   const openExport = (cycleId: string) => {
@@ -284,29 +296,36 @@ export function FarmCyclesSection({
       <div>
         <SectionToolbar
           title="Safras desta fazenda"
+          titleAction={
+            exportableCycle ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => openExport(exportableCycle.id)}
+              >
+                <Share2 className="w-4 h-4 text-muted-foreground" />
+                Exportar
+              </Button>
+            ) : null
+          }
           search={
             visibleCycles.length > 0
-              ? { value: search, onChange: setSearch, placeholder: "Buscar safra…" }
+              ? {
+                  value: search,
+                  onChange: setSearch,
+                  placeholder: "Buscar safra…",
+                }
               : undefined
           }
           actions={
             <>
-              {exportableCycle ? (
-                <Button
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => openExport(exportableCycle.id)}
-                >
-                  <Share2 className="h-4 w-4 text-muted-foreground" />
-                  Exportar
-                </Button>
-              ) : null}
               {producerId ? (
                 <Button
                   className="hidden gap-1.5 sm:inline-flex"
                   onClick={() => setNewCycleOpen(true)}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="w-4 h-4" />
                   Nova safra
                 </Button>
               ) : null}
@@ -338,19 +357,22 @@ export function FarmCyclesSection({
               const pct = cycle.progress_pct;
               const showProgress = cycle.recommendations_total > 0;
               return (
-                <Card key={cycle.id} className="gap-0 overflow-hidden p-0 transition-all hover:border-primary/30 hover:shadow-md">
+                <Card
+                  key={cycle.id}
+                  className="gap-0 p-0 overflow-hidden transition-all hover:border-primary/30 hover:shadow-md"
+                >
                   <CardContent className="p-0">
                     <button
                       type="button"
                       className="flex w-full items-center gap-3.5 px-4 py-4 text-left transition-colors hover:bg-hover/30"
                       onClick={() => openCycle(cycle.id)}
                     >
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
+                      <span className="flex items-center justify-center size-10 shrink-0 rounded-xl bg-primary-soft text-primary-strong">
                         <Leaf className="size-5" />
                       </span>
-                      <span className="min-w-0 flex-1">
+                      <span className="flex-1 min-w-0">
                         <span className="flex flex-wrap items-center gap-2">
-                          <span className="truncate text-base font-semibold text-text-strong">
+                          <span className="text-base font-semibold truncate text-text-strong">
                             {cycle.name}
                           </span>
                           {cycle.is_planning ? (
@@ -359,10 +381,15 @@ export function FarmCyclesSection({
                             </Badge>
                           ) : (
                             <Badge
-                              variant={cycle.status === "ACTIVE" ? "success" : "neutral"}
+                              variant={
+                                cycle.status === "ACTIVE"
+                                  ? "success"
+                                  : "neutral"
+                              }
                               className="shrink-0"
                             >
-                              {CYCLE_STATUS_LABELS[cycle.status] ?? cycle.status}
+                              {CYCLE_STATUS_LABELS[cycle.status] ??
+                                cycle.status}
                             </Badge>
                           )}
                         </span>
@@ -374,7 +401,9 @@ export function FarmCyclesSection({
                             cycle.is_planning
                               ? "sem talhões programados"
                               : `${cycle.plots_count} ${cycle.plots_count === 1 ? "talhão" : "talhões"}`,
-                            cycle.area_ha > 0 ? `${fmtHa(cycle.area_ha)} ha` : null,
+                            cycle.area_ha > 0
+                              ? `${fmtHa(cycle.area_ha)} ha`
+                              : null,
                           ]
                             .filter(Boolean)
                             .join(" · ")}
@@ -384,24 +413,28 @@ export function FarmCyclesSection({
                         <span className="hidden w-56 shrink-0 lg:block">
                           <span className="mb-1.5 flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">
-                              {cycle.recommendations_done}/{cycle.recommendations_total} aplicadas
+                              {cycle.recommendations_done}/
+                              {cycle.recommendations_total} aplicadas
                             </span>
                             <span className="font-semibold tabular-nums text-primary-strong">
                               {pct}%
                             </span>
                           </span>
-                          <ProgressBar value={pct} className="h-1.5 bg-surface-2" />
+                          <ProgressBar
+                            value={pct}
+                            className="h-1.5 bg-surface-2"
+                          />
                         </span>
                       ) : null}
                       <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
                     </button>
 
                     {showProgress ? (
-                      <div className="border-t border-border bg-rail px-4 py-3 lg:hidden">
+                      <div className="px-4 py-3 border-t border-border bg-rail lg:hidden">
                         <div className="mb-1.5 flex items-center justify-between text-xs">
                           <span className="text-muted-foreground">
-                            {cycle.recommendations_done}/{cycle.recommendations_total}{" "}
-                            aplicadas
+                            {cycle.recommendations_done}/
+                            {cycle.recommendations_total} aplicadas
                           </span>
                           <span className="font-semibold tabular-nums text-primary-strong">
                             {pct}%
@@ -420,7 +453,11 @@ export function FarmCyclesSection({
 
       {producerId ? (
         <StickyMobileCta>
-          <Button size="lg" className="gap-2" onClick={() => setNewCycleOpen(true)}>
+          <Button
+            size="lg"
+            className="gap-2"
+            onClick={() => setNewCycleOpen(true)}
+          >
             <Plus className="size-4" />
             Nova safra
           </Button>
