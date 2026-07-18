@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { EntityHero, type HeroStat } from "@/components/domain/entity-hero";
+import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { ProgressBar } from "@/components/ui/progress-bar";
@@ -182,7 +182,7 @@ export default function CycleDetailPage() {
 
   const isPlanning = seasons.length === 0;
 
-  const heroStats: HeroStat[] | undefined =
+  const heroStats: PageHeroStat[] | undefined =
     tab === "recommendations"
       ? [
           { label: "Talhões", value: plotCount },
@@ -206,7 +206,7 @@ export default function CycleDetailPage() {
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <EntityHero
+      <PageHero
         icon={<Leaf className="size-6" />}
         eyebrow="Safra"
         title={cycle.name}

@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
+import { PageHero } from "@/components/domain/page-hero";
 import {
   useCreatePurchaseListTemplate,
   useDeletePurchaseListTemplate,
@@ -78,28 +79,24 @@ export function CompraTemplatesView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <FileText className="h-5 w-5" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Templates de compra
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Crie listas de compra modelo e reutilize ao montar a lista de qualquer produtor —
-              sem refazer do zero.
-            </p>
-          </div>
-        </div>
-        {canTemplateCrud ? (
-        <Button onClick={() => setEditing("new")} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo template
-        </Button>
-        ) : null}
-      </div>
+      <PageHero
+        className="mb-0"
+        icon={<FileText className="size-6" />}
+        eyebrow="Biblioteca"
+        title="Templates de compra"
+        meta="Crie listas de compra modelo e reutilize ao montar a lista de qualquer produtor — sem refazer do zero."
+        actions={
+          canTemplateCrud ? (
+            <Button onClick={() => setEditing("new")} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Novo template
+            </Button>
+          ) : undefined
+        }
+        stats={[
+          { label: "Templates", value: isLoading ? "…" : (templates?.length ?? 0) },
+        ]}
+      />
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Carregando…</p>

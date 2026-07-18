@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { PageHero } from "@/components/domain/page-hero";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -147,82 +148,54 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
         ]}
       />
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <span
-            className={cn(
-              "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-xl font-bold",
-              isManager ? "bg-[#1E5C40] text-white" : "bg-[#EDE9E2] text-[#5C564E]",
-            )}
-          >
-            {initial}
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[26px] font-extrabold tracking-tight text-[#2B2723]">
-                {summary.name ?? roleLabel}
-              </h1>
-              <span
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide",
-                  isManager
-                    ? "bg-[#E4EEE7] text-[#1E6B4A]"
-                    : "bg-[#EDE9E2] text-[#5C564E]",
-                )}
-              >
-                {roleLabel}
+      <PageHero
+        className="mb-0"
+        icon={<span className="text-xl font-semibold">{initial}</span>}
+        eyebrow={roleLabel}
+        title={summary.name ?? roleLabel}
+        titleBadge={
+          !isManager ? (
+            summary.manager_user_id && summary.manager_name ? (
+              <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-strong">
+                via {summary.manager_name}
               </span>
-              {!isManager ? (
-                summary.manager_user_id && summary.manager_name ? (
-                  <span className="rounded-full bg-[#E4EEE7] px-2.5 py-0.5 text-[12px] font-medium text-[#1E6B4A]">
-                    via {summary.manager_name}
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-[#F3EEDD] px-2.5 py-0.5 text-[12px] font-medium text-[#7A6B3F]">
-                    direto com você
-                  </span>
-                )
-              ) : null}
-            </div>
-            <p className="mt-1 text-sm text-[#8A857D]">
-              {summary.email ?? "—"}
-              {summary.created_at ? ` · desde ${fmtDate(summary.created_at)}` : null}
-            </p>
-          </div>
-        </div>
-        {canManage ? (
-          <Button
-            variant="outline"
-            className="gap-2 border-[#EBD9D4] text-[#B23A28] hover:bg-[#FBF3F1]"
-            onClick={() => setConfirmRemove(true)}
-          >
-            <Trash2 className="size-4" />
-            Remover {roleLabel.toLowerCase()}
-          </Button>
-        ) : null}
-      </div>
-
-      <div
-        className={cn(
-          "grid gap-4",
-          isManager ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3",
-        )}
-      >
-        {isManager ? (
-          <StatCard value={summary.assistant_count ?? 0} label="consultores" />
-        ) : null}
-        <StatCard value={summary.producers.length} label="produtores" />
-        <StatCard value={summary.activity_count_30d} label="ações · 30 dias" />
-        {summary.last_activity_at ? (
-          <StatCard
-            value={fmtDate(summary.last_activity_at)}
-            label="última ação"
-            small
-          />
-        ) : (
-          <StatCard value="—" label="última ação" small />
-        )}
-      </div>
+            ) : (
+              <span className="rounded-full bg-clay-soft px-2.5 py-0.5 text-xs font-medium text-clay-strong">
+                direto com você
+              </span>
+            )
+          ) : null
+        }
+        meta={
+          <>
+            {summary.email ?? "—"}
+            {summary.created_at ? ` · desde ${fmtDate(summary.created_at)}` : null}
+          </>
+        }
+        actions={
+          canManage ? (
+            <Button
+              variant="outline"
+              className="gap-2 border-danger-border text-danger-strong hover:bg-danger-soft hover:text-danger-strong"
+              onClick={() => setConfirmRemove(true)}
+            >
+              <Trash2 className="size-4" />
+              Remover {roleLabel.toLowerCase()}
+            </Button>
+          ) : undefined
+        }
+        stats={[
+          ...(isManager
+            ? [{ label: "Consultores", value: summary.assistant_count ?? 0 }]
+            : []),
+          { label: "Produtores", value: summary.producers.length },
+          { label: "Ações · 30 dias", value: summary.activity_count_30d },
+          {
+            label: "Última ação",
+            value: summary.last_activity_at ? fmtDate(summary.last_activity_at) : "—",
+          },
+        ]}
+      />
 
       {!isManager ? (
         <div className="flex gap-3 rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-5 py-4">
@@ -413,25 +386,6 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
         loading={removeMutation.isPending}
         onConfirm={confirmRemoveMember}
       />
-    </div>
-  );
-}
-
-function StatCard({
-  value,
-  label,
-  small,
-}: {
-  value: string | number;
-  label: string;
-  small?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl bg-white px-5 py-4 shadow-sm">
-      <p className={cn("font-extrabold text-[#2B2723]", small ? "text-lg" : "text-[26px]")}>
-        {value}
-      </p>
-      <p className="text-[13px] text-[#8A857D]">{label}</p>
     </div>
   );
 }

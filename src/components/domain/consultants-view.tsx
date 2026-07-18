@@ -15,6 +15,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHero } from "@/components/domain/page-hero";
 import { useConsultants, useCreateInvitation, useMe } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { useCan } from "@/lib/auth/use-can";
@@ -33,26 +34,25 @@ export function ConsultantsView() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] bg-[#E4EEE7] text-[#1E5C40]">
-            <Users className="h-6 w-6" />
-          </span>
-          <div>
-            <h1 className="text-[28px] font-extrabold tracking-tight text-[#2B2723]">Equipe</h1>
-            <p className="mt-1 max-w-2xl text-[15px] text-[#6B655C]">
-              Gestores criam e gerenciam produtores. Consultores acompanham e registram
-              aplicações nos produtores compartilhados.
-            </p>
-          </div>
-        </div>
-        {canManage ? (
-          <Button onClick={() => setInviteOpen(true)} className="gap-2 rounded-xl px-5 py-3">
-            <UserPlus className="h-4 w-4" />
-            Convidar
-          </Button>
-        ) : null}
-      </div>
+      <PageHero
+        className="mb-0"
+        icon={<Users className="size-6" />}
+        eyebrow="Organização"
+        title="Equipe"
+        meta="Gestores criam e gerenciam produtores. Consultores acompanham e registram aplicações nos produtores compartilhados."
+        actions={
+          canManage ? (
+            <Button onClick={() => setInviteOpen(true)} className="gap-2">
+              <UserPlus className="h-4 w-4" />
+              Convidar
+            </Button>
+          ) : undefined
+        }
+        stats={[
+          { label: "Gestores", value: isLoading ? "…" : managers.length },
+          { label: "Consultores", value: isLoading ? "…" : assistants.length },
+        ]}
+      />
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Carregando…</p>

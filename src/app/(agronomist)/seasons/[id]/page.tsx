@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { PageHero } from "@/components/domain/page-hero";
 import {
   PageHeaderSkeleton,
   TimelineCardsSkeleton,
@@ -1285,6 +1286,9 @@ function RecommendationsTab({
   const reorderMut = useReorderRecommendations(seasonId);
   const meData = useMe().data as { name?: string } | undefined;
   const producerQuery = useProducer(producerId ?? "");
+  // Hook antes de qualquer return condicional (regras dos Hooks) — senão a
+  // transição loading→carregado dispara "rendered more hooks than previous".
+  const canEditStructurePerm = useCan("RECOMMENDATION_EDIT_STRUCTURE");
 
   if (isLoading) return <TimelineCardsSkeleton count={5} />;
 
@@ -1292,7 +1296,6 @@ function RecommendationsTab({
     Array.isArray(data) ? data : (data as { data?: unknown[] } | undefined)?.data ?? []
   ) as Recommendation[];
 
-  const canEditStructurePerm = useCan("RECOMMENDATION_EDIT_STRUCTURE");
   const canManageStages =
     (seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS") &&
     canEditStructurePerm;
@@ -1373,53 +1376,35 @@ function RecommendationsTab({
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 items-start gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-              <Leaf className="h-6 w-6" />
+      <PageHero
+        className="mb-0"
+        icon={<Leaf className="size-6" />}
+        eyebrow="Safra em execução"
+        title={title}
+        meta={
+          plotName ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Sprout className="size-4 shrink-0 text-primary-strong" aria-hidden />
+              <span>
+                Talhão <strong className="text-text-strong">{plotName}</strong>
+              </span>
             </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-                Safra em execução
-              </p>
-              <h1 className="mt-0.5 font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
-                {title}
-              </h1>
-              {plotName ? (
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Sprout className="h-4 w-4 shrink-0 text-primary-strong" />
-                  <span>
-                    Talhão <strong className="text-text-strong">{plotName}</strong>
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3 sm:justify-end">
-            {plantingDate ? (
-              <div className="rounded-lg border border-border bg-surface-2 px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                  Plantio
-                </p>
-                <p className="mt-0.5 font-display text-lg font-semibold tabular-nums text-text-strong">
-                  {fmtDate(plantingDate)}
-                </p>
-              </div>
-            ) : null}
-            {statusLabel ? (
-              <div className="rounded-lg border border-border bg-surface-2 px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                  Status
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-text-strong">{statusLabel}</p>
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="border-t border-border bg-rail px-5 py-4">
+          ) : undefined
+        }
+        stats={[
+          ...(plantingDate
+            ? [{ label: "Plantio", value: fmtDate(plantingDate) }]
+            : []),
+          ...(statusLabel ? [{ label: "Status", value: statusLabel }] : []),
+          {
+            label: "Aplicações",
+            value: total > 0 ? `${done}/${total}` : "—",
+            sub: total > 0 ? `${progressPct}%` : undefined,
+            subClassName: "font-semibold text-primary-strong",
+          },
+        ]}
+      >
+        <div className="mt-4 rounded-xl border border-border bg-rail px-4 py-3.5 sm:mt-5">
           <div className="mb-2 flex items-center justify-between gap-3 text-sm">
             <span className="font-medium text-text-strong">Progresso das aplicações</span>
             <span className="font-semibold tabular-nums text-primary-strong">
@@ -1429,7 +1414,7 @@ function RecommendationsTab({
           </div>
           <ProgressBar value={progressPct} />
         </div>
-      </section>
+      </PageHero>
 
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-base font-semibold text-text-strong">Etapas do cronograma</h2>

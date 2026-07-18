@@ -10,7 +10,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { EntityHero } from "@/components/domain/entity-hero";
+import { PageHero } from "@/components/domain/page-hero";
 import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
@@ -207,7 +207,7 @@ export default function FarmPlotsPage() {
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <EntityHero
+      <PageHero
         icon={<MapPin className="size-6" />}
         eyebrow="Fazenda · Base"
         title="Talhões da fazenda"

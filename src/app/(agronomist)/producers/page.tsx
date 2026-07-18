@@ -10,8 +10,7 @@ import { toast } from "sonner";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { PageHeader } from "@/components/domain/page-header";
-import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { PageHero } from "@/components/domain/page-hero";
 import { ProducerAttentionBadge } from "@/components/domain/producer-attention-badge";
 import { PaginationBar } from "@/components/ui/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
@@ -24,8 +23,6 @@ import {
   UsersRound,
   Search,
   ArrowDownUp,
-  Users as UsersIcon,
-  Sprout,
   Archive,
   RotateCcw,
   Trash2,
@@ -179,12 +176,13 @@ export default function ProducersPage() {
         <BreadcrumbBack
           items={[{ label: "Início", href: "/dashboard" }, { label: "Produtores" }]}
         />
-        <PageHeader
-          icon={<UsersRound className="h-5 w-5" />}
-          section="Carteira"
+        <PageHero
+          className="mb-0"
+          icon={<UsersRound className="size-6" />}
+          eyebrow="Carteira"
           title="Produtores"
-          description={`${fmt(totalProducers)} produtor${totalProducers === 1 ? "" : "es"} cadastrado${totalProducers === 1 ? "" : "s"}. Acompanhe fazendas, safras e aplicações de cada um.`}
-          action={
+          meta="Acompanhe fazendas, safras e aplicações de cada produtor."
+          actions={
             canCreateProducer ? (
               <Button asChild variant="clay">
                 <Link href="/producers/new">
@@ -194,24 +192,12 @@ export default function ProducersPage() {
               </Button>
             ) : undefined
           }
+          stats={[
+            { label: "Produtores", value: fmt(totalProducers) },
+            { label: "Hectares totais", value: `${fmtHa(totalHectares)} ha` },
+          ]}
         />
       </div>
-
-      {/* KPI strip */}
-      <KpiStrip>
-        <KpiCell
-          label="Produtores"
-          value={fmt(totalProducers)}
-          sub="na carteira"
-          icon={<UsersIcon className="size-4" />}
-        />
-        <KpiCell
-          label="Hectares totais"
-          value={`${fmtHa(totalHectares)} ha`}
-          sub="soma da carteira"
-          icon={<Sprout className="size-4" />}
-        />
-      </KpiStrip>
 
       {/* Lista */}
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">

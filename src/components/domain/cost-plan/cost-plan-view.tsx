@@ -13,6 +13,7 @@ import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { PageHero } from "@/components/domain/page-hero";
 import { useSeasonCostPlan, useUpdatePurchaseList, useLocalCatalog } from "@/lib/api/hooks";
 import { useCurrencyStore } from "@/stores/currency";
 import {
@@ -619,41 +620,31 @@ function PlanHeader({
     : null;
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-          <Wheat className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-            Plano de custo · {planTitle}
-          </p>
-          <h2 className="mt-0.5 truncate font-display text-2xl font-semibold tracking-[-0.02em] text-text-strong">
-            {title}
-          </h2>
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-            {meta.map((m, i) => (
-              <span key={i} className="inline-flex items-center gap-1">
-                {i > 0 ? <span className="text-muted-foreground/50">·</span> : null}
-                {m}
-              </span>
-            ))}
-          </p>
+    <PageHero
+      className="mb-0"
+      icon={<Wheat className="size-6" />}
+      eyebrow={`Plano de custo · ${planTitle}`}
+      title={title}
+      meta={
+        <>
+          {meta.join(" · ")}
           {updatedLabel ? (
-            <p className="mt-1 text-xs text-muted-foreground">Atualizado {updatedLabel}</p>
+            <span className="text-muted-foreground/70"> · atualizado {updatedLabel}</span>
           ) : null}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <CropToggle crop={crop} />
-        <DuplicateButton purchaseListId={purchaseListId} />
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={onExport}>
-          <Download className="h-4 w-4" />
-          Exportar
-        </Button>
-        <AddInsumoMenu products={products} onSelect={onAddProduct} />
-      </div>
-    </div>
+        </>
+      }
+      actions={
+        <>
+          <CropToggle crop={crop} />
+          <DuplicateButton purchaseListId={purchaseListId} />
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={onExport}>
+            <Download className="h-4 w-4" />
+            Exportar
+          </Button>
+          <AddInsumoMenu products={products} onSelect={onAddProduct} />
+        </>
+      }
+    />
   );
 }
 

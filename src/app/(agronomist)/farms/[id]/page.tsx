@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
-import { EntityHero } from "@/components/domain/entity-hero";
+import { PageHero } from "@/components/domain/page-hero";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,7 +138,7 @@ export default function FarmDetailPage() {
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <EntityHero
+      <PageHero
         icon={<Tractor className="size-6" />}
         eyebrow="Fazenda"
         title={farm?.name ?? "Detalhes da fazenda"}

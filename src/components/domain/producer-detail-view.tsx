@@ -7,7 +7,7 @@ import { getFarmCycles } from "@/lib/api/cycles";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
-import { EntityHero, type HeroStat } from "@/components/domain/entity-hero";
+import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
 import { ProducerTimingTemplatesPanel } from "@/components/domain/timing/producer-timing-templates-section";
@@ -193,7 +193,7 @@ export function ProducerDetailView({
   const statValue = (value: ReactNode) =>
     loadingFarms ? <Skeleton className="h-6 w-12" /> : value;
 
-  const heroStats: HeroStat[] = [
+  const heroStats: PageHeroStat[] = [
     { label: "Fazendas", value: statValue(stats.farms) },
     { label: "Talhões", value: statValue(stats.plots) },
     { label: "Hectares", value: statValue(`${fmtHa(stats.hectares)} ha`) },
@@ -216,7 +216,7 @@ export function ProducerDetailView({
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <EntityHero
+      <PageHero
         icon={<span className="text-xl font-semibold">{initial}</span>}
         eyebrow="Produtor"
         title={producer.name}
@@ -274,7 +274,7 @@ export function ProducerDetailView({
               : `${lateCount} aplicações atrasadas`}
           </button>
         ) : null}
-      </EntityHero>
+      </PageHero>
 
       <ProducerFarmsSection
         producerId={producerId}

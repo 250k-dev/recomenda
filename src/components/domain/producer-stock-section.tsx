@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/select";
+import { PageHero } from "@/components/domain/page-hero";
 import { useLocalCatalog } from "@/lib/api/hooks";
 import { useProducerStock, useAdjustProducerStock } from "@/lib/api/hooks/producers";
 import { apiErrorMessage } from "@/lib/api-error";
@@ -52,18 +53,21 @@ export function ProducerStockSection({ producerId }: { producerId: string }) {
   };
 
   return (
-    <section className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <Boxes className="h-5 w-5 text-primary" />
-        <h2 className="font-display text-lg font-semibold text-text-strong">
-          Estoque do produtor
-        </h2>
-      </div>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Cadastre o que o produtor já tem em estoque. Esses valores entram automaticamente na
-        coluna “Estoque” ao montar a lista de compra.
-      </p>
+    <>
+      <PageHero
+        icon={<Boxes className="size-6" />}
+        eyebrow="Estoque"
+        title="Estoque do produtor"
+        meta="Cadastre o que o produtor já tem em estoque. Esses valores entram automaticamente na coluna “Estoque” ao montar a lista de compra."
+        stats={[
+          {
+            label: "Produtos em estoque",
+            value: isLoading ? "…" : (stock ?? []).length,
+          },
+        ]}
+      />
 
+    <section className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1 space-y-1.5">
           <Label>Produto</Label>
@@ -135,5 +139,6 @@ export function ProducerStockSection({ producerId }: { producerId: string }) {
         </div>
       )}
     </section>
+    </>
   );
 }

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, Eye, FileDown, Leaf, Package, Pencil, Plus, Sprout, Store, Tag, Target, X, Check, Loader2 } from "lucide-react";
+import { Boxes, Eye, FileDown, Leaf, Pencil, Plus, Store, Target, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
-import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
+import { PageHero } from "@/components/domain/page-hero";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -393,32 +393,23 @@ export function FarmPurchaseListTab({
   if (!list) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-clay-soft text-clay-strong">
-              <Leaf className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-                Lista de compra
-              </p>
-              <h2 className="mt-0.5 font-display text-xl font-semibold tracking-[-0.02em] text-text-strong">
-                Nenhuma lista cadastrada
-              </h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Monte uma lista fixa para esta fazenda ou use as safras ativas abaixo.
-              </p>
-            </div>
-          </div>
-          {canListCrud ? (
-          <Button asChild size="sm" variant="outline" className="gap-1.5">
-            <Link href={newPurchaseListHref}>
-              <Plus className="h-4 w-4" />
-              Montar lista
-            </Link>
-          </Button>
-          ) : null}
-        </div>
+        <PageHero
+          className="mb-0"
+          icon={<Leaf className="size-6" />}
+          eyebrow="Lista de compra"
+          title="Nenhuma lista cadastrada"
+          meta="Monte uma lista fixa para esta fazenda ou use as safras ativas abaixo."
+          actions={
+            canListCrud ? (
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link href={newPurchaseListHref}>
+                  <Plus className="h-4 w-4" />
+                  Montar lista
+                </Link>
+              </Button>
+            ) : undefined
+          }
+        />
 
         {fallbackSeasonIds.length > 0 ? (
           <FarmSeasonShoppingFallback seasonIds={fallbackSeasonIds} />
@@ -452,26 +443,16 @@ export function FarmPurchaseListTab({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-            <Leaf className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-              Lista de compra · {list.name}
-            </p>
-            <h2 className="mt-0.5 font-display text-xl font-semibold tracking-[-0.02em] text-text-strong">
-              {CROP_LABELS[list.crop ?? "ANY"] ?? list.crop ?? "Multi-cultura"}
-              {list.variety ? ` · ${list.variety}` : ""}
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {fmtQty(totalHa)} ha · {(list.plots ?? []).length} talhões
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {editing ? (
+      <PageHero
+        className="mb-0"
+        icon={<Leaf className="size-6" />}
+        eyebrow={`Lista de compra · ${list.name}`}
+        title={`${CROP_LABELS[list.crop ?? "ANY"] ?? list.crop ?? "Multi-cultura"}${
+          list.variety ? ` · ${list.variety}` : ""
+        }`}
+        meta={`${fmtQty(totalHa)} ha · ${(list.plots ?? []).length} talhões`}
+        actions={
+          editing ? (
             <>
               <SaveStatus state={saveState} savedAt={savedAt} />
               <Button
@@ -580,9 +561,25 @@ export function FarmPurchaseListTab({
                 </Button>
               ) : null}
             </>
-          )}
-        </div>
-      </div>
+          )
+        }
+        stats={[
+          {
+            label: "Valor total",
+            value: kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—",
+          },
+          {
+            label: "Volume de sacas",
+            value: kpis.totalSacks > 0 ? `${fmtQty(kpis.totalSacks)} sc` : "—",
+          },
+          {
+            label: "Custo (sc/ha)",
+            value: kpis.costSacksPerHa > 0 ? `${fmtQty(kpis.costSacksPerHa)} sc/ha` : "—",
+          },
+          { label: "Produtos", value: String(kpis.productsCount) },
+          { label: "Hectares", value: `${fmtQty(totalHa)} ha` },
+        ]}
+      />
 
       {restoreItems && !editing && !effectiveReadOnly ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
@@ -608,38 +605,6 @@ export function FarmPurchaseListTab({
           de novo em alguns segundos (o servidor pode estar reativando).
         </div>
       ) : null}
-
-      <KpiStrip>
-        <KpiCell
-          label="Valor total"
-          value={kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—"}
-          icon={<Package className="size-4" />}
-        />
-        <KpiCell
-          label="Volume de sacas"
-          value={kpis.totalSacks > 0 ? `${fmtQty(kpis.totalSacks)} sc` : "—"}
-          icon={<Leaf className="size-4" />}
-        />
-        <KpiCell
-          label="Custo (sc/ha)"
-          value={
-            kpis.costSacksPerHa > 0
-              ? `${fmtQty(kpis.costSacksPerHa)} sc/ha`
-              : "—"
-          }
-          icon={<Tag className="size-4" />}
-        />
-        <KpiCell
-          label="Produtos"
-          value={String(kpis.productsCount)}
-          icon={<Package className="size-4" />}
-        />
-        <KpiCell
-          label="Hectares"
-          value={`${fmtQty(totalHa)} ha`}
-          icon={<Sprout className="size-4" />}
-        />
-      </KpiStrip>
 
       {hasItems || editing ? (
         <div className="space-y-4">
