@@ -43,7 +43,7 @@ import {
   RefreshCw,
   ChevronDown,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", {

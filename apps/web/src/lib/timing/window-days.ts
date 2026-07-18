@@ -1,5 +1,5 @@
 import { addDays, differenceInCalendarDays } from "date-fns";
-import { dateToLocalYmd, localYmdToDate } from "@/lib/utils/dates";
+import { dateToLocalYmd, localYmdToDate } from "@recomenda/utils";
 
 export const TIMING_WINDOW_TOLERANCE_DAYS = 2;
 

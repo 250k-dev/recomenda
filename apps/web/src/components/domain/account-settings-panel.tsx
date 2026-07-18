@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useMe, useUpdateProfile, useChangePassword } from "@/lib/api/hooks";
 import { SettingsFormSkeleton } from "@/components/domain/page-skeletons";
-import { maskPhoneBR } from "@/lib/utils/phone";
+import { maskPhoneBR } from "@recomenda/utils";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),

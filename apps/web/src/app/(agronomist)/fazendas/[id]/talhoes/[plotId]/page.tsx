@@ -21,7 +21,7 @@ import {
   useProducer,
 } from "@/lib/api/hooks";
 import { Eye, Leaf, MapPin, Sprout } from "lucide-react";
-import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@/lib/season-constants";
+import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@recomenda/utils";
 
 const SEASON_PRIORITY: Record<string, number> = {
   IN_PROGRESS: 0,

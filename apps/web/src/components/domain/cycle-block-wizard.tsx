@@ -16,7 +16,7 @@ import {
   Wheat,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, CROP_LABELS } from "@recomenda/utils";
 import {
   readLocalDraft,
   clearLocalDraft,
@@ -44,7 +44,6 @@ import {
   updateTimingTemplate,
 } from "@/lib/api/client";
 import type { CycleDetail } from "@/lib/api/cycles";
-import { CROP_LABELS } from "@/lib/season-constants";
 import {
   TimingStagesEditor,
   newTimingStageField,

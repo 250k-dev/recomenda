@@ -18,8 +18,7 @@ import type {
   QuotePaymentTerm,
   QuoteResponseItem,
 } from "@/lib/api/quotes";
-import { CROP_LABELS } from "@/lib/season-constants";
-import { PRODUCT_CATEGORY_LABELS } from "@/lib/catalog-global-options";
+import { CROP_LABELS, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 
 const fmtQty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });

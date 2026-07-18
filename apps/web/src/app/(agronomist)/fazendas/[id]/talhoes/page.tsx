@@ -38,7 +38,7 @@ import {
 import { getCycle } from "@/lib/api/cycles";
 import type { Plot } from "@/lib/api/farms";
 import { routes } from "@/config/routes";
-import { CROP_LABELS } from "@/lib/season-constants";
+import { CROP_LABELS } from "@recomenda/utils";
 
 const plotSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),

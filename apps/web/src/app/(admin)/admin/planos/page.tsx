@@ -25,7 +25,7 @@ import {
   usePlans,
   useUpdateAdminPlan,
 } from "@/lib/api/hooks";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { deactivateOutlineButtonClass } from "@recomenda/utils";
 
 const planFormSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),

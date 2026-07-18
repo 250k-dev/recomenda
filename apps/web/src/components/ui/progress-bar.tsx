@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 type ProgressTone = "primary" | "success" | "warning" | "danger" | "clay";
 

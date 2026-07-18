@@ -34,7 +34,7 @@ import {
   CROP_LABELS,
   STATUS_LABELS,
   STATUS_VARIANTS,
-} from "@/lib/season-constants";
+} from "@recomenda/utils";
 import { routes } from "@/config/routes";
 
 const fmtHa = (n: number) =>

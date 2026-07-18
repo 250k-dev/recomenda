@@ -7,7 +7,7 @@ import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
 import { CATEGORY_ORDER } from "@/lib/cost-plan/calculate";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
 import type { ListItem } from "@/lib/purchase-list/list-item";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 /** Formato correto: meta única da lista em sc/ha. */
 export const TOTAL_SC_HA_KEY = "TOTAL_SC_HA";

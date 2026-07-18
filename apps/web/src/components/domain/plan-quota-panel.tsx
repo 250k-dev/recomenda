@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
 import { usePlanQuota } from "@/lib/api/hooks";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 function formatBrlMonthly(value: string): string {
   const n = Number.parseFloat(value);

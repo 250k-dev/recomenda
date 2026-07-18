@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProducer, useTimingTemplate, useUpdateTimingTemplate } from "@/lib/api/hooks";
-import { CROP_LABELS } from "@/lib/season-constants";
+import { CROP_LABELS } from "@recomenda/utils";
 
 export default function ProducerTimingTemplateDetailPage() {
   const params = useParams<{ id: string; templateId: string }>();

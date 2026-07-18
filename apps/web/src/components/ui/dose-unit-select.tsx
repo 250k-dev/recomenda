@@ -1,5 +1,5 @@
 import { Select } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 export const DOSE_UNITS = ["L", "KG", "G", "ML", "DOSE", "T_HA", "BAG", "SACA"] as const;
 export type DoseUnit = (typeof DOSE_UNITS)[number];

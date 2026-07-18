@@ -16,7 +16,7 @@ import {
   Save,
   CircleAlert,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, CROP_LABELS, formatTimingPreviewDate } from "@recomenda/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,6 @@ import {
   createTimingTemplate,
   createTimingStage,
 } from "@/lib/api/client";
-import { CROP_LABELS } from "@/lib/season-constants";
 import {
   TimingStagesEditor,
   TIMING_TRIGGER_LABELS,
@@ -39,7 +38,6 @@ import {
   type TimingStageField,
 } from "@/components/domain/timing/timing-stages-editor";
 import { recommendedYmdToWindow, windowToRecommendedYmd } from "@/lib/timing/window-days";
-import { formatTimingPreviewDate } from "@/lib/utils/dates";
 import {
   Field,
   FieldError,

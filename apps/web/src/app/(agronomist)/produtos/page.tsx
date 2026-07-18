@@ -31,12 +31,12 @@ import {
   useUpdateLocalProduct,
 } from "@/lib/api/hooks";
 import {
+  deactivateOutlineButtonClass,
   DOSE_UNIT_LABELS,
   GLOBAL_DOSE_UNITS,
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
-} from "@/lib/catalog-global-options";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+} from "@recomenda/utils";
 import type { PlatformCatalogEntry } from "@/lib/api/client";
 
 const CATALOG_PAGE_SIZE = 15;

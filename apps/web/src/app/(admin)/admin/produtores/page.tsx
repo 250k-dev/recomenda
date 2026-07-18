@@ -17,7 +17,7 @@ import { useAdminProducers, useDeleteAdminProducer, usePatchAdminProducer } from
 import { ProducerAccountStatusBadge } from "@/components/domain/producer-account-status-badge";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
+import { deactivateOutlineButtonClass } from "@recomenda/utils";
 
 
 function rowKey(p: AdminProducer): string {

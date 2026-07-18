@@ -17,7 +17,7 @@ import {
 } from "@/lib/recommendations/share-message";
 import { printRecommendation } from "@/lib/recommendations/print-document";
 import { WhatsAppIcon } from "@/assets/whatsapp-icon";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
 

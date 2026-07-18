@@ -3,7 +3,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import type { BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { useFarm, useProducer, useSeason } from "@/lib/api/hooks";
-import { CROP_LABELS, STATUS_LABELS } from "@/lib/season-constants";
+import { CROP_LABELS, STATUS_LABELS } from "@recomenda/utils";
 import { routes } from "@/config/routes";
 
 /**

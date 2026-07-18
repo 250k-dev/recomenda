@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 /** Talhão usado nos fluxos de lista de compra e safra. */
 export type WizardPlot = {

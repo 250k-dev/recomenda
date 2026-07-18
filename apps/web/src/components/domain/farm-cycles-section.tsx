@@ -35,8 +35,7 @@ import {
   FarmSeasonsExportDialog,
   type FarmExportItem,
 } from "@/components/domain/farm-seasons-export-dialog";
-import { CROP_LABELS, STATUS_LABELS } from "@/lib/season-constants";
-import { cn } from "@/lib/utils";
+import { cn, CROP_LABELS, STATUS_LABELS } from "@recomenda/utils";
 
 const CROP_CHOICES = [
   { value: "SOYBEAN", label: "Soja" },

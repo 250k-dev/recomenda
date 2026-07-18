@@ -1,5 +1,5 @@
 import { FlaskConical } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 /** Product + dose chip used in season timeline / etapa recipes. */
 export function RecipeChip({

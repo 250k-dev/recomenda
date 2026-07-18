@@ -2,7 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 export type DeletePermanentIconButtonProps = Omit<
   React.ComponentProps<typeof Button>,

@@ -15,8 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 
-import { deactivateOutlineButtonClass } from "@/lib/action-button-styles";
-import { cn } from "@/lib/utils";
+import { cn, CROP_LABELS, deactivateOutlineButtonClass } from "@recomenda/utils";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
@@ -44,7 +43,6 @@ import {
 import { usePlanQuota } from "@/lib/api/hooks/auth";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@/lib/api-error";
-import { CROP_LABELS } from "@/lib/season-constants";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),

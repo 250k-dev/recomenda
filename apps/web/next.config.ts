@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
     },
   },
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  // Pacotes internos publicados como TypeScript cru (sem step de build): o Next
+  // precisa transpilá-los junto com o app.
+  transpilePackages: ["@recomenda/utils"],
   // Valida em tempo de compilação todo href/push interno (links quebrados
   // viram erro de type-check em vez de 404 em produção).
   typedRoutes: true,

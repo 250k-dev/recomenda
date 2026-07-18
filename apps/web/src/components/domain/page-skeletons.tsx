@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Alinha com `PageHeader`: título + descrição (+ ação opcional). */

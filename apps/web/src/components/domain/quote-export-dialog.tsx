@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { WhatsAppIcon } from "@/assets/whatsapp-icon";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 import type { QuoteComparison } from "@/lib/api/quotes";
 import {
   buildQuoteWhatsappMessage,

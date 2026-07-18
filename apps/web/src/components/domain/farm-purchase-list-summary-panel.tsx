@@ -13,7 +13,7 @@ import {
   computePurchaseListMetrics,
   detailItemToListItem,
 } from "@/lib/purchase-list-breakdown";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 
 const fmtBrl = (n: number) =>
   n.toLocaleString("pt-BR", {

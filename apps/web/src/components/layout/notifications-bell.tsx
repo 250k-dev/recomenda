@@ -29,7 +29,7 @@ import {
   type Notification,
 } from "@/lib/api/client";
 import { queryKeys, useNotifications } from "@/lib/api/hooks";
-import { cn } from "@/lib/utils";
+import { cn } from "@recomenda/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 

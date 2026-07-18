@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/dialog";
 import { ProducerDetailSkeleton } from "@/components/domain/page-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatPhoneBR, maskPhoneBR } from "@/lib/utils/phone";
+import { formatPhoneBR, maskPhoneBR } from "@recomenda/utils";
 import { toast } from "sonner";
 import {
   Pencil,

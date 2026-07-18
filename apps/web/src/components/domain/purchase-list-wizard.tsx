@@ -51,7 +51,7 @@ import {
   usePurchaseListTemplates,
 } from "@/lib/api/hooks";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
-import { CROP_LABELS } from "@/lib/season-constants";
+import { CROP_LABELS } from "@recomenda/utils";
 import {
   FieldError,
   StepFooter,
