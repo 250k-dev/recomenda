@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { routes } from "@/config/routes";
 import { useQueries } from "@tanstack/react-query";
 import { Check, ChevronRight, Leaf, Plus, Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -56,13 +57,10 @@ const fmtHa = (n: number) =>
 function cycleHref(
   cycle: Pick<CycleSummary, "id" | "farm_id">,
   producerId: string | null,
-  tab?: string,
 ) {
-  const params = new URLSearchParams();
-  if (producerId) params.set("producer_id", producerId);
-  if (tab) params.set("tab", tab);
-  const qs = params.toString();
-  return `/farms/${cycle.farm_id}/cycles/${cycle.id}${qs ? `?${qs}` : ""}`;
+  return routes.fazendas.safra(cycle.farm_id, cycle.id, {
+    producer_id: producerId,
+  });
 }
 
 /** Diálogo "Nova safra": passo leve (nome + culturas) — a lista de compra e a

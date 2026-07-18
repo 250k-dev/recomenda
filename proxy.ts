@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const publicRoutes = ["/login", "/forgot-password", "/reset-password", "/invite", "/cotacao", "/producer-only"];
+const publicRoutes = ["/login", "/esqueci-senha", "/redefinir-senha", "/convite", "/cotacao", "/acesso-produtor"];
 
 function isPublicPath(pathname: string) {
   return publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
@@ -74,7 +74,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (role === "PRODUCER") {
-    return NextResponse.redirect(new URL("/producer-only", request.url));
+    return NextResponse.redirect(new URL("/acesso-produtor", request.url));
   }
 
   if ((role === "AGRONOMIST" || role === "STAFF") && pathname.startsWith("/admin")) {

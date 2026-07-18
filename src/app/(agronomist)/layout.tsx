@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AgronomistShell } from "@/components/layout/agronomist-shell";
 import { getSessionRole } from "@/lib/auth/session";
+import { routes } from "@/config/routes";
 
 export default async function AgronomistLayout({ children }: { children: ReactNode }) {
   const role = await getSessionRole();
@@ -9,7 +10,11 @@ export default async function AgronomistLayout({ children }: { children: ReactNo
   // e permissões aplicados no backend).
   if (role !== "AGRONOMIST" && role !== "STAFF") {
     redirect(
-      role === "ADMIN" ? "/admin" : role === "PRODUCER" ? "/producer-only" : "/login",
+      role === "ADMIN"
+        ? routes.admin.dashboard
+        : role === "PRODUCER"
+          ? routes.acessoProdutor
+          : routes.login(),
     );
   }
   return <AgronomistShell>{children}</AgronomistShell>;

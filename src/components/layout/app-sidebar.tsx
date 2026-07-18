@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useMe, usePlanQuota } from "@/lib/api/hooks";
 import { navFor } from "@/config/nav";
+import { routes } from "@/config/routes";
 import type { AccessLevel, UserRole } from "@/types/auth";
 import { Logo } from "@/assets/logo";
 import { NotificationsBell } from "./notifications-bell";
@@ -33,15 +34,15 @@ import { Badge } from "../ui/badge";
 
 const iconMap: Record<string, React.ReactNode> = {
   "/dashboard": <LayoutDashboard className="size-4" />,
-  "/producers": <Users className="size-4" />,
-  "/catalog": <Package className="size-4" />,
-  "/reports": <BarChart3 className="size-4" />,
-  "/consultants": <UsersRound className="size-4" />,
+  "/produtores": <Users className="size-4" />,
+  "/produtos": <Package className="size-4" />,
+  "/relatorios": <BarChart3 className="size-4" />,
+  "/equipe": <UsersRound className="size-4" />,
   "/admin": <LayoutDashboard className="size-4" />,
-  "/admin/plans": <CreditCard className="size-4" />,
-  "/admin/agronomists": <Users className="size-4" />,
-  "/admin/producers": <UsersRound className="size-4" />,
-  "/admin/global-catalog": <Package className="size-4" />,
+  "/admin/planos": <CreditCard className="size-4" />,
+  "/admin/agronomos": <Users className="size-4" />,
+  "/admin/produtores": <UsersRound className="size-4" />,
+  "/admin/catalogo-global": <Package className="size-4" />,
 };
 
 export function AppSidebar({ role }: { role: UserRole }) {
@@ -64,7 +65,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
   const profileName =
     role === "ADMIN" ? "Administrador" : currentUser?.name?.trim() || "";
   const userInitial = profileName ? profileName.charAt(0).toUpperCase() : "U";
-  const profileHref = role === "ADMIN" ? "/admin/profile" : "/profile";
+  const profileHref = role === "ADMIN" ? routes.admin.perfil : routes.perfil;
 
   return (
     <Sidebar collapsible="icon">

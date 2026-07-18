@@ -9,11 +9,11 @@ Criado `middleware.ts` na raiz do projeto Next.js.
 O middleware intercepta todas as requisições antes de chegarem às páginas e aplica as seguintes regras:
 
 **Rotas públicas** — passam sem verificação:
-- `/login`, `/forgot-password`, `/reset-password`, `/invite/*`, `/api/auth/*`
+- `/login`, `/esqueci-senha`, `/redefinir-senha`, `/convite/*`, `/cotacao/*`, `/api/auth/*`
 
 **Usuário sem cookie `access_token`** — redirecionado para `/login`, exceto se já estiver em rota pública.
 
-**Role PRODUCER** — redirecionado para `/producer-only` (produtores usam o app mobile; se tentarem acessar o web, veem essa página).
+**Role PRODUCER** — redirecionado para `/acesso-produtor` (produtores usam o app mobile; se tentarem acessar o web, veem essa página).
 
 **Usuário autenticado em `/login` ou `/`** — redirecionado automaticamente para `/admin` (ADMIN) ou `/dashboard` (AGRONOMIST).
 

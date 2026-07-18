@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { Fragment, useEffect } from "react";
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 export type BreadcrumbItem = {
   label: string;
-  href?: string;
+  href?: Route;
 };
 
 /**

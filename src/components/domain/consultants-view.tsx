@@ -20,6 +20,7 @@ import { useConsultants, useCreateInvitation, useMe } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { useCan } from "@/lib/auth/use-can";
 import { cn } from "@/lib/utils";
+import { routes } from "@/config/routes";
 import type { TeamMemberRow } from "@/lib/api/consultants";
 import type { AccessLevel } from "@/types/auth";
 
@@ -146,7 +147,7 @@ function MemberCard({
 
   return (
     <Link
-      href={`/consultants/${member.user_id}`}
+      href={routes.equipe.membro(member.user_id)}
       className="group flex w-full flex-col gap-3 rounded-2xl border border-transparent bg-white px-[22px] py-5 shadow-sm transition-all hover:border-[#CBDDD2] hover:shadow-[0_4px_14px_rgba(30,92,64,0.08)]"
     >
       <div className="flex items-start gap-3">
@@ -270,7 +271,7 @@ function InviteTeamDialog({
         payload.manager_user_id = vinculo === "direto" ? null : vinculo;
       }
       const res = await createInvitation.mutateAsync(payload);
-      const full = `${window.location.origin}/invite/${res.token}`;
+      const full = `${window.location.origin}${routes.convite(res.token)}`;
       setLink(full);
       toast.success("Convite criado. Envie o link ao membro.");
     } catch (e) {

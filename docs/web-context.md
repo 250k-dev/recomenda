@@ -135,7 +135,7 @@ Mutations success → toast. Errors handled by global error boundary in queries;
 - Body: items table (product autocomplete from local catalog, dose input, unit display).
 - Right panel: live preview "for a 100ha plot, this mix totals: X liters of A, Y kg of B".
 
-### Season Wizard (`/seasons/new`)
+### Season Wizard (`/safras/nova`)
 Three-step wizard:
 1. **Plot & basics** — select farm → plot, producer (must have access), crop, variety, cycle days, desiccation date.
 2. **Timing & mixes** — select timing template, then per-stage mix override + dates preview.

@@ -1,5 +1,8 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
+import type { Route } from "next";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
@@ -50,7 +53,7 @@ function ShortcutCard({
   sub,
   accent = false,
 }: {
-  href: string;
+  href: Route;
   icon: LucideIcon;
   title: string;
   sub: string;
@@ -194,20 +197,20 @@ export default function DashboardPage() {
           sub="Agenda de aplicações"
         />
         <ShortcutCard
-          href="/producers"
+          href={routes.produtores.lista}
           icon={Users}
           title="Produtores"
           sub="Carteira completa"
         />
         <ShortcutCard
-          href="/compra-templates"
+          href={routes.templatesDeCompra}
           icon={FileText}
           title="Templates de compra"
           sub="Modelos de lista"
         />
         {canManageTeam ? (
           <ShortcutCard
-            href="/consultants"
+            href={routes.equipe.lista}
             icon={UserCog}
             title="Equipe"
             sub="Consultores da conta"
@@ -215,7 +218,7 @@ export default function DashboardPage() {
         ) : null}
         {canCreateProducer ? (
           <ShortcutCard
-            href="/producers/new"
+            href={routes.produtores.novo}
             icon={Plus}
             title="Cadastrar produtor"
             sub="Adicionar à carteira"
@@ -345,7 +348,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/seasons/${ev.seasonId}`}>Abrir</Link>
+                    <Link href={routes.safras.cronograma(ev.seasonId)}>Abrir</Link>
                   </Button>
                 </div>
               ))}
@@ -409,7 +412,7 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground">
                 Acompanhe o uso da sua quota em{" "}
                 <Link
-                  href="/profile"
+                  href={routes.perfil}
                   className="font-semibold text-primary-strong hover:underline"
                 >
                   Meu perfil

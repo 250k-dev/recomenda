@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { duplicatePurchaseList } from "@/lib/api/client";
+import { routes } from "@/config/routes";
 import { getCommodities } from "@/lib/api/market";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -229,7 +230,10 @@ export function CostPlanView({
   if (!plan) {
     const configureHref =
       farmId && producerId
-        ? `/farms/${farmId}/season/new?producer_id=${encodeURIComponent(producerId)}&season_id=${encodeURIComponent(seasonId)}`
+        ? routes.fazendas.novaSafra(farmId, {
+            producer_id: producerId,
+            season_id: seasonId,
+          })
         : null;
     return (
       <Card className="border-dashed">
@@ -731,7 +735,7 @@ function DuplicateButton({ purchaseListId }: { purchaseListId: string }) {
       queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
       queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
       if (newList.season_id) {
-        router.push(`/seasons/${newList.season_id}?tab=cost-plan`);
+        router.push(routes.safras.planoDeCusto(newList.season_id));
       }
     },
   });

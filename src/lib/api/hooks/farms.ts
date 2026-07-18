@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getFarms,
@@ -72,6 +73,22 @@ export function useFarmAccess(farmId: string) {
     queryFn: () => getFarmAccess(farmId),
     enabled: Boolean(farmId),
   });
+}
+
+/**
+ * Produtor do contexto da fazenda: o da URL (`?producer_id=`) ou, na falta
+ * dele, o único produtor com acesso à fazenda. `null` quando ambíguo.
+ */
+export function useResolvedFarmProducerId(
+  farmId: string,
+  producerIdFromUrl: string | null,
+): string | null {
+  const { data: access } = useFarmAccess(farmId);
+  return useMemo(() => {
+    if (producerIdFromUrl) return producerIdFromUrl;
+    if (access?.length === 1) return access[0].producer_id;
+    return null;
+  }, [producerIdFromUrl, access]);
 }
 
 export function useGrantFarmAccess(farmId: string) {

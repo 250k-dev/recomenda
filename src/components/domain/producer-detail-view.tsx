@@ -1,10 +1,13 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
+import type { Route } from "next";
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { getFarmCycles } from "@/lib/api/cycles";
-import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
 import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
@@ -54,7 +57,7 @@ const fmtHa = (n: number) =>
 
 export type ProducerDetailViewProps = {
   producerId: string;
-  backHref: string;
+  backHref: Route;
   showSeasonActions: boolean;
   showImpersonate?: boolean;
 };
@@ -180,7 +183,7 @@ export function ProducerDetailView({
       <p className="p-6 text-sm text-destructive">Produtor não encontrado.</p>
     );
 
-  const breadcrumbs = [
+  const breadcrumbs: BreadcrumbItem[] = [
     { label: "Produtores", href: backHref },
     { label: producer.name },
   ];
@@ -342,7 +345,11 @@ export function ProducerDetailView({
               producerId={producerId}
               onCreated={(cycleId) =>
                 router.push(
-                  `/farms/${onbFarmId}/purchase-list/new?producer_id=${encodeURIComponent(producerId)}&cycle_id=${encodeURIComponent(cycleId)}&onboarding=recommendation`,
+                  routes.fazendas.novaListaDeCompra(onbFarmId, {
+                    producer_id: producerId,
+                    cycle_id: cycleId,
+                    onboarding: "recommendation",
+                  }),
                 )
               }
             />
@@ -361,8 +368,12 @@ export function ProducerDetailView({
             onConfirm={() =>
               router.push(
                 onbCycleId
-                  ? `/farms/${onbFarmId}/cycles/${onbCycleId}?producer_id=${encodeURIComponent(producerId)}`
-                  : `/farms/${onbFarmId}?producer_id=${encodeURIComponent(producerId)}&tab=seasons`,
+                  ? routes.fazendas.safra(onbFarmId, onbCycleId, {
+                      producer_id: producerId,
+                    })
+                  : routes.fazendas.detalhe(onbFarmId, {
+                      producer_id: producerId,
+                    }),
               )
             }
           />

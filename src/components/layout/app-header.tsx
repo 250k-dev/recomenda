@@ -15,15 +15,15 @@ const HOME: BreadcrumbItem = { label: "Início", href: "/dashboard" };
 
 // Rótulo da seção quando a página não publica breadcrumbs próprios.
 const SECTION_LABELS: Array<[prefix: string, label: string]> = [
-  ["/producers", "Produtores"],
-  ["/catalog", "Produtos"],
-  ["/reports", "Relatórios"],
-  ["/consultants", "Equipe"],
-  ["/profile", "Perfil"],
-  ["/farms", "Fazendas"],
-  ["/seasons", "Safras"],
+  ["/produtores", "Produtores"],
+  ["/produtos", "Produtos"],
+  ["/relatorios", "Relatórios"],
+  ["/equipe", "Equipe"],
+  ["/perfil", "Perfil"],
+  ["/fazendas", "Fazendas"],
+  ["/safras", "Safras"],
   ["/cronograma", "Cronograma"],
-  ["/compra-templates", "Templates de compra"],
+  ["/templates-de-compra", "Templates de compra"],
 ];
 
 export function AppHeader() {

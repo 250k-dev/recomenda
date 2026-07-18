@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
 import Link from "next/link";
 import { useMemo } from "react";
 import { PageHeader } from "@/components/domain/page-header";
@@ -49,7 +51,7 @@ export default function AdminHomePage() {
         <DashboardKpiSkeleton cards={4} />
       ) : (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Link href="/admin/agronomists" className="block transition-opacity hover:opacity-90">
+        <Link href={routes.admin.agronomos.lista} className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base">Agrônomos</CardTitle>
@@ -64,7 +66,7 @@ export default function AdminHomePage() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/admin/producers" className="block transition-opacity hover:opacity-90">
+        <Link href={routes.admin.produtores.lista} className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base">Produtores</CardTitle>
@@ -79,7 +81,7 @@ export default function AdminHomePage() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/admin/plans" className="block transition-opacity hover:opacity-90">
+        <Link href={routes.admin.planos} className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base">Planos</CardTitle>
@@ -92,7 +94,7 @@ export default function AdminHomePage() {
             </CardContent>
           </Card>
         </Link>
-        <Link href="/admin/global-catalog" className="block transition-opacity hover:opacity-90">
+        <Link href={routes.admin.catalogoGlobal} className="block transition-opacity hover:opacity-90">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base">Produtos</CardTitle>

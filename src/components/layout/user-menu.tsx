@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -161,7 +163,7 @@ export function UserMenu() {
             asChild
             className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
           >
-            <Link href="/profile">
+            <Link href={routes.perfil}>
               <User className="size-4.5" />
               Meu perfil
             </Link>
@@ -170,7 +172,7 @@ export function UserMenu() {
             asChild
             className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
           >
-            <Link href="/reports">
+            <Link href={routes.relatorios}>
               <BarChart3 className="size-4.5" />
               Relatórios
             </Link>

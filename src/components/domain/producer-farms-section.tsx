@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
@@ -194,7 +196,7 @@ export function ProducerFarmsSection({
               )}
               onOpen={() =>
                 router.push(
-                  `/farms/${farm.id}?producer_id=${encodeURIComponent(producerId)}`,
+                  routes.fazendas.detalhe(farm.id, { producer_id: producerId }),
                 )
               }
             />

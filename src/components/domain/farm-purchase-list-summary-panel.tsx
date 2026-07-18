@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { Eye, Store } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -82,7 +83,7 @@ export function FarmPurchaseListSummaryPanel({
   isLoading: boolean;
   producerName?: string | null;
   onOpenFull: () => void;
-  costPlanHref?: string | null;
+  costPlanHref?: Route | null;
 }) {
   const fxRate = useCurrencyStore((state) => state.fxRate);
   const grainPrice = useCurrencyStore((state) => state.grainPrice);

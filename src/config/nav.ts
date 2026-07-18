@@ -1,37 +1,39 @@
+import type { Route } from "next";
 import type { AccessLevel, UserRole } from "@/types/auth";
+import { routes } from "@/config/routes";
 
-export type NavItem = { label: string; href: string };
+export type NavItem = { label: string; href: Route };
 
 const ADMIN_NAV: NavItem[] = [
-  { label: "Dashboard", href: "/admin" },
-  { label: "Planos", href: "/admin/plans" },
-  { label: "Agrônomos", href: "/admin/agronomists" },
-  { label: "Produtores", href: "/admin/producers" },
-  { label: "Produtos", href: "/admin/global-catalog" },
+  { label: "Dashboard", href: routes.admin.dashboard },
+  { label: "Planos", href: routes.admin.planos },
+  { label: "Agrônomos", href: routes.admin.agronomos.lista },
+  { label: "Produtores", href: routes.admin.produtores.lista },
+  { label: "Produtos", href: routes.admin.catalogoGlobal },
 ];
 
 const AGRONOMIST_NAV: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Produtores", href: "/producers" },
-  { label: "Produtos", href: "/catalog" },
-  { label: "Relatórios", href: "/reports" },
-  { label: "Equipe", href: "/consultants" },
+  { label: "Dashboard", href: routes.dashboard },
+  { label: "Produtores", href: routes.produtores.lista },
+  { label: "Produtos", href: routes.produtos },
+  { label: "Relatórios", href: routes.relatorios },
+  { label: "Equipe", href: routes.equipe.lista },
 ];
 
 // Gestor: mesma navegação do agrônomo (menos Relatórios, que agrega TODAS as
 // fazendas e vazaria escopo), incluindo Equipe (gerencia seus consultores).
 const MANAGER_NAV: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Produtores", href: "/producers" },
-  { label: "Produtos", href: "/catalog" },
-  { label: "Equipe", href: "/consultants" },
+  { label: "Dashboard", href: routes.dashboard },
+  { label: "Produtores", href: routes.produtores.lista },
+  { label: "Produtos", href: routes.produtos },
+  { label: "Equipe", href: routes.equipe.lista },
 ];
 
 // Consultor: só acompanha e registra — sem Equipe, sem Relatórios.
 const ASSISTANT_NAV: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Produtores", href: "/producers" },
-  { label: "Produtos", href: "/catalog" },
+  { label: "Dashboard", href: routes.dashboard },
+  { label: "Produtores", href: routes.produtores.lista },
+  { label: "Produtos", href: routes.produtos },
 ];
 
 /** Navegação por papel + nível de acesso (o nível só importa para STAFF). */

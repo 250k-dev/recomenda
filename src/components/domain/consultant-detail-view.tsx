@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -108,7 +110,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
     try {
       await removeMutation.mutateAsync(userId);
       toast.success(`${roleLabel} removido.`);
-      router.push("/consultants");
+      router.push(routes.equipe.lista);
     } catch (e) {
       toast.error(apiErrorMessage(e, `Não foi possível remover o ${roleLabel.toLowerCase()}.`));
     }
@@ -127,7 +129,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
   if (isError || !summary) {
     return (
       <div className="mx-auto max-w-[1240px]">
-        <BreadcrumbBack items={[{ label: "Equipe", href: "/consultants" }]} />
+        <BreadcrumbBack items={[{ label: "Equipe", href: routes.equipe.lista }]} />
         <p className="mt-6 text-sm text-muted-foreground">
           Membro não encontrado ou sem permissão para visualizar.
         </p>
@@ -143,7 +145,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
     <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
       <BreadcrumbBack
         items={[
-          { label: "Equipe", href: "/consultants" },
+          { label: "Equipe", href: routes.equipe.lista },
           { label: summary.name ?? roleLabel },
         ]}
       />
@@ -223,7 +225,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
             {linkedAssistants.map((a) => (
               <li key={a.user_id}>
                 <Link
-                  href={`/consultants/${a.user_id}`}
+                  href={routes.equipe.membro(a.user_id)}
                   className="flex items-center justify-between rounded-xl bg-[#F7F5F1] px-4 py-3 transition hover:bg-[#EFEBE4]"
                 >
                   <div className="min-w-0">
@@ -304,7 +306,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
                       </button>
                       {on ? (
                         <Link
-                          href={`/producers/${p.id}`}
+                          href={routes.produtores.detalhe(p.id)}
                           className="shrink-0 text-xs font-bold text-[#1E6B4A] hover:underline"
                         >
                           abrir
@@ -331,7 +333,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
               {summary.producers.map((p) => (
                 <li key={p.id}>
                   <Link
-                    href={`/producers/${p.id}`}
+                    href={routes.produtores.detalhe(p.id)}
                     className="flex items-center justify-between rounded-xl bg-[#F7F5F1] px-4 py-3 transition hover:bg-[#EFEBE4]"
                   >
                     <span className="text-sm font-medium text-[#2B2723]">{p.name}</span>

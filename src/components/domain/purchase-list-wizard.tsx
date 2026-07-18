@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -548,7 +550,7 @@ function StepList({
               </p>
             </div>
             <Button asChild type="button" variant="outline" size="sm" className="gap-1.5">
-              <Link href="/compra-templates" target="_blank" rel="noopener noreferrer">
+              <Link href={routes.templatesDeCompra} target="_blank" rel="noopener noreferrer">
                 <Settings2 className="h-4 w-4" />
                 Criar/gerenciar templates
               </Link>

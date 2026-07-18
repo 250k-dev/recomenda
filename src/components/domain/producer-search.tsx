@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
 import {
   useEffect,
   useMemo,
@@ -8,6 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { Search, Users, Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -76,7 +79,7 @@ export function ProducerSearchButton() {
     }
   };
 
-  const go = (path: string) => {
+  const go = <T extends string>(path: Route<T>) => {
     setDialogOpen(false);
     router.push(path);
   };
@@ -119,7 +122,7 @@ export function ProducerSearchButton() {
       const top = query.trim() !== "" ? results[0] : undefined;
       if (top?.producer_id) {
         e.preventDefault();
-        go(`/producers/${top.producer_id}`);
+        go(routes.produtores.detalhe(top.producer_id));
       }
     }
   };
@@ -235,7 +238,11 @@ export function ProducerSearchButton() {
                       onMouseEnter={() => setActiveKey(key)}
                       onKeyDown={onOptionKeyDown}
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => go(`/producers/${p.producer_id}`)}
+                      onClick={() =>
+                        p.producer_id
+                          ? go(routes.produtores.detalhe(p.producer_id))
+                          : undefined
+                      }
                       className={optionClass(key)}
                     >
                       <div className="flex items-center justify-center text-xs font-semibold rounded-full size-7 shrink-0 bg-primary/10 text-primary">
@@ -270,7 +277,7 @@ export function ProducerSearchButton() {
                 onMouseEnter={() => setActiveKey("all")}
                 onKeyDown={onOptionKeyDown}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => go("/producers")}
+                onClick={() => go(routes.produtores.lista)}
                 className={optionClass("all")}
               >
                 <Users className="size-4 shrink-0 text-muted-foreground" />
@@ -285,7 +292,7 @@ export function ProducerSearchButton() {
                 onMouseEnter={() => setActiveKey("catalog")}
                 onKeyDown={onOptionKeyDown}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => go("/catalog")}
+                onClick={() => go(routes.produtos)}
                 className={optionClass("catalog")}
               >
                 <Package className="size-4 shrink-0 text-muted-foreground" />
@@ -301,7 +308,7 @@ export function ProducerSearchButton() {
                   onMouseEnter={() => setActiveKey("new")}
                   onKeyDown={onOptionKeyDown}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => go("/producers/new")}
+                  onClick={() => go(routes.produtores.novo)}
                   className={optionClass("new", "font-medium text-primary")}
                 >
                   <Plus className="size-4 shrink-0" />

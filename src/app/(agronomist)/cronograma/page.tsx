@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
@@ -18,7 +19,7 @@ export default function CronogramaPage() {
       if (nextProducerId) params.set("producer_id", nextProducerId);
       else params.delete("producer_id");
       const query = params.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname);
+      router.replace((query ? `${pathname}?${query}` : pathname) as Route);
     },
     [pathname, router, searchParams],
   );

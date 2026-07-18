@@ -1,5 +1,8 @@
 "use client";
 
+import type { Route } from "next";
+import { routes } from "@/config/routes";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -356,7 +359,7 @@ function payloadSeasonId(
   return typeof v === "string" && v.length > 0 ? v : null;
 }
 
-function getNotificationPath(notification: Notification): string | null {
+function getNotificationPath(notification: Notification): Route | null {
   const { type, payload } = notification;
   const seasonId = payloadSeasonId(payload);
   switch (type) {
@@ -365,10 +368,12 @@ function getNotificationPath(notification: Notification): string | null {
     case "RECOMMENDATION_DUE":
     case "RECOMMENDATION_LATE":
     case "PRODUCT_SUBSTITUTED":
-      return seasonId ? `/seasons/${seasonId}` : null;
+      return seasonId ? routes.safras.cronograma(seasonId) : null;
     case "TEAM_ACTIVITY": {
       const farmId = payload?.farm_id;
-      return typeof farmId === "string" && farmId ? `/farms/${farmId}` : null;
+      return typeof farmId === "string" && farmId
+        ? routes.fazendas.detalhe(farmId)
+        : null;
     }
     case "INVITATION":
     default:

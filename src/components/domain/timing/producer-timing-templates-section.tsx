@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -92,11 +94,14 @@ export function ProducerTimingTemplatesPanel({
       onSuccess: (created) => {
         setSheetOpen(false);
         form.reset();
-        const qs = onboardingFarmId
-          ? `?onboarding=season&farm_id=${encodeURIComponent(onboardingFarmId)}`
-          : "";
         router.push(
-          `/producers/${producerId}/timing-templates/${created.id}${qs}`,
+          routes.produtores.modeloDeTiming(
+            producerId,
+            created.id,
+            onboardingFarmId
+              ? { onboarding: "season", farm_id: onboardingFarmId }
+              : undefined,
+          ),
         );
       },
       onError: (err) => {
@@ -115,7 +120,8 @@ export function ProducerTimingTemplatesPanel({
     else setSheetOpen(true);
   };
   const archivedData = archived ?? [];
-  const baseHref = `/producers/${producerId}/timing-templates`;
+  const templateHref = (templateId: string) =>
+    routes.produtores.modeloDeTiming(producerId, templateId);
 
   return (
     <>
@@ -165,7 +171,7 @@ export function ProducerTimingTemplatesPanel({
                 {templatesData.map((template) => (
                   <Link
                     key={template.id}
-                    href={`${baseHref}/${template.id}`}
+                    href={templateHref(template.id)}
                     className="group flex flex-wrap items-center gap-3 rounded-xl border bg-background p-4 transition-all hover:border-primary/30 hover:shadow-sm"
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">

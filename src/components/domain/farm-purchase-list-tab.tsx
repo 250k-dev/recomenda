@@ -1,5 +1,8 @@
 "use client";
 
+import { routes } from "@/config/routes";
+
+import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Boxes, Eye, FileDown, Leaf, Pencil, Plus, Store, Target, X, Check, Loader2 } from "lucide-react";
@@ -110,14 +113,14 @@ export type FarmPurchaseListTabProps = {
   onSelectList: (id: string) => void;
   isLoading: boolean;
   producerId: string | null;
-  newPurchaseListHref: string;
+  newPurchaseListHref: Route;
   fallbackSeasonIds: string[];
   /** Hide edit affordances (used by the standalone read-only list page). */
   readOnly?: boolean;
   /** Quando embutido na safra (sem abas), abre o plano de custo agregado. */
   onOpenCostPlan?: () => void;
   /** Quando informado, mostra o botão Estoque na mesma linha dos outros. */
-  stockHref?: string;
+  stockHref?: Route;
 };
 
 export function FarmPurchaseListTab({
@@ -544,7 +547,7 @@ export function FarmPurchaseListTab({
                 </Button>
               ) : list.season_id ? (
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href={`/seasons/${list.season_id}?tab=cost-plan`}>
+                  <Link href={routes.safras.planoDeCusto(list.season_id)}>
                     <Eye className="h-4 w-4" />
                     Ver plano de custo
                   </Link>
