@@ -16,7 +16,11 @@ import {
   UserCog,
   type LucideIcon,
 } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { RailCard, RailRow } from "@/components/domain/rail-card";
 import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -121,7 +125,10 @@ export default function DashboardPage() {
 
   const plotCount = useMemo(
     () =>
-      activeProducers.reduce((sum, producer) => sum + (producer.plots_count ?? 0), 0),
+      activeProducers.reduce(
+        (sum, producer) => sum + (producer.plots_count ?? 0),
+        0,
+      ),
     [activeProducers],
   );
 
@@ -136,7 +143,11 @@ export default function DashboardPage() {
   // endpoint de carteira — soma aqui em vez de buscar todas as `seasons`
   // (uma por talhão) só para contar, que era mais uma chamada e o número errado.
   const activeCyclesCount = useMemo(
-    () => activeProducers.reduce((sum, producer) => sum + (producer.active_cycles_count ?? 0), 0),
+    () =>
+      activeProducers.reduce(
+        (sum, producer) => sum + (producer.active_cycles_count ?? 0),
+        0,
+      ),
     [activeProducers],
   );
 
@@ -156,7 +167,8 @@ export default function DashboardPage() {
     // Dessecação nunca é "atrasada" (isLate já vem false do agenda) — cai em Pendentes.
     const inToday = (r: AgendaEvent) =>
       !r.isLate && r.ymd <= today && r.windowEndYmd >= today;
-    const inWeek = (r: AgendaEvent) => !r.isLate && r.ymd > today && r.ymd <= weekEnd;
+    const inWeek = (r: AgendaEvent) =>
+      !r.isLate && r.ymd > today && r.ymd <= weekEnd;
     return {
       late: recs
         .filter((r) => r.isLate)
@@ -174,7 +186,7 @@ export default function DashboardPage() {
   return (
     <>
       {/* Atalhos de funcionalidades */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-flow-col lg:auto-cols-fr">
+      <div className="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-3 lg:grid-flow-col lg:auto-cols-fr">
         <ShortcutCard
           href="/cronograma"
           icon={CalendarDays}
@@ -214,8 +226,8 @@ export default function DashboardPage() {
 
       {/* Attention panel + rail */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <section className="overflow-hidden border shadow-sm rounded-xl border-border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2.5">
               <BellRing className="size-5 text-clay-strong" />
               <h3 className="font-display text-[1.05rem] font-semibold text-text-strong">
@@ -226,18 +238,20 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     aria-label="Como funciona o status das etapas"
-                    className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                    className="inline-flex transition-colors text-muted-foreground hover:text-foreground"
                   >
                     <Info className="size-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent
                   sideOffset={6}
-                  className="w-64 whitespace-normal text-left text-xs leading-relaxed"
+                  className="w-64 text-xs leading-relaxed text-left whitespace-normal"
                 >
-                  Cada etapa tem uma janela de tolerância centrada na data prevista. Enquanto hoje
-                  está dentro da janela aparece como “Hoje” ou “Na janela”; depois que a janela
-                  fecha, vira “Atrasada”. Ao corrigir a data da etapa, a janela é recalculada.
+                  Cada etapa tem uma janela de tolerância centrada na data
+                  prevista. Enquanto hoje está dentro da janela aparece como
+                  “Hoje” ou “Na janela”; depois que a janela fecha, vira
+                  “Atrasada”. Ao corrigir a data da etapa, a janela é
+                  recalculada.
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -278,11 +292,11 @@ export default function DashboardPage() {
           </div>
 
           {agenda.isLoading ? (
-            <div className="space-y-3 p-5">
+            <div className="p-5 space-y-3">
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="h-16 animate-pulse rounded-lg bg-surface-2"
+                  className="h-16 rounded-lg animate-pulse bg-surface-2"
                 />
               ))}
             </div>
@@ -314,7 +328,7 @@ export default function DashboardPage() {
                       (ev.isLate ? "bg-danger" : "bg-warning")
                     }
                   />
-                  <div className="min-w-0 flex-1">
+                  <div className="flex-1 min-w-0">
                     <b className="text-[0.95rem] font-semibold text-text-strong">
                       {ev.applicationTitle}
                     </b>
@@ -354,7 +368,10 @@ export default function DashboardPage() {
             ) : (
               <>
                 <RailRow label="Produtores" value={producerCount} />
-                <RailRow label="Fazendas" value={farms.data?.pagination?.total ?? 0} />
+                <RailRow
+                  label="Fazendas"
+                  value={farms.data?.pagination?.total ?? 0}
+                />
                 <RailRow label="Talhões" value={plotCount} />
                 <RailRow
                   label="Safras em andamento"
@@ -374,14 +391,14 @@ export default function DashboardPage() {
           />
 
           {planLoading ? (
-            <div className="rounded-xl border border-clay-border bg-clay-soft p-4.5 shadow-sm">
-              <Skeleton className="h-4 w-56" />
-              <Skeleton className="mt-2 h-4 w-full" />
+            <div className="rounded-xl border border-primary-border bg-primary-soft p-4.5 shadow-sm">
+              <Skeleton className="w-56 h-4" />
+              <Skeleton className="w-full h-4 mt-2" />
             </div>
           ) : planData?.plan ? (
-            <div className="rounded-xl border border-clay-border bg-clay-soft p-4.5 shadow-sm">
+            <div className="rounded-xl border border-primary-border bg-primary-soft p-4.5 shadow-sm">
               <div className="mb-2 flex items-center gap-2.5">
-                <Sparkles className="size-4 text-clay-strong" />
+                <Sparkles className="size-4 text-primary-strong" />
                 <b className="text-[0.95rem] text-text-strong">
                   Plano {planData.plan.name} ·{" "}
                   {planData.quota_usage?.current ?? 0}/
@@ -393,7 +410,7 @@ export default function DashboardPage() {
                 Acompanhe o uso da sua quota em{" "}
                 <Link
                   href="/profile"
-                  className="font-semibold text-clay-strong hover:underline"
+                  className="font-semibold text-primary-strong hover:underline"
                 >
                   Meu perfil
                 </Link>

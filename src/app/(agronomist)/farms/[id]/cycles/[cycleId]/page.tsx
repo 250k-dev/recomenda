@@ -6,10 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Calculator,
+  ChevronRight,
   Leaf,
+  ListChecks,
   Plus,
   Rocket,
   ShoppingCart,
+  SquareCheckBig,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
@@ -468,22 +472,17 @@ export default function CycleDetailPage() {
                           {STATUS_LABELS[season.status] ?? season.status}
                         </Badge>
                       </span>
-                      <span className="flex justify-end gap-1.5">
-                        <Button
-                          asChild
-                          variant="secondary"
-                          size="sm"
-                          className="gap-1.5"
-                        >
+                      <span className="flex justify-end gap-4">
+                        <Button asChild variant="secondary" size="sm">
                           <Link href={row.recommendationHref}>
                             Recomendações
+                            <ChevronRight />
                           </Link>
                         </Button>
                         {season.status !== "ARCHIVED" ? (
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-danger-strong hover:bg-danger-soft hover:text-danger-strong"
+                            variant="destructive"
+                            size="icon-sm"
                             onClick={() =>
                               setArchiveConfirm({
                                 id: season.id,
@@ -491,7 +490,7 @@ export default function CycleDetailPage() {
                               })
                             }
                           >
-                            Remover
+                            <Trash2 />
                           </Button>
                         ) : null}
                       </span>
@@ -551,16 +550,15 @@ export default function CycleDetailPage() {
                           className="flex-1"
                         >
                           <Link href={row.recommendationHref}>
+                            <SquareCheckBig />
                             Recomendações
                           </Link>
                         </Button>
                         {season.status !== "ARCHIVED" ? (
                           <Button
-                            variant="outline"
+                            variant="destructive"
                             size="sm"
-                            className={cn(
-                              "shrink-0 border-danger-border text-danger-strong hover:bg-danger-soft hover:text-danger-strong",
-                            )}
+                            className="shrink-0"
                             onClick={() =>
                               setArchiveConfirm({
                                 id: season.id,
@@ -568,6 +566,7 @@ export default function CycleDetailPage() {
                               })
                             }
                           >
+                            <Trash2 />
                             Remover
                           </Button>
                         ) : null}
