@@ -33,6 +33,7 @@ import {
   dayOffsetToIsoDate,
   isoDateToDayOffset,
 } from "@/lib/timing/window-days";
+import type { StageProductDraft } from "@/lib/timing/types";
 import {
   findPurchaseListOverages,
   formatDosePerHa,
@@ -54,18 +55,6 @@ export const TIMING_TRIGGER_LABELS: Record<string, string> = {
   DAYS_AFTER_DESICCATION: "Pré-plantio",
   DAYS_AFTER_TASSELING: "Pós-plantio",
   FIXED_DATE_OFFSET: "Pós-plantio",
-};
-
-export type StageProductDraft = {
-  key: string;
-  category: string;
-  productId: string;
-  productName: string;
-  dose: string;
-  unit: string;
-  mixItemId?: string;
-  /** Produto fora da lista de compra (fora da programação). */
-  outOfProgram?: boolean;
 };
 
 export function usePurchaseListCatalogProducts(

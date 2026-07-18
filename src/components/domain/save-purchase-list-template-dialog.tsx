@@ -17,11 +17,8 @@ import { Label } from "@/components/ui/label";
 import { useCreatePurchaseListTemplate } from "@/lib/api/hooks";
 import { apiErrorMessage } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
-import {
-  FieldError,
-  listItemToPayload,
-  type ListItem,
-} from "@/components/domain/season/_shared";
+import { FieldError } from "@/components/domain/season/_shared";
+import { listItemToPayload, type ListItem } from "@/lib/purchase-list/list-item";
 
 /**
  * Botão + diálogo "Salvar como template": grava os produtos atuais como modelo

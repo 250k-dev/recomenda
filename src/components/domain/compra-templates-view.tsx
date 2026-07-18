@@ -24,7 +24,7 @@ import {
   listItemToPayload,
   validateListItems,
   type ListItem,
-} from "@/components/domain/season/_shared";
+} from "@/lib/purchase-list/list-item";
 
 type Crop = "SOYBEAN" | "CORN" | "ANY";
 

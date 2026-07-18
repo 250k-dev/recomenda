@@ -38,11 +38,11 @@ import {
   useUpdatePurchaseList,
 } from "@/lib/api/hooks";
 import { useProducerStock } from "@/lib/api/hooks/producers";
-import type { ListItem } from "@/components/domain/season/_shared";
+import type { ListItem } from "@/lib/purchase-list/list-item";
 import {
   listItemToPayload,
   validateListItems,
-} from "@/components/domain/season/_shared";
+} from "@/lib/purchase-list/list-item";
 import type { PurchaseListDetail, PurchaseListItemInput } from "@/lib/api/client";
 import { CROP_LABELS } from "@/lib/season-constants";
 import { toast } from "sonner";

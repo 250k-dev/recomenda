@@ -14,7 +14,7 @@ import {
   localYmdToDate,
   maskBrazilianDateInput,
   parseBrazilianDate,
-} from "@/lib/timing/window-days";
+} from "@/lib/utils/dates";
 
 type BrazilianDateInputProps = {
   value: string;

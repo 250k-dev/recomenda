@@ -4,10 +4,7 @@
  */
 import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
 import { CATEGORY_LABELS } from "@/lib/cost-plan/categories";
-import {
-  SEED_CATEGORIES,
-  seedQuantityUnitLabel,
-} from "@/components/domain/season/_shared";
+import { SEED_CATEGORIES, seedQuantityUnitLabel } from "./list-item";
 import {
   escapeHtml,
   fmtBrl,
