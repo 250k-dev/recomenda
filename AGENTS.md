@@ -12,7 +12,7 @@ apps/web/           # o Next.js app — o único app
   src/components/   # domain/ (feature code), layout/, auth/
   src/stores/       # zustand
   src/lib/auth/     # session.ts e session-cookies.ts — server-only, ficam aqui
-  src/config/nav.ts # usa `Route` do next: não pode virar pacote
+  src/config/nav.ts # menu por papel: navegação de produto, não roteamento
   proxy.ts          # Next 16 renomeou middleware.ts → proxy.ts
 packages/
   utils/            # @recomenda/utils      — formatação, datas, constantes
