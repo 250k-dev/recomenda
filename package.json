@@ -9,11 +9,15 @@
     "start": "turbo start",
     "lint": "eslint .",
     "typecheck": "turbo typecheck",
+    "test:fronteiras": "node scripts/test-fronteiras.mjs",
+    "check:ciclos": "node scripts/check-ciclos.mjs",
     "codegen": "pnpm --filter @recomenda/api codegen"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
     "eslint-config-next": "16.2.4",
+    "eslint-plugin-boundaries": "^7.0.2",
+    "madge": "^8.0.0",
     "turbo": "^2.6.4"
   }
 }

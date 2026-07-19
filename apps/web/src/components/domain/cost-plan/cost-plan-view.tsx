@@ -118,6 +118,7 @@ export function CostPlanView({
     [setGlobalFxRate],
   );
 
+  /* eslint-disable react-hooks/set-state-in-effect -- dívida pré-existente (baseline desde A1): semeia o formulário a partir do plano carregado. Corrigir exige `key` no pai ou estado derivado, e mexe no fluxo de edição do plano de custo — fora do escopo de uma fase de config. */
   useEffect(() => {
     if (!plan) return;
     // Seed the global store from the saved plan value if the global is still empty
@@ -155,6 +156,7 @@ export function CostPlanView({
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const area = plan?.total_hectares ?? 0;
   const plotsCount = plan?.plots?.length ?? 0;

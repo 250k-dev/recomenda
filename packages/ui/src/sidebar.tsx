@@ -608,6 +608,7 @@ function SidebarMenuSkeleton({
 }) {
   // Random width between 50 to 90%.
   const width = React.useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- código upstream do shadcn, largura aleatória do skeleton. Editar componente de terceiro só para agradar o lint traz custo de rebase sem ganho.
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
 

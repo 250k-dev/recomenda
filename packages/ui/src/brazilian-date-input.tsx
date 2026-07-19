@@ -36,7 +36,9 @@ export function BrazilianDateInput({
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(() => (value ? formatTimingPreviewDate(value) : ""));
 
+  // Sincroniza o texto digitado com a prop `value` controlada.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- dívida pré-existente (A1..A7). Corrigir exige derivar o texto do valor ou usar `key`, e é mudança de comportamento — não cabe numa fase de config.
     setText(value ? formatTimingPreviewDate(value) : "");
   }, [value]);
 

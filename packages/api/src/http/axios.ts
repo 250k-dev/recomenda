@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- load-bearing, ver o porquê logo abaixo
 /// <reference path="../axios.d.ts" />
 // A referência acima é necessária: `axios.d.ts` aumenta `InternalAxiosRequestConfig`
 // com `_retry`, mas ninguém o importa. Dentro do pacote o `include` do tsconfig o
