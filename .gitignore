@@ -42,5 +42,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Sondas de `pnpm test:fronteiras`. O script apaga as suas ao sair e varre as
+# órfãs ao entrar, mas um SIGKILL no meio deixa arquivo no disco — e ele cai
+# dentro do `include` do tsconfig do pacote, quebrando `pnpm typecheck`.
+__fronteira_probe*
+
 /docs/design-refactor
 /docs/monorepo

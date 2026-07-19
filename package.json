@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@11.15.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
@@ -11,7 +14,8 @@
     "typecheck": "turbo typecheck",
     "test:fronteiras": "node scripts/test-fronteiras.mjs",
     "check:ciclos": "node scripts/check-ciclos.mjs",
-    "codegen": "pnpm --filter @recomenda/api codegen"
+    "codegen": "pnpm --filter @recomenda/api codegen",
+    "check:tailwind": "node scripts/check-tailwind-source.mjs"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
