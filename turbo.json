@@ -1,13 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["NEXT_PUBLIC_API_BASE_URL", "API_INTERNAL_URL", "JWT_SECRET"],
+  "globalDependencies": ["**/.env", "**/.env.*local", "pnpm-lock.yaml"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": ["NEXT_PUBLIC_API_BASE_URL", "API_INTERNAL_URL", "JWT_SECRET"]
     },
-    "typecheck": { "dependsOn": ["^build"] },
-    "lint": {},
+    "typecheck": { "dependsOn": ["^build"], "outputs": [] },
     "dev": { "cache": false, "persistent": true },
     "start": { "cache": false, "persistent": true }
   }

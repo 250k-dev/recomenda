@@ -1,7 +1,16 @@
 "use client";
 
+import type { Route } from "next";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { BreadcrumbItem } from "@/components/domain/breadcrumb-back";
+
+// Declarado aqui, e não em `domain/breadcrumb-back`, porque aquele arquivo já
+// importa deste — o par formava o único ciclo restante do repo. A seta agora é
+// única (domain → layout) e `breadcrumb-back` re-exporta o tipo, então os 12
+// consumidores seguem importando do mesmo lugar de sempre.
+export type BreadcrumbItem = {
+  label: string;
+  href?: Route;
+};
 
 // Contextos separados: o setter é estável (páginas publicam sem re-renderizar
 // em loop) e os items só interessam ao header.

@@ -120,11 +120,13 @@ export function MonthCalendar({
     return allEvents.filter((event) => event.ymd >= monthStart && event.ymd <= monthEnd);
   }, [allEvents, month]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- dívida pré-existente (baseline desde A1): reseta o painel ao trocar de produtor. A forma canônica é `key={producerId}` no componente pai, mas mexer nisso é mudança de comportamento sem teste que a cubra. */
   useEffect(() => {
     didAutoFocus.current = false;
     setPanelMode("day");
     setStatusFilter(null);
   }, [producerId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const nextEventYmd = useMemo(() => {
     const ymds = Object.keys(calendarMarkersByDay).sort();

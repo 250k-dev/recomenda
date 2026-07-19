@@ -1,6 +1,5 @@
 "use client";
 
-import type { Route } from "next";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { Fragment, useEffect } from "react";
@@ -9,13 +8,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@recomenda/ui/popover";
-import { useBreadcrumbSetter } from "@/components/layout/breadcrumbs-context";
+import {
+  useBreadcrumbSetter,
+  type BreadcrumbItem,
+} from "@/components/layout/breadcrumbs-context";
 import { cn } from "@recomenda/utils";
 
-export type BreadcrumbItem = {
-  label: string;
-  href?: Route;
-};
+// O tipo é declarado em `layout/breadcrumbs-context` (a camada de baixo, que
+// este arquivo já consumia) e re-exportado aqui para não mexer nos 12
+// consumidores que sempre o importaram deste caminho.
+export type { BreadcrumbItem };
 
 /**
  * Desktop (≥sm): container segmentado (1b) — cápsula branca com a trilha
