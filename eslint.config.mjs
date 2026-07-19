@@ -16,6 +16,10 @@ const eslintConfig = defineConfig([
     "**/out/**",
     "**/build/**",
     "**/next-env.d.ts",
+    // Mockups de design versionados fora do git (`.gitignore:43`). Não são
+    // código-fonte do app; sozinhos respondiam por 14 dos 36 achados quando o
+    // lint passou a varrer a raiz.
+    "docs/design-refactor/**",
   ]),
 ]);
 

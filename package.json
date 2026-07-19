@@ -7,7 +7,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "start": "turbo start",
-    "lint": "turbo lint",
+    "lint": "eslint .",
     "typecheck": "turbo typecheck",
     "codegen": "pnpm --filter @recomenda/api codegen"
   },
