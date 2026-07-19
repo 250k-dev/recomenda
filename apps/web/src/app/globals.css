@@ -1,0 +1,279 @@
+@import "tailwindcss";
+/* O scanner de classes do Tailwind v4 só varre a árvore do app. Os primitivos
+   vivem em @recomenda/ui, fora dela: sem este @source as classes deles param de
+   ser geradas — sem erro de build, sem warning, só a tela quebrada. */
+@source "../../../../packages/ui/src";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Fonts — Poppins (display) + Inter (body) */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-poppins), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-heading: var(--font-poppins), var(--font-inter), ui-sans-serif, sans-serif;
+
+  /* shadcn semantic colors -> design tokens */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /* === Redesign design tokens exposed as Tailwind color utilities === */
+  /* Surfaces */
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-canvas: var(--canvas);
+  --color-rail: var(--rail-bg);
+  --color-search: var(--search-bg);
+  --color-hover: var(--hover);
+  /* Text / lines */
+  --color-text-strong: var(--text-strong);
+  --color-placeholder: var(--placeholder);
+  --color-border-strong: var(--border-strong);
+  /* Brand green extras */
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-border: var(--primary-border);
+  /* Terracota (brand accent — NOT shadcn's hover `accent`) */
+  --color-clay: var(--clay);
+  --color-clay-strong: var(--clay-strong);
+  --color-clay-soft: var(--clay-soft);
+  --color-clay-border: var(--clay-border);
+  --color-clay-ink: var(--clay-ink);
+  /* Semantic */
+  --color-success: var(--success);
+  --color-success-strong: var(--success-strong);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-strong: var(--warning-strong);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-border: var(--danger-border);
+  /* Category tokens (variedade / fertilizante / inseticida-outros / herbicida) */
+  --color-tg: var(--tg);
+  --color-tg-soft: var(--tg-soft);
+  --color-ta: var(--ta);
+  --color-ta-soft: var(--ta-soft);
+  --color-tb: var(--tb);
+  --color-tb-soft: var(--tb-soft);
+  --color-tc: var(--tc);
+  --color-tc-soft: var(--tc-soft);
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Warm shadow scale (mockup --shadow-sm/md/lg) */
+  --shadow-2xs: 0 1px 2px rgba(70, 48, 16, 0.04);
+  --shadow-xs: 0 1px 2px rgba(70, 48, 16, 0.05);
+  --shadow-sm: 0 1px 2px rgba(70, 48, 16, 0.05), 0 2px 7px rgba(70, 48, 16, 0.045);
+  --shadow-md: 0 8px 24px rgba(70, 48, 16, 0.1);
+  --shadow-lg: 0 18px 50px rgba(70, 48, 16, 0.16);
+  --shadow-xl: 0 18px 50px rgba(70, 48, 16, 0.16);
+}
+
+:root {
+  /* === Raw design tokens (source of truth: docs/design-refactor) === */
+  --bg: oklch(0.964 0.011 83);
+  --canvas: oklch(0.915 0.009 80);
+  --surface: oklch(0.995 0.005 86);
+  --surface-2: oklch(0.958 0.014 81);
+  --hover: oklch(0.948 0.018 80);
+  --text-strong: oklch(0.255 0.03 58);
+  --text: oklch(0.36 0.027 60);
+  --muted-fg: oklch(0.52 0.024 64);
+  --placeholder: oklch(0.66 0.02 68);
+  --border-soft: oklch(0.905 0.016 76);
+  --border-strong: oklch(0.85 0.022 74);
+
+  --primary-base: oklch(0.455 0.098 152);
+  --primary-strong: oklch(0.38 0.09 152);
+  --primary-ink: oklch(0.985 0.02 110);
+  --primary-soft: oklch(0.95 0.03 145);
+  --primary-border: oklch(0.88 0.045 145);
+
+  /* terracota */
+  --clay: oklch(0.585 0.13 44);
+  --clay-strong: oklch(0.5 0.13 42);
+  --clay-soft: oklch(0.945 0.04 52);
+  --clay-border: oklch(0.88 0.06 50);
+  --clay-ink: oklch(0.99 0.01 80);
+
+  --success: oklch(0.52 0.1 150);
+  --success-strong: oklch(0.4 0.092 150);
+  --success-soft: oklch(0.95 0.04 140);
+  --success-border: oklch(0.86 0.06 140);
+  --warning: oklch(0.7 0.13 62);
+  --warning-strong: oklch(0.48 0.12 52);
+  --warning-soft: oklch(0.955 0.05 68);
+  --warning-border: oklch(0.88 0.08 62);
+  --danger: oklch(0.54 0.16 32);
+  --danger-strong: oklch(0.46 0.16 32);
+  --danger-soft: oklch(0.955 0.04 38);
+  --danger-border: oklch(0.88 0.06 36);
+
+  /* category: tg=variedade(verde) ta=fertilizante(âmbar) tb=inseticida/outros(azul) tc=herbicida(laranja) */
+  --tg: oklch(0.43 0.095 152);
+  --tg-soft: oklch(0.93 0.05 145);
+  --ta: oklch(0.54 0.12 58);
+  --ta-soft: oklch(0.94 0.06 74);
+  --tb: oklch(0.48 0.09 232);
+  --tb-soft: oklch(0.925 0.04 220);
+  --tc: oklch(0.54 0.13 42);
+  --tc-soft: oklch(0.935 0.05 46);
+
+  --search-bg: oklch(0.965 0.013 80);
+  --rail-bg: oklch(0.952 0.016 80);
+
+  --brand-shadow: 0 4px 12px oklch(0.455 0.098 152 / 0.4);
+  --btn-shadow: 0 2px 5px oklch(0.36 0.09 152 / 0.3);
+  --clay-shadow: 0 2px 5px oklch(0.45 0.12 42 / 0.32);
+
+  /* === shadcn semantic tokens mapped onto the design tokens === */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text-strong);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-strong);
+  --primary: var(--primary-base);
+  --primary-foreground: var(--primary-ink);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text-strong);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--muted-fg);
+  /* shadcn `accent` is the subtle/hover token — keep neutral, NOT terracota */
+  --accent: var(--hover);
+  --accent-foreground: var(--text-strong);
+  --destructive: var(--danger);
+  --border: var(--border-soft);
+  --input: var(--border-strong);
+  --ring: var(--primary-base);
+  --chart-1: oklch(0.52 0.1 150);
+  --chart-2: oklch(0.54 0.12 58);
+  --chart-3: oklch(0.54 0.13 42);
+  --chart-4: oklch(0.48 0.09 232);
+  --chart-5: oklch(0.7 0.13 62);
+  --radius: 0.75rem;
+
+  /* Admin sidebar — forest green */
+  --sidebar: oklch(0.27 0.035 156);
+  --sidebar-foreground: oklch(0.92 0.012 110);
+  --sidebar-primary: oklch(0.5 0.1 152);
+  --sidebar-primary-foreground: oklch(0.985 0.02 110);
+  --sidebar-accent: oklch(1 0 0 / 0.13);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(1 0 0 / 0.12);
+  --sidebar-ring: oklch(0.5 0.1 152);
+}
+
+.dark {
+  /* App is light-only (no theme toggle). Kept for completeness; unused. */
+  --background: oklch(0.153 0.006 107.1);
+  --foreground: oklch(0.988 0.003 106.5);
+  --card: oklch(0.228 0.013 107.4);
+  --card-foreground: oklch(0.988 0.003 106.5);
+  --popover: oklch(0.228 0.013 107.4);
+  --popover-foreground: oklch(0.988 0.003 106.5);
+  --primary: oklch(0.62 0.12 152);
+  --primary-foreground: oklch(0.153 0.006 107.1);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.286 0.016 107.4);
+  --muted-foreground: oklch(0.737 0.021 106.9);
+  --accent: oklch(0.286 0.016 107.4);
+  --accent-foreground: oklch(0.988 0.003 106.5);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.58 0.031 107.3);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+    /* Bump base type ~6% for legibility (older users, outdoors). All rem-based
+       Tailwind sizes scale proportionally. Tune here if it reads too large. */
+    font-size: 17px;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+    color: var(--text-strong);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 220ms ease-out both;
+  }
+  .animate-slide-up {
+    animation: slide-up 240ms ease-out both;
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

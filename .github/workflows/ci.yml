@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Um push novo no mesmo branch cancela o run anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lê a versão de `packageManager` no package.json da raiz.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # `--frozen-lockfile` é o que impede um pnpm-lock.yaml desatualizado de
+      # passar. O `allowBuilds` do pnpm-workspace.yaml (sharp, unrs-resolver) é
+      # o que deixa os binários nativos rodarem postinstall num runner limpo.
+      - run: pnpm install --frozen-lockfile
+
+      # `pnpm lint` é `eslint .` na raiz e cobre apps/ E packages/.
+      # NÃO troque por `turbo lint`: a task foi removida do turbo.json no A8
+      # justamente porque só enxergava apps/web, deixando ~6.500 linhas de
+      # packages/ fora do gate — foi assim que um erro passou cinco fases.
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      # Não precisa de secrets: as três env vars têm default em
+      # @recomenda/config (medido — o build passa sem .env nenhum).
+      - run: pnpm build
+
+      - run: pnpm check:ciclos
+
+      # O gate que protege os outros gates: confirma que as regras de fronteira
+      # ainda REPROVAM violações propositais. Uma regra que parou de pegar tem
+      # a mesma aparência de uma que funciona — só este passo distingue.
+      - run: pnpm test:fronteiras

@@ -1,0 +1,119 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { CalendarDays } from "lucide-react";
+import { ptBR } from "react-day-picker/locale";
+import { Input } from "./input";
+import { Button } from "./button";
+import { Calendar } from "./calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import {
+  cn,
+  dateToLocalYmd,
+  formatTimingPreviewDate,
+  localYmdToDate,
+  maskBrazilianDateInput,
+  parseBrazilianDate,
+} from "@recomenda/utils";
+
+type BrazilianDateInputProps = {
+  value: string;
+  onChange?: (ymd: string) => void;
+  readOnly?: boolean;
+  placeholder?: string;
+  className?: string;
+  "aria-label"?: string;
+};
+
+export function BrazilianDateInput({
+  value,
+  onChange,
+  readOnly = false,
+  placeholder = "DD/MM/AAAA",
+  className,
+  "aria-label": ariaLabel,
+}: BrazilianDateInputProps) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(() => (value ? formatTimingPreviewDate(value) : ""));
+
+  // Sincroniza o texto digitado com a prop `value` controlada.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- dívida pré-existente (A1..A7). Corrigir exige derivar o texto do valor ou usar `key`, e é mudança de comportamento — não cabe numa fase de config.
+    setText(value ? formatTimingPreviewDate(value) : "");
+  }, [value]);
+
+  const selectedDate =
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? localYmdToDate(value) : undefined;
+
+  const commitText = (nextText: string) => {
+    const parsed = parseBrazilianDate(nextText);
+    if (parsed) {
+      onChange?.(parsed);
+      setText(formatTimingPreviewDate(parsed));
+      return;
+    }
+    setText(value ? formatTimingPreviewDate(value) : "");
+  };
+
+  if (readOnly) {
+    return (
+      <Input
+        value={value ? formatTimingPreviewDate(value) : ""}
+        readOnly
+        tabIndex={-1}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        className={cn("bg-muted/40 text-muted-foreground", className)}
+      />
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <div className="relative">
+        <Input
+          value={text}
+          inputMode="numeric"
+          placeholder={placeholder}
+          aria-label={ariaLabel}
+          className={cn("pr-10", className)}
+          onChange={(event) => setText(maskBrazilianDateInput(event.target.value))}
+          onBlur={() => commitText(text)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitText(text);
+            }
+          }}
+        />
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Abrir calendário"
+          >
+            <CalendarDays className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+      </div>
+
+      <PopoverContent align="start" className="w-auto p-0">
+        <Calendar
+          mode="single"
+          locale={ptBR}
+          selected={selectedDate}
+          defaultMonth={selectedDate ?? new Date()}
+          onSelect={(date) => {
+            if (!date) return;
+            const nextValue = dateToLocalYmd(date);
+            onChange?.(nextValue);
+            setText(formatTimingPreviewDate(nextValue));
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}

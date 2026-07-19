@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,11 +11,14 @@
 !.yarn/versions
 
 # next.js
-/.next/
-/out/
+.next/
+out/
+
+# turborepo
+.turbo/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
@@ -29,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...exceto o template, que não tem segredo e é a única documentação das vars.
+!.env.example
 
 # vercel
 .vercel

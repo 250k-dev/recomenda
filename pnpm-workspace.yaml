@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm >=10 não roda postinstall de dependência sem aprovação explícita.
+# sharp: otimizador de imagem do Next (binário nativo).
+# unrs-resolver: resolver de imports do eslint-config-next (binário nativo).
+allowBuilds:
+  sharp: true
+  unrs-resolver: true
