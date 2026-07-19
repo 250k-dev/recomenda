@@ -24,15 +24,15 @@ import {
   isStageProductPersistable,
   mapMixItemsToStageProducts,
   syncStageProducts,
-} from "@/lib/timing/sync-stage-products";
-import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@/lib/timing/window-days";
+} from "@recomenda/domain/timing/sync-stage-products";
+import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@recomenda/domain/timing/window-days";
 import {
   readLocalDraft,
   clearLocalDraft,
   useLocalDraft,
 } from "@/lib/use-local-draft";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
-import type { StageProductDraft } from "@/lib/timing/types";
+import type { StageProductDraft } from "@recomenda/domain/timing/types";
 
 type TimingTemplateStagesPanelProps = {
   template: TimingTemplate & { stages: TimingStage[] };

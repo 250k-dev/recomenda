@@ -19,7 +19,7 @@ import {
   printQuoteComparison,
   type QuoteExportMode,
   type QuotePrintContext,
-} from "@/lib/quotes/quote-print-document";
+} from "@recomenda/domain/quotes/quote-print-document";
 
 export function QuoteExportDialog({
   open,

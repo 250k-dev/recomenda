@@ -17,7 +17,7 @@ import {
   buildPurchaseListWhatsappMessage,
   printPurchaseList,
   type PurchaseListPrintContext,
-} from "@/lib/purchase-list/purchase-list-print-document";
+} from "@recomenda/domain/purchase-list/purchase-list-print-document";
 
 export function PurchaseListExportDialog({
   open,

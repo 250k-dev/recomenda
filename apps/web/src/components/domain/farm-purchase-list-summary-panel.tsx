@@ -12,7 +12,7 @@ import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
 import {
   computePurchaseListMetrics,
   detailItemToListItem,
-} from "@/lib/purchase-list-breakdown";
+} from "@recomenda/domain/purchase-list/breakdown";
 import { cn } from "@recomenda/utils";
 
 const fmtBrl = (n: number) =>

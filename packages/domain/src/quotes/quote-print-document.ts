@@ -15,7 +15,7 @@ import {
   headerHtml,
   htmlShell,
   printHtml,
-} from "@/lib/print/print-core";
+} from "../print/print-core";
 
 const TERM_LABEL: Record<QuotePaymentTerm, string> = {
   CASH: "à vista",

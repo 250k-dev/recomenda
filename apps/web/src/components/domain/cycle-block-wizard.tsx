@@ -49,14 +49,14 @@ import {
   newTimingStageField,
   type TimingStageField,
 } from "@/components/domain/timing/timing-stages-editor";
-import { recommendedYmdToWindow } from "@/lib/timing/window-days";
+import { recommendedYmdToWindow } from "@recomenda/domain/timing/window-days";
 import {
   Field,
   FieldError,
   extractError,
   fmt,
 } from "@/components/domain/season/_shared";
-import { SEED_CATEGORIES } from "@/lib/purchase-list/list-item";
+import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
 
 type CronogramMode = "template" | "custom";
 

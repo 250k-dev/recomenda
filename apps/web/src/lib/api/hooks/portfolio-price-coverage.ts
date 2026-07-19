@@ -2,7 +2,7 @@
 
 import { useQueries } from "@tanstack/react-query";
 import { getProducerPurchaseLists } from "@recomenda/api/purchase-lists";
-import { computePortfolioPriceCoverage } from "@/lib/purchase-list-metrics";
+import { computePortfolioPriceCoverage } from "@recomenda/domain/purchase-list/metrics";
 import { queryKeys } from "./queryKeys";
 
 export function usePortfolioPriceCoverage(producerIds: string[]) {

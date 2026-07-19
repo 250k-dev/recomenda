@@ -14,8 +14,8 @@ import {
 import {
   buildMultiWhatsappMessage,
   type RecommendationShareData,
-} from "@/lib/recommendations/share-message";
-import { printRecommendations } from "@/lib/recommendations/print-document";
+} from "@recomenda/domain/recommendations/share-message";
+import { printRecommendations } from "@recomenda/domain/recommendations/print-document";
 import { WhatsAppIcon } from "@/assets/whatsapp-icon";
 import { cn } from "@recomenda/utils";
 

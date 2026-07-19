@@ -4,7 +4,7 @@ import {
   updateTimingStage,
   type MixTemplateItem,
 } from "@recomenda/api/templates";
-import type { StageProductDraft } from "@/lib/timing/types";
+import type { StageProductDraft } from "./types";
 import type { Product } from "@recomenda/api/catalog";
 
 function parseDose(value: string): number {

@@ -7,7 +7,7 @@ import {
   headerHtml,
   htmlShell,
   printHtml,
-} from "@/lib/print/print-core";
+} from "../print/print-core";
 
 const STATUS_CLASS: Record<string, string> = {
   PENDING: "is-pending",

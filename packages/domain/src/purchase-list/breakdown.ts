@@ -10,8 +10,8 @@ import {
   isSeedItem,
   listItemQuantity,
   type ListItem,
-} from "@/lib/purchase-list/list-item";
-import { CATEGORY_ORDER, type CategoryBreakdown } from "@/lib/cost-plan/calculate";
+} from "./list-item";
+import { CATEGORY_ORDER, type CategoryBreakdown } from "../cost-plan/calculate";
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 
 /** Converte um item persistido da lista no `ListItem` do cálculo. */
