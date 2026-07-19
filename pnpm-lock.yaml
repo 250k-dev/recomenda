@@ -142,6 +142,9 @@ importers:
       '@recomenda/domain':
         specifier: workspace:*
         version: link:../domain
+      '@recomenda/utils':
+        specifier: workspace:*
+        version: link:../utils
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
