@@ -1,5 +1,5 @@
-import { api } from "@/lib/http/axios";
-import type { AdminProducerAccountStatus } from "@/lib/api/producers";
+import { api } from "./http/axios";
+import type { AdminProducerAccountStatus } from "./producers";
 
 export interface Plan {
   id: string;

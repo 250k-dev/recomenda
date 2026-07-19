@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
-import { apiErrorMessage } from "@/lib/api-error";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import { Users, Plus } from "lucide-react";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -23,7 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { deactivateOutlineButtonClass } from "@recomenda/utils";
-import type { AdminAgronomist } from "@/lib/api/client";
+import type { AdminAgronomist } from "@recomenda/api";
 import {
   useAdminAgronomists,
   useCreateAdminAgronomist,

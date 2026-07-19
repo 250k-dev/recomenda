@@ -34,7 +34,7 @@ import {
   updatePlot,
   deletePlot,
   grantFarmAccess,
-} from "@/lib/api/client";
+} from "@recomenda/api";
 
 type Producer = { id: string; name: string };
 type Farm = { id: string; name: string };

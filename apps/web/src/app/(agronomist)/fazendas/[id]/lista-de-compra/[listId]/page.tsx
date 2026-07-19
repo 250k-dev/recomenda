@@ -15,7 +15,7 @@ import {
   useProducerPurchaseLists,
 } from "@/lib/api/hooks";
 import { routes } from "@recomenda/config";
-import type { PurchaseListDetail } from "@/lib/api/client";
+import type { PurchaseListDetail } from "@recomenda/api";
 
 export default function PurchaseListViewPage() {
   const params = useParams<{ id: string; listId: string }>();

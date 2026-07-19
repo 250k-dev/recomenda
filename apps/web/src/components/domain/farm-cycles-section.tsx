@@ -29,8 +29,8 @@ import {
   useMe,
   useProducer,
 } from "@/lib/api/hooks";
-import type { CycleSummary } from "@/lib/api/cycles";
-import { getTimeline, type Recommendation } from "@/lib/api/seasons";
+import type { CycleSummary } from "@recomenda/api/cycles";
+import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import {
   FarmSeasonsExportDialog,
   type FarmExportItem,

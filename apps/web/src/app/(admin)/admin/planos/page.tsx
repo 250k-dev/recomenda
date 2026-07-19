@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
-import { apiErrorMessage } from "@/lib/api-error";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import { CreditCard, Plus } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { StatusBadge } from "@/components/domain/status-badge";
@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { Plan } from "@/lib/api/client";
+import type { Plan } from "@recomenda/api";
 import {
   useCreateAdminPlan,
   useDeleteAdminPlan,

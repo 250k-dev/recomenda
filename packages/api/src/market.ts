@@ -1,4 +1,4 @@
-import { api } from "@/lib/http/axios";
+import { api } from "./http/axios";
 
 export interface CommoditiesQuote {
   /** Dólar (R$ por US$) — PTAX venda do BCB. */

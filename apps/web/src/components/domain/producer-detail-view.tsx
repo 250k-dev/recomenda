@@ -6,7 +6,7 @@ import type { Route } from "next";
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
-import { getFarmCycles } from "@/lib/api/cycles";
+import { getFarmCycles } from "@recomenda/api/cycles";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
@@ -24,7 +24,7 @@ import {
   useUpdateProducer,
   queryKeys,
 } from "@/lib/api/hooks";
-import { createFarm, grantFarmAccess } from "@/lib/api/client";
+import { createFarm, grantFarmAccess } from "@recomenda/api";
 import {
   Sheet,
   SheetContent,

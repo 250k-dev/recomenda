@@ -27,7 +27,7 @@ import {
 import { useMe, usePlanQuota } from "@/lib/api/hooks";
 import { navFor } from "@/config/nav";
 import { routes } from "@recomenda/config";
-import type { AccessLevel, UserRole } from "@/types/auth";
+import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
 import { Logo } from "@/assets/logo";
 import { NotificationsBell } from "./notifications-bell";
 import { Badge } from "../ui/badge";

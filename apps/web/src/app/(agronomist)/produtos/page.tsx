@@ -37,7 +37,7 @@ import {
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
 } from "@recomenda/utils";
-import type { PlatformCatalogEntry } from "@/lib/api/client";
+import type { PlatformCatalogEntry } from "@recomenda/api";
 
 const CATALOG_PAGE_SIZE = 15;
 

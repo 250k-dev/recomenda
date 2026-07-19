@@ -4,7 +4,7 @@ import { CheckCircle2, AlertTriangle, Clock, SkipForward, Leaf } from "lucide-re
 import { Badge } from "@/components/ui/badge";
 import { cn, CROP_LABELS } from "@recomenda/utils";
 import { usePlotHistory } from "@/lib/api/hooks";
-import type { PlotHistorySeason, PlotHistoryRec } from "@/lib/api/seasons";
+import type { PlotHistorySeason, PlotHistoryRec } from "@recomenda/api/seasons";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",

@@ -43,7 +43,7 @@ import {
   updatePurchaseList,
   type PurchaseListDetail,
   type PurchaseListInput,
-} from "@/lib/api/client";
+} from "@recomenda/api";
 import { detailItemToListItem } from "@/lib/purchase-list-breakdown";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 import {

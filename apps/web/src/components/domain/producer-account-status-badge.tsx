@@ -1,5 +1,5 @@
 import { StatusBadge, type StatusTone } from "@/components/domain/status-badge";
-import type { AdminProducerAccountStatus } from "@/lib/api/client";
+import type { AdminProducerAccountStatus } from "@recomenda/api";
 
 export const PRODUCER_ACCOUNT_STATUS_LABEL: Record<
   AdminProducerAccountStatus,

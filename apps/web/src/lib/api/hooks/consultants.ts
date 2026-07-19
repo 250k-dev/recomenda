@@ -10,7 +10,7 @@ import {
   grantMemberProducer,
   removeConsultant,
   revokeMemberProducer,
-} from "@/lib/api/consultants";
+} from "@recomenda/api/consultants";
 
 const teamKey = ["consultants"] as const;
 const shareableProducersKey = ["consultants-shareable-producers"] as const;

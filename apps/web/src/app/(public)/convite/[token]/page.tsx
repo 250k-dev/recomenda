@@ -15,9 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { getAuthSession, login, logout } from "@/lib/api/auth";
+import { getAuthSession, login, logout } from "@recomenda/api/auth";
 import { useAcceptInvitation, useInvitationByToken } from "@/lib/api/hooks";
-import type { InvitationPreview } from "@/lib/api/producers";
+import type { InvitationPreview } from "@recomenda/api/producers";
 
 const acceptSchema = z
   .object({

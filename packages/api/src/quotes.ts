@@ -1,4 +1,4 @@
-import { api } from "@/lib/http/axios";
+import { api } from "./http/axios";
 
 export type QuoteRequestStatus = "OPEN" | "CLOSED";
 export type QuoteResponseStatus = "DRAFT" | "SUBMITTED";

@@ -1,5 +1,5 @@
-import { api } from "@/lib/http/axios";
-import type { PaginatedResponse } from "@/lib/api/types";
+import { api } from "./http/axios";
+import type { PaginatedResponse } from "./types";
 
 export interface Season {
   id: string;

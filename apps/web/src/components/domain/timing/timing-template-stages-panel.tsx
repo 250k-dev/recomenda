@@ -12,7 +12,7 @@ import {
   updateTimingStage,
   type TimingStage,
   type TimingTemplate,
-} from "@/lib/api/templates";
+} from "@recomenda/api/templates";
 import {
   useCreateTimingStage,
   useDeleteTimingStage,

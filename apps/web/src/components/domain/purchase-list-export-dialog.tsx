@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { WhatsAppIcon } from "@/assets/whatsapp-icon";
-import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
+import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 import {
   buildPurchaseListWhatsappMessage,
   printPurchaseList,

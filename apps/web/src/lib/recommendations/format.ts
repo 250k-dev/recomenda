@@ -1,4 +1,4 @@
-import type { Recommendation } from "@/lib/api/client";
+import type { Recommendation } from "@recomenda/api";
 
 /** Display status incluindo o estado derivado "OVERDUE" (atrasado). */
 export type RecommendationDisplayStatus =

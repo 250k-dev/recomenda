@@ -1,6 +1,6 @@
-import { api } from "@/lib/http/axios";
-import type { LoginResponse } from "@/types/auth";
-import type { AgronomistMePlanResponse } from "@/lib/api/types";
+import { api } from "./http/axios";
+import type { LoginResponse } from "./auth-types";
+import type { AgronomistMePlanResponse } from "./types";
 
 export async function login(email: string, password: string) {
   const response = await fetch("/api/auth/login", {

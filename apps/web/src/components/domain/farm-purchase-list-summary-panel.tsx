@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
-import type { PurchaseListDetail } from "@/lib/api/client";
+import type { PurchaseListDetail } from "@recomenda/api";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
 import {
   computePurchaseListMetrics,

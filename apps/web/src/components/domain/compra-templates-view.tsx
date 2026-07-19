@@ -17,8 +17,8 @@ import {
   useUpdatePurchaseListTemplate,
 } from "@/lib/api/hooks";
 import { useCan } from "@/lib/auth/use-can";
-import { apiErrorMessage } from "@/lib/api-error";
-import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
+import { apiErrorMessage } from "@recomenda/api/api-error";
+import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 import { CROP_LABELS } from "@recomenda/utils";
 import {
   listItemToPayload,

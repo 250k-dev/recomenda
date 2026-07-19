@@ -9,7 +9,7 @@ import {
   getPlanQuota,
   impersonateProducer,
   exitImpersonation,
-} from "@/lib/api/auth";
+} from "@recomenda/api/auth";
 import { useImpersonationStore } from "@/stores/impersonation";
 import { queryKeys } from "./queryKeys";
 

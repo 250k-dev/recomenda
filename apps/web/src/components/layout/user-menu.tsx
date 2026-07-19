@@ -19,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, usePlanQuota } from "@/lib/api/hooks";
-import { logout } from "@/lib/api/client";
+import { logout } from "@recomenda/api";
 import { NotificationsPanel, useNotificationsList } from "./notifications-bell";
 
 export function UserMenu() {

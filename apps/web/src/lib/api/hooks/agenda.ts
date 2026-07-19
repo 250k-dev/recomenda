@@ -9,7 +9,7 @@ import {
   format,
   startOfMonth,
 } from "date-fns";
-import { getSeasons, getTimeline, type Recommendation } from "@/lib/api/seasons";
+import { getSeasons, getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import { recommendationWindowSpanDays } from "@/lib/timing/window-days";
 import { queryKeys } from "./queryKeys";
 

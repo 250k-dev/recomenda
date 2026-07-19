@@ -17,7 +17,7 @@ import {
   softDeleteQuoteItem,
   softDeleteQuoteResponse,
   updateQuoteResponse,
-} from "@/lib/api/quotes";
+} from "@recomenda/api/quotes";
 import { queryKeys } from "./queryKeys";
 
 // --- Agrônomo -----------------------------------------------------------------

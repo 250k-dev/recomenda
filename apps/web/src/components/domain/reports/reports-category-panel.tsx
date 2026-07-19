@@ -1,7 +1,7 @@
 "use client";
 
 import { RailCard } from "@/components/domain/rail-card";
-import type { ReportCategoryBreakdown } from "@/lib/api/reports";
+import type { ReportCategoryBreakdown } from "@recomenda/api/reports";
 import {
   categoryBarClass,
   categoryToken,

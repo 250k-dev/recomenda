@@ -1,4 +1,4 @@
-import { api } from "@/lib/http/axios";
+import { api } from "./http/axios";
 
 export interface PurchaseListItemInput {
   local_product_id: string;

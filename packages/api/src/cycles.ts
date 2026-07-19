@@ -1,4 +1,4 @@
-import { api } from "@/lib/http/axios";
+import { api } from "./http/axios";
 
 /** Safra da fazenda (`crop_cycles`): agrupa as programações por talhão. */
 

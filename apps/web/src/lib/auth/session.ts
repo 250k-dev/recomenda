@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import type { UserRole } from "@/types/auth";
+import type { UserRole } from "@recomenda/api/auth-types";
 
 export async function getSessionRole(): Promise<UserRole | null> {
   const cookieStore = await cookies();

@@ -7,7 +7,7 @@ import type {
   QuoteComparisonResponse,
   QuoteComparisonResponseItem,
   QuotePaymentTerm,
-} from "@/lib/api/quotes";
+} from "@recomenda/api/quotes";
 import {
   escapeHtml,
   fmtBrl,

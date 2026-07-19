@@ -30,7 +30,7 @@ import {
   createSeason,
   createTimingTemplate,
   createTimingStage,
-} from "@/lib/api/client";
+} from "@recomenda/api";
 import {
   TimingStagesEditor,
   TIMING_TRIGGER_LABELS,

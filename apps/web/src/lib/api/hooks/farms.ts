@@ -15,7 +15,7 @@ import {
   createPlot,
   updatePlot,
   deletePlot,
-} from "@/lib/api/farms";
+} from "@recomenda/api/farms";
 import { queryKeys } from "./queryKeys";
 
 export function useFarms() {

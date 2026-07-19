@@ -17,7 +17,7 @@ import { ReportsProductivityPanel } from "@/components/domain/reports/reports-pr
 import { ReportsCategoryPanel } from "@/components/domain/reports/reports-category-panel";
 import { ReportsExportPanel } from "@/components/domain/reports/reports-export-panel";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { ComparativeReport } from "@/lib/api/client";
+import type { ComparativeReport } from "@recomenda/api";
 import { useComparativeReport } from "@/lib/api/hooks";
 import {
   buildReportMetrics,
