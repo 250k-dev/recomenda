@@ -10,7 +10,7 @@ import { routes } from "@recomenda/config";
 import { getCommodities } from "@recomenda/api/market";
 import { Card, CardContent } from "@recomenda/ui/card";
 import { Input } from "@recomenda/ui/input";
-import { DoseUnitSelect } from "@recomenda/ui/dose-unit-select";
+import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
 import { Button } from "@recomenda/ui/button";
 import { Select } from "@recomenda/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
