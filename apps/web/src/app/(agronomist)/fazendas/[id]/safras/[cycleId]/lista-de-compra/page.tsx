@@ -11,8 +11,8 @@ import {
   CyclePageShell,
   useCyclePage,
 } from "@/components/domain/cycle/cycle-page-shell";
-import { useCyclePurchaseList } from "@/lib/api/hooks";
-import { useCan } from "@/lib/auth/use-can";
+import { useCyclePurchaseList } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 
 /** Lista de compra da safra da fazenda (era `?tab=purchase` na safra). */
 export default function CyclePurchaseListPage() {

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCreatePurchaseListTemplate } from "@/lib/api/hooks";
+import { useCreatePurchaseListTemplate } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { cn } from "@recomenda/utils";
 import { FieldError } from "@/components/domain/season/_shared";

@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
-import { useProducer } from "@/lib/api/hooks";
+import { useProducer } from "@recomenda/api-hooks";
 
 export default function CronogramaPage() {
   const router = useRouter();

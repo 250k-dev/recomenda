@@ -18,7 +18,7 @@ import {
   useSkipRecommendation,
   useUndoRecommendation,
   useUpdateRecommendationItem,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import {
   productsForPurchaseListCategory,
   purchaseListProductLabel,

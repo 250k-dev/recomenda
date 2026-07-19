@@ -39,8 +39,8 @@ import {
   useDeleteTimingTemplate,
   useHardDeleteTimingTemplate,
   useTimingTemplates,
-} from "@/lib/api/hooks";
-import { usePlanQuota } from "@/lib/api/hooks/auth";
+} from "@recomenda/api-hooks";
+import { usePlanQuota } from "@recomenda/api-hooks/auth";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 

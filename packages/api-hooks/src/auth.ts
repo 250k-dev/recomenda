@@ -10,7 +10,7 @@ import {
   impersonateProducer,
   exitImpersonation,
 } from "@recomenda/api/auth";
-import { useImpersonationStore } from "@/stores/impersonation";
+import { useImpersonationStore } from "./impersonation-store";
 import { queryKeys } from "./queryKeys";
 
 export function useMe() {

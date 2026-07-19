@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { useMe, useUpdateProfile, useChangePassword } from "@/lib/api/hooks";
+import { useMe, useUpdateProfile, useChangePassword } from "@recomenda/api-hooks";
 import { SettingsFormSkeleton } from "@/components/domain/page-skeletons";
 import { maskPhoneBR } from "@recomenda/utils";
 

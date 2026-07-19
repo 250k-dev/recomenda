@@ -1,7 +1,7 @@
 "use client";
 
-import { useExitImpersonation } from "@/lib/api/hooks";
-import { useImpersonationStore } from "@/stores/impersonation";
+import { useExitImpersonation } from "@recomenda/api-hooks";
+import { useImpersonationStore } from "@recomenda/api-hooks/impersonation-store";
 import { Button } from "@/components/ui/button";
 
 export function ImpersonationBanner() {

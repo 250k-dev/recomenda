@@ -28,9 +28,9 @@ import {
   useMemberProducerActions,
   useShareableProducers,
   useRemoveConsultant,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
-import { useCan } from "@/lib/auth/use-can";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
 
 const fmtDate = (iso: string) =>

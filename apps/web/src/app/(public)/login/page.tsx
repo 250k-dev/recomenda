@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { useLogin } from "@/lib/api/hooks";
+import { useLogin } from "@recomenda/api-hooks";
 
 const loginSchema = z.object({
   email: z.string().email("E-mail inválido"),

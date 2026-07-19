@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
-import { useTimingTemplate, useTimingTemplates, usePlanQuota, queryKeys } from "@/lib/api/hooks";
+import { useTimingTemplate, useTimingTemplates, usePlanQuota, queryKeys } from "@recomenda/api-hooks";
 import {
   createMixTemplate,
   replaceMixTemplateItems,
@@ -54,8 +54,8 @@ import {
   readLocalDraft,
   clearLocalDraft,
   useLocalDraft,
-} from "@/lib/use-local-draft";
-import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
+} from "@recomenda/api-hooks/use-local-draft";
+import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
 
 export type SeasonWizardProps = {
   producerId: string;

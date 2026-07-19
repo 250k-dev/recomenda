@@ -11,7 +11,7 @@ import {
   useFarm,
   useProducer,
   useResolvedFarmProducerId,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { routes } from "@recomenda/config";
 
 /** Estoque do produtor no contexto da fazenda (era `?tab=stock` na fazenda). */

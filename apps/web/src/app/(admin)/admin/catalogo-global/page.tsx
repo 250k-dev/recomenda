@@ -38,7 +38,7 @@ import {
   useUpdateLocalProduct,
   useResolveCustomLink,
   usePromoteCustomToGlobal,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 
 const CATALOG_PAGE_SIZE = 15;
 

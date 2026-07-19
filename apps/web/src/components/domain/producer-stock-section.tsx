@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/select";
 import { PageHero } from "@/components/domain/page-hero";
-import { useLocalCatalog } from "@/lib/api/hooks";
-import { useProducerStock, useAdjustProducerStock } from "@/lib/api/hooks/producers";
+import { useLocalCatalog } from "@recomenda/api-hooks";
+import { useProducerStock, useAdjustProducerStock } from "@recomenda/api-hooks/producers";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 
 /**

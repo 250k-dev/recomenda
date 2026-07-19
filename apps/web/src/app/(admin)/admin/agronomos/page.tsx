@@ -30,7 +30,7 @@ import {
   useDeleteAdminAgronomist,
   usePlans,
   useUpdateAdminAgronomist,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 
 const createSchema = z.object({
   name: z.string().min(2, "Nome obrigatório"),

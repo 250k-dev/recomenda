@@ -28,7 +28,7 @@ import {
   markNotificationRead,
   type Notification,
 } from "@recomenda/api";
-import { queryKeys, useNotifications } from "@/lib/api/hooks";
+import { queryKeys, useNotifications } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";

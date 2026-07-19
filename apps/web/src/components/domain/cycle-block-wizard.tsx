@@ -21,7 +21,7 @@ import {
   readLocalDraft,
   clearLocalDraft,
   useLocalDraft,
-} from "@/lib/use-local-draft";
+} from "@recomenda/api-hooks/use-local-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ import {
   usePublishCycle,
   useTimingTemplate,
   useTimingTemplates,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import {
   createMixTemplate,
   replaceMixTemplateItems,

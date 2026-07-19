@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { useQuoteResponse, useUpdateQuoteResponse } from "@/lib/api/hooks";
+import { useQuoteResponse, useUpdateQuoteResponse } from "@recomenda/api-hooks";
 import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
 import { CompletionRing } from "@/components/domain/completion-ring";
 import type {

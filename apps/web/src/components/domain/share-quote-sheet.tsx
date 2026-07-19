@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useCreateQuoteRequest } from "@/lib/api/hooks";
+import { useCreateQuoteRequest } from "@recomenda/api-hooks";
 import { toast } from "sonner";
 import { cn } from "@recomenda/utils";
 

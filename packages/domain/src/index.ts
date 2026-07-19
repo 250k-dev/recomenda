@@ -10,6 +10,13 @@
 // Regra do pacote: nada aqui conhece camada de UI. Sem React, sem Next, sem
 // React Query. Ver `print/print-core` para a única parte browser-only.
 
+// ---- permissões --------------------------------------------------------
+// Espelho no cliente da camada de acesso do backend. Mora aqui porque é regra
+// de negócio pura (quem pode o quê) e porque `@recomenda/api-hooks` precisa
+// dela — deixá-la no app faria um pacote importar de `apps/`.
+export type { Permission, Principal } from "./auth/permissions";
+export { can, isManager, isAssistant } from "./auth/permissions";
+
 // ---- catálogo ----------------------------------------------------------
 export type {
   PurchaseListCrop,

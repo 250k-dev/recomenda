@@ -12,7 +12,7 @@ import {
   useFarm,
   useFarmPlots,
   useProducer,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 
 export default function FarmPurchaseListNewPage() {
   const params = useParams<{ id: string }>();

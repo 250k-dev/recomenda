@@ -15,8 +15,8 @@ import {
   useProducer,
   useReorderRecommendations,
   useSeasonTimeline,
-} from "@/lib/api/hooks";
-import { useCan } from "@/lib/auth/use-can";
+} from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { usePurchaseListCatalogProducts } from "@/components/domain/timing/timing-stages-editor";
 import type { Recommendation } from "@recomenda/api";
 import {

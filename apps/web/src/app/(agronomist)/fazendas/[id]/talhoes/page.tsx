@@ -34,7 +34,7 @@ import {
   useFarmSeasons,
   useProducer,
   useUpdatePlot,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { getCycle } from "@recomenda/api/cycles";
 import type { Plot } from "@recomenda/api/farms";
 import { routes } from "@recomenda/config";

@@ -15,8 +15,8 @@ import {
   useDeletePurchaseListTemplate,
   usePurchaseListTemplates,
   useUpdatePurchaseListTemplate,
-} from "@/lib/api/hooks";
-import { useCan } from "@/lib/auth/use-can";
+} from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 import { CROP_LABELS } from "@recomenda/utils";

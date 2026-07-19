@@ -13,7 +13,7 @@ import { AdminListFilter } from "@/components/domain/admin-list-filter";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import type { AdminProducer } from "@recomenda/api";
-import { useAdminProducers, useDeleteAdminProducer, usePatchAdminProducer } from "@/lib/api/hooks";
+import { useAdminProducers, useDeleteAdminProducer, usePatchAdminProducer } from "@recomenda/api-hooks";
 import { ProducerAccountStatusBadge } from "@/components/domain/producer-account-status-badge";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";

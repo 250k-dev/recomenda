@@ -14,11 +14,11 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { Skeleton } from "@/components/ui/skeleton";
-import { queryKeys } from "@/lib/api/hooks";
+import { queryKeys } from "@recomenda/api-hooks";
 import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import { getFarmCycles } from "@recomenda/api/cycles";
 import type { ProducerFarm } from "@recomenda/api";
-import { useCan } from "@/lib/auth/use-can";
+import { useCan } from "@recomenda/api-hooks/use-can";
 
 const RUNNING_SEASON_STATUSES = new Set(["PUBLISHED", "IN_PROGRESS"]);
 

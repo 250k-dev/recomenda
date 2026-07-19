@@ -14,8 +14,8 @@ import type { Route } from "next";
 import { Search, Users, Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { useProducers } from "@/lib/api/hooks";
-import { useCan } from "@/lib/auth/use-can";
+import { useProducers } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
 
 const MAX_MATCHES = 8;

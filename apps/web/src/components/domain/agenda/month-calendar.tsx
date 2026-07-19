@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
-import { useAgronomistAgenda, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@/lib/api/hooks";
+import { useAgronomistAgenda, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
 
 const MINI_WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
