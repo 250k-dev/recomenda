@@ -11,6 +11,7 @@ import {
 } from "date-fns";
 import { getSeasons, getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import { recommendationWindowSpanDays } from "@recomenda/domain/timing/window-days";
+import { localYmdToDate } from "@recomenda/utils";
 import { queryKeys } from "./queryKeys";
 
 const BATCH_SIZE = 10;
@@ -63,11 +64,8 @@ function ymdFromDate(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
 
-function localYmdToDate(ymd: string): Date {
-  const [y, m, d] = ymd.split("-").map((x) => Number.parseInt(x, 10));
-  return new Date(y, m - 1, d);
-}
-
+// Reexportado porque `month-calendar.tsx` já o importa daqui junto com os
+// hooks de agenda. A implementação é a de `@recomenda/utils`.
 export { localYmdToDate };
 
 function recommendationTitle(r: Recommendation): string {

@@ -149,11 +149,6 @@ export async function createPurchaseList(payload: PurchaseListInput) {
   return data;
 }
 
-export async function getPurchaseList(id: string) {
-  const { data } = await api.get<PurchaseListDetail>(`/purchase-lists/${id}`);
-  return data;
-}
-
 export async function getProducerPurchaseLists(producerId: string) {
   const { data } = await api.get<PurchaseListDetail[]>(`/purchase-lists`, {
     params: { producer_id: producerId },

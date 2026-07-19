@@ -24,9 +24,3 @@ export interface AgronomistMePlanResponse {
     limit: number;
   };
 }
-
-/** @deprecated Use AgronomistMePlanResponse — mantido só se algum consumidor esperar só a fatia de quota. */
-export interface PlanQuota {
-  current: number;
-  limit: number;
-}

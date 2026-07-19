@@ -23,7 +23,6 @@ export * from "./dialog";
 export * from "./dropdown-menu";
 export * from "./label";
 export * from "./popover";
-export * from "./scroll-area";
 export * from "./separator";
 export * from "./sheet";
 export * from "./skeleton";
