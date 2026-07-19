@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
+import { Input } from "./input";
 
 /**
  * Texto pt-BR (`114.811,11`) → número canônico do JS (`114811.11`), que é o que o

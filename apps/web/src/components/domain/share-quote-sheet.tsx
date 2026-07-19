@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Check, Copy, Link2, Loader2, MessageCircle, Share2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@recomenda/ui/button";
+import { Input } from "@recomenda/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
+} from "@recomenda/ui/sheet";
 import { useCreateQuoteRequest } from "@recomenda/api-hooks";
 import { toast } from "sonner";
 import { cn } from "@recomenda/utils";

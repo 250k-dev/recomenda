@@ -11,7 +11,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@recomenda/ui/alert-dialog";
 
 interface OnboardingPromptDialogProps {
   open: boolean;

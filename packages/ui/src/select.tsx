@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BaseSelect } from "@/components/ui/searchable-select";
+import { BaseSelect } from "./searchable-select";
 import { cn } from "@recomenda/utils";
 
 export type SelectOption = {
@@ -92,4 +92,4 @@ export { Select };
 export {
   SearchableSelect,
   type SearchableSelectOption,
-} from "@/components/ui/searchable-select";
+} from "./searchable-select";

@@ -1,9 +1,9 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import { useSidebar } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Logo } from "@/assets/logo";
+import { useSidebar } from "@recomenda/ui/sidebar";
+import { Button } from "@recomenda/ui/button";
+import { Logo } from "@recomenda/ui/assets/logo";
 
 export function MobileTopbar() {
   const { toggleSidebar } = useSidebar();

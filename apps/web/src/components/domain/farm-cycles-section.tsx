@@ -6,18 +6,18 @@ import { routes } from "@recomenda/config";
 import { useQueries } from "@tanstack/react-query";
 import { Check, ChevronRight, Leaf, Plus, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@recomenda/ui/badge";
+import { Button } from "@recomenda/ui/button";
+import { Card, CardContent } from "@recomenda/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { ProgressBar } from "@/components/ui/progress-bar";
+} from "@recomenda/ui/dialog";
+import { EmptyState } from "@recomenda/ui/empty-state";
+import { Input } from "@recomenda/ui/input";
+import { ProgressBar } from "@recomenda/ui/progress-bar";
 import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";

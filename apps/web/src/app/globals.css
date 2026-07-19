@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* O scanner de classes do Tailwind v4 só varre a árvore do app. Os primitivos
+   vivem em @recomenda/ui, fora dela: sem este @source as classes deles param de
+   ser geradas — sem erro de build, sem warning, só a tela quebrada. */
+@source "../../../../packages/ui/src";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 

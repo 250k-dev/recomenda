@@ -13,11 +13,11 @@ import { StatusBadge } from "@/components/domain/status-badge";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { AdminListFilter } from "@/components/domain/admin-list-filter";
-import { DataTable } from "@/components/ui/data-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { DataTable } from "@recomenda/ui/data-table";
+import { Button } from "@recomenda/ui/button";
+import { Input } from "@recomenda/ui/input";
+import { Label } from "@recomenda/ui/label";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@recomenda/ui/sheet";
 import type { Plan } from "@recomenda/api";
 import {
   useCreateAdminPlan,

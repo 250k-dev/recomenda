@@ -2,7 +2,7 @@
 
 import { Download, FileDown } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 
 export function ReportsExportPanel() {
   const handleExport = () => {

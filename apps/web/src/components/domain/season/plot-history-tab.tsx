@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, AlertTriangle, Clock, SkipForward, Leaf } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@recomenda/ui/badge";
 import { cn, CROP_LABELS } from "@recomenda/utils";
 import { usePlotHistory } from "@recomenda/api-hooks";
 import type { PlotHistorySeason, PlotHistoryRec } from "@recomenda/api/seasons";

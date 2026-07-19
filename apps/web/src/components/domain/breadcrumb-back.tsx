@@ -8,7 +8,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@recomenda/ui/popover";
 import { useBreadcrumbSetter } from "@/components/layout/breadcrumbs-context";
 import { cn } from "@recomenda/utils";
 

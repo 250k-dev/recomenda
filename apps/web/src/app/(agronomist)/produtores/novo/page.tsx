@@ -16,10 +16,10 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/ui/select";
+import { Button } from "@recomenda/ui/button";
+import { Input } from "@recomenda/ui/input";
+import { Label } from "@recomenda/ui/label";
+import { SearchableSelect } from "@recomenda/ui/select";
 import {
   BRAZIL_STATES,
   cn,

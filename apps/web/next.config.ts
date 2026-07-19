@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
     "@recomenda/api-hooks",
     "@recomenda/config",
     "@recomenda/domain",
+    "@recomenda/ui",
     "@recomenda/utils",
   ],
   // Valida em tempo de compilação todo href/push interno (links quebrados

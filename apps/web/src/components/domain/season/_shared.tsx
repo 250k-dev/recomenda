@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
-import { Label } from "@/components/ui/label";
+import { Label } from "@recomenda/ui/label";
 import { cn } from "@recomenda/utils";
 
 /** Talhão usado nos fluxos de lista de compra e safra. */

@@ -14,9 +14,9 @@ import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
 import { ProducerTimingTemplatesPanel } from "@/components/domain/timing/producer-timing-templates-section";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@recomenda/ui/button";
+import { Input } from "@recomenda/ui/input";
+import { Label } from "@recomenda/ui/label";
 import {
   useAgronomistAgenda,
   useProducer,
@@ -30,7 +30,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
+} from "@recomenda/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -38,9 +38,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@recomenda/ui/dialog";
 import { ProducerDetailSkeleton } from "@/components/domain/page-skeletons";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@recomenda/ui/skeleton";
 import { formatPhoneBR, maskPhoneBR } from "@recomenda/utils";
 import { toast } from "sonner";
 import {

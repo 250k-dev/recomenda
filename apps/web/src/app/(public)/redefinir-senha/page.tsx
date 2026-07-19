@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { ArrowLeft, Check } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { PasswordInput } from "@/components/ui/password-input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Card } from "@recomenda/ui/card";
+import { PasswordInput } from "@recomenda/ui/password-input";
+import { Label } from "@recomenda/ui/label";
+import { Button } from "@recomenda/ui/button";
 import { AuthShell } from "@/components/auth/auth-shell";
 
 export default function ResetPasswordPage() {

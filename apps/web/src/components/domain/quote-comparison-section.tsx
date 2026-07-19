@@ -5,8 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FileDown, Loader2, PencilLine, RotateCcw, Share2, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/domain/status-badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@recomenda/ui/button";
+import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -14,10 +14,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { EmptyState } from "@/components/ui/empty-state";
+} from "@recomenda/ui/dialog";
+import { Input } from "@recomenda/ui/input";
+import { Label } from "@recomenda/ui/label";
+import { EmptyState } from "@recomenda/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import {
   usePurchaseListQuoteTrash,

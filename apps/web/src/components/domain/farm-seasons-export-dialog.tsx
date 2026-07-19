@@ -3,20 +3,20 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, FileDown } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@recomenda/ui/dialog";
 import {
   buildMultiWhatsappMessage,
   type RecommendationShareData,
 } from "@recomenda/domain/recommendations/share-message";
 import { printRecommendations } from "@recomenda/domain/recommendations/print-document";
-import { WhatsAppIcon } from "@/assets/whatsapp-icon";
+import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
 import { cn } from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);

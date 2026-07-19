@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ShieldOff } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 import { logout } from "@recomenda/api/auth";
 
 export default function ProducerOnlyPage() {

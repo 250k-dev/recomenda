@@ -5,7 +5,7 @@ import { CircleUserRound, CreditCard, LogOut } from "lucide-react";
 import { PageHeader } from "@/components/domain/page-header";
 import { AccountSettingsPanel } from "@/components/domain/account-settings-panel";
 import { PlanQuotaPanel } from "@/components/domain/plan-quota-panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 import { logout } from "@recomenda/api";
 
 export default function ProfilePage() {
