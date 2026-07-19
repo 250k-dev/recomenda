@@ -18,7 +18,7 @@ import {
 } from "@/lib/api/hooks";
 import { useCan } from "@/lib/auth/use-can";
 import { usePurchaseListCatalogProducts } from "@/components/domain/timing/timing-stages-editor";
-import type { Recommendation } from "@/lib/api/client";
+import type { Recommendation } from "@recomenda/api";
 import {
   RecommendationStageFields,
   type RecommendationStageDraft,

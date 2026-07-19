@@ -26,7 +26,7 @@ import {
   createRecommendationItem,
   updateRecommendationItem,
   deleteRecommendationItem,
-} from "@/lib/api/seasons";
+} from "@recomenda/api/seasons";
 import { queryKeys } from "./queryKeys";
 
 /** Lista de compra espelha produtos "fora da programação" no servidor — invalida

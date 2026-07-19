@@ -29,7 +29,7 @@ import {
   useShareableProducers,
   useRemoveConsultant,
 } from "@/lib/api/hooks";
-import { apiErrorMessage } from "@/lib/api-error";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import { useCan } from "@/lib/auth/use-can";
 import { cn } from "@recomenda/utils";
 

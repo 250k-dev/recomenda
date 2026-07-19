@@ -21,7 +21,7 @@ import {
   updateGlobalProduct,
   deleteGlobalProduct,
   importGlobalCatalogFile,
-} from "@/lib/api/catalog";
+} from "@recomenda/api/catalog";
 import { queryKeys } from "./queryKeys";
 
 export function useLocalCatalog() {

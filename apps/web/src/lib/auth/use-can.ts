@@ -2,7 +2,7 @@
 
 import { useMe } from "@/lib/api/hooks";
 import { can, type Permission } from "@/lib/auth/permissions";
-import type { AccessLevel, UserRole } from "@/types/auth";
+import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
 
 /** Principal atual (role + access_level) para gates de UI. */
 export function usePrincipal() {

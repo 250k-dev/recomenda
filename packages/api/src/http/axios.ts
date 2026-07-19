@@ -1,3 +1,7 @@
+/// <reference path="../axios.d.ts" />
+// A referência acima é necessária: `axios.d.ts` aumenta `InternalAxiosRequestConfig`
+// com `_retry`, mas ninguém o importa. Dentro do pacote o `include` do tsconfig o
+// pega; no programa do app, não — e a augmentação sumiria em silêncio.
 import axios, { AxiosError } from "axios";
 import type { ApiError, ApiErrorPayload } from "./types";
 

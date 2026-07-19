@@ -1,4 +1,4 @@
-import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
+import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 
 export function isPurchaseListFullyPriced(list: PurchaseListDetail): boolean {
   if (list.items.length === 0) return false;

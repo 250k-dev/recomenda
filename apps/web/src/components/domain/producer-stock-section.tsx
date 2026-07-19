@@ -10,7 +10,7 @@ import { SearchableSelect } from "@/components/ui/select";
 import { PageHero } from "@/components/domain/page-hero";
 import { useLocalCatalog } from "@/lib/api/hooks";
 import { useProducerStock, useAdjustProducerStock } from "@/lib/api/hooks/producers";
-import { apiErrorMessage } from "@/lib/api-error";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 
 /**
  * Item 13 — Estoque do produtor: o agrônomo cadastra o que o produtor tem em

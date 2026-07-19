@@ -7,7 +7,7 @@
  * `lib/` consome estas funções, e a camada de baixo não pode depender da de
  * cima.
  */
-import type { PurchaseListItemInput } from "@/lib/api/purchase-lists";
+import type { PurchaseListItemInput } from "@recomenda/api/purchase-lists";
 import { seedQuantityFromPopulation } from "@/lib/cost-plan/calculate";
 
 /** Item da lista de compra (estado de formulário). */

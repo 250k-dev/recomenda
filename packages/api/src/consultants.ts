@@ -1,5 +1,5 @@
-import { api } from "@/lib/http/axios";
-import type { AccessLevel } from "@/types/auth";
+import { api } from "./http/axios";
+import type { AccessLevel } from "./auth-types";
 
 /** Membro de equipe (Gestor ou Consultor). */
 export interface TeamMemberRow {

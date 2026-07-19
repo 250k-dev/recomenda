@@ -43,7 +43,7 @@ import {
   listItemToPayload,
   validateListItems,
 } from "@/lib/purchase-list/list-item";
-import type { PurchaseListDetail, PurchaseListItemInput } from "@/lib/api/client";
+import type { PurchaseListDetail, PurchaseListItemInput } from "@recomenda/api";
 import { CROP_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";

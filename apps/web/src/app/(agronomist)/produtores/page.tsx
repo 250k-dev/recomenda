@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
-import { apiErrorMessage } from "@/lib/api-error";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { ProducerAttentionBadge } from "@/components/domain/producer-attention-badge";
@@ -18,7 +18,7 @@ import { PaginationBar } from "@/components/ui/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import type { AgronomistProducerListRow } from "@/lib/api/client";
+import type { AgronomistProducerListRow } from "@recomenda/api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Plus,

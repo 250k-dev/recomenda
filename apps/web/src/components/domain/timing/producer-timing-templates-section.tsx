@@ -42,7 +42,7 @@ import {
 } from "@/lib/api/hooks";
 import { usePlanQuota } from "@/lib/api/hooks/auth";
 import { toast } from "sonner";
-import { apiErrorMessage } from "@/lib/api-error";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),

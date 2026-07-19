@@ -1,4 +1,4 @@
-import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
+import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 
 type StageProductLike = {
   productId: string;

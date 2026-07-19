@@ -9,7 +9,7 @@
     "start": "turbo start",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
-    "codegen": "pnpm --filter web codegen"
+    "codegen": "pnpm --filter @recomenda/api codegen"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

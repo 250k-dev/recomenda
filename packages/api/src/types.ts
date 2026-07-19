@@ -1,6 +1,6 @@
 // Declarados em `lib/http/types` (camada de baixo). Re-exportados aqui para os
 // consumidores que já importam deste caminho.
-export type { ApiError, ApiErrorPayload } from "@/lib/http/types";
+export type { ApiError, ApiErrorPayload } from "./http/types";
 
 export interface Pagination {
   page: number;

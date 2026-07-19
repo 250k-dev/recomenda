@@ -8,10 +8,11 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "codegen": "openapi-typescript \"$NEXT_PUBLIC_API_BASE_URL/openapi.json\" -o src/lib/api/generated.ts"
+    "codegen": "pnpm --filter @recomenda/api codegen"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@recomenda/api": "workspace:*",
     "@recomenda/config": "workspace:*",
     "@recomenda/utils": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
@@ -46,7 +47,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
-    "openapi-typescript": "^7.13.0",
     "openapi-typescript-codegen": "^0.30.0",
     "tailwindcss": "^4",
     "typescript": "^5"

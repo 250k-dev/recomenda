@@ -17,8 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SearchableSelect } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalCatalogImportResult, GlobalProduct } from "@/lib/api/client";
-import { apiErrorMessage } from "@/lib/api-error";
+import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalCatalogImportResult, GlobalProduct } from "@recomenda/api";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import {
   deactivateOutlineButtonClass,
   DOSE_UNIT_LABELS,

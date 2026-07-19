@@ -1,4 +1,4 @@
-import type { ComparativeReport, ReportPerSeason } from "@/lib/api/reports";
+import type { ComparativeReport, ReportPerSeason } from "@recomenda/api/reports";
 
 function mean(values: number[]): number | null {
   if (values.length === 0) return null;

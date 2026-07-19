@@ -1,4 +1,4 @@
-import type { GlobalProduct, PlatformCatalogEntry } from "@/lib/api/catalog";
+import type { GlobalProduct, PlatformCatalogEntry } from "@recomenda/api/catalog";
 
 export type PurchaseListCrop = "SOYBEAN" | "CORN";
 

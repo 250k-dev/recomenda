@@ -14,7 +14,7 @@ import {
   createAdminPlan,
   updateAdminPlan,
   deleteAdminPlan,
-} from "@/lib/api/admin";
+} from "@recomenda/api/admin";
 import { queryKeys } from "./queryKeys";
 
 export function usePlans() {

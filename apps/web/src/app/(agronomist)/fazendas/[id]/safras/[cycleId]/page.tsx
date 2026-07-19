@@ -29,7 +29,7 @@ import {
 } from "@/components/domain/cycle/cycle-page-shell";
 import { useArchiveSeason, useCyclePurchaseList } from "@/lib/api/hooks";
 import { useCan } from "@/lib/auth/use-can";
-import type { CycleSeasonRow } from "@/lib/api/cycles";
+import type { CycleSeasonRow } from "@recomenda/api/cycles";
 import {
   CROP_LABELS,
   STATUS_LABELS,

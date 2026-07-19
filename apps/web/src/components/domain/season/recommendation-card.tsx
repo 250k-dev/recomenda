@@ -24,7 +24,7 @@ import {
   purchaseListProductLabel,
   type PurchaseListCatalogProduct,
 } from "@/lib/catalog/purchase-list-catalog";
-import type { Recommendation, RecommendationItem } from "@/lib/api/client";
+import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import {
   AlertTriangle,
   CalendarDays,

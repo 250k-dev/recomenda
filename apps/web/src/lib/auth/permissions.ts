@@ -1,4 +1,4 @@
-import type { AccessLevel, UserRole } from "@/types/auth";
+import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
 
 /**
  * Espelho no cliente da camada de permissões do backend (`src/common/access`).

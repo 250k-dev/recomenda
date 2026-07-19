@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { WhatsAppIcon } from "@/assets/whatsapp-icon";
 import { cn } from "@recomenda/utils";
-import type { QuoteComparison } from "@/lib/api/quotes";
+import type { QuoteComparison } from "@recomenda/api/quotes";
 import {
   buildQuoteWhatsappMessage,
   printQuoteComparison,

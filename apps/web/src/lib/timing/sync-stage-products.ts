@@ -3,9 +3,9 @@ import {
   replaceMixTemplateItems,
   updateTimingStage,
   type MixTemplateItem,
-} from "@/lib/api/templates";
+} from "@recomenda/api/templates";
 import type { StageProductDraft } from "@/lib/timing/types";
-import type { Product } from "@/lib/api/catalog";
+import type { Product } from "@recomenda/api/catalog";
 
 function parseDose(value: string): number {
   return Number(String(value).replace(",", "."));

@@ -1,5 +1,5 @@
 import type { Route } from "next";
-import type { AccessLevel, UserRole } from "@/types/auth";
+import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
 import { routes } from "@recomenda/config";
 
 export type NavItem = { label: string; href: Route };

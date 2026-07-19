@@ -35,8 +35,8 @@ import {
   useProducer,
   useUpdatePlot,
 } from "@/lib/api/hooks";
-import { getCycle } from "@/lib/api/cycles";
-import type { Plot } from "@/lib/api/farms";
+import { getCycle } from "@recomenda/api/cycles";
+import type { Plot } from "@recomenda/api/farms";
 import { routes } from "@recomenda/config";
 import { CROP_LABELS } from "@recomenda/utils";
 

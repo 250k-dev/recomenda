@@ -11,7 +11,7 @@ import {
   updatePurchaseList,
   getProducerPurchaseLists,
   getFarmPurchaseLists,
-} from "@/lib/api/purchase-lists";
+} from "@recomenda/api/purchase-lists";
 import { queryKeys } from "./queryKeys";
 
 export function useSeasonCostPlan(seasonId: string) {

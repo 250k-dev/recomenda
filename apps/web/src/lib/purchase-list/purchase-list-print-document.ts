@@ -2,7 +2,7 @@
  * Documento imprimível (PDF) e mensagem de WhatsApp da lista de compra completa.
  * Mesmo visual dos PDFs de recomendação (usa o núcleo em print-core).
  */
-import type { PurchaseListDetail } from "@/lib/api/purchase-lists";
+import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 import { CATEGORY_LABELS } from "@/lib/cost-plan/categories";
 import { SEED_CATEGORIES, seedQuantityUnitLabel } from "./list-item";
 import {

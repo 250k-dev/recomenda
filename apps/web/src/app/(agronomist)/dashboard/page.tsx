@@ -39,7 +39,7 @@ import {
   usePortfolioPriceCoverage,
 } from "@/lib/api/hooks";
 import { useCan } from "@/lib/auth/use-can";
-import { activeAgronomistProducerAccounts } from "@/lib/api/producers";
+import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
 import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
 import { cn } from "@recomenda/utils";
 

@@ -42,8 +42,8 @@ import {
   createTimingTemplate,
   createTimingStage,
   updateTimingTemplate,
-} from "@/lib/api/client";
-import type { CycleDetail } from "@/lib/api/cycles";
+} from "@recomenda/api";
+import type { CycleDetail } from "@recomenda/api/cycles";
 import {
   TimingStagesEditor,
   newTimingStageField,

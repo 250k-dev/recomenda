@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { MobileTopbar } from "@/components/layout/mobile-topbar";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
-import type { UserRole } from "@/types/auth";
+import type { UserRole } from "@recomenda/api/auth-types";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./app-sidebar";
 

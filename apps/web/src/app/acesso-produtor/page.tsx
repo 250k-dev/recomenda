@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { ShieldOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { logout } from "@/lib/api/auth";
+import { logout } from "@recomenda/api/auth";
 
 export default function ProducerOnlyPage() {
   const router = useRouter();

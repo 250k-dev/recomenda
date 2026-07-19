@@ -16,8 +16,8 @@ import {
   revokeInvitation,
   getInvitationByToken,
   acceptInvitation,
-} from "@/lib/api/producers";
-import { getSeasonShoppingList } from "@/lib/api/seasons";
+} from "@recomenda/api/producers";
+import { getSeasonShoppingList } from "@recomenda/api/seasons";
 import { queryKeys } from "./queryKeys";
 
 export function useProducers() {

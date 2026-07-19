@@ -17,7 +17,7 @@ import type {
   QuoteAvailability,
   QuotePaymentTerm,
   QuoteResponseItem,
-} from "@/lib/api/quotes";
+} from "@recomenda/api/quotes";
 import { CROP_LABELS, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 

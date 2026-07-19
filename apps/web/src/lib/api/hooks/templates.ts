@@ -25,7 +25,7 @@ import {
   createMixTemplateItem,
   updateMixTemplateItem,
   deleteMixTemplateItem,
-} from "@/lib/api/templates";
+} from "@recomenda/api/templates";
 import { queryKeys } from "./queryKeys";
 
 export function useTimingTemplates(producerId: string) {

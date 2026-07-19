@@ -1,4 +1,4 @@
-import type { Recommendation } from "@/lib/api/client";
+import type { Recommendation } from "@recomenda/api";
 import { displayRecStatus, fmtDate, recommendationStatusLabel } from "./format";
 import type { RecommendationShareData } from "./share-message";
 import {

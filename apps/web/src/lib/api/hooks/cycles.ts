@@ -11,8 +11,8 @@ import {
   publishCycle,
   updateCycle,
   type ApplyBlockPayload,
-} from "@/lib/api/cycles";
-import { getPurchaseListByCycle } from "@/lib/api/purchase-lists";
+} from "@recomenda/api/cycles";
+import { getPurchaseListByCycle } from "@recomenda/api/purchase-lists";
 import { queryKeys } from "./queryKeys";
 
 export function useFarmCycles(farmId: string) {

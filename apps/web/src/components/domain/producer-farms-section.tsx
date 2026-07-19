@@ -15,9 +15,9 @@ import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryKeys } from "@/lib/api/hooks";
-import { getTimeline, type Recommendation } from "@/lib/api/seasons";
-import { getFarmCycles } from "@/lib/api/cycles";
-import type { ProducerFarm } from "@/lib/api/client";
+import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
+import { getFarmCycles } from "@recomenda/api/cycles";
+import type { ProducerFarm } from "@recomenda/api";
 import { useCan } from "@/lib/auth/use-can";
 
 const RUNNING_SEASON_STATUSES = new Set(["PUBLISHED", "IN_PROGRESS"]);

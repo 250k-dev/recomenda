@@ -25,7 +25,7 @@ import {
   useQuoteTrashActions,
 } from "@/lib/api/hooks";
 import { queryKeys } from "@/lib/api/hooks/queryKeys";
-import { apiErrorMessage } from "@/lib/api-error";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import { QuoteExportDialog } from "@/components/domain/quote-export-dialog";
 import {
   createQuoteRequest,
@@ -33,7 +33,7 @@ import {
   type QuoteAvailability,
   type QuoteComparisonResponse,
   type QuotePaymentTerm,
-} from "@/lib/api/quotes";
+} from "@recomenda/api/quotes";
 
 const fmtQty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const fmtBrl = (n: number) =>

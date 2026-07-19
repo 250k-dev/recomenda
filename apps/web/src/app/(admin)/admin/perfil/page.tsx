@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { logout } from "@/lib/api/client";
+import { logout } from "@recomenda/api";
 
 export default function AdminProfilePage() {
   const router = useRouter();

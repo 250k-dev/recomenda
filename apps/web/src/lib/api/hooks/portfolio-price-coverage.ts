@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueries } from "@tanstack/react-query";
-import { getProducerPurchaseLists } from "@/lib/api/purchase-lists";
+import { getProducerPurchaseLists } from "@recomenda/api/purchase-lists";
 import { computePortfolioPriceCoverage } from "@/lib/purchase-list-metrics";
 import { queryKeys } from "./queryKeys";
 
