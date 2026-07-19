@@ -17,6 +17,7 @@ import { ReportsProductivityPanel } from "@/components/domain/reports/reports-pr
 import { ReportsCategoryPanel } from "@/components/domain/reports/reports-category-panel";
 import { ReportsExportPanel } from "@/components/domain/reports/reports-export-panel";
 import { EmptyState } from "@recomenda/ui/empty-state";
+import { publicEnv } from "@recomenda/config";
 import type { ComparativeReport } from "@recomenda/api";
 import { useComparativeReport } from "@recomenda/api-hooks";
 import {
@@ -26,7 +27,7 @@ import {
 } from "@recomenda/domain/reports/metrics";
 
 function harvestReportMockEnabled(): boolean {
-  const flag = process.env.NEXT_PUBLIC_REPORTS_MOCK_HARVEST;
+  const flag = publicEnv.NEXT_PUBLIC_REPORTS_MOCK_HARVEST;
   if (flag === "true") return true;
   if (flag === "false") return false;
   return process.env.NODE_ENV === "development";
