@@ -12,7 +12,7 @@ import { Package, Plus } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { AdminCatalogNameCell, DataTable } from "@recomenda/ui/data-table";
+import { TruncatedNameCell, DataTable } from "@recomenda/ui/data-table";
 import { Button } from "@recomenda/ui/button";
 import { Input } from "@recomenda/ui/input";
 import { Select, SearchableSelect } from "@recomenda/ui/select";
@@ -647,7 +647,7 @@ export default function AdminGlobalCatalogPage() {
       );
 
     return [
-      <AdminCatalogNameCell key={`n-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
+      <TruncatedNameCell key={`n-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
       PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
       DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
       origin,
@@ -665,7 +665,7 @@ export default function AdminGlobalCatalogPage() {
       "—"
     );
     return [
-      <AdminCatalogNameCell key={`cn-${p.local_product_id ?? p.name}`} name={p.name} />,
+      <TruncatedNameCell key={`cn-${p.local_product_id ?? p.name}`} name={p.name} />,
       PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
       DOSE_UNIT_SHORT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_SHORT_LABELS] ?? p.dose_unit,
       p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "-",
@@ -685,7 +685,7 @@ export default function AdminGlobalCatalogPage() {
   });
 
   const inactiveRows = paginatedInactiveRows.map((p) => [
-    <AdminCatalogNameCell key={`in-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
+    <TruncatedNameCell key={`in-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
     PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
     DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
     p.entry_type === "GLOBAL_INACTIVE" ? (
