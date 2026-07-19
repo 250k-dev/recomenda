@@ -24,7 +24,7 @@ import {
   listItemToPayload,
   validateListItems,
   type ListItem,
-} from "@/lib/purchase-list/list-item";
+} from "@recomenda/domain/purchase-list/list-item";
 
 type Crop = "SOYBEAN" | "CORN" | "ANY";
 

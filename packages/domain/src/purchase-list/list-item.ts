@@ -8,7 +8,7 @@
  * cima.
  */
 import type { PurchaseListItemInput } from "@recomenda/api/purchase-lists";
-import { seedQuantityFromPopulation } from "@/lib/cost-plan/calculate";
+import { seedQuantityFromPopulation } from "../cost-plan/calculate";
 
 /** Item da lista de compra (estado de formulário). */
 export type ListItem = {

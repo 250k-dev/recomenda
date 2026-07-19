@@ -3,7 +3,7 @@
  * Mesmo visual dos PDFs de recomendação (usa o núcleo em print-core).
  */
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
-import { CATEGORY_LABELS } from "@/lib/cost-plan/categories";
+import { CATEGORY_LABELS } from "../cost-plan/categories";
 import { SEED_CATEGORIES, seedQuantityUnitLabel } from "./list-item";
 import {
   escapeHtml,
@@ -12,7 +12,7 @@ import {
   headerHtml,
   htmlShell,
   printHtml,
-} from "@/lib/print/print-core";
+} from "../print/print-core";
 
 type PurchaseListItem = PurchaseListDetail["items"][number];
 

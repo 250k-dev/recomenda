@@ -23,7 +23,7 @@ import {
   purchaseListProductLabel,
   type PurchaseListCatalogProduct,
   type PurchaseListCrop,
-} from "@/lib/catalog/purchase-list-catalog";
+} from "@recomenda/domain/catalog/purchase-list-catalog";
 import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
 import {
   areaFromBags,
@@ -36,7 +36,7 @@ import {
   DEFAULT_SPACING_M,
   SEED_CATEGORIES,
   type ListItem,
-} from "@/lib/purchase-list/list-item";
+} from "@recomenda/domain/purchase-list/list-item";
 
 const DEFAULT_ITEM_STAGE = "Outra";
 /** Ciclo padrão da semente (dias) — soja gira em ~110 dias. */

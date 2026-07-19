@@ -8,7 +8,7 @@ import {
   StageWindowDateFields,
   TIMING_TRIGGER_TYPES,
 } from "@/components/domain/timing/timing-stages-editor";
-import { todayLocalYmd } from "@/lib/timing/window-days";
+import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 
 export function normalizeSeasonTriggerType(value?: string | null): string {
   if (value === "PRE_PLANTING" || value === "DAYS_AFTER_DESICCATION") {

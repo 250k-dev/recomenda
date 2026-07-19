@@ -25,16 +25,16 @@ import {
   productsForPurchaseListCategory,
   purchaseListProductLabel,
   type PurchaseListCatalogProduct,
-} from "@/lib/catalog/purchase-list-catalog";
+} from "@recomenda/domain/catalog/purchase-list-catalog";
 import {
   dayOffsetToIsoDate,
   isoDateToDayOffset,
-} from "@/lib/timing/window-days";
-import type { StageProductDraft } from "@/lib/timing/types";
+} from "@recomenda/domain/timing/window-days";
+import type { StageProductDraft } from "@recomenda/domain/timing/types";
 import {
   findPurchaseListOverages,
   formatDosePerHa,
-} from "@/lib/timing/purchase-list-budget";
+} from "@recomenda/domain/timing/purchase-list-budget";
 import { useCan } from "@/lib/auth/use-can";
 
 export const TIMING_TRIGGER_TYPES = [

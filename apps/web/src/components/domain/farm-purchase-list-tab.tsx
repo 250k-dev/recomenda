@@ -21,7 +21,7 @@ import {
 import {
   computePurchaseListMetrics,
   detailItemToListItem,
-} from "@/lib/purchase-list-breakdown";
+} from "@recomenda/domain/purchase-list/breakdown";
 import {
   readLocalDraft,
   clearLocalDraft,
@@ -38,11 +38,11 @@ import {
   useUpdatePurchaseList,
 } from "@/lib/api/hooks";
 import { useProducerStock } from "@/lib/api/hooks/producers";
-import type { ListItem } from "@/lib/purchase-list/list-item";
+import type { ListItem } from "@recomenda/domain/purchase-list/list-item";
 import {
   listItemToPayload,
   validateListItems,
-} from "@/lib/purchase-list/list-item";
+} from "@recomenda/domain/purchase-list/list-item";
 import type { PurchaseListDetail, PurchaseListItemInput } from "@recomenda/api";
 import { CROP_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";

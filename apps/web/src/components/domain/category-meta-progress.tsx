@@ -3,10 +3,10 @@
 import { useMemo } from "react";
 import { AlertTriangle, Target } from "lucide-react";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
-import { computePurchaseListMetrics } from "@/lib/purchase-list-breakdown";
-import { CATEGORY_ORDER } from "@/lib/cost-plan/calculate";
-import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
-import type { ListItem } from "@/lib/purchase-list/list-item";
+import { computePurchaseListMetrics } from "@recomenda/domain/purchase-list/breakdown";
+import { CATEGORY_ORDER } from "@recomenda/domain/cost-plan/calculate";
+import { CATEGORY_LABELS, CATEGORY_COLORS } from "@recomenda/domain/cost-plan/categories";
+import type { ListItem } from "@recomenda/domain/purchase-list/list-item";
 import { cn } from "@recomenda/utils";
 
 /** Formato correto: meta única da lista em sc/ha. */

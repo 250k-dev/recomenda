@@ -37,7 +37,7 @@ import {
   newTimingStageField,
   type TimingStageField,
 } from "@/components/domain/timing/timing-stages-editor";
-import { recommendedYmdToWindow, windowToRecommendedYmd } from "@/lib/timing/window-days";
+import { recommendedYmdToWindow, windowToRecommendedYmd } from "@recomenda/domain/timing/window-days";
 import {
   Field,
   FieldError,

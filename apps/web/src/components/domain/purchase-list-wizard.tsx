@@ -44,7 +44,7 @@ import {
   type PurchaseListDetail,
   type PurchaseListInput,
 } from "@recomenda/api";
-import { detailItemToListItem } from "@/lib/purchase-list-breakdown";
+import { detailItemToListItem } from "@recomenda/domain/purchase-list/breakdown";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 import {
   queryKeys,
@@ -65,7 +65,7 @@ import {
   listItemToPayload,
   validateListItems,
   type ListItem,
-} from "@/lib/purchase-list/list-item";
+} from "@recomenda/domain/purchase-list/list-item";
 
 export type PurchaseListWizardProps = {
   producerId: string;

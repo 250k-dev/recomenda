@@ -23,7 +23,7 @@ import {
   buildReportMetrics,
   formatReportCurrency,
   formatReportMargin,
-} from "@/lib/reports/metrics";
+} from "@recomenda/domain/reports/metrics";
 
 function harvestReportMockEnabled(): boolean {
   const flag = process.env.NEXT_PUBLIC_REPORTS_MOCK_HARVEST;

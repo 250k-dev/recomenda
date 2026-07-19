@@ -10,7 +10,7 @@ import {
   startOfMonth,
 } from "date-fns";
 import { getSeasons, getTimeline, type Recommendation } from "@recomenda/api/seasons";
-import { recommendationWindowSpanDays } from "@/lib/timing/window-days";
+import { recommendationWindowSpanDays } from "@recomenda/domain/timing/window-days";
 import { queryKeys } from "./queryKeys";
 
 const BATCH_SIZE = 10;

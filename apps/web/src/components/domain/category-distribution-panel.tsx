@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { cn } from "@recomenda/utils";
-import { CATEGORY_ORDER } from "@/lib/cost-plan/calculate";
-import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
-import type { CategoryBreakdown } from "@/lib/cost-plan/calculate";
+import { CATEGORY_ORDER } from "@recomenda/domain/cost-plan/calculate";
+import { CATEGORY_LABELS, CATEGORY_COLORS } from "@recomenda/domain/cost-plan/categories";
+import type { CategoryBreakdown } from "@recomenda/domain/cost-plan/calculate";
 
 const brlSmall = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });

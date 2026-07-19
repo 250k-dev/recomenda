@@ -22,8 +22,8 @@ import {
   CATEGORY_ORDER,
   type CostItemInput,
   type CostSummary,
-} from "@/lib/cost-plan/calculate";
-import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/cost-plan/categories";
+} from "@recomenda/domain/cost-plan/calculate";
+import { CATEGORY_LABELS, CATEGORY_COLORS } from "@recomenda/domain/cost-plan/categories";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
 import {
   Pencil,

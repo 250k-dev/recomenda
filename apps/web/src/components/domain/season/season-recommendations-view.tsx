@@ -23,11 +23,11 @@ import {
   RecommendationStageFields,
   type RecommendationStageDraft,
 } from "@/components/domain/recommendation-stage-fields";
-import { todayLocalYmd } from "@/lib/timing/window-days";
+import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 import { extractError } from "@/components/domain/season/_shared";
 import { RecommendationCard } from "@/components/domain/season/recommendation-card";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
-import { fmtDate } from "@/lib/recommendations/format";
+import { fmtDate } from "@recomenda/domain/recommendations/format";
 import { routes } from "@recomenda/config";
 
 function AddStagePanel({

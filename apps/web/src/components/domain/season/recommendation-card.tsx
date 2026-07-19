@@ -23,7 +23,7 @@ import {
   productsForPurchaseListCategory,
   purchaseListProductLabel,
   type PurchaseListCatalogProduct,
-} from "@/lib/catalog/purchase-list-catalog";
+} from "@recomenda/domain/catalog/purchase-list-catalog";
 import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import {
   AlertTriangle,
@@ -50,9 +50,9 @@ import {
 import {
   recommendedYmdToWindow,
   todayLocalYmd,
-} from "@/lib/timing/window-days";
-import { SEED_CATEGORIES } from "@/lib/purchase-list/list-item";
-import { displayRecStatus, fmtDate } from "@/lib/recommendations/format";
+} from "@recomenda/domain/timing/window-days";
+import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
+import { displayRecStatus, fmtDate } from "@recomenda/domain/recommendations/format";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
