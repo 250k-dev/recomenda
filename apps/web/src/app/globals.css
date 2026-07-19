@@ -1,8 +1,29 @@
 @import "tailwindcss";
-/* O scanner de classes do Tailwind v4 só varre a árvore do app. Os primitivos
-   vivem em @recomenda/ui, fora dela: sem este @source as classes deles param de
-   ser geradas — sem erro de build, sem warning, só a tela quebrada. */
-@source "../../../../packages/ui/src";
+/* O scanner de classes do Tailwind v4 só varre a árvore do app. Todo pacote
+   que emite nome de classe vive fora dela — @recomenda/ui (os primitivos) e
+   @recomenda/utils (action-button-styles, categories) — e sem este @source as
+   classes deles param de ser geradas: sem erro de build, sem warning, só a
+   tela quebrada.
+
+   É o diretório inteiro, e não uma linha por pacote, de propósito. A forma
+   por pacote já falhou uma vez: `utils` ficou de fora da Fase 2 até a
+   auditoria, porque depende de alguém lembrar de vir aqui ao criar pacote.
+   Apontar para `packages` cobre os futuros de graça. Custa uma classe espúria
+   (`flex-shrink`, tirada de uma string de CSS cru em domain/recommendations/
+   print-document.ts) — 27 bytes contra uma classe inteira de bug silencioso.
+
+   Glob de ARQUIVO é equivalente e pode ser usado: a forma com curinga duplo
+   mais extensões (packages, barra, curinga duplo, barra, curinga.{ts,tsx})
+   gera CSS byte a byte idêntico a esta linha. O que NÃO funciona é curinga de
+   DIRETÓRIO sem padrão de arquivo (packages, barra, curinga, barra, src):
+   nesta versão (tailwindcss 4.3.3) não casa nada e derruba o CSS de 133 KB
+   para 94 KB, levando junto os primitivos do shadcn — e sem falhar o build.
+   As duas formas estão escritas por extenso porque a sequência de curinga com
+   barra fecha este comentário.
+
+   O caminho resolve relativo A ESTE ARQUIVO. Mover globals.css quebra tudo
+   isso em silêncio. */
+@source "../../../../packages";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
