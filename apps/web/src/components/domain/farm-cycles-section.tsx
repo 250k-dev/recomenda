@@ -28,7 +28,7 @@ import {
   useFarmCycles,
   useMe,
   useProducer,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import type { CycleSummary } from "@recomenda/api/cycles";
 import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import {

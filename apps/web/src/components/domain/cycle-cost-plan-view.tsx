@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
-import { useCycleCostPlan } from "@/lib/api/hooks";
+import { useCycleCostPlan } from "@recomenda/api-hooks";
 import { CROP_LABELS } from "@recomenda/utils";
 
 const fmtBrl = (n: number) =>

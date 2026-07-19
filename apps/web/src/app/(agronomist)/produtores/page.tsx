@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@/lib/api/hooks";
+import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
@@ -30,7 +30,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn, deactivateOutlineButtonClass } from "@recomenda/utils";
-import { useCan, usePrincipal } from "@/lib/auth/use-can";
+import { useCan, usePrincipal } from "@recomenda/api-hooks/use-can";
 
 type Tab = "active" | "archived";
 type SortMode = "name" | "hectares-desc" | "hectares-asc";

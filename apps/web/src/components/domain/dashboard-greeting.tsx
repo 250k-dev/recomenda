@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale/pt-BR";
-import { useMe } from "@/lib/api/hooks";
+import { useMe } from "@recomenda/api-hooks";
 
 // Saudação pelo relógio local do usuário, só no cliente: no SSR o fuso é o do
 // servidor, então lá cai no "Olá" neutro para não hidratar com valor errado.

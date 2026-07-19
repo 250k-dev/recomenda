@@ -15,7 +15,7 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
-import { useAdminAgronomistDetail, usePlans } from "@/lib/api/hooks";
+import { useAdminAgronomistDetail, usePlans } from "@recomenda/api-hooks";
 
 export default function AdminAgronomistDetailPage() {
   const params = useParams<{ id: string }>();

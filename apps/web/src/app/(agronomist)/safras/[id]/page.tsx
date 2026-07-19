@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { PageHeaderSkeleton } from "@/components/domain/page-skeletons";
 import { SeasonRecommendationsView } from "@/components/domain/season/season-recommendations-view";
 import { useSeasonPage } from "@/components/domain/season/use-season-page";
-import { usePublishSeason } from "@/lib/api/hooks";
+import { usePublishSeason } from "@recomenda/api-hooks";
 
 /** Cronograma de recomendações — tela padrão da safra (era `?tab=recommendations`). */
 export default function SeasonSchedulePage() {

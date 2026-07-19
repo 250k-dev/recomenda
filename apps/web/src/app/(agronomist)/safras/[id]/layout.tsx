@@ -8,7 +8,7 @@ import { Send } from "lucide-react";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { usePublishSeason } from "@/lib/api/hooks";
+import { usePublishSeason } from "@recomenda/api-hooks";
 import { useSeasonPage } from "@/components/domain/season/use-season-page";
 import { cn, STATUS_VARIANTS } from "@recomenda/utils";
 

@@ -23,8 +23,8 @@ import {
   usePurchaseListQuoteTrash,
   usePurchaseListQuotes,
   useQuoteTrashActions,
-} from "@/lib/api/hooks";
-import { queryKeys } from "@/lib/api/hooks/queryKeys";
+} from "@recomenda/api-hooks";
+import { queryKeys } from "@recomenda/api-hooks/queryKeys";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { QuoteExportDialog } from "@/components/domain/quote-export-dialog";
 import {

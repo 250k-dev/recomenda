@@ -24,7 +24,7 @@ import {
   useDeleteAdminPlan,
   usePlans,
   useUpdateAdminPlan,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { deactivateOutlineButtonClass } from "@recomenda/utils";
 
 const planFormSchema = z.object({

@@ -1,0 +1,30 @@
+{
+  "name": "@recomenda/api-hooks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@recomenda/api": "workspace:*",
+    "@recomenda/domain": "workspace:*",
+    "date-fns": "^4.4.0",
+    "zustand": "^5.0.12"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5",
+    "react": "^19"
+  },
+  "devDependencies": {
+    "@recomenda/tsconfig": "workspace:*",
+    "@tanstack/react-query": "^5.100.8",
+    "@types/react": "^19",
+    "react": "19.2.4",
+    "typescript": "^5"
+  }
+}

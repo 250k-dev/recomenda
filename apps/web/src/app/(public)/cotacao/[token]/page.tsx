@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCreateQuoteResponse, useQuoteByToken } from "@/lib/api/hooks";
+import { useCreateQuoteResponse, useQuoteByToken } from "@recomenda/api-hooks";
 import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
 import { CROP_LABELS, maskPhoneBR, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";

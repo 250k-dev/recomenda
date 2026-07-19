@@ -23,7 +23,7 @@ import {
   useProducerFarms,
   useUpdateProducer,
   queryKeys,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { createFarm, grantFarmAccess } from "@recomenda/api";
 import {
   Sheet,

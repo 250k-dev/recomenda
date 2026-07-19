@@ -1,7 +1,7 @@
 "use client";
 
-import { useMe } from "@/lib/api/hooks";
-import { can, type Permission } from "@/lib/auth/permissions";
+import { useMe } from "./auth";
+import { can, type Permission } from "@recomenda/domain/auth/permissions";
 import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
 
 /** Principal atual (role + access_level) para gates de UI. */

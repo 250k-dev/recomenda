@@ -19,7 +19,7 @@ import {
   useLocalCatalog,
   useReorderTimingStages,
   queryKeys,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import {
   isStageProductPersistable,
   mapMixItemsToStageProducts,
@@ -30,8 +30,8 @@ import {
   readLocalDraft,
   clearLocalDraft,
   useLocalDraft,
-} from "@/lib/use-local-draft";
-import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
+} from "@recomenda/api-hooks/use-local-draft";
+import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
 import type { StageProductDraft } from "@recomenda/domain/timing/types";
 
 type TimingTemplateStagesPanelProps = {

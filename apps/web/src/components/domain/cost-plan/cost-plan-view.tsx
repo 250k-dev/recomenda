@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { PageHero } from "@/components/domain/page-hero";
-import { useSeasonCostPlan, useUpdatePurchaseList, useLocalCatalog } from "@/lib/api/hooks";
+import { useSeasonCostPlan, useUpdatePurchaseList, useLocalCatalog } from "@recomenda/api-hooks";
 import { useCurrencyStore } from "@/stores/currency";
 import {
   calculateSummary,

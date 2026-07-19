@@ -14,7 +14,7 @@ import {
   useAdminPlatformActiveCatalog,
   useAdminProducers,
   usePlans,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 
 export default function AdminHomePage() {
   const { data: agronomists, isLoading: loadingA } = useAdminAgronomists("active");

@@ -20,7 +20,7 @@ import {
   useArchivedSeasons,
   useHardDeleteSeason,
   useSeasons,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { cn, CROP_LABELS, deactivateOutlineButtonClass, STATUS_LABELS } from "@recomenda/utils";
 
 const STATUS_CLASSES: Record<string, string> = {

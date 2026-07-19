@@ -10,7 +10,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
-import { usePlanQuota } from "@/lib/api/hooks";
+import { usePlanQuota } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
 
 function formatBrlMonthly(value: string): string {

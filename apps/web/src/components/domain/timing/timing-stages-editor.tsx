@@ -17,7 +17,7 @@ import {
   useCreateLocalProduct,
   useProducerPurchaseLists,
   useFarmPurchaseLists,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 import {
@@ -35,7 +35,7 @@ import {
   findPurchaseListOverages,
   formatDosePerHa,
 } from "@recomenda/domain/timing/purchase-list-budget";
-import { useCan } from "@/lib/auth/use-can";
+import { useCan } from "@recomenda/api-hooks/use-can";
 
 export const TIMING_TRIGGER_TYPES = [
   { value: "PRE_PLANTING", label: "Pré-plantio" },

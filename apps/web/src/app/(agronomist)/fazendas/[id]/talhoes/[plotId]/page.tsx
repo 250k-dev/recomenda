@@ -19,7 +19,7 @@ import {
   useFarmPlots,
   useFarmSeasons,
   useProducer,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { Eye, Leaf, MapPin, Sprout } from "lucide-react";
 import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@recomenda/utils";
 

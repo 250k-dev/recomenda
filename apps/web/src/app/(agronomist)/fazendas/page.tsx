@@ -17,8 +17,8 @@ import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useCreateFarm, useFarms } from "@/lib/api/hooks";
-import { useCan } from "@/lib/auth/use-can";
+import { useCreateFarm, useFarms } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { Building2, Info, Plus } from "lucide-react";
 
 const createSchema = z.object({

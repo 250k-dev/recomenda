@@ -15,7 +15,7 @@ import {
   useCreateLocalProduct,
   useGlobalCatalog,
   usePlatformCatalog,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import {
   buildPurchaseListCatalog,

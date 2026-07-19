@@ -27,8 +27,8 @@ import {
   CyclePageShell,
   useCyclePage,
 } from "@/components/domain/cycle/cycle-page-shell";
-import { useArchiveSeason, useCyclePurchaseList } from "@/lib/api/hooks";
-import { useCan } from "@/lib/auth/use-can";
+import { useArchiveSeason, useCyclePurchaseList } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import type { CycleSeasonRow } from "@recomenda/api/cycles";
 import {
   CROP_LABELS,

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMe, usePlanQuota } from "@/lib/api/hooks";
+import { useMe, usePlanQuota } from "@recomenda/api-hooks";
 import { logout } from "@recomenda/api";
 import { NotificationsPanel, useNotificationsList } from "./notifications-bell";
 

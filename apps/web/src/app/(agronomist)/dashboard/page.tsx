@@ -37,10 +37,10 @@ import {
   useProducers,
   usePlanQuota,
   usePortfolioPriceCoverage,
-} from "@/lib/api/hooks";
-import { useCan } from "@/lib/auth/use-can";
+} from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
-import { useAgronomistAgenda, type AgendaEvent } from "@/lib/api/hooks/agenda";
+import { useAgronomistAgenda, type AgendaEvent } from "@recomenda/api-hooks/agenda";
 import { cn } from "@recomenda/utils";
 
 type AttentionTab = "late" | "today" | "pending" | "week";

@@ -26,8 +26,8 @@ import {
   readLocalDraft,
   clearLocalDraft,
   useLocalDraft,
-} from "@/lib/use-local-draft";
-import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
+} from "@recomenda/api-hooks/use-local-draft";
+import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
 import {
   CategoryMetaProgress,
@@ -36,8 +36,8 @@ import {
 import {
   useFarmAggregatedShoppingList,
   useUpdatePurchaseList,
-} from "@/lib/api/hooks";
-import { useProducerStock } from "@/lib/api/hooks/producers";
+} from "@recomenda/api-hooks";
+import { useProducerStock } from "@recomenda/api-hooks/producers";
 import type { ListItem } from "@recomenda/domain/purchase-list/list-item";
 import {
   listItemToPayload,
@@ -51,7 +51,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
-import { useCan } from "@/lib/auth/use-can";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { PurchaseListTargetsDialog } from "@/components/domain/purchase-list-targets-dialog";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
 

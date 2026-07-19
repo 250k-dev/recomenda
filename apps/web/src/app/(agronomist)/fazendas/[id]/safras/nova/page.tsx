@@ -6,7 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { SeasonWizard } from "@/components/domain/season-wizard";
 import { Button } from "@/components/ui/button";
-import { useFarm, useFarmPlots, useProducer } from "@/lib/api/hooks";
+import { useFarm, useFarmPlots, useProducer } from "@recomenda/api-hooks";
 import { routes } from "@recomenda/config";
 
 export default function FarmSeasonNewPage() {

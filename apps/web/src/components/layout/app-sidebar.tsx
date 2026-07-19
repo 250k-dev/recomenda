@@ -24,7 +24,7 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { useMe, usePlanQuota } from "@/lib/api/hooks";
+import { useMe, usePlanQuota } from "@recomenda/api-hooks";
 import { navFor } from "@/config/nav";
 import { routes } from "@recomenda/config";
 import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";

@@ -29,7 +29,7 @@ import {
   useInactiveLocalCatalog,
   usePlatformCatalog,
   useUpdateLocalProduct,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import {
   deactivateOutlineButtonClass,
   DOSE_UNIT_LABELS,

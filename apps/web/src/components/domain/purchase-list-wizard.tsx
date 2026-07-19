@@ -24,7 +24,7 @@ import {
   readLocalDraft,
   clearLocalDraft,
   useLocalDraft,
-} from "@/lib/use-local-draft";
+} from "@recomenda/api-hooks/use-local-draft";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
@@ -45,11 +45,11 @@ import {
   type PurchaseListInput,
 } from "@recomenda/api";
 import { detailItemToListItem } from "@recomenda/domain/purchase-list/breakdown";
-import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
+import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
 import {
   queryKeys,
   usePurchaseListTemplates,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
 import { CROP_LABELS } from "@recomenda/utils";
 import {

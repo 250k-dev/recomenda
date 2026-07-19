@@ -24,7 +24,7 @@ import {
   useProducer,
   useResolvedFarmProducerId,
   useUpdateFarm,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { routes } from "@recomenda/config";
 import { FarmCyclesSection } from "@/components/domain/farm-cycles-section";
 import { toast } from "sonner";

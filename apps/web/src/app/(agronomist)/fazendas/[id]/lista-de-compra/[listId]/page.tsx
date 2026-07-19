@@ -13,7 +13,7 @@ import {
   useProducer,
   useFarmPurchaseLists,
   useProducerPurchaseLists,
-} from "@/lib/api/hooks";
+} from "@recomenda/api-hooks";
 import { routes } from "@recomenda/config";
 import type { PurchaseListDetail } from "@recomenda/api";
 
