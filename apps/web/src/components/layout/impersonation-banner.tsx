@@ -2,7 +2,7 @@
 
 import { useExitImpersonation } from "@recomenda/api-hooks";
 import { useImpersonationStore } from "@recomenda/api-hooks/impersonation-store";
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 
 export function ImpersonationBanner() {
   const { isImpersonating, producerName } = useImpersonationStore();

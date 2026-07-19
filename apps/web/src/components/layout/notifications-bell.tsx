@@ -22,7 +22,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@recomenda/ui/popover";
 import {
   markAllNotificationsRead,
   markNotificationRead,
@@ -30,8 +30,8 @@ import {
 } from "@recomenda/api";
 import { queryKeys, useNotifications } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import { Badge } from "@recomenda/ui/badge";
+import { Button } from "@recomenda/ui/button";
 
 /** Lista de notificações + contagem de não lidas, normalizada. */
 export function useNotificationsList() {

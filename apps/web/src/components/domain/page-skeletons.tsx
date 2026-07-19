@@ -1,5 +1,5 @@
 import { cn } from "@recomenda/utils";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@recomenda/ui/skeleton";
 
 /** Alinha com `PageHeader`: título + descrição (+ ação opcional). */
 export function PageHeaderSkeleton({ withAction }: { withAction?: boolean }) {

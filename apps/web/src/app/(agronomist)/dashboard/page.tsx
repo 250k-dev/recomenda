@@ -23,14 +23,14 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@recomenda/ui/tooltip";
 import { RailCard, RailRow } from "@/components/domain/rail-card";
 import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@recomenda/ui/button";
+import { EmptyState } from "@recomenda/ui/empty-state";
+import { Skeleton } from "@recomenda/ui/skeleton";
 import { CompactListSkeleton } from "@/components/domain/page-skeletons";
 import {
   useFarms,

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BookmarkPlus } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,9 +11,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@recomenda/ui/dialog";
+import { Input } from "@recomenda/ui/input";
+import { Label } from "@recomenda/ui/label";
 import { useCreatePurchaseListTemplate } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { cn } from "@recomenda/utils";

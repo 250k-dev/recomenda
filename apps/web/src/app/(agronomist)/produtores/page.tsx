@@ -5,21 +5,21 @@ import { routes } from "@recomenda/config";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type MouseEvent } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Button } from "@recomenda/ui/button";
+import { Input } from "@recomenda/ui/input";
+import { Select } from "@recomenda/ui/select";
 import { toast } from "sonner";
 import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { ProducerAttentionBadge } from "@/components/domain/producer-attention-badge";
-import { PaginationBar } from "@/components/ui/pagination-bar";
+import { PaginationBar } from "@recomenda/ui/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyState } from "@recomenda/ui/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import type { AgronomistProducerListRow } from "@recomenda/api";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
 import {
   Plus,
   UsersRound,

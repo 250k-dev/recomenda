@@ -16,11 +16,11 @@ import { toast } from "sonner";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { type PageHeroStat } from "@/components/domain/page-hero";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
-import { ProgressBar } from "@/components/ui/progress-bar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { EmptyState } from "@/components/ui/empty-state";
+import { ProgressBar } from "@recomenda/ui/progress-bar";
+import { Badge } from "@recomenda/ui/badge";
+import { Button } from "@recomenda/ui/button";
+import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
+import { EmptyState } from "@recomenda/ui/empty-state";
 import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { CycleBlockWizard } from "@/components/domain/cycle-block-wizard";
 import {

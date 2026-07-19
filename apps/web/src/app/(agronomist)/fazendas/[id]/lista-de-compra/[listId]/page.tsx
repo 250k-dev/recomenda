@@ -7,7 +7,7 @@ import { Pencil } from "lucide-react";
 import { DetailToolbar } from "@/components/domain/detail-toolbar";
 import type { BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 import {
   useFarm,
   useProducer,

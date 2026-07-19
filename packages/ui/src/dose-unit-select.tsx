@@ -1,4 +1,4 @@
-import { Select } from "@/components/ui/select";
+import { Select } from "./select";
 import { cn } from "@recomenda/utils";
 
 export const DOSE_UNITS = ["L", "KG", "G", "ML", "DOSE", "T_HA", "BAG", "SACA"] as const;

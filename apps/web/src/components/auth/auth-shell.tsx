@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Logo } from "@/assets/logo";
-import { Logo250K } from "@/assets/logo-250K";
+import { Logo } from "@recomenda/ui/assets/logo";
+import { Logo250K } from "@recomenda/ui/assets/logo-250K";
 import { cn } from "@recomenda/utils";
 
 /**

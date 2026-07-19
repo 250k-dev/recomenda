@@ -10,11 +10,11 @@ import { PageHeader } from "@/components/domain/page-header";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@recomenda/ui/button";
+import { DataTable } from "@recomenda/ui/data-table";
+import { EmptyState } from "@recomenda/ui/empty-state";
+import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@recomenda/ui/alert";
 import {
   useArchiveSeason,
   useArchivedSeasons,

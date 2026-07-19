@@ -26,11 +26,11 @@ import {
   Search,
   Users,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@recomenda/ui/button";
+import { Card, CardContent } from "@recomenda/ui/card";
+import { Input } from "@recomenda/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@recomenda/ui/popover";
+import { Skeleton } from "@recomenda/ui/skeleton";
 import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
 import { useAgronomistAgenda, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";

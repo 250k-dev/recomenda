@@ -3,9 +3,9 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { Eye, Store } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@recomenda/ui/card";
+import { Button } from "@recomenda/ui/button";
+import { Skeleton } from "@recomenda/ui/skeleton";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import type { PurchaseListDetail } from "@recomenda/api";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";

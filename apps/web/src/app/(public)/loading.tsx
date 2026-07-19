@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@recomenda/ui/skeleton";
 
 export default function PublicRoutesLoading() {
   return (

@@ -2,11 +2,11 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SearchableSelect } from "@/components/ui/select";
-import { DoseUnitSelect } from "@/components/ui/dose-unit-select";
+import { Button } from "@recomenda/ui/button";
+import { Input } from "@recomenda/ui/input";
+import { Label } from "@recomenda/ui/label";
+import { Select, SearchableSelect } from "@recomenda/ui/select";
+import { DoseUnitSelect } from "@recomenda/ui/dose-unit-select";
 import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import {
   useApplyRecommendation,

@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { PageHeader } from "@/components/domain/page-header";
 import { LayoutDashboard } from "lucide-react";
 import { DashboardKpiSkeleton } from "@/components/domain/page-skeletons";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@recomenda/ui/card";
 import {
   useAdminAgronomists,
   useAdminDeactivatedCatalog,

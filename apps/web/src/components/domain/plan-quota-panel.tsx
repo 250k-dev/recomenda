@@ -7,9 +7,9 @@ import {
   TrendingUp,
   TriangleAlert,
 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ProgressBar } from "@/components/ui/progress-bar";
-import { Button } from "@/components/ui/button";
+import { Skeleton } from "@recomenda/ui/skeleton";
+import { ProgressBar } from "@recomenda/ui/progress-bar";
+import { Button } from "@recomenda/ui/button";
 import { usePlanQuota } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
 

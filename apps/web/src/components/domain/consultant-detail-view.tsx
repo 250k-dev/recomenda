@@ -17,10 +17,10 @@ import {
 import { toast } from "sonner";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@recomenda/ui/button";
+import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
+import { Input } from "@recomenda/ui/input";
+import { Skeleton } from "@recomenda/ui/skeleton";
 import {
   useConsultantActivity,
   useConsultantSummary,

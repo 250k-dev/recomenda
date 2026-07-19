@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Plus, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Input } from "./input";
 import { cn } from "@recomenda/utils";
 
 export type SearchableSelectOption = {

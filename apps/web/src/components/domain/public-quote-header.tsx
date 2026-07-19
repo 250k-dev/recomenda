@@ -1,5 +1,5 @@
 import { Lock } from "lucide-react";
-import { Logo } from "@/assets/logo";
+import { Logo } from "@recomenda/ui/assets/logo";
 
 /** Header for the public lojista quote pages — brand + security seal. */
 export function PublicQuoteHeader() {

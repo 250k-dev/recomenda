@@ -6,9 +6,9 @@ import { toast } from "sonner";
 import { Leaf, Plus, Send, Share2 } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
 import { TimelineCardsSkeleton } from "@/components/domain/page-skeletons";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ProgressBar } from "@/components/ui/progress-bar";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@recomenda/ui/empty-state";
+import { ProgressBar } from "@recomenda/ui/progress-bar";
+import { Button } from "@recomenda/ui/button";
 import {
   useCreateRecommendation,
   useMe,

@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@recomenda/ui/badge";
 import { cn } from "@recomenda/utils";
 
 export type StatusTone =

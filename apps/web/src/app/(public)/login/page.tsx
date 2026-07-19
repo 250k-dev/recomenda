@@ -5,12 +5,12 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, Loader2, LogIn } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent } from "@recomenda/ui/card";
+import { Input } from "@recomenda/ui/input";
+import { PasswordInput } from "@recomenda/ui/password-input";
+import { Label } from "@recomenda/ui/label";
+import { Button } from "@recomenda/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@recomenda/ui/alert";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { useLogin } from "@recomenda/api-hooks";
 

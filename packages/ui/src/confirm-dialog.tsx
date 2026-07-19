@@ -11,8 +11,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { buttonVariants } from "@/components/ui/button";
+} from "./alert-dialog";
+import { buttonVariants } from "./button";
 import { cn } from "@recomenda/utils";
 
 type Tone = "default" | "destructive";

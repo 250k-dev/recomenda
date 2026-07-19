@@ -3,15 +3,15 @@
 import { useState } from "react";
 import { Check, Copy, FileDown } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@recomenda/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { WhatsAppIcon } from "@/assets/whatsapp-icon";
+} from "@recomenda/ui/dialog";
+import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 import {
   buildPurchaseListWhatsappMessage,

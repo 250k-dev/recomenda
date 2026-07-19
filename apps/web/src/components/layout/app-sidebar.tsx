@@ -23,14 +23,14 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-} from "@/components/ui/sidebar";
+} from "@recomenda/ui/sidebar";
 import { useMe, usePlanQuota } from "@recomenda/api-hooks";
 import { navFor } from "@/config/nav";
 import { routes } from "@recomenda/config";
 import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
-import { Logo } from "@/assets/logo";
+import { Logo } from "@recomenda/ui/assets/logo";
 import { NotificationsBell } from "./notifications-bell";
-import { Badge } from "../ui/badge";
+import { Badge } from "@recomenda/ui/badge";
 
 const iconMap: Record<string, React.ReactNode> = {
   "/dashboard": <LayoutDashboard className="size-4" />,
