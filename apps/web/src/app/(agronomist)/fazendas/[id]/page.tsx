@@ -8,15 +8,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@recomenda/ui/dialog";
+} from "@recomenda/ui/primitives/dialog";
 import {
   useFarm,
   useFarmPlots,

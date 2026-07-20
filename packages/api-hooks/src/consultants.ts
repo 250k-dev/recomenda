@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getConsultantActivity,
   getConsultantSummary,
-  getMemberProducers,
   getShareableProducers,
   getTeam,
   grantMemberProducer,
@@ -27,14 +26,6 @@ export function useShareableProducers(enabled = true) {
     queryKey: shareableProducersKey,
     queryFn: getShareableProducers,
     enabled,
-  });
-}
-
-export function useMemberProducers(userId: string, enabled = true) {
-  return useQuery({
-    queryKey: memberProducersKey(userId),
-    queryFn: () => getMemberProducers(userId),
-    enabled: Boolean(userId) && enabled,
   });
 }
 

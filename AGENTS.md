@@ -13,7 +13,7 @@ apps/web/           # o Next.js app — o único app
   src/stores/       # zustand
   src/lib/auth/     # session.ts e session-cookies.ts — server-only, ficam aqui
   src/config/nav.ts # usa `Route` do next: não pode virar pacote
-  proxy.ts          # Next 16 renomeou middleware.ts → proxy.ts
+  src/proxy.ts      # Next 16 renomeou middleware.ts → proxy.ts
 packages/
   utils/            # @recomenda/utils      — formatação, datas, constantes
   config/           # @recomenda/config     — env validada + routes.ts
@@ -26,6 +26,12 @@ packages/
 
 `components/domain` (17,9k linhas) **não** é pacote de propósito: é código de
 feature com um único consumidor. Extrair custa caro e não devolve nada.
+
+> ⚠️ **`proxy.ts` fica em `src/`, ao lado de `app/` — não na raiz do app.** O
+> Next só carrega o arquivo se ele estiver no mesmo nível de `app/`, e como
+> aqui `app` é `src/app`, o caminho é `apps/web/src/proxy.ts`. Na raiz ele é
+> ignorado **em silêncio**: build passa, nenhum aviso, e a validação de sessão
+> simplesmente não roda. Foi o que aconteceu até o B5 — ver `handoff/B5.md`.
 
 ## O que pode importar o quê
 
@@ -55,9 +61,38 @@ Mais três invariantes que não são sobre o grafo:
 regras de ESLint na config da raiz, e `pnpm test:fronteiras` verifica que elas
 continuam pegando violação de verdade.
 
-Ao criar um pacote novo, edite a tabela `GRAFO` no topo de `eslint.config.mjs` —
-as regras são geradas a partir dela. Quem não estiver na tabela nasce proibido
-de importar qualquer coisa interna, que é o default correto.
+## Pacote novo mexe em três lugares
+
+Nenhum dos três falha alto. Esquecer o terceiro já custou um bug visual que
+sobreviveu a seis fases de migração.
+
+1. **A tabela `GRAFO`**, no topo de `eslint.config.mjs`. As regras de fronteira
+   são geradas a partir dela. Quem não estiver na tabela nasce proibido de
+   importar qualquer coisa interna, que é o default correto.
+2. **`transpilePackages`**, em `apps/web/next.config.ts`. Os pacotes são
+   TypeScript cru, sem build próprio — fora dessa lista o Next não os compila.
+3. **`@source`**, em `apps/web/src/app/globals.css` — a regra abaixo.
+
+### `@source`: todo pacote que contenha string de classe Tailwind
+
+Em **qualquer extensão**, não só onde houver JSX.
+
+O scanner do Tailwind v4 lê os literais dos arquivos que ele varre, e **não
+segue import**. Ele varre a árvore de `apps/web`; um pacote fica de fora até ser
+declarado:
+
+```css
+@import "tailwindcss";
+@source "../../../../packages/ui/src";
+```
+
+O modo de falha é o pior possível: **sem erro de build, sem warning, sem nada em
+runtime.** As classes simplesmente não são geradas e a tela aparece sem estilo.
+
+Não "otimize" um `@source` fora porque o pacote não tem componente. `packages/utils`
+não tem JSX nenhum — só constantes `.ts` com nomes de classe, do tipo
+`"border-orange-300 bg-orange-50"` — e foi exatamente assim que quebrou: ficou
+fora do `@source`, os botões perderam a cor, e nenhum gate acusou.
 
 ## Comandos
 
@@ -80,5 +115,13 @@ cálculo, formatação de moeda, agregação de safra ou geração de lista de c
 exige smoke manual** — subir o app, abrir a tela afetada e conferir os números
 contra o esperado. `pnpm build` passar não diz nada sobre correção de conta.
 
-O histórico da migração para monorepo está em `docs/monorepo/` (gitignored),
-com o baseline de números por fazenda/safra usado nas verificações de A3–A7.
+## Sobre `docs/monorepo/`
+
+O histórico da migração para monorepo — incluindo o baseline de números por
+fazenda/safra usado nas verificações — vive em `docs/monorepo/`, que é
+**documentação operacional deliberadamente fora do versionamento**
+(`.gitignore:46`).
+
+Se você clonou este repo, esse diretório **não existe** na sua árvore. Nada aqui
+depende dele: as regras que valem em código são as deste arquivo, e quem as
+aplica é o `eslint.config.mjs`.

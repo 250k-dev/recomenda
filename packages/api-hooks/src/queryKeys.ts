@@ -1,7 +1,6 @@
 export const queryKeys = {
   timingTemplatesArchived: (producerId: string) =>
     ["timing-templates-archived", producerId] as const,
-  mixTemplatesArchived: ["mix-templates-archived"],
   seasonsArchived: ["seasons-archived"],
   me: ["me"],
   quota: ["quota"],

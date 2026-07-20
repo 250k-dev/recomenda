@@ -11,10 +11,10 @@ import { PageHeader } from "@/components/domain/page-header";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { StatusBadge } from "@/components/domain/status-badge";
-import { SectionTitle } from "@recomenda/ui/section-title";
-import { EmptyState } from "@recomenda/ui/empty-state";
-import { Card, CardContent, CardHeader, CardTitle } from "@recomenda/ui/card";
-import { DataTable } from "@recomenda/ui/data-table";
+import { SectionTitle } from "@recomenda/ui/patterns/section-title";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
+import { Card, CardContent, CardHeader, CardTitle } from "@recomenda/ui/primitives/card";
+import { DataTable } from "@recomenda/ui/patterns/data-table";
 import { useAdminAgronomistDetail, usePlans } from "@recomenda/api-hooks";
 
 export default function AdminAgronomistDetailPage() {

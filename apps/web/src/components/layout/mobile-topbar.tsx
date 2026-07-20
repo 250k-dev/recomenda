@@ -1,8 +1,8 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import { useSidebar } from "@recomenda/ui/sidebar";
-import { Button } from "@recomenda/ui/button";
+import { useSidebar } from "@recomenda/ui/primitives/sidebar";
+import { Button } from "@recomenda/ui/primitives/button";
 import { Logo } from "@recomenda/ui/assets/logo";
 
 export function MobileTopbar() {

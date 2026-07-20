@@ -7,21 +7,22 @@ import { z } from "zod";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/domain/page-header";
-import { PaginationBar } from "@recomenda/ui/pagination-bar";
+import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
 import { Package, Plus } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { AdminCatalogNameCell, DataTable } from "@recomenda/ui/data-table";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { Select, SearchableSelect } from "@recomenda/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@recomenda/ui/sheet";
+import { TruncatedNameCell, DataTable } from "@recomenda/ui/patterns/data-table";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Select, SearchableSelect } from "@recomenda/ui/forms/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@recomenda/ui/primitives/sheet";
 import type { AdminDeactivatedCatalogEntry, AdminPlatformActiveEntry, GlobalCatalogImportResult, GlobalProduct } from "@recomenda/api";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import {
   deactivateOutlineButtonClass,
   DOSE_UNIT_LABELS,
+  DOSE_UNIT_SHORT_LABELS,
   GLOBAL_DOSE_UNITS,
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
@@ -113,17 +114,6 @@ const customProductSchema = z
   });
 
 type CustomProductFormValues = z.infer<typeof customProductSchema>;
-
-const DOSE_UNITS: Record<string, string> = {
-  L: "L (Litro)",
-  KG: "kg (Quilograma)",
-  G: "g (Grama)",
-  ML: "mL (Mililitro)",
-  DOSE: "Dose",
-  T_HA: "t/ha (Tonelada/ha)",
-  BAG: "bag (5M sementes)",
-  SACA: "sacos (60k sementes)",
-};
 
 function downloadProdutosPlataformaTemplate() {
   const csv = "MARCA,DOSAGEM,TIPO,CLASSE\n";
@@ -657,7 +647,7 @@ export default function AdminGlobalCatalogPage() {
       );
 
     return [
-      <AdminCatalogNameCell key={`n-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
+      <TruncatedNameCell key={`n-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
       PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
       DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
       origin,
@@ -675,9 +665,9 @@ export default function AdminGlobalCatalogPage() {
       "—"
     );
     return [
-      <AdminCatalogNameCell key={`cn-${p.local_product_id ?? p.name}`} name={p.name} />,
+      <TruncatedNameCell key={`cn-${p.local_product_id ?? p.name}`} name={p.name} />,
       PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
-      DOSE_UNITS[p.dose_unit as keyof typeof DOSE_UNITS]?.split(" ")[0] ?? p.dose_unit,
+      DOSE_UNIT_SHORT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_SHORT_LABELS] ?? p.dose_unit,
       p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "-",
       agronomistCell,
       <div key={`v-${p.local_product_id}`}>{renderCustomVinculo(p)}</div>,
@@ -695,7 +685,7 @@ export default function AdminGlobalCatalogPage() {
   });
 
   const inactiveRows = paginatedInactiveRows.map((p) => [
-    <AdminCatalogNameCell key={`in-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
+    <TruncatedNameCell key={`in-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
     PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
     DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
     p.entry_type === "GLOBAL_INACTIVE" ? (

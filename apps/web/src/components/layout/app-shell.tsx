@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { MobileTopbar } from "@/components/layout/mobile-topbar";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import type { UserRole } from "@recomenda/api/auth-types";
-import { SidebarProvider, SidebarTrigger } from "@recomenda/ui/sidebar";
+import { SidebarProvider } from "@recomenda/ui/primitives/sidebar";
 import { AppSidebar } from "./app-sidebar";
 
 export function AppShell({

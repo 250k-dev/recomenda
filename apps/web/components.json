@@ -15,7 +15,7 @@
   "aliases": {
     "components": "@/components",
     "utils": "@recomenda/utils",
-    "ui": "@recomenda/ui",
+    "ui": "@recomenda/ui/primitives",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

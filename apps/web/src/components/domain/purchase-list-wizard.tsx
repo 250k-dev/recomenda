@@ -19,14 +19,14 @@ import {
   Loader2,
   Settings2,
 } from "lucide-react";
-import { Button } from "@recomenda/ui/button";
+import { Button } from "@recomenda/ui/primitives/button";
 import {
   readLocalDraft,
   clearLocalDraft,
   useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import {
   useCurrencyStore,

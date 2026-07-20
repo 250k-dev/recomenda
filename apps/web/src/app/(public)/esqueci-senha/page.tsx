@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail } from "lucide-react";
-import { Card } from "@recomenda/ui/card";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
-import { Button } from "@recomenda/ui/button";
+import { Card } from "@recomenda/ui/primitives/card";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
+import { Button } from "@recomenda/ui/primitives/button";
 import { AuthShell } from "@/components/auth/auth-shell";
 
 export default function ForgotPasswordPage() {

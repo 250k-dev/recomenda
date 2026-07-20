@@ -5,11 +5,11 @@ import { AlertTriangle, DollarSign, Plus, Sprout, Trash2 } from "lucide-react";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
 import { useLiveFxRate } from "@/hooks/use-live-fx-rate";
 import { toast } from "sonner";
-import { DoseUnitSelect } from "@recomenda/ui/dose-unit-select";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { MoneyInput } from "@recomenda/ui/money-input";
-import { Select, SearchableSelect } from "@recomenda/ui/select";
+import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { MoneyInput } from "@recomenda/ui/forms/money-input";
+import { Select, SearchableSelect } from "@recomenda/ui/forms/select";
 import {
   useCloneGlobalProduct,
   useCreateLocalProduct,

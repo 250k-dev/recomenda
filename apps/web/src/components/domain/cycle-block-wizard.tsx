@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
@@ -22,13 +23,14 @@ import {
   clearLocalDraft,
   useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { Badge } from "@recomenda/ui/badge";
-import { Skeleton } from "@recomenda/ui/skeleton";
-import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Badge } from "@recomenda/ui/primitives/badge";
+import { Skeleton } from "@recomenda/ui/primitives/skeleton";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import {
+  queryKeys,
   useCycleAvailablePlots,
   useCyclePurchaseList,
   useApplyCycleBlock,
@@ -247,6 +249,7 @@ function StepModel({
   onBack: () => void;
   onNext: (templateId: string) => void;
 }) {
+  const queryClient = useQueryClient();
   const { data: templates, isLoading } = useTimingTemplates(producerId);
   const { data: selectedTemplate } = useTimingTemplate(
     cronogramMode === "template" ? timingTemplateId : "",
@@ -362,6 +365,14 @@ function StepModel({
       if (!saveToLibrary) {
         await updateTimingTemplate(template.id, { is_archived: true });
       }
+
+      // A lista de modelos salvos que este mesmo passo lê (`useTimingTemplates`,
+      // acima) acabou de ganhar um item. Sem invalidar, voltar um passo dentro do
+      // `staleTime` de 30s (providers.tsx:15) mostra a lista sem o modelo novo.
+      // O season-wizard já fazia isto (season-wizard.tsx:1096); aqui faltava.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.timingTemplates(producerId),
+      });
 
       onNext(template.id);
     } catch (e: unknown) {

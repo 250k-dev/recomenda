@@ -1,7 +1,7 @@
 "use client";
 
 import { RailCard } from "@/components/domain/rail-card";
-import { ProgressBar } from "@recomenda/ui/progress-bar";
+import { ProgressBar } from "@recomenda/ui/patterns/progress-bar";
 
 type PriceCoverageRailCardProps = {
   completeLists: number;

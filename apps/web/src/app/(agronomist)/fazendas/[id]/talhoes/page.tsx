@@ -14,16 +14,16 @@ import { PageHero } from "@/components/domain/page-hero";
 import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
-import { Button } from "@recomenda/ui/button";
-import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
-import { EmptyState } from "@recomenda/ui/empty-state";
-import { Input } from "@recomenda/ui/input";
+import { Button } from "@recomenda/ui/primitives/button";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
+import { Input } from "@recomenda/ui/primitives/input";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@recomenda/ui/sheet";
+} from "@recomenda/ui/primitives/sheet";
 import {
   queryKeys,
   useCreatePlot,

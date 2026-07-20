@@ -15,9 +15,9 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@recomenda/ui/dropdown-menu";
-import { Badge } from "@recomenda/ui/badge";
-import { Skeleton } from "@recomenda/ui/skeleton";
+} from "@recomenda/ui/primitives/dropdown-menu";
+import { Badge } from "@recomenda/ui/primitives/badge";
+import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { useMe, usePlanQuota } from "@recomenda/api-hooks";
 import { logout } from "@recomenda/api";
 import { NotificationsPanel, useNotificationsList } from "./notifications-bell";

@@ -8,21 +8,21 @@ import { toast } from "sonner";
 import { Plus, Package } from "lucide-react";
 
 import { PageHeader } from "@/components/domain/page-header";
-import { PaginationBar } from "@recomenda/ui/pagination-bar";
+import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { AdminCatalogNameCell, DataTable } from "@recomenda/ui/data-table";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
-import { Select } from "@recomenda/ui/select";
+import { TruncatedNameCell, DataTable } from "@recomenda/ui/patterns/data-table";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
+import { Select } from "@recomenda/ui/forms/select";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@recomenda/ui/sheet";
+} from "@recomenda/ui/primitives/sheet";
 import {
   useClonePeerLocalProduct,
   useCreateLocalProduct,
@@ -313,7 +313,7 @@ export default function CatalogPage() {
   );
 
   const globalTableRows = paginatedGlobal.map((p) => [
-    <AdminCatalogNameCell
+    <TruncatedNameCell
       key={`g-${p.global_product_id ?? p.name}`}
       name={p.name}
     />,
@@ -342,7 +342,7 @@ export default function CatalogPage() {
         "—"
       );
     return [
-      <AdminCatalogNameCell
+      <TruncatedNameCell
         key={`c-${p.local_product_id ?? p.peer_local_product_id ?? p.name}`}
         name={p.name}
       />,
@@ -358,7 +358,7 @@ export default function CatalogPage() {
   });
 
   const inactiveTableRows = paginatedInactive.map((product) => [
-    <AdminCatalogNameCell key={`i-${product.id}`} name={product.name} />,
+    <TruncatedNameCell key={`i-${product.id}`} name={product.name} />,
     product.category
       ? (PRODUCT_CATEGORY_LABELS[
           product.category as keyof typeof PRODUCT_CATEGORY_LABELS

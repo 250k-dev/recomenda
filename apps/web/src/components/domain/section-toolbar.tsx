@@ -2,7 +2,7 @@
 
 import { ReactNode } from "react";
 import { Search } from "lucide-react";
-import { Input } from "@recomenda/ui/input";
+import { Input } from "@recomenda/ui/primitives/input";
 import { cn } from "@recomenda/utils";
 
 /**

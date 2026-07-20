@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Recomenda
 
-## Getting Started
+Aplicação web que agrônomos usam para planejar a safra dos seus produtores:
+cadastro de fazendas e talhões, modelos de timing de aplicação, plano de custo,
+lista de compra e cotação com fornecedores por link público.
 
-First, run the development server:
+É o front-end. A API é um Nest separado, fora deste repo — veja
+`apps/web/.env.example` para apontar para ela.
+
+## Como subir
+
+Pré-requisitos: **Node 22** e **pnpm 11.15.0** (fixado em `packageManager`;
+`corepack enable` resolve a versão sozinho).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp apps/web/.env.example apps/web/.env   # as 3 vars são opcionais, têm default
+pnpm dev                                 # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Estrutura
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Monorepo pnpm + turbo. Um app, sete pacotes:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+apps/web/      # o Next.js app — o único app
+packages/      # utils, config, api, domain, api-hooks, ui, tsconfig
+```
 
-## Learn More
+**Quem pode importar quem é regra de lint, não convenção.** A tabela do grafo,
+os invariantes de fronteira e o que fazer ao criar um pacote novo estão no
+[`AGENTS.md`](./AGENTS.md) — leia antes de mover código entre pacotes.
 
-To learn more about Next.js, take a look at the following resources:
+## Gates
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Os cinco rodam no CI e devem passar antes de abrir PR:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pnpm lint               # eslint . na RAIZ — cobre apps/ E packages/
+pnpm typecheck          # 7 pacotes
+pnpm build
+pnpm check:ciclos       # dependência circular
+pnpm test:fronteiras    # as regras de fronteira ainda pegam violação?
+```
 
-## Deploy on Vercel
+## Não há testes automatizados
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Zero arquivos de teste no repo. Os gates acima provam que compila e que as
+fronteiras valem — **não** provam que a conta está certa.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Mudança em cálculo, formatação de moeda, agregação de safra, lista de compra ou
+classe de Tailwind exige **smoke manual**: subir o app, abrir a tela afetada e
+conferir contra o esperado.
