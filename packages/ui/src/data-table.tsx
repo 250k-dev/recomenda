@@ -61,7 +61,8 @@ export function DataTable({
   );
 }
 
-export function AdminCatalogNameCell({ name }: { name: string }) {
+/** Célula de nome com truncamento e `title` — nada específico de tela. */
+export function TruncatedNameCell({ name }: { name: string }) {
   return (
     <span
       className="block max-w-[14rem] truncate font-semibold text-text-strong"

@@ -35,6 +35,7 @@ export const PRODUCT_CATEGORY_LABELS: Record<GlobalProductCategory, string> = {
   OTHER: "Outro",
 };
 
+/** Rótulo por extenso — usado em listagens, filtros e formulários. */
 export const DOSE_UNIT_LABELS: Record<GlobalDoseUnit, string> = {
   L: "Litros (L)",
   KG: "Quilogramas (kg)",
@@ -44,4 +45,23 @@ export const DOSE_UNIT_LABELS: Record<GlobalDoseUnit, string> = {
   T_HA: "Toneladas/ha (t/ha)",
   BAG: "Bag (5M sementes)",
   SACA: "Sacos (60k sementes)",
+};
+
+/**
+ * Rótulo curto — usado onde não cabe o por extenso: o seletor de unidade dos
+ * formulários de dose e a coluna de unidade das tabelas de produto.
+ *
+ * Mora ao lado do mapa longo de propósito: eram dois vocabulários em pacotes
+ * diferentes, e a coluna de `catalogo-global` recuperava o curto fatiando a
+ * string de um terceiro mapa (`.split(" ")[0]`). Mantenha os dois aqui.
+ */
+export const DOSE_UNIT_SHORT_LABELS: Record<GlobalDoseUnit, string> = {
+  L: "L",
+  KG: "kg",
+  G: "g",
+  ML: "mL",
+  DOSE: "Dose",
+  T_HA: "t/ha",
+  BAG: "bag",
+  SACA: "sacos",
 };

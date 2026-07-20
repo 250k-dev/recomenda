@@ -32,7 +32,6 @@ export * from "./tooltip";
 // ---- Entrada de dados ----
 export * from "./brazilian-date-input";
 export * from "./calendar";
-export * from "./dose-unit-select";
 export * from "./input";
 export * from "./money-input";
 export * from "./native-select";
