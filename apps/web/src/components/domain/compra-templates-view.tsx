@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, FileText, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@recomenda/ui/button";
-import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
-import { EmptyState } from "@recomenda/ui/empty-state";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
+import { Button } from "@recomenda/ui/primitives/button";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import { PageHero } from "@/components/domain/page-hero";
 import {

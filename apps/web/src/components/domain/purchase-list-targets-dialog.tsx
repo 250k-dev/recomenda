@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Target, Loader2 } from "lucide-react";
-import { Button } from "@recomenda/ui/button";
+import { Button } from "@recomenda/ui/primitives/button";
 import {
   Dialog,
   DialogContent,
@@ -10,9 +10,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@recomenda/ui/dialog";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
+} from "@recomenda/ui/primitives/dialog";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
 import {
   resolveTotalTargetScHa,
   TOTAL_SC_HA_KEY,

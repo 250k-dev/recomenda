@@ -1,8 +1,8 @@
 "use client";
 
-import { Input } from "@recomenda/ui/input";
-import { Textarea } from "@recomenda/ui/textarea";
-import { Select } from "@recomenda/ui/select";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Textarea } from "@recomenda/ui/primitives/textarea";
+import { Select } from "@recomenda/ui/forms/select";
 import { Field } from "@/components/domain/season/_shared";
 import {
   StageWindowDateFields,

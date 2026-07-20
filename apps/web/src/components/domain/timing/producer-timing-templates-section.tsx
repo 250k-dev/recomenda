@@ -19,20 +19,20 @@ import { cn, CROP_LABELS, deactivateOutlineButtonClass } from "@recomenda/utils"
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
-import { Select } from "@recomenda/ui/select";
-import { Badge } from "@recomenda/ui/badge";
-import { EmptyState } from "@recomenda/ui/empty-state";
-import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
+import { Select } from "@recomenda/ui/forms/select";
+import { Badge } from "@recomenda/ui/primitives/badge";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@recomenda/ui/sheet";
+} from "@recomenda/ui/primitives/sheet";
 import {
   useArchivedTimingTemplates,
   useCreateTimingTemplate,

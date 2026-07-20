@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@recomenda/ui/input";
+import { Input } from "@recomenda/ui/primitives/input";
 
 type AdminListFilterProps = {
   value: string;

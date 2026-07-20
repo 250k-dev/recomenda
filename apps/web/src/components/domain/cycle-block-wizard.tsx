@@ -23,11 +23,11 @@ import {
   clearLocalDraft,
   useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { Badge } from "@recomenda/ui/badge";
-import { Skeleton } from "@recomenda/ui/skeleton";
-import { ConfirmDialog } from "@recomenda/ui/confirm-dialog";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Badge } from "@recomenda/ui/primitives/badge";
+import { Skeleton } from "@recomenda/ui/primitives/skeleton";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import {
   queryKeys,

@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { ptBR } from "react-day-picker/locale";
-import { Input } from "./input";
-import { Button } from "./button";
-import { Calendar } from "./calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { Input } from "../primitives/input";
+import { Button } from "../primitives/button";
+import { Calendar } from "../primitives/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../primitives/popover";
 import {
   cn,
   dateToLocalYmd,

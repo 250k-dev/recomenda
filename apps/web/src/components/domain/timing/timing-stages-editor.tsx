@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, CircleAlert, FlaskConical, Info, Plus, Trash2 } from "lucide-react";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { BrazilianDateInput } from "@recomenda/ui/brazilian-date-input";
-import { Textarea } from "@recomenda/ui/textarea";
-import { Select, SearchableSelect } from "@recomenda/ui/select";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { BrazilianDateInput } from "@recomenda/ui/forms/brazilian-date-input";
+import { Textarea } from "@recomenda/ui/primitives/textarea";
+import { Select, SearchableSelect } from "@recomenda/ui/forms/select";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@recomenda/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@recomenda/ui/primitives/tooltip";
 import { Field } from "@/components/domain/season/_shared";
 import {
   usePlatformCatalog,

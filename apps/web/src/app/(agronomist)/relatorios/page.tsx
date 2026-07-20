@@ -16,7 +16,7 @@ import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { ReportsProductivityPanel } from "@/components/domain/reports/reports-productivity-panel";
 import { ReportsCategoryPanel } from "@/components/domain/reports/reports-category-panel";
 import { ReportsExportPanel } from "@/components/domain/reports/reports-export-panel";
-import { EmptyState } from "@recomenda/ui/empty-state";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { publicEnv } from "@recomenda/config";
 import type { ComparativeReport } from "@recomenda/api";
 import { useComparativeReport } from "@recomenda/api-hooks";

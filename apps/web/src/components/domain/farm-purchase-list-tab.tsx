@@ -6,11 +6,11 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Boxes, Eye, FileDown, Leaf, Pencil, Plus, Store, Target, X, Check, Loader2 } from "lucide-react";
-import { Select } from "@recomenda/ui/select";
+import { Select } from "@recomenda/ui/forms/select";
 import { PageHero } from "@/components/domain/page-hero";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { EmptyState } from "@recomenda/ui/empty-state";
-import { Button } from "@recomenda/ui/button";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
+import { Button } from "@recomenda/ui/primitives/button";
 import { FieldError } from "@/components/domain/season/_shared";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import {
@@ -46,8 +46,8 @@ import {
 import type { PurchaseListDetail, PurchaseListItemInput } from "@recomenda/api";
 import { CROP_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
-import { Card, CardContent } from "@recomenda/ui/card";
-import { DataTable } from "@recomenda/ui/data-table";
+import { Card, CardContent } from "@recomenda/ui/primitives/card";
+import { DataTable } from "@recomenda/ui/patterns/data-table";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";

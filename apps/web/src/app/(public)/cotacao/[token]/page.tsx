@@ -11,11 +11,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@recomenda/ui/card";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
-import { Button } from "@recomenda/ui/button";
-import { Skeleton } from "@recomenda/ui/skeleton";
+} from "@recomenda/ui/primitives/card";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { useCreateQuoteResponse, useQuoteByToken } from "@recomenda/api-hooks";
 import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
 import { CROP_LABELS, maskPhoneBR, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";

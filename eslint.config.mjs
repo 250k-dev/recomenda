@@ -54,7 +54,8 @@ export const PROIBIDOS_EXTERNOS = {
  * Padrões que negam todo `@recomenda/*` e reabrem só os permitidos.
  * A negação é o que faz a regra valer para pacote futuro: quem for criado
  * amanhã já nasce proibido até ser liberado aqui.
- * `@recomenda/x/**` cobre os imports profundos (`@recomenda/ui/popover`).
+ * `@recomenda/x/**` cobre os imports profundos, em qualquer profundidade
+ * (`@recomenda/ui/primitives/popover`).
  */
 function negarRecomendaExceto(permitidos) {
   return [

@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { SeasonWizard } from "@/components/domain/season-wizard";
-import { Button } from "@recomenda/ui/button";
+import { Button } from "@recomenda/ui/primitives/button";
 import { useFarm, useFarmPlots, useProducer } from "@recomenda/api-hooks";
 import { routes } from "@recomenda/config";
 

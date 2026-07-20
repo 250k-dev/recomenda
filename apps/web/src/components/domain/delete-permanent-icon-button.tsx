@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { Button } from "@recomenda/ui/button";
+import { Button } from "@recomenda/ui/primitives/button";
 import { cn } from "@recomenda/utils";
 
 export type DeletePermanentIconButtonProps = Omit<

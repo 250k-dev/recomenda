@@ -7,7 +7,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./table";
+} from "../primitives/table";
 
 export function DataTable({
   headers,

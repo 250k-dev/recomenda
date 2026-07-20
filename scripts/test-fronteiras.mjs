@@ -122,10 +122,10 @@ const GERADAS_EXTERNAS = Object.keys(PROIBIDOS_EXTERNOS).flatMap((pkg) =>
 const MANUAIS = [
   // ---- Formas de import ----
   {
-    id: "import profundo (@recomenda/ui/popover)",
+    id: "import profundo (@recomenda/ui/primitives/popover)",
     pkg: "domain",
     espera: CAMADA_1,
-    code: `import { Popover } from "@recomenda/ui/popover";\nexport const x = Popover;\n`,
+    code: `import { Popover } from "@recomenda/ui/primitives/popover";\nexport const x = Popover;\n`,
   },
   {
     id: "import profundo 2 níveis (@recomenda/api/http/types)",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Select } from "@recomenda/ui/select";
+import { Select } from "@recomenda/ui/forms/select";
 import { cn, DOSE_UNIT_SHORT_LABELS, GLOBAL_DOSE_UNITS, type GlobalDoseUnit } from "@recomenda/utils";
 
 interface DoseUnitSelectProps {

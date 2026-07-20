@@ -1,4 +1,4 @@
-import { Skeleton } from "@recomenda/ui/skeleton";
+import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 
 export default function PublicRoutesLoading() {
   return (

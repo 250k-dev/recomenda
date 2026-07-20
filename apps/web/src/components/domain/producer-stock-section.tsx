@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { Boxes, Pencil, Save } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
-import { SearchableSelect } from "@recomenda/ui/select";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
+import { SearchableSelect } from "@recomenda/ui/forms/select";
 import { PageHero } from "@/components/domain/page-hero";
 import { useLocalCatalog } from "@recomenda/api-hooks";
 import { useProducerStock, useAdjustProducerStock } from "@recomenda/api-hooks/producers";

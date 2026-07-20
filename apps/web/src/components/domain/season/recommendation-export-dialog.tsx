@@ -3,14 +3,14 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, FileDown } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@recomenda/ui/button";
+import { Button } from "@recomenda/ui/primitives/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@recomenda/ui/dialog";
+} from "@recomenda/ui/primitives/dialog";
 import {
   buildWhatsappMessage,
   type RecommendationShareData,
