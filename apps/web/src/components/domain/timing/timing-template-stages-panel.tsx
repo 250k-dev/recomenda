@@ -23,8 +23,9 @@ import {
 import {
   isStageProductPersistable,
   mapMixItemsToStageProducts,
-  syncStageProducts,
+  planStageProducts,
 } from "@recomenda/domain/timing/sync-stage-products";
+import { applyStageProductsPlan } from "@/components/domain/timing/apply-stage-products-plan";
 import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@recomenda/domain/timing/window-days";
 import {
   readLocalDraft,
@@ -208,14 +209,17 @@ export function TimingTemplateStagesPanel({
           notes: trimmedNotes.length > 0 ? trimmedNotes : null,
         });
 
-        const mixId = await syncStageProducts({
-          stageId: stage.id,
+        // Decidir (puro, em domain) e executar (transporte) são passos separados
+        // desde o B7 — antes `syncStageProducts` fazia os dois de dentro de
+        // `domain`, disparando rede de um pacote que a doc define como puro.
+        const plan = planStageProducts({
           stageName: editorStage.name.trim() || stage.name,
           templateName: template.name,
           crop: template.crop,
           currentMixId: stage.default_mix_template_id,
           products: editorStage.products,
         });
+        const mixId = await applyStageProductsPlan(stage.id, plan);
         if (mixId) touchedMixIds.add(mixId);
       }
 

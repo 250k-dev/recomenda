@@ -4,8 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getLocalCatalog,
   getInactiveLocalCatalog,
-  getAllInactiveLocalCatalog,
-  getAllLocalProducts,
   getGlobalCatalog,
   getPlatformCatalog,
   getAdminPlatformActiveCatalog,
@@ -30,14 +28,6 @@ export function useLocalCatalog() {
 
 export function useInactiveLocalCatalog() {
   return useQuery({ queryKey: queryKeys.inactiveLocalCatalog, queryFn: getInactiveLocalCatalog });
-}
-
-export function useAllLocalProducts() {
-  return useQuery({ queryKey: queryKeys.allLocalProducts, queryFn: getAllLocalProducts });
-}
-
-export function useAllInactiveLocalProducts() {
-  return useQuery({ queryKey: queryKeys.allInactiveLocalProducts, queryFn: getAllInactiveLocalCatalog });
 }
 
 export function useGlobalCatalog() {

@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type TimingStage,
-  type MixTemplateItem,
   getTimingTemplates,
   getTimingTemplate,
   createTimingTemplate,
@@ -12,19 +11,8 @@ import {
   hardDeleteTimingTemplate,
   getArchivedTimingTemplates,
   createTimingStage,
-  updateTimingStage,
   deleteTimingStage,
   reorderTimingStages,
-  getMixTemplates,
-  getMixTemplate,
-  createMixTemplate,
-  updateMixTemplate,
-  deleteMixTemplate,
-  hardDeleteMixTemplate,
-  getArchivedMixTemplates,
-  createMixTemplateItem,
-  updateMixTemplateItem,
-  deleteMixTemplateItem,
 } from "@recomenda/api/templates";
 import { queryKeys } from "./queryKeys";
 
@@ -109,17 +97,6 @@ export function useCreateTimingStage(templateId: string) {
   });
 }
 
-export function useUpdateTimingStage(templateId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, ...payload }: Partial<TimingStage> & { id: string }) =>
-      updateTimingStage(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplate(templateId) });
-    },
-  });
-}
-
 export function useDeleteTimingStage(templateId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -140,93 +117,3 @@ export function useReorderTimingStages(templateId: string) {
   });
 }
 
-export function useMixTemplates() {
-  return useQuery({ queryKey: queryKeys.mixTemplates, queryFn: getMixTemplates });
-}
-
-export function useMixTemplate(id: string) {
-  return useQuery({
-    queryKey: queryKeys.mixTemplate(id),
-    queryFn: () => getMixTemplate(id),
-    enabled: Boolean(id),
-  });
-}
-
-export function useCreateMixTemplate() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: createMixTemplate,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplates });
-    },
-  });
-}
-
-export function useUpdateMixTemplate(id: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (payload: Parameters<typeof updateMixTemplate>[1]) =>
-      updateMixTemplate(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplates });
-    },
-  });
-}
-
-export function useDeleteMixTemplate() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: deleteMixTemplate,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplates });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplatesArchived });
-    },
-  });
-}
-
-export function useArchivedMixTemplates() {
-  return useQuery({ queryKey: queryKeys.mixTemplatesArchived, queryFn: getArchivedMixTemplates });
-}
-
-export function useHardDeleteMixTemplate() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: hardDeleteMixTemplate,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplatesArchived });
-    },
-  });
-}
-
-export function useCreateMixTemplateItem(templateId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (payload: { local_product_id: string; dose_per_hectare: number; dose_unit?: string }) =>
-      createMixTemplateItem(templateId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(templateId) });
-    },
-  });
-}
-
-export function useUpdateMixTemplateItem(templateId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, ...payload }: Pick<MixTemplateItem, "id"> & { dose_per_hectare?: number; dose_unit?: string }) =>
-      updateMixTemplateItem(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(templateId) });
-    },
-  });
-}
-
-export function useDeleteMixTemplateItem(templateId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: deleteMixTemplateItem,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mixTemplate(templateId) });
-    },
-  });
-}
