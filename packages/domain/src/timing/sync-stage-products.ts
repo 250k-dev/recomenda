@@ -1,9 +1,4 @@
-import {
-  createMixTemplate,
-  replaceMixTemplateItems,
-  updateTimingStage,
-  type MixTemplateItem,
-} from "@recomenda/api/templates";
+import type { MixTemplateItem } from "@recomenda/api/templates";
 import type { StageProductDraft } from "./types";
 import type { Product } from "@recomenda/api/catalog";
 
@@ -52,21 +47,51 @@ export function mapMixItemsToStageProducts(
   });
 }
 
-export async function syncStageProducts({
-  stageId,
+export type MixItemInput = {
+  local_product_id: string;
+  dose_per_hectare: number;
+  dose_unit: string;
+};
+
+/** O que a etapa precisa que aconteça no servidor. Decidir isto é lógica de
+ *  negócio (mora aqui); executar é transporte (mora em quem tem acesso à rede). */
+export type StageProductsPlan =
+  /** Nada a persistir e nada a limpar — o mix atual, se houver, fica como está. */
+  | { kind: "keep"; mixId: string | null }
+  /** A etapa ficou de fato sem produtos: esvazia o mix e desvincula do estágio. */
+  | { kind: "clear"; mixId: string }
+  /** Há produtos válidos: cria o mix se ainda não existir e substitui os itens. */
+  | {
+      kind: "sync";
+      /** `null` = ainda não existe mix; quem executa precisa criar um. */
+      mixId: string | null;
+      /** Nome do mix a criar, usado só quando `mixId` é `null`. */
+      newMixName: string;
+      crop: string;
+      items: MixItemInput[];
+    };
+
+/**
+ * Decide, sem tocar na rede, o que fazer com os produtos de uma etapa.
+ *
+ * Era `syncStageProducts`, que importava os fetchers e disparava as chamadas
+ * daqui — o único dos 14 pontos `domain → api` que importava valores em vez de
+ * tipos, contra `00-arquitetura.md:101` ("lógica de negócio pura"). A execução
+ * saiu para `apps/web` (`apply-stage-products-plan.ts`); o que decide ficou.
+ */
+export function planStageProducts({
   stageName,
   templateName,
   crop,
   currentMixId,
   products,
 }: {
-  stageId: string;
   stageName: string;
   templateName: string;
   crop: string;
   currentMixId?: string | null;
   products: StageProductDraft[];
-}) {
+}): StageProductsPlan {
   // NÃO aborta a etapa toda por causa de uma linha incompleta (produto sem dose).
   // Salva os produtos válidos e apenas ignora os incompletos — que continuam como
   // rascunho na tela. Antes, uma linha zerada bloqueava o save e o produto válido
@@ -78,33 +103,18 @@ export async function syncStageProducts({
     // meio da edição — não esvazia o mix. Só esvazia quando a etapa fica de fato
     // sem produtos.
     if (hasIncompleteProducts(products)) {
-      return currentMixId ?? null;
+      return { kind: "keep", mixId: currentMixId ?? null };
     }
     if (currentMixId) {
-      // Esvazia o mix (1 chamada) e desvincula do estágio.
-      await replaceMixTemplateItems(currentMixId, []);
-      await updateTimingStage(stageId, { default_mix_template_id: null });
+      return { kind: "clear", mixId: currentMixId };
     }
-    return null;
+    return { kind: "keep", mixId: null };
   }
 
-  let mixId = currentMixId ?? null;
-  if (!mixId) {
-    const mix = await createMixTemplate({
-      name: `${stageName} — ${templateName}`,
-      crop,
-    });
-    mixId = mix.id;
-    await updateTimingStage(stageId, { default_mix_template_id: mixId });
-  }
-
-  // Dedup por produto (última dose vence) e substitui TODOS os itens numa única
-  // requisição. Antes era um GET + 1 request por item (N+1: 200 itens = 200
-  // chamadas); agora é 1 chamada, atômica no servidor.
-  const byProduct = new Map<
-    string,
-    { local_product_id: string; dose_per_hectare: number; dose_unit: string }
-  >();
+  // Dedup por produto (última dose vence) para substituir TODOS os itens numa
+  // única requisição. Antes era um GET + 1 request por item (N+1: 200 itens =
+  // 200 chamadas); agora é 1 chamada, atômica no servidor.
+  const byProduct = new Map<string, MixItemInput>();
   for (const product of validProducts) {
     byProduct.set(product.productId, {
       local_product_id: product.productId,
@@ -112,7 +122,12 @@ export async function syncStageProducts({
       dose_unit: product.unit,
     });
   }
-  await replaceMixTemplateItems(mixId, [...byProduct.values()]);
 
-  return mixId;
+  return {
+    kind: "sync",
+    mixId: currentMixId ?? null,
+    newMixName: `${stageName} — ${templateName}`,
+    crop,
+    items: [...byProduct.values()],
+  };
 }

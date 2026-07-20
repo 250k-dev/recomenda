@@ -15,6 +15,7 @@ export {
 
 export {
   DOSE_UNIT_LABELS,
+  DOSE_UNIT_SHORT_LABELS,
   GLOBAL_DOSE_UNITS,
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
@@ -24,21 +25,20 @@ export {
 
 export {
   categoryBarClass,
-  categoryDotClass,
-  categorySoftClass,
   categoryToken,
   type CategoryToken,
 } from "./categories";
 
 export {
   dateToLocalYmd,
-  formatDateBR,
   formatTimingPreviewDate,
   localYmdToDate,
   maskBrazilianDateInput,
   parseBrazilianDate,
 } from "./dates";
 
-export { formatPhoneBR, maskPhoneBR, phoneDigitsBR } from "./phone";
+// `phoneDigitsBR` fica fora do barril de propósito: é detalhe interno de
+// `maskPhoneBR` e não tem consumidor externo.
+export { formatPhoneBR, maskPhoneBR } from "./phone";
 
 export { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "./season-constants";

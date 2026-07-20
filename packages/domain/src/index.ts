@@ -143,7 +143,7 @@ export {
 export {
   isStageProductPersistable,
   mapMixItemsToStageProducts,
-  syncStageProducts,
+  planStageProducts,
 } from "./timing/sync-stage-products";
 export {
   TIMING_WINDOW_TOLERANCE_DAYS,

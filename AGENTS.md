@@ -13,7 +13,7 @@ apps/web/           # o Next.js app — o único app
   src/stores/       # zustand
   src/lib/auth/     # session.ts e session-cookies.ts — server-only, ficam aqui
   src/config/nav.ts # usa `Route` do next: não pode virar pacote
-  proxy.ts          # Next 16 renomeou middleware.ts → proxy.ts
+  src/proxy.ts      # Next 16 renomeou middleware.ts → proxy.ts
 packages/
   utils/            # @recomenda/utils      — formatação, datas, constantes
   config/           # @recomenda/config     — env validada + routes.ts
@@ -26,6 +26,12 @@ packages/
 
 `components/domain` (17,9k linhas) **não** é pacote de propósito: é código de
 feature com um único consumidor. Extrair custa caro e não devolve nada.
+
+> ⚠️ **`proxy.ts` fica em `src/`, ao lado de `app/` — não na raiz do app.** O
+> Next só carrega o arquivo se ele estiver no mesmo nível de `app/`, e como
+> aqui `app` é `src/app`, o caminho é `apps/web/src/proxy.ts`. Na raiz ele é
+> ignorado **em silêncio**: build passa, nenhum aviso, e a validação de sessão
+> simplesmente não roda. Foi o que aconteceu até o B5 — ver `handoff/B5.md`.
 
 ## O que pode importar o quê
 

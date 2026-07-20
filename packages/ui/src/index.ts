@@ -23,7 +23,6 @@ export * from "./dialog";
 export * from "./dropdown-menu";
 export * from "./label";
 export * from "./popover";
-export * from "./scroll-area";
 export * from "./separator";
 export * from "./sheet";
 export * from "./skeleton";
@@ -33,7 +32,6 @@ export * from "./tooltip";
 // ---- Entrada de dados ----
 export * from "./brazilian-date-input";
 export * from "./calendar";
-export * from "./dose-unit-select";
 export * from "./input";
 export * from "./money-input";
 export * from "./native-select";

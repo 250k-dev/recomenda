@@ -10,8 +10,6 @@ import {
   getFarmPlots,
   getFarmSeasons,
   getFarmAccess,
-  grantFarmAccess,
-  revokeFarmAccess,
   createPlot,
   updatePlot,
   deletePlot,
@@ -89,26 +87,6 @@ export function useResolvedFarmProducerId(
     if (access?.length === 1) return access[0].producer_id;
     return null;
   }, [producerIdFromUrl, access]);
-}
-
-export function useGrantFarmAccess(farmId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (producerId: string) => grantFarmAccess(farmId, producerId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.farmAccess(farmId) });
-    },
-  });
-}
-
-export function useRevokeFarmAccess(farmId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (producerId: string) => revokeFarmAccess(farmId, producerId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.farmAccess(farmId) });
-    },
-  });
 }
 
 export function useCreatePlot(farmId: string) {

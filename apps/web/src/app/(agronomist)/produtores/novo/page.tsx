@@ -4,7 +4,7 @@ import { routes } from "@recomenda/config";
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   User,
@@ -27,14 +27,14 @@ import {
   formatFarmLocation,
   maskPhoneBR,
 } from "@recomenda/utils";
+import { createFarm, grantFarmAccess } from "@recomenda/api";
 import {
-  createProducer,
-  createFarm,
-  createPlot,
-  updatePlot,
-  deletePlot,
-  grantFarmAccess,
-} from "@recomenda/api";
+  queryKeys,
+  useCreateProducer,
+  useCreatePlot,
+  useUpdatePlot,
+  useDeletePlot,
+} from "@recomenda/api-hooks";
 
 type Producer = { id: string; name: string };
 type Farm = { id: string; name: string };
@@ -56,6 +56,7 @@ const fmt = (n: number) =>
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   // const sidebar = useSidebar();
   const [step, setStep] = useState(1);
   const [producer, setProducer] = useState<Producer | null>(null);
@@ -215,14 +216,21 @@ export default function OnboardingPage() {
             }
             onBack={() => setStep(2)}
             onAnotherFarm={() => setStep(2)}
-            onFinish={() =>
+            onFinish={() => {
+              // `useCreatePlot`/`useUpdatePlot` invalidam só `farmPlots`, mas a
+              // tela de destino conta talhões e hectares por `producerFarms`
+              // (producer-detail-view.tsx:141). Invalida uma vez ao sair do
+              // wizard, que é quando o usuário chega lá.
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.producerFarms(producer.id),
+              });
               router.push(
                 routes.produtores.detalhe(producer.id, {
                   onboarding: "season",
                   farm_id: currentFarm.id,
                 }),
-              )
-            }
+              );
+            }}
           />
         )}
         </section>
@@ -335,20 +343,26 @@ function StepProducer({
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const mutation = useMutation({
-    mutationFn: createProducer,
-    onSuccess: (p) => onDone({ id: p.id, name: p.name }),
-    onError: (e: unknown) => setError(extractError(e)),
-  });
+  // Hook do pacote, não `useMutation` inline: este passo é de UMA chamada, que é
+  // exatamente a forma que `useCreateProducer` cobre — e é ele que invalida
+  // `queryKeys.producers`. Sem isso, voltar para /produtores dentro do
+  // `staleTime` de 30s (providers.tsx:15) mostrava a lista sem o produtor novo.
+  const mutation = useCreateProducer();
 
   const submit = () => {
     setError(null);
     if (!name.trim()) return setError("Informe o nome do produtor.");
-    mutation.mutate({
-      name: name.trim(),
-      email: email.trim() || undefined,
-      phone: phone.trim() || undefined,
-    });
+    mutation.mutate(
+      {
+        name: name.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+      },
+      {
+        onSuccess: (p) => onDone({ id: p.id, name: p.name }),
+        onError: (e: unknown) => setError(extractError(e)),
+      },
+    );
   };
 
   return (
@@ -462,6 +476,11 @@ function StepFarm({
     [citiesQuery.data],
   );
 
+  const queryClient = useQueryClient();
+
+  // Continua `useMutation` inline de propósito: são DUAS chamadas encadeadas
+  // (criar a fazenda, depois conceder o acesso ao produtor), e não existe hook
+  // de um passo que cubra o par. Mesmo formato de producer-detail-view.tsx:105.
   const mutation = useMutation({
     mutationFn: async () => {
       const location =
@@ -475,7 +494,14 @@ function StepFarm({
       await grantFarmAccess(created.id, producer.id);
       return created;
     },
-    onSuccess: (f) => onDone({ id: f.id, name: f.name }),
+    onSuccess: (f) => {
+      // A carteira do produtor conta fazendas/talhões/hectares a partir deste
+      // payload (producer-detail-view.tsx:141 lê `f.plots`).
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.producerFarms(producer.id),
+      });
+      onDone({ id: f.id, name: f.name });
+    },
     onError: (e: unknown) => setError(extractError(e)),
   });
 
@@ -632,52 +658,12 @@ function StepPlot({
     setError(null);
   };
 
-  const createMutation = useMutation({
-    mutationFn: () =>
-      createPlot(farm.id, { name: name.trim(), area_hectares: Number(area) }),
-    onSuccess: (p) => {
-      onAddPlot({
-        id: p.id,
-        name: p.name,
-        area: Number(area),
-        farmId: farm.id,
-        farmName: farm.name,
-      });
-      resetForm();
-    },
-    onError: (e: unknown) => setError(extractError(e)),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (plotId: string) =>
-      updatePlot(plotId, { name: name.trim(), area_hectares: Number(area) }),
-    onSuccess: (p) => {
-      onUpdatePlot({
-        id: p.id,
-        name: p.name,
-        area: Number(p.area_hectares),
-        farmId: farm.id,
-        farmName: farm.name,
-      });
-      resetForm();
-    },
-    onError: (e: unknown) => setError(extractError(e)),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deletePlot,
-    onSuccess: (_data, plotId) => {
-      onRemovePlot(plotId);
-      setEditingPlotId((current) => {
-        if (current === plotId) {
-          setName("");
-          setArea("");
-        }
-        return current === plotId ? null : current;
-      });
-    },
-    onError: (e: unknown) => setError(extractError(e)),
-  });
+  // Os três são de UMA chamada e já existem no pacote — `useDeletePlot` inclusive
+  // carrega o fan-out correto (farmPlots + producer-farms + producers), que era o
+  // que faltava aqui.
+  const createMutation = useCreatePlot(farm.id);
+  const updateMutation = useUpdatePlot(farm.id);
+  const deleteMutation = useDeletePlot(farm.id);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
@@ -687,10 +673,40 @@ function StepPlot({
     const n = Number(area);
     if (!n || n <= 0) return setError("Informe os hectares do talhão.");
     if (editingPlotId) {
-      updateMutation.mutate(editingPlotId);
+      updateMutation.mutate(
+        { id: editingPlotId, name: name.trim(), area_hectares: n },
+        {
+          onSuccess: (p) => {
+            onUpdatePlot({
+              id: p.id,
+              name: p.name,
+              area: Number(p.area_hectares),
+              farmId: farm.id,
+              farmName: farm.name,
+            });
+            resetForm();
+          },
+          onError: (e: unknown) => setError(extractError(e)),
+        },
+      );
       return;
     }
-    createMutation.mutate();
+    createMutation.mutate(
+      { name: name.trim(), area_hectares: n },
+      {
+        onSuccess: (p) => {
+          onAddPlot({
+            id: p.id,
+            name: p.name,
+            area: n,
+            farmId: farm.id,
+            farmName: farm.name,
+          });
+          resetForm();
+        },
+        onError: (e: unknown) => setError(extractError(e)),
+      },
+    );
   };
 
   const startEdit = (plot: WizPlot) => {
@@ -849,7 +865,21 @@ function StepPlot({
                       size="icon"
                       className="w-8 h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       aria-label={`Remover ${p.name}`}
-                      onClick={() => deleteMutation.mutate(p.id)}
+                      onClick={() =>
+                        deleteMutation.mutate(p.id, {
+                          onSuccess: () => {
+                            onRemovePlot(p.id);
+                            setEditingPlotId((current) => {
+                              if (current === p.id) {
+                                setName("");
+                                setArea("");
+                              }
+                              return current === p.id ? null : current;
+                            });
+                          },
+                          onError: (e: unknown) => setError(extractError(e)),
+                        })
+                      }
                       disabled={deleteMutation.isPending || isSaving}
                     >
                       <Trash2 className="w-4 h-4" />

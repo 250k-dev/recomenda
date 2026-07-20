@@ -4,10 +4,39 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      // `dist/**` saiu: nenhum pacote emite `dist` (os 6 são TS cru, com
+      // `noEmit`, transpilados pelo `transpilePackages` do Next).
+      "outputs": [".next/**", "!.next/cache/**"],
       "env": ["NEXT_PUBLIC_API_BASE_URL", "API_INTERNAL_URL", "JWT_SECRET"]
     },
-    "typecheck": { "dependsOn": ["^build"], "outputs": [] },
+
+    // `^typecheck`, não `^build`. Nenhum pacote tem script `build`, mas
+    // `^build` não era no-op: o turbo materializava 7 nós fantasma que
+    // hasheavam os inputs de cada pacote — inclusive o `env` de `build` — e o
+    // hash propagava. Trocar `JWT_SECRET` derrubava o cache dos 7 typechecks.
+    // Medido, antes e depois:
+    //
+    //   antes  JWT_SECRET=X  →  web#typecheck muda   |  15 nós no grafo
+    //   depois JWT_SECRET=X  →  web#typecheck igual  |   8 nós
+    //
+    // Ressalva medida: `NEXT_PUBLIC_API_BASE_URL` continua derrubando, e não
+    // é este `env` — é a inferência de framework do turbo, que joga
+    // `NEXT_PUBLIC_*` no hash de toda task do workspace Next. O benefício vale
+    // para `JWT_SECRET` e `API_INTERNAL_URL`.
+    //
+    // `dependsOn: []` seria ERRADO e foi medido: sem a aresta, mexer em
+    // `packages/domain` NÃO muda o hash de `web#typecheck` (4f8674c7… nos dois
+    // estados) e um erro de tipo passaria por cache hit. Com `^typecheck`, o
+    // hash muda (797578 → 25a6d0).
+    //
+    // `outputs: []` fica. Declarar `tsconfig.tsbuildinfo` como output não
+    // rende nada: o turbo só restaura output em cache HIT, e em hit o `tsc`
+    // não roda. No MISS — o único caso em que ele roda — nada é restaurado.
+    // Medido nos dois casos. O `incremental: true` do `packages/tsconfig`
+    // continua valendo a pena localmente, onde o arquivo persiste em disco:
+    // `apps/web` faz 5,22s → 1,19s. Em CI, checkout limpo, não economiza.
+    "typecheck": { "dependsOn": ["^typecheck"], "outputs": [] },
+
     "dev": { "cache": false, "persistent": true },
     "start": { "cache": false, "persistent": true }
   }

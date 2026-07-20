@@ -19,9 +19,31 @@ export type RouteContext = {
   onboarding?: string | null;
 };
 
-/** Monta um href tipado a partir de um caminho + query (valores vazios são omitidos). */
-export function withQuery(
-  path: string,
+/**
+ * Valida um caminho dinâmico contra a árvore de rotas e devolve `Route`.
+ *
+ * `Route` sem argumento de tipo **não** representa rota dinâmica: o ramo
+ * dinâmico do tipo que o Next gera é `T extends ... ? T : never`, e com o
+ * default (`T = string`) ele colapsa para `never`. É por isso que
+ * `satisfies Route` reprova um `/produtores/${id}` legítimo, e é por isso que o
+ * cast na volta é inevitável — o tipo público não sabe dizer "rota dinâmica".
+ *
+ * Receber o caminho como `Route<T>` faz o `T` ser inferido do template literal:
+ * é aí que a checagem acontece. Um typo no trecho estático
+ * (`/produtoress/${id}`) reprova no `typecheck` de `apps/web`.
+ */
+function dynamicRoute<T extends string>(path: Route<T>): Route {
+  return path as Route;
+}
+
+/**
+ * Monta um href tipado a partir de um caminho + query (valores vazios são omitidos).
+ *
+ * O `path` é validado como `Route<T>` pelo mesmo mecanismo de `dynamicRoute` —
+ * ver o comentário de lá para o porquê do genérico e dos casts.
+ */
+export function withQuery<T extends string>(
+  path: Route<T>,
   query?: Record<string, string | null | undefined>,
 ): Route {
   if (!query) return path as Route;
@@ -34,29 +56,30 @@ export function withQuery(
 }
 
 export const routes = {
-  home: "/" as Route,
+  home: "/" satisfies Route,
   login: (opts?: { force?: boolean }) =>
     withQuery("/login", opts?.force ? { force: "1" } : undefined),
-  esqueciSenha: "/esqueci-senha" as Route,
-  redefinirSenha: "/redefinir-senha" as Route,
-  convite: (token: string) => `/convite/${token}` as Route,
+  esqueciSenha: "/esqueci-senha" satisfies Route,
+  redefinirSenha: "/redefinir-senha" satisfies Route,
+  convite: (token: string) => dynamicRoute(`/convite/${token}`),
   /** Beco informativo para contas de produtor (sem acesso ao painel web). */
-  acessoProdutor: "/acesso-produtor" as Route,
+  acessoProdutor: "/acesso-produtor" satisfies Route,
 
-  dashboard: "/dashboard" as Route,
+  dashboard: "/dashboard" satisfies Route,
   cronograma: (ctx?: RouteContext) => withQuery("/cronograma", ctx),
-  perfil: "/perfil" as Route,
-  relatorios: "/relatorios" as Route,
+  perfil: "/perfil" satisfies Route,
+  relatorios: "/relatorios" satisfies Route,
   /** Catálogo de produtos do agrônomo (rótulo de menu: "Produtos"). */
-  produtos: "/produtos" as Route,
-  templatesDeCompra: "/templates-de-compra" as Route,
+  produtos: "/produtos" satisfies Route,
+  templatesDeCompra: "/templates-de-compra" satisfies Route,
 
   produtores: {
-    lista: "/produtores" as Route,
-    novo: "/produtores/novo" as Route,
+    lista: "/produtores" satisfies Route,
+    novo: "/produtores/novo" satisfies Route,
     detalhe: (id: string, ctx?: RouteContext & { hash?: string | null }) => {
       const { hash, ...query } = ctx ?? {};
       const href = withQuery(`/produtores/${id}`, query);
+      // O caminho já foi validado pelo `withQuery`; o `#hash` é sufixo livre.
       return (hash ? `${href}#${hash}` : href) as Route;
     },
     modeloDeTiming: (
@@ -68,12 +91,12 @@ export const routes = {
   },
 
   equipe: {
-    lista: "/equipe" as Route,
-    membro: (userId: string) => `/equipe/${userId}` as Route,
+    lista: "/equipe" satisfies Route,
+    membro: (userId: string) => dynamicRoute(`/equipe/${userId}`),
   },
 
   fazendas: {
-    lista: "/fazendas" as Route,
+    lista: "/fazendas" satisfies Route,
     detalhe: (id: string, ctx?: RouteContext) =>
       withQuery(`/fazendas/${id}`, ctx),
     estoque: (id: string, ctx?: RouteContext) =>
@@ -102,7 +125,7 @@ export const routes = {
    * a safra da fazenda como um todo vive em `fazendas.safra`.
    */
   safras: {
-    lista: "/safras" as Route,
+    lista: "/safras" satisfies Route,
     nova: (ctx?: RouteContext) => withQuery("/safras/nova", ctx),
     /** Tela padrão da safra do talhão: o cronograma de recomendações. */
     cronograma: (id: string, ctx?: RouteContext) =>
@@ -114,24 +137,24 @@ export const routes = {
   },
 
   admin: {
-    dashboard: "/admin" as Route,
-    planos: "/admin/planos" as Route,
+    dashboard: "/admin" satisfies Route,
+    planos: "/admin/planos" satisfies Route,
     agronomos: {
-      lista: "/admin/agronomos" as Route,
-      detalhe: (id: string) => `/admin/agronomos/${id}` as Route,
+      lista: "/admin/agronomos" satisfies Route,
+      detalhe: (id: string) => dynamicRoute(`/admin/agronomos/${id}`),
     },
     produtores: {
-      lista: "/admin/produtores" as Route,
-      detalhe: (id: string) => `/admin/produtores/${id}` as Route,
+      lista: "/admin/produtores" satisfies Route,
+      detalhe: (id: string) => dynamicRoute(`/admin/produtores/${id}`),
     },
-    catalogoGlobal: "/admin/catalogo-global" as Route,
-    perfil: "/admin/perfil" as Route,
+    catalogoGlobal: "/admin/catalogo-global" satisfies Route,
+    perfil: "/admin/perfil" satisfies Route,
   },
 
   /** Fluxo público de cotação para fornecedores (link com token). */
   cotacao: {
-    convite: (token: string) => `/cotacao/${token}` as Route,
+    convite: (token: string) => dynamicRoute(`/cotacao/${token}`),
     loja: (token: string, responseToken: string) =>
-      `/cotacao/${token}/loja/${responseToken}` as Route,
+      dynamicRoute(`/cotacao/${token}/loja/${responseToken}`),
   },
 } as const;

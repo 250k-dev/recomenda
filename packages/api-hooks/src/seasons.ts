@@ -9,12 +9,10 @@ import {
 import {
   getSeasons,
   getSeason,
-  createSeason,
   archiveSeason,
   hardDeleteSeason,
   publishSeason,
   getArchivedSeasons,
-  getSeasonShoppingList,
   getTimeline,
   getPlotHistory,
   createRecommendation,
@@ -52,16 +50,6 @@ export function useSeason(id: string) {
     queryKey: queryKeys.season(id),
     queryFn: () => getSeason(id),
     enabled: Boolean(id),
-  });
-}
-
-export function useCreateSeason() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: createSeason,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
-    },
   });
 }
 
@@ -107,14 +95,6 @@ export function useSeasonTimeline(seasonId: string) {
   return useQuery({
     queryKey: queryKeys.seasonTimeline(seasonId),
     queryFn: () => getTimeline(seasonId),
-    enabled: Boolean(seasonId),
-  });
-}
-
-export function useSeasonShoppingList(seasonId: string) {
-  return useQuery({
-    queryKey: queryKeys.seasonShoppingList(seasonId),
-    queryFn: () => getSeasonShoppingList(seasonId),
     enabled: Boolean(seasonId),
   });
 }

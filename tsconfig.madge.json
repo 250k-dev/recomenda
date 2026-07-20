@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "SÓ PARA O MADGE — não é config de build, nada compila com isto",
+
+  // Por que este arquivo existe:
+  // o madge não lê o campo `exports` do package.json, então TODO import
+  // `@recomenda/*` era invisível para ele — 153 arquivos pulados, e um ciclo
+  // entre pacotes não seria detectado (auditoria §3). Estes `paths` traduzem
+  // cada `exports` para caminho de disco, que é a única forma que o madge
+  // entende. O `@/*` no fim é o que dispensa a segunda passada dentro de
+  // `apps/web`: os `paths` do tsconfig dele são relativos ao diretório dele.
+  //
+  // Nenhum pacote estende este arquivo. Se um pacote novo entrar no
+  // `pnpm-workspace.yaml`, acrescente as duas linhas dele aqui — senão o
+  // `check:ciclos` volta a pular os imports do pacote em silêncio.
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@recomenda/utils": ["packages/utils/src/index.ts"],
+      "@recomenda/utils/*": ["packages/utils/src/*"],
+
+      // A entrada explícita é necessária: o `/*` casa `server` contra
+      // `src/server.*`, que não existe — o arquivo real é `env.server.ts`.
+      "@recomenda/config/server": ["packages/config/src/env.server.ts"],
+      "@recomenda/config": ["packages/config/src/index.ts"],
+      "@recomenda/config/*": ["packages/config/src/*"],
+
+      "@recomenda/api": ["packages/api/src/index.ts"],
+      "@recomenda/api/*": ["packages/api/src/*"],
+
+      "@recomenda/domain": ["packages/domain/src/index.ts"],
+      "@recomenda/domain/*": ["packages/domain/src/*"],
+
+      "@recomenda/api-hooks": ["packages/api-hooks/src/index.ts"],
+      "@recomenda/api-hooks/*": ["packages/api-hooks/src/*"],
+
+      "@recomenda/ui": ["packages/ui/src/index.ts"],
+      "@recomenda/ui/*": ["packages/ui/src/*"],
+
+      "@/*": ["apps/web/src/*"]
+    }
+  }
+}

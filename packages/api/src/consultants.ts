@@ -59,11 +59,6 @@ export async function getTeam() {
   return data;
 }
 
-/** @deprecated use getTeam — mantido só se algum import legado restar */
-export async function getConsultants() {
-  return getTeam();
-}
-
 export async function getShareableProducers() {
   const { data } = await api.get<ShareableProducer[]>("/consultants/shareable-producers");
   return data;
