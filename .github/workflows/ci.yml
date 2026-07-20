@@ -10,19 +10,44 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# O job só lê o repositório. Sem isto ele herda o default do repo, que pode ser
+# `write` em tudo — permissão que nenhum passo daqui usa.
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Folga larga para não matar run legítimo, e curto o bastante para um passo
+    # travado não segurar a fila pelas 6 h de default do GitHub.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       # Lê a versão de `packageManager` no package.json da raiz.
       - uses: pnpm/action-setup@v4
 
+      # `node-version-file` em vez de número solto: a versão passa a viver no
+      # `.nvmrc`, que é o mesmo arquivo que o dev local usa. Antes o `22` só
+      # existia aqui e nenhum package.json tinha `engines` — o que também
+      # significava que trocar de Node NÃO invalidava o cache do turbo
+      # (`globalCacheInputs.engines: null`, medido).
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
+
+      # Cache local do turbo. Sem isto todo run era frio: `pnpm build` e os 7
+      # `typecheck` rodavam do zero mesmo quando nada relevante mudou.
+      # O SHA na key faz o cache ser gravado a cada run; o `restore-keys` é o
+      # que faz o run atual aproveitar o do commit anterior.
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            turbo-${{ runner.os }}-
 
       # `--frozen-lockfile` é o que impede um pnpm-lock.yaml desatualizado de
       # passar. O `allowBuilds` do pnpm-workspace.yaml (sharp, unrs-resolver) é
@@ -47,3 +72,13 @@ jobs:
       # ainda REPROVAM violações propositais. Uma regra que parou de pegar tem
       # a mesma aparência de uma que funciona — só este passo distingue.
       - run: pnpm test:fronteiras
+
+      # O `@source` do Tailwind é o invariante mais silencioso do monorepo:
+      # pacote fora dele tem as classes descartadas sem erro e sem warning, e
+      # foi assim que 8 telas ficaram quebradas por sete fases. Este passo
+      # injeta uma classe sentinela em cada pacote, builda e confere no CSS.
+      #
+      # ⚠️ Este passo REPROVA em `main` hoje, e está certo: `main` tem 5 dos 6
+      # pacotes fora do `@source`. Ele fica verde quando o branch
+      # `ajuste/b1-tailwind-source` entrar — B1 antes de B4.
+      - run: pnpm check:tailwind

@@ -1,13 +1,4 @@
-// Aliasado: `formatDateBR` tem um parâmetro chamado `format`, que sombrearia o
-// import dentro daquela função.
 import { format as formatDateFns } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
-
-const DEFAULT_TIME_ZONE = "America/Sao_Paulo";
-
-export function formatDateBR(value: string | Date, format = "dd/MM/yyyy") {
-  return formatInTimeZone(value, DEFAULT_TIME_ZONE, format);
-}
 
 /**
  * Helpers de data local (sem fuso) no formato `YYYY-MM-DD`, mais a máscara e o
