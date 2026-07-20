@@ -11,7 +11,6 @@ import {
   getProducerFarms,
   getProducerStock,
   adjustProducerStock,
-  removeFarmAccess,
   createInvitation,
   revokeInvitation,
   getInvitationByToken,
@@ -98,16 +97,6 @@ export function useAdjustProducerStock(producerId: string) {
       adjustProducerStock(producerId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(producerId) });
-    },
-  });
-}
-
-export function useRemoveFarmAccess(producerId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (farmId: string) => removeFarmAccess(producerId, farmId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.producerFarms(producerId) });
     },
   });
 }

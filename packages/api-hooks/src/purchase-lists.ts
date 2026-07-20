@@ -7,7 +7,6 @@ import {
   deletePurchaseList,
   getPurchaseListBySeason,
   getPurchaseListTemplates,
-  importPurchaseListTemplate,
   updatePurchaseList,
   getProducerPurchaseLists,
   getFarmPurchaseLists,
@@ -108,21 +107,3 @@ export function useDeletePurchaseListTemplate() {
   });
 }
 
-export function useImportPurchaseListTemplate() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (vars: { templateId: string; producer_id: string; name?: string }) =>
-      importPurchaseListTemplate(vars.templateId, {
-        producer_id: vars.producer_id,
-        name: vars.name,
-      }),
-    onSuccess: (data) => {
-      if (data.producer_id) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.producerPurchaseLists(data.producer_id),
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
-    },
-  });
-}

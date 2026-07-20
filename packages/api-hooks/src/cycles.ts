@@ -9,7 +9,6 @@ import {
   getCycleCostPlan,
   getFarmCycles,
   publishCycle,
-  updateCycle,
   type ApplyBlockPayload,
 } from "@recomenda/api/cycles";
 import { getPurchaseListByCycle } from "@recomenda/api/purchase-lists";
@@ -62,20 +61,6 @@ export function useCreateCycle(farmId: string) {
       createCycle(farmId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
-    },
-  });
-}
-
-export function useUpdateCycle(id: string, farmId?: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (payload: { name?: string; crops?: string[]; status?: string }) =>
-      updateCycle(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.cycle(id) });
-      if (farmId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
-      }
     },
   });
 }
