@@ -8,11 +8,11 @@ import { PageHeader } from "@/components/domain/page-header";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { StatCard } from "@/components/domain/stat-card";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
-import { Card, CardContent } from "@recomenda/ui/card";
-import { EmptyState } from "@recomenda/ui/empty-state";
+import { Card, CardContent } from "@recomenda/ui/primitives/card";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import type { Route } from "next";
-import { Badge } from "@recomenda/ui/badge";
-import { Button } from "@recomenda/ui/button";
+import { Badge } from "@recomenda/ui/primitives/badge";
+import { Button } from "@recomenda/ui/primitives/button";
 import { routes } from "@recomenda/config";
 import {
   useFarm,

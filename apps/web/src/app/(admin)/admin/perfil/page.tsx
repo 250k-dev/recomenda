@@ -10,8 +10,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@recomenda/ui/card";
-import { Button } from "@recomenda/ui/button";
+} from "@recomenda/ui/primitives/card";
+import { Button } from "@recomenda/ui/primitives/button";
 import { logout } from "@recomenda/api";
 
 export default function AdminProfilePage() {

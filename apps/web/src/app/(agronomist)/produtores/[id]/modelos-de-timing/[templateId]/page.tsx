@@ -10,9 +10,9 @@ import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { routes } from "@recomenda/config";
 import { TemplateEditorSkeleton } from "@/components/domain/page-skeletons";
 import { TimingTemplateStagesPanel } from "@/components/domain/timing/timing-template-stages-panel";
-import { EmptyState } from "@recomenda/ui/empty-state";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
 import { useProducer, useTimingTemplate, useUpdateTimingTemplate } from "@recomenda/api-hooks";
 import { CROP_LABELS } from "@recomenda/utils";
 

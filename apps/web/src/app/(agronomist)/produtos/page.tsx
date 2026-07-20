@@ -8,21 +8,21 @@ import { toast } from "sonner";
 import { Plus, Package } from "lucide-react";
 
 import { PageHeader } from "@/components/domain/page-header";
-import { PaginationBar } from "@recomenda/ui/pagination-bar";
+import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
-import { TruncatedNameCell, DataTable } from "@recomenda/ui/data-table";
-import { Button } from "@recomenda/ui/button";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
-import { Select } from "@recomenda/ui/select";
+import { TruncatedNameCell, DataTable } from "@recomenda/ui/patterns/data-table";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
+import { Select } from "@recomenda/ui/forms/select";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@recomenda/ui/sheet";
+} from "@recomenda/ui/primitives/sheet";
 import {
   useClonePeerLocalProduct,
   useCreateLocalProduct,

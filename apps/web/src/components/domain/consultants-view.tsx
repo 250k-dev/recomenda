@@ -4,17 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronRight, Copy, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@recomenda/ui/button";
+import { Button } from "@recomenda/ui/primitives/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@recomenda/ui/dialog";
-import { EmptyState } from "@recomenda/ui/empty-state";
-import { Input } from "@recomenda/ui/input";
-import { Label } from "@recomenda/ui/label";
+} from "@recomenda/ui/primitives/dialog";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
+import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
 import { PageHero } from "@/components/domain/page-hero";
 import { useConsultants, useCreateInvitation, useMe } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";

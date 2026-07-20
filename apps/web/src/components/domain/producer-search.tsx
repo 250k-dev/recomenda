@@ -12,8 +12,8 @@ import {
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Search, Users, Plus, Package } from "lucide-react";
-import { Button } from "@recomenda/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@recomenda/ui/dialog";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Dialog, DialogContent, DialogTitle } from "@recomenda/ui/primitives/dialog";
 import { useProducers } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";

@@ -11,7 +11,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-} from "@recomenda/ui/alert-dialog";
+} from "@recomenda/ui/primitives/alert-dialog";
 
 interface OnboardingPromptDialogProps {
   open: boolean;

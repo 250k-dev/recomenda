@@ -11,8 +11,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "./alert-dialog";
-import { buttonVariants } from "./button";
+} from "../primitives/alert-dialog";
+import { buttonVariants } from "../primitives/button";
 import { cn } from "@recomenda/utils";
 
 type Tone = "default" | "destructive";

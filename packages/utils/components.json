@@ -13,11 +13,11 @@
   "iconLibrary": "lucide",
   "rtl": false,
   "aliases": {
-    "components": "@recomenda/ui/primitives",
+    "components": "@recomenda/utils",
     "utils": "@recomenda/utils",
-    "ui": "@recomenda/ui/primitives",
+    "ui": "@recomenda/utils",
     "lib": "@recomenda/utils",
-    "hooks": "@recomenda/ui/hooks"
+    "hooks": "@recomenda/utils"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

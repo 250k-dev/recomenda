@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
-import { Button } from "@recomenda/ui/button";
-import { EmptyState } from "@recomenda/ui/empty-state";
+import { Button } from "@recomenda/ui/primitives/button";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { ProducerStockSection } from "@/components/domain/producer-stock-section";
 import {
   useFarm,

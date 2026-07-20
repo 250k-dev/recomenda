@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Calculator, MapPin, ShoppingCart, Sprout, Wheat } from "lucide-react";
-import { Button } from "@recomenda/ui/button";
-import { Card, CardContent } from "@recomenda/ui/card";
-import { EmptyState } from "@recomenda/ui/empty-state";
+import { Button } from "@recomenda/ui/primitives/button";
+import { Card, CardContent } from "@recomenda/ui/primitives/card";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { useCycleCostPlan } from "@recomenda/api-hooks";

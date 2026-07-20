@@ -7,7 +7,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@recomenda/ui/popover";
+} from "@recomenda/ui/primitives/popover";
 import {
   useBreadcrumbSetter,
   type BreadcrumbItem,
