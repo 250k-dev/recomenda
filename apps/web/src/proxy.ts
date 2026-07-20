@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { errors, jwtVerify } from "jose";
+import { serverEnv } from "@recomenda/config/server";
 
 const publicRoutes = ["/login", "/esqueci-senha", "/redefinir-senha", "/convite", "/cotacao", "/acesso-produtor"];
 
@@ -7,12 +8,24 @@ function isPublicPath(pathname: string) {
   return publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
-async function readAccessRole(accessToken: string | undefined): Promise<string | null> {
-  if (!accessToken) return null;
+/**
+ * Estado do access token. `expirado` é separado de `invalido` de propósito: os
+ * dois falham em `jwtVerify`, mas exigem respostas opostas — ver o comentário
+ * do ramo de expulsão em `proxy()`.
+ */
+type EstadoSessao =
+  | { estado: "sem-token" }
+  | { estado: "sem-segredo" }
+  | { estado: "valido"; role: string | null }
+  | { estado: "expirado" }
+  | { estado: "invalido" };
 
-  const secret = process.env.JWT_SECRET;
+async function lerAccessToken(accessToken: string | undefined): Promise<EstadoSessao> {
+  if (!accessToken) return { estado: "sem-token" };
+
+  const secret = serverEnv.JWT_SECRET;
   if (!secret) {
-    return null;
+    return { estado: "sem-segredo" };
   }
 
   try {
@@ -20,9 +33,15 @@ async function readAccessRole(accessToken: string | undefined): Promise<string |
       accessToken,
       new TextEncoder().encode(secret),
     );
-    return typeof payload.role === "string" ? payload.role : null;
-  } catch {
-    return null;
+    return {
+      estado: "valido",
+      role: typeof payload.role === "string" ? payload.role : null,
+    };
+  } catch (erro) {
+    // Assinatura confere, só venceu o `exp`.
+    if (erro instanceof errors.JWTExpired) return { estado: "expirado" };
+    // Assinatura quebrada, token malformado ou claim inválida.
+    return { estado: "invalido" };
   }
 }
 
@@ -39,8 +58,10 @@ export async function proxy(request: NextRequest) {
   }
 
   const accessToken = request.cookies.get("access_token")?.value;
+  const refreshToken = request.cookies.get("refresh_token")?.value;
   const cookieRole = request.cookies.get("role")?.value;
-  const verifiedRole = await readAccessRole(accessToken);
+  const sessao = await lerAccessToken(accessToken);
+  const verifiedRole = sessao.estado === "valido" ? sessao.role : null;
   const role = verifiedRole ?? cookieRole ?? null;
   const forceLogin =
     request.nextUrl.searchParams.get("force") === "1" ||
@@ -64,8 +85,20 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login?force=1", request.url));
   }
 
-  // Token presente mas inválido (exp/sig) quando JWT_SECRET está configurado.
-  if (process.env.JWT_SECRET && !verifiedRole) {
+  // Sessão forjada — assinatura quebrada, token malformado ou claim inválida.
+  // Não há o que renovar: derruba tudo.
+  //
+  // Token só EXPIRADO não entra aqui, e a distinção é load-bearing. O access
+  // vive 1h e o refresh 30 dias, mas quem renova é o interceptor de 401 do
+  // axios (`packages/api/src/http/axios.ts:70`), que só roda depois da página
+  // carregar — o proxy roda antes, em navegação. Se ele apagasse o
+  // refresh_token aqui, toda navegação feita após 1h de sessão viraria
+  // re-login, derrubando a sessão efetiva de 30 dias para 1 hora.
+  // Com refresh_token no cookie, deixa passar e o XHR renova.
+  const sessaoForjada = sessao.estado === "invalido";
+  const expiradoSemRenovacao = sessao.estado === "expirado" && !refreshToken;
+
+  if (sessaoForjada || expiradoSemRenovacao) {
     const response = NextResponse.redirect(new URL("/login?force=1", request.url));
     response.cookies.delete("access_token");
     response.cookies.delete("refresh_token");
