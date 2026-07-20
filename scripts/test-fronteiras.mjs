@@ -125,7 +125,8 @@ if (falhas === 0) {
   console.error(
     `\n✘ ${falhas} de ${total} sondas com resultado errado.\n` +
       `  Uma violação que "PASSOU" significa que a regra correspondente em\n` +
-      `  eslint.config.mjs deixou de proteger o grafo. Ver docs/monorepo/handoff/A8.md.\n`,
+      `  eslint.config.mjs deixou de proteger o grafo — a tabela GRAFO no topo\n` +
+      `  dele e a do AGENTS.md ("O que pode importar o quê") são a referência.\n`,
   );
 }
 process.exit(falhas === 0 ? 0 : 1);

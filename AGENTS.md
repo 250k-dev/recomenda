@@ -109,5 +109,13 @@ cálculo, formatação de moeda, agregação de safra ou geração de lista de c
 exige smoke manual** — subir o app, abrir a tela afetada e conferir os números
 contra o esperado. `pnpm build` passar não diz nada sobre correção de conta.
 
-O histórico da migração para monorepo está em `docs/monorepo/` (gitignored),
-com o baseline de números por fazenda/safra usado nas verificações de A3–A7.
+## Sobre `docs/monorepo/`
+
+O histórico da migração para monorepo — incluindo o baseline de números por
+fazenda/safra usado nas verificações — vive em `docs/monorepo/`, que é
+**documentação operacional deliberadamente fora do versionamento**
+(`.gitignore:46`).
+
+Se você clonou este repo, esse diretório **não existe** na sua árvore. Nada aqui
+depende dele: as regras que valem em código são as deste arquivo, e quem as
+aplica é o `eslint.config.mjs`.
