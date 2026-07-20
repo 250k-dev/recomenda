@@ -1,5 +1,21 @@
 {
   "extends": "@recomenda/tsconfig/base.json",
-  "compilerOptions": { "rootDir": "src", "noEmit": true, "jsx": "react-jsx" },
+  "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    // Só para o CLI do shadcn. Ele resolve os aliases do components.json por
+    // `paths` do tsconfig ou pelo `imports` do package.json — e o `exports`
+    // (`./*` → `./src/*.tsx`) não resolve um diretório, que é o que o alias
+    // passou a ser no B10 (`@recomenda/ui/primitives`). Sem isto o `shadcn add`
+    // para com "Could not resolve the following aliases".
+    //
+    // Não é para usar no código: import cruzado dentro do pacote continua
+    // proibido pelo ESLint, e `pnpm test:fronteiras` cobre isso — inclusive o
+    // auto-import do barril. Este `paths` só ensina o resolver a achar o
+    // diretório; não afrouxa fronteira nenhuma.
+    "baseUrl": ".",
+    "paths": { "@recomenda/ui/*": ["./src/*"] }
+  },
   "include": ["src/**/*"]
 }
