@@ -431,10 +431,10 @@ if (falhas === 0) {
   console.log(`\n✔ ${resultados.length} sondas de fronteira OK\n`);
 } else {
   console.error(
-    `\n✘ ${falhas} de ${resultados.length} sondas com resultado errado.\n` +
-      `  Uma violação que "FALHOU" significa que a regra nomeada em\n` +
-      `  eslint.config.mjs deixou de proteger o grafo — ou passou a ser pega por\n` +
-      `  outra camada, o que também é informação: a camada nomeada degradou.\n`,
+    `\n✘ ${falhas} de ${total} sondas com resultado errado.\n` +
+      `  Uma violação que "PASSOU" significa que a regra correspondente em\n` +
+      `  eslint.config.mjs deixou de proteger o grafo — a tabela GRAFO no topo\n` +
+      `  dele e a do AGENTS.md ("O que pode importar o quê") são a referência.\n`,
   );
 }
 process.exit(falhas === 0 ? 0 : 1);

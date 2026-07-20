@@ -4,9 +4,11 @@ import nextTs from "eslint-config-next/typescript";
 import boundaries from "eslint-plugin-boundaries";
 
 // -----------------------------------------------------------------------------
-// O grafo de dependências de docs/monorepo/00-arquitetura.md, em forma de dado.
-// Editar esta tabela é a única coisa que precisa mudar quando um pacote novo
-// entrar: as duas camadas de enforcement abaixo são geradas a partir dela.
+// O grafo de dependências do AGENTS.md ("O que pode importar o quê"), em forma
+// de dado. Editar esta tabela é a única coisa que precisa mudar AQUI quando um
+// pacote novo entrar — as duas camadas de enforcement abaixo são geradas a
+// partir dela. O AGENTS.md lista os outros dois lugares que também mudam
+// (`transpilePackages` e `@source`); mantenha a tabela de lá em sincronia.
 // -----------------------------------------------------------------------------
 export const GRAFO = {
   utils: [],
@@ -130,7 +132,7 @@ const eslintConfig = defineConfig([
               message:
                 `Fronteira violada: @recomenda/${pkg} só pode importar ` +
                 `${GRAFO[pkg].length ? GRAFO[pkg].map((d) => `@recomenda/${d}`).join(", ") : "(nenhum pacote interno)"}. ` +
-                `Ver o grafo em docs/monorepo/00-arquitetura.md.`,
+                `Ver a tabela "O que pode importar o quê" no AGENTS.md.`,
             },
             // Módulos externos proibidos para este pacote (`domain` sem
             // React/Next/React Query, `ui` sem Next). A tabela está no topo.
@@ -216,7 +218,7 @@ const eslintConfig = defineConfig([
         {
           default: "disallow",
           message:
-            "Fronteira violada: {{from.element.type}} não pode importar {{to.element.type}}. Ver o grafo permitido em docs/monorepo/00-arquitetura.md.",
+            'Fronteira violada: {{from.element.type}} não pode importar {{to.element.type}}. Ver a tabela "O que pode importar o quê" no AGENTS.md.',
           policies: [
             {
               from: { element: { types: "api" } },
