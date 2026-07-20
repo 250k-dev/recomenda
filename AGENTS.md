@@ -55,9 +55,38 @@ Mais três invariantes que não são sobre o grafo:
 regras de ESLint na config da raiz, e `pnpm test:fronteiras` verifica que elas
 continuam pegando violação de verdade.
 
-Ao criar um pacote novo, edite a tabela `GRAFO` no topo de `eslint.config.mjs` —
-as regras são geradas a partir dela. Quem não estiver na tabela nasce proibido
-de importar qualquer coisa interna, que é o default correto.
+## Pacote novo mexe em três lugares
+
+Nenhum dos três falha alto. Esquecer o terceiro já custou um bug visual que
+sobreviveu a seis fases de migração.
+
+1. **A tabela `GRAFO`**, no topo de `eslint.config.mjs`. As regras de fronteira
+   são geradas a partir dela. Quem não estiver na tabela nasce proibido de
+   importar qualquer coisa interna, que é o default correto.
+2. **`transpilePackages`**, em `apps/web/next.config.ts`. Os pacotes são
+   TypeScript cru, sem build próprio — fora dessa lista o Next não os compila.
+3. **`@source`**, em `apps/web/src/app/globals.css` — a regra abaixo.
+
+### `@source`: todo pacote que contenha string de classe Tailwind
+
+Em **qualquer extensão**, não só onde houver JSX.
+
+O scanner do Tailwind v4 lê os literais dos arquivos que ele varre, e **não
+segue import**. Ele varre a árvore de `apps/web`; um pacote fica de fora até ser
+declarado:
+
+```css
+@import "tailwindcss";
+@source "../../../../packages/ui/src";
+```
+
+O modo de falha é o pior possível: **sem erro de build, sem warning, sem nada em
+runtime.** As classes simplesmente não são geradas e a tela aparece sem estilo.
+
+Não "otimize" um `@source` fora porque o pacote não tem componente. `packages/utils`
+não tem JSX nenhum — só constantes `.ts` com nomes de classe, do tipo
+`"border-orange-300 bg-orange-50"` — e foi exatamente assim que quebrou: ficou
+fora do `@source`, os botões perderam a cor, e nenhum gate acusou.
 
 ## Comandos
 
