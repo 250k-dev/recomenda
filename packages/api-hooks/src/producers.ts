@@ -13,6 +13,9 @@ import {
   adjustProducerStock,
   createInvitation,
   revokeInvitation,
+  getInvitations,
+  resendInvitation,
+  deleteInvitation,
   getInvitationByToken,
   acceptInvitation,
 } from "@recomenda/api/producers";
@@ -106,6 +109,37 @@ export function useCreateInvitation() {
   return useMutation({
     mutationFn: createInvitation,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.producers });
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+    },
+  });
+}
+
+/** Convites de um tipo (a tela de Equipe usa `kind="CONSULTANT"`). */
+export function useInvitations(kind?: "PRODUCER" | "CONSULTANT", options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.invitations(kind),
+    queryFn: () => getInvitations(kind),
+    enabled: options?.enabled !== false,
+  });
+}
+
+export function useResendInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: resendInvitation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+    },
+  });
+}
+
+export function useDeleteInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteInvitation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.producers });
     },
   });

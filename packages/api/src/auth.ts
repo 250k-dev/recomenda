@@ -58,6 +58,21 @@ export async function updateProfile(updates: {
   return data;
 }
 
+/** Dispara o e-mail com o link de redefinição. Responde 200 mesmo para e-mail
+ *  sem conta — não dá para descobrir quem é cadastrado por aqui. */
+export async function forgotPassword(email: string) {
+  const { data } = await api.post<{ ok: true }>("/auth/forgot-password", { email });
+  return data;
+}
+
+export async function resetPassword(token: string, password: string) {
+  const { data } = await api.post<{ ok: true }>("/auth/reset-password", {
+    token,
+    password,
+  });
+  return data;
+}
+
 export async function changePassword(oldPassword: string, newPassword: string) {
   const { data } = await api.post("/auth/change-password", {
     old_password: oldPassword,

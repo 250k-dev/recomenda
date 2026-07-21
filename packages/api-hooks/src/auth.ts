@@ -6,6 +6,8 @@ import {
   getMe,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
   getPlanQuota,
   impersonateProducer,
   exitImpersonation,
@@ -32,6 +34,19 @@ export function useChangePassword() {
   return useMutation({
     mutationFn: (data: { oldPassword: string; newPassword: string }) =>
       changePassword(data.oldPassword, data.newPassword),
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (email: string) => forgotPassword(email),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (data: { token: string; password: string }) =>
+      resetPassword(data.token, data.password),
   });
 }
 

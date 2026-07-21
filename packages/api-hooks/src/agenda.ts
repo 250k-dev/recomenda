@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addDays,
   differenceInCalendarDays,
@@ -9,10 +9,17 @@ import {
   format,
   startOfMonth,
 } from "date-fns";
-import { getSeasons, getTimeline, type Recommendation } from "@recomenda/api/seasons";
+import {
+  applyRecommendation,
+  getSeasons,
+  getTimeline,
+  skipRecommendation,
+  type Recommendation,
+} from "@recomenda/api/seasons";
 import { recommendationWindowSpanDays } from "@recomenda/domain/timing/window-days";
 import { localYmdToDate } from "@recomenda/utils";
 import { queryKeys } from "./queryKeys";
+import { invalidateAfterRecommendationExecution } from "./seasons";
 
 const BATCH_SIZE = 10;
 const MAX_EVENTS = 500;
@@ -30,6 +37,8 @@ export type AgendaSeasonRow = {
 export type AgendaEvent = {
   id: string;
   ymd: string;
+  /** Id da recomendação (etapa) — permite registrar/pular direto da agenda. */
+  recommendationId: string;
   /** Dia único usado no mini calendário (um ponto por recomendação). */
   displayYmd: string;
   applicationTitle: string;
@@ -232,6 +241,7 @@ async function fetchAgendaEvents(
     }
 
     const baseEvent: Omit<AgendaEvent, "id" | "ymd"> = {
+      recommendationId: r.id,
       displayYmd,
       applicationTitle: recommendationTitle(r),
       farmName: season.farm_name?.trim() || "Fazenda",
@@ -319,4 +329,58 @@ export function useAgronomistAgenda(month: Date, producerId?: string) {
 export function weekDaysForAgenda(anchor: Date): Date[] {
   const start = addDays(anchor, -((anchor.getDay() + 6) % 7));
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+export type BulkRegisterInput = {
+  action: "apply" | "skip";
+  /** Data de execução (só usada em "apply"). */
+  date: string;
+  notes?: string;
+  items: Array<{ seasonId: string; recommendationId: string }>;
+};
+
+export type BulkRegisterResult = {
+  ok: number;
+  failed: number;
+  seasonIds: string[];
+};
+
+/**
+ * Registro em massa do cronograma: aplica (ou pula) várias etapas com uma data só.
+ * Não há endpoint batch no server — resolve item a item com `Promise.allSettled`,
+ * tolera falha parcial e invalida a agenda + as timelines das safras afetadas.
+ */
+export function useBulkRegisterRecommendations() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      action,
+      date,
+      notes,
+      items,
+    }: BulkRegisterInput): Promise<BulkRegisterResult> => {
+      const results = await Promise.allSettled(
+        items.map((it) =>
+          action === "apply"
+            ? applyRecommendation(it.recommendationId, {
+                executed_date: date,
+                notes,
+              })
+            : skipRecommendation(it.recommendationId, notes),
+        ),
+      );
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      return {
+        ok,
+        failed: results.length - ok,
+        seasonIds: [...new Set(items.map((it) => it.seasonId))],
+      };
+    },
+    onSuccess: ({ seasonIds }) => {
+      // Mesmo conjunto de caches do registro individual, por safra afetada.
+      for (const seasonId of seasonIds) {
+        invalidateAfterRecommendationExecution(queryClient, seasonId);
+      }
+    },
+  });
 }

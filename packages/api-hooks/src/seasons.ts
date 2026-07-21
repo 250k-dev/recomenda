@@ -37,6 +37,28 @@ function invalidatePurchaseListsAfterRecommendationChange(queryClient: QueryClie
   void queryClient.invalidateQueries({ queryKey: ["season-cost-plan"] });
 }
 
+/**
+ * Registrar / pular / reverter uma etapa mexe em muito mais que o status dela:
+ * o servidor **debita (ou estorna) estoque**, **reagenda as etapas PENDENTES
+ * seguintes** da safra e **cria notificação**. Sem tirar tudo isso do cache, a
+ * tela só corrige com F5. Usado por apply/skip/undo e pelo registro em massa.
+ */
+export function invalidateAfterRecommendationExecution(
+  queryClient: QueryClient,
+  seasonId: string,
+) {
+  // Lista de etapas da safra — as seguintes podem ter sido reagendadas.
+  void queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+  // Cronograma agregado: tela inicial e /cronograma (prefix = todos os produtores).
+  void queryClient.invalidateQueries({ queryKey: ["agronomist-agenda"] });
+  // "Histórico do talhão" mostra o status (Aplicado / Pulada) da etapa.
+  void queryClient.invalidateQueries({ queryKey: queryKeys.plotHistory(seasonId) });
+  // Aplicar debita estoque; reverter estorna (prefix = todos os produtores).
+  void queryClient.invalidateQueries({ queryKey: ["producer-stock"] });
+  // O servidor grava uma notificação para o agrônomo.
+  void queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+}
+
 export function useSeasons() {
   return useQuery({ queryKey: queryKeys.seasons, queryFn: getSeasons });
 }
@@ -142,7 +164,7 @@ export function useApplyRecommendation(seasonId: string) {
     mutationFn: ({ id, executed_date, notes }: { id: string; executed_date: string; notes?: string }) =>
       applyRecommendation(id, { executed_date, notes }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      invalidateAfterRecommendationExecution(queryClient, seasonId);
     },
   });
 }
@@ -153,7 +175,7 @@ export function useSkipRecommendation(seasonId: string) {
     mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
       skipRecommendation(id, notes),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      invalidateAfterRecommendationExecution(queryClient, seasonId);
     },
   });
 }
@@ -163,7 +185,7 @@ export function useUndoRecommendation(seasonId: string) {
   return useMutation({
     mutationFn: (id: string) => undoRecommendation(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      invalidateAfterRecommendationExecution(queryClient, seasonId);
     },
   });
 }

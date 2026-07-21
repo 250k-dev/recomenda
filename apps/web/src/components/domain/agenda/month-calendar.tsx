@@ -21,19 +21,31 @@ import {
   AlertTriangle,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ListChecks,
   Search,
+  SkipForward,
   Users,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Card, CardContent } from "@recomenda/ui/primitives/card";
 import { Input } from "@recomenda/ui/primitives/input";
+import { Label } from "@recomenda/ui/primitives/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@recomenda/ui/primitives/popover";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
-import { useAgronomistAgenda, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
+import { useAgronomistAgenda, useBulkRegisterRecommendations, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
+import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
+
+/** Chave estável de seleção (uma por recomendação, dedupe entre dias). */
+function eventSelectionKey(event: AgendaEvent): string {
+  return `${event.seasonId}:${event.recommendationId}`;
+}
 
 const MINI_WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -94,6 +106,55 @@ export function MonthCalendar({
   const [statusFilter, setStatusFilter] = useState<AgendaStatusFilter | null>(null);
   const didAutoFocus = useRef(false);
 
+  // Registro em massa: modo seleção + etapas escolhidas (por recomendação).
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Map<string, AgendaEvent>>(new Map());
+  const [bulkDate, setBulkDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const bulkMut = useBulkRegisterRecommendations();
+
+  const selectedKeys = useMemo(() => new Set(selected.keys()), [selected]);
+
+  const toggleSelected = (event: AgendaEvent) => {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      const key = eventSelectionKey(event);
+      if (next.has(key)) next.delete(key);
+      else next.set(key, event);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Map());
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelected(new Map());
+  };
+
+  const runBulk = (action: "apply" | "skip") => {
+    const items = [...selected.values()].map((event) => ({
+      seasonId: event.seasonId,
+      recommendationId: event.recommendationId,
+    }));
+    if (items.length === 0) return;
+    bulkMut.mutate(
+      { action, date: bulkDate, items },
+      {
+        onSuccess: ({ ok, failed }) => {
+          if (failed === 0) {
+            toast.success(
+              `${ok} ${ok === 1 ? "aplicação registrada" : "aplicações registradas"}.`,
+            );
+          } else {
+            toast.warning(`${ok} registradas · ${failed} falharam.`);
+          }
+          exitSelectionMode();
+        },
+        onError: () => toast.error("Não foi possível registrar as aplicações."),
+      },
+    );
+  };
+
   const { data: producersData } = useProducers();
   const producerOptions = useMemo(
     () =>
@@ -125,6 +186,8 @@ export function MonthCalendar({
     didAutoFocus.current = false;
     setPanelMode("day");
     setStatusFilter(null);
+    setSelectionMode(false);
+    setSelected(new Map());
   }, [producerId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -320,6 +383,28 @@ export function MonthCalendar({
                   if (mode === "day") setStatusFilter(null);
                 }}
               />
+              <button
+                type="button"
+                onClick={() =>
+                  selectionMode ? exitSelectionMode() : setSelectionMode(true)
+                }
+                aria-pressed={selectionMode}
+                className={cn(
+                  "flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                  selectionMode
+                    ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                    : "bg-primary/12 text-primary hover:bg-primary/18",
+                )}
+              >
+                {selectionMode ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <ListChecks className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {selectionMode ? "Cancelar" : "Selecionar"}
+                </span>
+              </button>
             </div>
           </div>
 
@@ -335,21 +420,86 @@ export function MonthCalendar({
               monthEvents.length === 0 ? (
                 <EmptyAgendaState message="Nenhuma aplicação pendente neste mês." />
               ) : (
-                <GroupedAgendaList events={monthEvents} todayYmd={todayYmd} variant="month" />
+                <GroupedAgendaList
+                  events={monthEvents}
+                  todayYmd={todayYmd}
+                  variant="month"
+                  selectable={selectionMode}
+                  selectedKeys={selectedKeys}
+                  onToggle={toggleSelected}
+                />
               )
             ) : panelMode === "filter" ? (
               <FilteredAgendaPanel
                 filter={statusFilter ?? "pending"}
                 events={filteredEvents}
                 todayYmd={todayYmd}
+                selectable={selectionMode}
+                selectedKeys={selectedKeys}
+                onToggle={toggleSelected}
               />
             ) : selectedEvents.length === 0 ? (
               <EmptyAgendaState message="Nenhuma aplicação pendente neste dia." />
             ) : (
-              <GroupedAgendaList events={selectedEvents} todayYmd={todayYmd} />
+              <GroupedAgendaList
+                events={selectedEvents}
+                todayYmd={todayYmd}
+                selectable={selectionMode}
+                selectedKeys={selectedKeys}
+                onToggle={toggleSelected}
+              />
             )}
           </CardContent>
         </Card>
+
+        {selectionMode && selected.size > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-card p-3 shadow-lg">
+            <span className="text-sm font-semibold text-foreground">
+              {selected.size}{" "}
+              {selected.size === 1
+                ? "aplicação selecionada"
+                : "aplicações selecionadas"}
+            </span>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground">Data</Label>
+              <Input
+                type="date"
+                value={bulkDate}
+                onChange={(e) => setBulkDate(e.target.value)}
+                className="h-9 w-40 bg-card"
+              />
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearSelection}
+                disabled={bulkMut.isPending}
+              >
+                Limpar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => runBulk("skip")}
+                disabled={bulkMut.isPending}
+                className="gap-1.5 bg-card text-muted-foreground"
+              >
+                <SkipForward className="h-3.5 w-3.5" />
+                Pular
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => runBulk("apply")}
+                disabled={bulkMut.isPending || !bulkDate}
+                className="gap-1.5"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {bulkMut.isPending ? "Registrando…" : "Marcar como aplicadas"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );
@@ -547,10 +697,16 @@ function GroupedAgendaList({
   events,
   todayYmd,
   variant = "day",
+  selectable = false,
+  selectedKeys,
+  onToggle,
 }: {
   events: AgendaEvent[];
   todayYmd: string;
   variant?: "day" | "month";
+  selectable?: boolean;
+  selectedKeys?: Set<string>;
+  onToggle?: (event: AgendaEvent) => void;
 }) {
   const groups = groupEventsByFarm(events);
 
@@ -582,7 +738,14 @@ function GroupedAgendaList({
             </div>
             <ul className="flex flex-col gap-2">
               {group.events.map((event) => (
-                <AgendaEventCard key={event.id} event={event} todayYmd={todayYmd} />
+                <AgendaEventCard
+                  key={event.id}
+                  event={event}
+                  todayYmd={todayYmd}
+                  selectable={selectable}
+                  selected={selectedKeys?.has(eventSelectionKey(event))}
+                  onToggle={onToggle ? () => onToggle(event) : undefined}
+                />
               ))}
             </ul>
           </section>
@@ -596,17 +759,31 @@ function FilteredAgendaPanel({
   filter,
   events,
   todayYmd,
+  selectable = false,
+  selectedKeys,
+  onToggle,
 }: {
   filter: AgendaStatusFilter;
   events: AgendaEvent[];
   todayYmd: string;
+  selectable?: boolean;
+  selectedKeys?: Set<string>;
+  onToggle?: (event: AgendaEvent) => void;
 }) {
   if (events.length === 0) {
     return <EmptyAgendaState message={STATUS_FILTER_META[filter].emptyMessage} />;
   }
 
   if (filter === "today") {
-    return <GroupedAgendaList events={events} todayYmd={todayYmd} />;
+    return (
+      <GroupedAgendaList
+        events={events}
+        todayYmd={todayYmd}
+        selectable={selectable}
+        selectedKeys={selectedKeys}
+        onToggle={onToggle}
+      />
+    );
   }
 
   const byDay = new Map<string, AgendaEvent[]>();
@@ -625,7 +802,13 @@ function FilteredAgendaPanel({
           <p className="mb-3 text-sm font-semibold capitalize text-muted-foreground">
             {format(localYmdToDate(ymd), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>
-          <GroupedAgendaList events={dayEvents} todayYmd={todayYmd} />
+          <GroupedAgendaList
+            events={dayEvents}
+            todayYmd={todayYmd}
+            selectable={selectable}
+            selectedKeys={selectedKeys}
+            onToggle={onToggle}
+          />
         </section>
       ))}
     </div>
@@ -826,43 +1009,99 @@ function getEventStatusPresentation(event: AgendaEvent, todayYmd: string) {
 function AgendaEventCard({
   event,
   todayYmd,
+  selectable = false,
+  selected = false,
+  onToggle,
 }: {
   event: AgendaEvent;
   todayYmd: string;
+  /** Modo seleção (registro em massa): o card não navega e vira alvo de seleção. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
 }) {
   const status = getEventStatusPresentation(event, todayYmd);
   const eventDate = format(localYmdToDate(event.ymd), "d MMM", { locale: ptBR });
 
-  return (
-    <li>
-      <Link
-        href={routes.safras.cronograma(event.seasonId)}
-        className="group flex items-center gap-3 rounded-xl border border-border/80 bg-card px-4 py-3.5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-      >
-        <span
-          className={cn("h-10 w-[3px] shrink-0 rounded-full", status.borderClass)}
-          aria-hidden
-        />
-        <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
-              {event.applicationTitle}
-            </p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              {event.plotName} · {eventDate}
-            </p>
-          </div>
+  const body = (
+    <>
+      <span
+        className={cn("h-10 w-[3px] shrink-0 rounded-full", status.borderClass)}
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
+          {event.applicationTitle}
+        </p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">
+          {event.plotName} · {eventDate}
+        </p>
+      </div>
+    </>
+  );
+
+  const statusBadge = (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold",
+        status.badgeClass,
+      )}
+    >
+      {status.showWarning ? <AlertTriangle className="h-3 w-3" /> : null}
+      {status.label}
+    </span>
+  );
+
+  if (selectable) {
+    return (
+      <li>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={selected}
+          className={cn(
+            "group flex w-full items-center gap-3 rounded-xl border bg-card px-4 py-3.5 text-left shadow-sm transition-all",
+            selected
+              ? "border-primary/50 ring-1 ring-primary/20"
+              : "border-border/80 hover:border-primary/30",
+          )}
+        >
           <span
             className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold",
-              status.badgeClass,
+              "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
+              selected
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card",
             )}
+            aria-hidden
           >
-            {status.showWarning ? <AlertTriangle className="h-3 w-3" /> : null}
-            {status.label}
+            {selected ? <Check className="h-3.5 w-3.5" /> : null}
           </span>
+          {body}
+          {statusBadge}
+        </button>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <div className="group flex items-center gap-3 rounded-xl border border-border/80 bg-card px-4 py-3.5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
+        <Link
+          href={routes.safras.cronograma(event.seasonId)}
+          className="flex min-w-0 flex-1 items-center gap-3"
+        >
+          {body}
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          {statusBadge}
+          <RecommendationRegisterPopover
+            seasonId={event.seasonId}
+            recommendationId={event.recommendationId}
+            title={event.applicationTitle}
+          />
         </div>
-      </Link>
+      </div>
     </li>
   );
 }

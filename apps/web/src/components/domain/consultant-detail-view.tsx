@@ -25,7 +25,7 @@ import {
   useConsultantActivity,
   useConsultantSummary,
   useConsultants,
-  useMemberProducerActions,
+  useSetMemberProducers,
   useShareableProducers,
   useRemoveConsultant,
 } from "@recomenda/api-hooks";
@@ -59,15 +59,16 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
   const { data: activity, isLoading: activityLoading } = useConsultantActivity(userId);
   const { data: shareable } = useShareableProducers(canManage);
   const { data: team } = useConsultants();
-  const { grant, revoke } = useMemberProducerActions(userId);
+  const setProducers = useSetMemberProducers(userId);
   const removeMutation = useRemoveConsultant();
 
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [producerFilter, setProducerFilter] = useState("");
-  const [togglingId, setTogglingId] = useState<string | null>(null);
+  /** Seleção em edição. `null` = intocada, espelhando o servidor. */
+  const [draft, setDraft] = useState<Set<string> | null>(null);
 
   const isManager = summary?.access_level === "MANAGER";
-  const roleLabel = isManager ? "Gestor" : "Consultor";
+  const roleLabel = isManager ? "Gestor" : "Operador";
 
   const sharedIds = useMemo(
     () => new Set((summary?.producers ?? []).map((p) => p.id)),
@@ -92,17 +93,44 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
     return (team.assistants ?? []).filter((a) => a.manager_user_id === userId);
   }, [isManager, team, userId]);
 
-  const toggleProducer = async (producerId: string) => {
-    if (!canManage || togglingId) return;
-    const on = sharedIds.has(producerId);
-    setTogglingId(producerId);
+  // O que está marcado na tela: o rascunho quando houve edição, senão o servidor.
+  const selecionados = draft ?? sharedIds;
+
+  const aIncluir = useMemo(
+    () => [...selecionados].filter((id) => !sharedIds.has(id)),
+    [selecionados, sharedIds],
+  );
+  const aRemover = useMemo(
+    () => [...sharedIds].filter((id) => !selecionados.has(id)),
+    [selecionados, sharedIds],
+  );
+  const temMudanca = aIncluir.length > 0 || aRemover.length > 0;
+
+  const toggleProducer = (producerId: string) => {
+    if (!canManage || setProducers.isPending) return;
+    setDraft((anterior) => {
+      const proximo = new Set(anterior ?? sharedIds);
+      if (proximo.has(producerId)) proximo.delete(producerId);
+      else proximo.add(producerId);
+      return proximo;
+    });
+  };
+
+  const salvarCompartilhamento = async () => {
     try {
-      if (on) await revoke.mutateAsync(producerId);
-      else await grant.mutateAsync(producerId);
+      const res = await setProducers.mutateAsync({ add: aIncluir, remove: aRemover });
+      setDraft(null);
+      toast.success(
+        [
+          res.added > 0 ? `${res.added} produtor(es) liberado(s)` : "",
+          res.removed > 0 ? `${res.removed} removido(s)` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ") || "Compartilhamento atualizado.",
+      );
     } catch (e) {
+      // O rascunho fica de pé: a pessoa não perde a seleção e pode tentar de novo.
       toast.error(apiErrorMessage(e, "Não foi possível atualizar o compartilhamento."));
-    } finally {
-      setTogglingId(null);
     }
   };
 
@@ -138,7 +166,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
   }
 
   const initial = (summary.name ?? "?").trim().charAt(0).toUpperCase();
-  const selectedCount = sharedIds.size;
+  const selectedCount = selecionados.size;
   const totalCount = allProducers.length;
 
   return (
@@ -186,7 +214,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
             ? [{ label: "Desde", value: fmtDate(summary.created_at) }]
             : []),
           ...(isManager
-            ? [{ label: "Consultores", value: summary.assistant_count ?? 0 }]
+            ? [{ label: "Operadores", value: summary.assistant_count ?? 0 }]
             : []),
           { label: "Produtores", value: summary.producers.length },
           { label: "Ações · 30 dias", value: summary.activity_count_30d },
@@ -201,7 +229,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
         <div className="flex gap-3 rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-5 py-4">
           <Info className="mt-0.5 size-5 shrink-0 text-[#1E6B4A]" />
           <p className="text-sm text-[#2B2723]">
-            Consultores têm acesso somente-leitura: veem os produtores e fazendas
+            Operadores têm acesso somente-leitura: veem os produtores e fazendas
             compartilhados e podem apenas registrar aplicações das recomendações (e trocar
             produto/dose na etapa).
           </p>
@@ -214,7 +242,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
             <Users className="size-5 text-[#1E6B4A]" />
             <div>
               <h2 className="text-base font-extrabold text-[#2B2723]">
-                Consultores deste gestor
+                Operadores deste gestor
               </h2>
               <p className="text-xs text-[#8A857D]">
                 Criados e gerenciados por {(summary.name ?? "").split(" ")[0] || "este gestor"}.
@@ -230,7 +258,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[#2B2723]">
-                      {a.name ?? "Consultor"}
+                      {a.name ?? "Operador"}
                     </p>
                     <p className="truncate text-xs text-[#8A857D]">{a.email ?? "—"}</p>
                   </div>
@@ -251,6 +279,17 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
               </h2>
               <p className="text-xs text-[#8A857D]">
                 {selectedCount} de {totalCount} selecionados
+                {temMudanca ? (
+                  <span className="ml-1.5 font-semibold text-[#7A6B3F]">
+                    ·{" "}
+                    {[
+                      aIncluir.length > 0 ? `${aIncluir.length} a liberar` : "",
+                      aRemover.length > 0 ? `${aRemover.length} a remover` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" e ")}
+                  </span>
+                ) : null}
               </p>
             </div>
             <div className="relative w-full max-w-[260px]">
@@ -270,8 +309,8 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
           ) : (
             <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
               {filteredProducers.map((p) => {
-                const on = sharedIds.has(p.id);
-                const busy = togglingId === p.id;
+                const on = selecionados.has(p.id);
+                const alterado = on !== sharedIds.has(p.id);
                 return (
                   <li key={p.id}>
                     <div
@@ -280,11 +319,13 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
                         on
                           ? "border-[#BFD7C8] bg-[#F2F7F3]"
                           : "border-transparent bg-[#F7F5F1]",
+                        // Contorno âmbar no que ainda não foi salvo.
+                        alterado && "border-[#D9C48A] bg-[#FBF7EC]",
                       )}
                     >
                       <button
                         type="button"
-                        disabled={busy || grant.isPending || revoke.isPending}
+                        disabled={setProducers.isPending}
                         onClick={() => toggleProducer(p.id)}
                         className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-90"
                       >
@@ -294,11 +335,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
                             on ? "border-[#1E6B4A] bg-[#1E6B4A]" : "border-[#C9C4BB] bg-white",
                           )}
                         >
-                          {busy ? (
-                            <Loader2 className="size-3 animate-spin text-white" />
-                          ) : on ? (
-                            <Check className="size-3 text-white" strokeWidth={3} />
-                          ) : null}
+                          {on ? <Check className="size-3 text-white" strokeWidth={3} /> : null}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#2B2723]">
                           {p.name}
@@ -318,6 +355,29 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
               })}
             </ul>
           )}
+          {temMudanca ? (
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-[#F1EEE8] pt-4">
+              <p className="mr-auto text-xs text-[#8A857D]">
+                Alterações ainda não aplicadas.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setDraft(null)}
+                disabled={setProducers.isPending}
+              >
+                Descartar
+              </Button>
+              <Button onClick={salvarCompartilhamento} disabled={setProducers.isPending}>
+                {setProducers.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> Salvando…
+                  </>
+                ) : (
+                  "Confirmar alterações"
+                )}
+              </Button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -378,7 +438,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
         title={`Remover ${roleLabel.toLowerCase()}?`}
         description={
           summary.name
-            ? `${summary.name} perderá o acesso e o login será desativado.`
+            ? `${summary.name} será removido definitivamente. O acesso acaba e o e-mail fica livre para um novo convite.`
             : undefined
         }
         tone="destructive"

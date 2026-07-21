@@ -59,7 +59,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
       : role === "STAFF"
         ? accessLevel === "MANAGER"
           ? "Gestor"
-          : "Consultor"
+          : "Operador"
         : "Agronomista";
 
   const profileName =

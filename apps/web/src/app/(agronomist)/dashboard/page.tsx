@@ -10,6 +10,7 @@ import {
   Users,
   Leaf,
   CalendarDays,
+  ChevronRight,
   Plus,
   ArrowRight,
   Sparkles,
@@ -26,9 +27,8 @@ import {
 } from "@recomenda/ui/primitives/tooltip";
 import { RailCard, RailRow } from "@/components/domain/rail-card";
 import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
-import { StatusBadge } from "@/components/domain/status-badge";
+import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
-import { Button } from "@recomenda/ui/primitives/button";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { CompactListSkeleton } from "@/components/domain/page-skeletons";
@@ -44,6 +44,57 @@ import { useAgronomistAgenda, type AgendaEvent } from "@recomenda/api-hooks/agen
 import { cn } from "@recomenda/utils";
 
 type AttentionTab = "late" | "today" | "pending" | "week";
+
+const DOT_PENDING_CLASS = "bg-muted-foreground/35";
+
+/**
+ * Modelo limpo da lista "Precisa de atenção": o ponto colorido carrega o status
+ * (sem pill) e a coluna de tempo mostra só o prazo. Vermelho = atrasada,
+ * âmbar = na janela/hoje, cinza = pendente/futura.
+ */
+function attentionRowPresentation(event: AgendaEvent): {
+  dotClass: string;
+  timeLabel: string;
+  timeClass: string;
+} {
+  // Dessecação é sempre manual — a agenda já troca o rótulo e não conta atraso.
+  if (event.pillLabel === "Manual") {
+    return {
+      dotClass: DOT_PENDING_CLASS,
+      timeLabel: "Manual",
+      timeClass: "text-muted-foreground",
+    };
+  }
+  if (event.isLate) {
+    return {
+      dotClass: "bg-danger",
+      // "Atraso 46 dias" → "46 dias": o ponto vermelho já diz que atrasou.
+      timeLabel: event.pillLabel.replace(/^Atraso\s+/, ""),
+      timeClass: "text-danger-strong",
+    };
+  }
+  if (event.pillLabel === "Hoje" || event.pillLabel === "Na janela") {
+    return {
+      dotClass: "bg-warning",
+      timeLabel: event.pillLabel,
+      timeClass: "text-foreground",
+    };
+  }
+  return {
+    dotClass: DOT_PENDING_CLASS,
+    timeLabel: event.pillLabel,
+    timeClass: "text-muted-foreground",
+  };
+}
+
+function LegendDot({ dotClass, label }: { dotClass: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn("size-2 shrink-0 rounded-full", dotClass)} />
+      {label}
+    </span>
+  );
+}
 
 /** Atalho de funcionalidade em formato de card clicável (variante `accent` em terracota). */
 function ShortcutCard({
@@ -213,7 +264,7 @@ export default function DashboardPage() {
             href={routes.equipe.lista}
             icon={UserCog}
             title="Equipe"
-            sub="Consultores da conta"
+            sub="Gestores e operadores"
           />
         ) : null}
         {canCreateProducer ? (
@@ -320,39 +371,59 @@ export default function DashboardPage() {
             />
           ) : (
             <div>
-              {list.slice(0, 6).map((ev) => (
-                <div
-                  key={ev.id}
-                  className="flex items-center gap-3.5 border-t border-border px-5 py-3.5 first:border-t-0"
-                >
-                  <span
-                    className={
-                      "size-2.5 shrink-0 rounded-full " +
-                      (ev.isLate ? "bg-danger" : "bg-warning")
-                    }
+              {list.slice(0, 6).map((ev) => {
+                const row = attentionRowPresentation(ev);
+                return (
+                  <div
+                    key={ev.id}
+                    className="flex items-center gap-3.5 border-t border-border px-5 py-3.5 first:border-t-0"
+                  >
+                    <span
+                      className={cn(
+                        "size-2.5 shrink-0 rounded-full",
+                        row.dotClass,
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <b className="text-[0.95rem] font-semibold text-text-strong">
+                        {ev.applicationTitle}
+                      </b>
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {ev.farmName} · {ev.plotName} · {ev.producerName}
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "hidden shrink-0 text-sm font-semibold tabular-nums sm:block",
+                        row.timeClass,
+                      )}
+                    >
+                      {row.timeLabel}
+                    </div>
+                    <RecommendationRegisterPopover
+                      seasonId={ev.seasonId}
+                      recommendationId={ev.recommendationId}
+                      title={ev.applicationTitle}
+                    />
+                    <Link
+                      href={routes.safras.cronograma(ev.seasonId)}
+                      aria-label={`Abrir ${ev.applicationTitle}`}
+                      className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+                    >
+                      <ChevronRight className="size-4" />
+                    </Link>
+                  </div>
+                );
+              })}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3.5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  <LegendDot dotClass="bg-danger" label="Atrasada" />
+                  <LegendDot dotClass="bg-warning" label="Na janela / hoje" />
+                  <LegendDot
+                    dotClass={DOT_PENDING_CLASS}
+                    label="Pendente / futura"
                   />
-                  <div className="flex-1 min-w-0">
-                    <b className="text-[0.95rem] font-semibold text-text-strong">
-                      {ev.applicationTitle}
-                    </b>
-                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {ev.farmName} · {ev.plotName} · {ev.producerName}
-                    </div>
-                  </div>
-                  <div className="hidden text-right sm:block">
-                    <StatusBadge tone={ev.isLate ? "danger" : "warning"}>
-                      {ev.isLate ? "Atrasada" : "Na janela"}
-                    </StatusBadge>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {ev.pillLabel}
-                    </div>
-                  </div>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={routes.safras.cronograma(ev.seasonId)}>Abrir</Link>
-                  </Button>
                 </div>
-              ))}
-              <div className="flex items-center justify-center border-t border-border px-5 py-3.5">
                 <Link
                   href="/cronograma"
                   className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-strong hover:underline"

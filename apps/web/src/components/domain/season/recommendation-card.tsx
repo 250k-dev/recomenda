@@ -47,6 +47,7 @@ import {
   recommendationToStageDraft,
   type RecommendationStageDraft,
 } from "@/components/domain/recommendation-stage-fields";
+import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import {
   recommendedYmdToWindow,
   todayLocalYmd,
@@ -882,6 +883,18 @@ export function RecommendationCard({
               originalDate={rec.predicted_date_original}
               tone="primary"
             />
+          ) : null}
+          {isPending ? (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <RecommendationRegisterPopover
+                seasonId={seasonId}
+                recommendationId={rec.id}
+                title={rec.name}
+              />
+            </div>
           ) : null}
           <span
             aria-hidden="true"

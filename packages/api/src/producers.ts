@@ -79,6 +79,8 @@ export interface Invitation {
   id: string;
   link: string;
   token: string;
+  /** false quando o convite foi criado sem e-mail — só resta copiar o link. */
+  email_sent: boolean;
 }
 
 export async function getProducers() {
@@ -152,6 +154,8 @@ export async function createInvitation(payload: {
   access_level?: "MANAGER" | "ASSISTANT";
   /** Só para ASSISTANT criado pelo agrônomo: vínculo sob um gestor (null = direto). */
   manager_user_id?: string | null;
+  /** Produtores liberados assim que o convite de equipe for aceito. */
+  producer_ids?: string[];
 }) {
   const { data } = await api.post<Invitation>("/invitations", payload);
   return data;
@@ -159,5 +163,39 @@ export async function createInvitation(payload: {
 
 export async function revokeInvitation(id: string) {
   const { data } = await api.post(`/invitations/${id}/revoke`);
+  return data;
+}
+
+/** Convite como aparece na listagem (o de equipe alimenta a tela de Equipe). */
+export interface InvitationRow {
+  id: string;
+  email?: string | null;
+  token: string;
+  kind: "PRODUCER" | "CONSULTANT";
+  status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+  access_level?: "MANAGER" | "ASSISTANT" | null;
+  manager_user_id?: string | null;
+  farm_ids: string[];
+  expires_at: string;
+  created_at: string;
+}
+
+export async function getInvitations(kind?: "PRODUCER" | "CONSULTANT") {
+  const { data } = await api.get<{ data: InvitationRow[] }>("/invitations", {
+    params: kind ? { kind } : undefined,
+  });
+  return data.data;
+}
+
+export async function resendInvitation(id: string) {
+  const { data } = await api.post<{ ok: true; email_sent: boolean }>(
+    `/invitations/${id}/resend`,
+  );
+  return data;
+}
+
+/** Exclui de vez — só funciona em convite não aceito. */
+export async function deleteInvitation(id: string) {
+  const { data } = await api.delete<{ ok: true }>(`/invitations/${id}`);
   return data;
 }

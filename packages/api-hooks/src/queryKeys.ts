@@ -40,6 +40,7 @@ export const queryKeys = {
   adminAgronomistDetail: (id: string) => ["admin-agronomist-detail", id] as const,
   adminProducers: ["admin-producers"],
   invitationToken: (token: string) => ["invitation-token", token],
+  invitations: (kind?: string) => ["invitations", kind ?? "all"] as const,
   comparativeReport: ["comparative-report"],
   producerPurchaseLists: (producerId: string) => ["producer-purchase-lists", producerId] as const,
   farmPurchaseLists: (farmId: string) => ["farm-purchase-lists", farmId] as const,

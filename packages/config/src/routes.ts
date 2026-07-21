@@ -60,7 +60,8 @@ export const routes = {
   login: (opts?: { force?: boolean }) =>
     withQuery("/login", opts?.force ? { force: "1" } : undefined),
   esqueciSenha: "/esqueci-senha" satisfies Route,
-  redefinirSenha: "/redefinir-senha" satisfies Route,
+  /** Destino do link enviado por e-mail; o token vem no caminho, nunca na query. */
+  redefinirSenha: (token: string) => dynamicRoute(`/redefinir-senha/${token}`),
   convite: (token: string) => dynamicRoute(`/convite/${token}`),
   /** Beco informativo para contas de produtor (sem acesso ao painel web). */
   acessoProdutor: "/acesso-produtor" satisfies Route,

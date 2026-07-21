@@ -119,7 +119,7 @@ export default function AdminAgronomistDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Dados do consultor</CardTitle>
+          <CardTitle>Dados do agrônomo</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex justify-between gap-4">

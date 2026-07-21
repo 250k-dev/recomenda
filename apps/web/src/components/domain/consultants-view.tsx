@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ChevronRight, Copy, UserPlus, Users } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  Copy,
+  MailWarning,
+  Send,
+  Trash2,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
@@ -16,22 +25,36 @@ import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
 import { PageHero } from "@/components/domain/page-hero";
-import { useConsultants, useCreateInvitation, useMe } from "@recomenda/api-hooks";
+import {
+  useConsultants,
+  useCreateInvitation,
+  useDeleteInvitation,
+  useInvitations,
+  useMe,
+  useResendInvitation,
+  useShareableProducers,
+} from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import type { TeamMemberRow } from "@recomenda/api/consultants";
+import type { InvitationRow } from "@recomenda/api/producers";
 import type { AccessLevel } from "@recomenda/api/auth-types";
 
 export function ConsultantsView() {
   const { data: team, isLoading } = useConsultants();
   const canManage = useCan("TEAM_MANAGE");
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Só quem gerencia equipe pode listar convites — sem isso a chamada volta 403.
+  const { data: invitations } = useInvitations("CONSULTANT", { enabled: canManage });
 
   const managers = team?.managers ?? [];
   const assistants = team?.assistants ?? [];
-  const empty = !isLoading && managers.length === 0 && assistants.length === 0;
+  // Aceito virou membro e já aparece nos cards; revogado é ruído.
+  const pending = (invitations ?? []).filter((i) => i.status !== "ACCEPTED" && i.status !== "REVOKED");
+  const empty =
+    !isLoading && managers.length === 0 && assistants.length === 0 && pending.length === 0;
 
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-8">
@@ -50,7 +73,10 @@ export function ConsultantsView() {
         }
         stats={[
           { label: "Gestores", value: isLoading ? "…" : managers.length },
-          { label: "Consultores", value: isLoading ? "…" : assistants.length },
+          { label: "Operadores", value: isLoading ? "…" : assistants.length },
+          ...(pending.length > 0
+            ? [{ label: "Convites pendentes", value: pending.length }]
+            : []),
         ]}
       />
 
@@ -59,7 +85,7 @@ export function ConsultantsView() {
       ) : empty ? (
         <EmptyState
           title="Nenhum membro na equipe ainda."
-          description="Convide um gestor ou consultor e compartilhe os produtores que ele deve acompanhar."
+          description="Convide um gestor ou operador e compartilhe os produtores que ele deve acompanhar."
         />
       ) : (
         <div className="flex flex-col gap-10">
@@ -72,16 +98,19 @@ export function ConsultantsView() {
             />
           ) : null}
           <TeamSection
-            title="Consultores"
+            title="Operadores"
             microcopy="visualizam produtores compartilhados e registram aplicações"
             members={assistants}
             variant="assistant"
             emptyLabel={
               managers.length > 0
-                ? "Nenhum consultor ainda. Convide um ou peça a um gestor para criar."
+                ? "Nenhum operador ainda. Convide um ou peça a um gestor para criar."
                 : undefined
             }
           />
+          {canManage && pending.length > 0 ? (
+            <PendingInvitationsSection invitations={pending} />
+          ) : null}
         </div>
       )}
 
@@ -94,6 +123,155 @@ export function ConsultantsView() {
       ) : null}
     </div>
   );
+}
+
+/**
+ * Convites de equipe ainda não aceitos. Existe porque, sem essa lista, convite
+ * repetido para o mesmo e-mail se acumula invisível — e o agrônomo só descobre
+ * quando o convidado esbarra em "já existe uma conta com este e-mail".
+ */
+function PendingInvitationsSection({ invitations }: { invitations: InvitationRow[] }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-extrabold text-[#2B2723]">
+          Convites pendentes{" "}
+          <span className="font-semibold text-[#8A857D]">({invitations.length})</span>
+        </h2>
+        <p className="text-sm text-[#8A857D]">
+          · enviados por e-mail, aguardando o convidado criar a senha
+        </p>
+      </div>
+      <ul className="flex flex-col gap-3">
+        {invitations.map((invitation) => (
+          <li key={invitation.id}>
+            <PendingInvitationCard invitation={invitation} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PendingInvitationCard({ invitation }: { invitation: InvitationRow }) {
+  const resend = useResendInvitation();
+  const remove = useDeleteInvitation();
+  const [copied, setCopied] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  const papel = invitation.access_level === "ASSISTANT" ? "Operador" : "Gestor";
+  const expirado =
+    invitation.status === "EXPIRED" || new Date(invitation.expires_at) < new Date();
+  const link = `${typeof window === "undefined" ? "" : window.location.origin}${routes.convite(invitation.token)}`;
+
+  const copiar = async () => {
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const reenviar = async () => {
+    try {
+      const res = await resend.mutateAsync(invitation.id);
+      toast.success(
+        res.email_sent
+          ? `Convite reenviado para ${invitation.email}.`
+          : "Convite renovado. Sem e-mail cadastrado — envie o link.",
+      );
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Não foi possível reenviar o convite."));
+    }
+  };
+
+  const excluir = async () => {
+    try {
+      await remove.mutateAsync(invitation.id);
+      toast.success("Convite excluído.");
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Não foi possível excluir o convite."));
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-[#EDE7DC] bg-white px-[22px] py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#F3EEDD] text-[#7A6B3F]">
+          <MailWarning className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-[15px] font-bold text-[#2B2723]">
+              {invitation.email ?? "Sem e-mail (só link)"}
+            </p>
+            <span className="rounded-full bg-[#E4EEE7] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1E6B4A]">
+              {papel}
+            </span>
+            {expirado ? (
+              <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-danger-strong">
+                Expirado
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[13px] text-[#8A857D]">
+            {expirado
+              ? "O link não funciona mais. Reenvie para renovar por mais 14 dias."
+              : `Válido até ${formatarData(invitation.expires_at)}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={copiar} className="gap-1.5">
+          {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
+          Link
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={reenviar}
+          disabled={resend.isPending || !invitation.email}
+          className="gap-1.5"
+          title={invitation.email ? undefined : "Convite sem e-mail cadastrado"}
+        >
+          <Send className="size-4" />
+          {resend.isPending ? "Enviando…" : "Reenviar"}
+        </Button>
+        {confirming ? (
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={excluir}
+              disabled={remove.isPending}
+            >
+              {remove.isPending ? "Excluindo…" : "Confirmar"}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setConfirming(true)}
+            className="gap-1.5 text-danger-strong hover:bg-danger-soft"
+          >
+            <Trash2 className="size-4" />
+            Excluir
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatarData(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function TeamSection({
@@ -162,7 +340,7 @@ function MemberCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-[17px] font-bold text-[#2B2723]">
-              {member.name ?? (isManager ? "Gestor" : "Consultor")}
+              {member.name ?? (isManager ? "Gestor" : "Operador")}
             </p>
             {isManager ? (
               <span className="rounded-full bg-[#E4EEE7] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1E6B4A]">
@@ -183,7 +361,7 @@ function MemberCard({
         {isManager ? (
           <p>
             <strong className="text-[#2B2723]">{member.assistant_count}</strong>{" "}
-            {member.assistant_count === 1 ? "consultor" : "consultores"}
+            {member.assistant_count === 1 ? "operador" : "operadores"}
             {" · "}
             <strong className="text-[#2B2723]">{member.producer_count}</strong>{" "}
             {member.producer_count === 1 ? "produtor" : "produtores"}
@@ -243,7 +421,12 @@ function InviteTeamDialog({
   const [role, setRole] = useState<AccessLevel>("MANAGER");
   const [vinculo, setVinculo] = useState<"direto" | string>("direto");
   const [link, setLink] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [producerIds, setProducerIds] = useState<string[]>([]);
+  const [producerFilter, setProducerFilter] = useState("");
+  // Só produtores ativos — o backend já filtra desativados.
+  const { data: shareableProducers } = useShareableProducers(open);
 
   const emailValid = /.+@.+\..+/.test(email.trim());
   const effectiveRole: AccessLevel = isStaffManager ? "ASSISTANT" : role;
@@ -256,6 +439,9 @@ function InviteTeamDialog({
       setRole(isStaffManager ? "ASSISTANT" : "MANAGER");
       setVinculo("direto");
       setLink(null);
+      setSentTo(null);
+      setProducerIds([]);
+      setProducerFilter("");
     }
   }
 
@@ -266,6 +452,7 @@ function InviteTeamDialog({
         kind: "CONSULTANT",
         access_level: effectiveRole,
         farm_ids: [],
+        producer_ids: producerIds,
       };
       if (effectiveRole === "ASSISTANT" && !isStaffManager) {
         payload.manager_user_id = vinculo === "direto" ? null : vinculo;
@@ -273,7 +460,16 @@ function InviteTeamDialog({
       const res = await createInvitation.mutateAsync(payload);
       const full = `${window.location.origin}${routes.convite(res.token)}`;
       setLink(full);
-      toast.success("Convite criado. Envie o link ao membro.");
+      if (res.email_sent) {
+        setSentTo(payload.email ?? null);
+        toast.success(
+          producerIds.length > 0
+            ? `Convite enviado para ${payload.email} com ${producerIds.length} produtor(es).`
+            : `Convite enviado para ${payload.email}.`,
+        );
+      } else {
+        toast.success("Convite criado. Envie o link ao membro.");
+      }
     } catch (e) {
       toast.error(apiErrorMessage(e, "Não foi possível criar o convite."));
     }
@@ -292,19 +488,26 @@ function InviteTeamDialog({
         <DialogHeader className="px-7 pt-7">
           <DialogTitle className="text-[21px] font-extrabold">Convidar para a equipe</DialogTitle>
           <DialogDescription>
-            Escolha o papel e envie o convite por e-mail. O compartilhamento de produtores é
-            feito depois, no detalhe do membro.
+            Escolha o papel, os produtores que ele vai acompanhar e envie o convite por
+            e-mail.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-5 px-7 py-5">
           {link ? (
-            <div className="flex flex-col gap-2">
-              <Label>Link de convite</Label>
-              <div className="flex gap-2">
-                <Input readOnly value={link} className="font-mono text-xs" />
-                <Button variant="outline" size="icon" onClick={copy} title="Copiar">
-                  {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
-                </Button>
+            <div className="flex flex-col gap-3">
+              {sentTo ? (
+                <div className="rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-4 py-3 text-sm text-[#2B2723]">
+                  Convite enviado para <strong>{sentTo}</strong>. O link vale por 14 dias.
+                </div>
+              ) : null}
+              <div className="flex flex-col gap-2">
+                <Label>{sentTo ? "Ou envie o link direto" : "Link de convite"}</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={link} className="font-mono text-xs" />
+                  <Button variant="outline" size="icon" onClick={copy} title="Copiar">
+                    {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
@@ -314,19 +517,19 @@ function InviteTeamDialog({
                   <RoleCard
                     selected={effectiveRole === "MANAGER"}
                     title="Gestor"
-                    description="Cria e gerencia produtores, fazendas, listas e recomendações. Pode convidar consultores."
+                    description="Cria e gerencia produtores, fazendas, listas e recomendações. Pode convidar operadores."
                     onClick={() => setRole("MANAGER")}
                   />
                   <RoleCard
                     selected={effectiveRole === "ASSISTANT"}
-                    title="Consultor"
+                    title="Operador"
                     description="Visualiza produtores compartilhados e registra aplicações das recomendações."
                     onClick={() => setRole("ASSISTANT")}
                   />
                 </div>
               ) : (
                 <div className="rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-4 py-3 text-sm text-[#2B2723]">
-                  Você está convidando um <strong>Consultor</strong>, que ficará vinculado a você.
+                  Você está convidando um <strong>Operador</strong>, que ficará vinculado a você.
                 </div>
               )}
 
@@ -363,6 +566,19 @@ function InviteTeamDialog({
                 </div>
               ) : null}
 
+              <ProducerPicker
+                producers={shareableProducers ?? []}
+                selected={producerIds}
+                onToggle={(id) =>
+                  setProducerIds((prev) =>
+                    prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
+                  )
+                }
+                onToggleAll={(ids) => setProducerIds(ids)}
+                filter={producerFilter}
+                onFilterChange={setProducerFilter}
+              />
+
               <div className="flex justify-end gap-2 pt-1">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>
                   Cancelar
@@ -380,6 +596,107 @@ function InviteTeamDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Escolha de produtores dentro do convite. Antes só dava para compartilhar
+ * depois do aceite, na tela do membro — quem convidava precisava lembrar de
+ * voltar lá, e o convidado entrava sem enxergar nada.
+ */
+function ProducerPicker({
+  producers,
+  selected,
+  onToggle,
+  onToggleAll,
+  filter,
+  onFilterChange,
+}: {
+  producers: { id: string; name: string }[];
+  selected: string[];
+  onToggle: (id: string) => void;
+  onToggleAll: (ids: string[]) => void;
+  filter: string;
+  onFilterChange: (value: string) => void;
+}) {
+  if (producers.length === 0) {
+    return (
+      <div className="space-y-2">
+        <Label>Produtores</Label>
+        <p className="rounded-xl border border-[#EDE7DC] bg-[#FAF8F4] px-4 py-3 text-sm text-[#8A857D]">
+          Nenhum produtor ativo para compartilhar. Você pode liberar depois, na tela do
+          membro.
+        </p>
+      </div>
+    );
+  }
+
+  const termo = filter.trim().toLowerCase();
+  const visiveis = termo
+    ? producers.filter((p) => p.name.toLowerCase().includes(termo))
+    : producers;
+  const todosMarcados = selected.length === producers.length;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>
+          Produtores{" "}
+          <span className="font-normal text-[#8A857D]">
+            ({selected.length} de {producers.length})
+          </span>
+        </Label>
+        <button
+          type="button"
+          className="text-[13px] font-semibold text-[#1E6B4A] hover:underline"
+          onClick={() => onToggleAll(todosMarcados ? [] : producers.map((p) => p.id))}
+        >
+          {todosMarcados ? "Limpar" : "Selecionar todos"}
+        </button>
+      </div>
+      {producers.length > 6 ? (
+        <Input
+          value={filter}
+          onChange={(e) => onFilterChange(e.target.value)}
+          placeholder="Buscar produtor…"
+          className="rounded-xl"
+        />
+      ) : null}
+      <ul className="max-h-[184px] overflow-y-auto rounded-xl border border-[#EDE7DC] bg-white">
+        {visiveis.length === 0 ? (
+          <li className="px-4 py-3 text-sm text-[#8A857D]">Nenhum produtor com esse nome.</li>
+        ) : (
+          visiveis.map((p) => {
+            const marcado = selected.includes(p.id);
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  onClick={() => onToggle(p.id)}
+                  aria-pressed={marcado}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-[#F7F5F1]"
+                >
+                  <span
+                    className={cn(
+                      "grid size-5 shrink-0 place-items-center rounded-md border transition",
+                      marcado
+                        ? "border-[#1E6B4A] bg-[#1E6B4A] text-white"
+                        : "border-[#D5CFC5] bg-white",
+                    )}
+                  >
+                    {marcado ? <Check className="size-3.5" /> : null}
+                  </span>
+                  <span className="truncate text-sm text-[#2B2723]">{p.name}</span>
+                </button>
+              </li>
+            );
+          })
+        )}
+      </ul>
+      <p className="text-[13px] text-[#8A857D]">
+        Liberados assim que o convite for aceito. Dá para ajustar depois na tela do membro.
+      </p>
+    </div>
   );
 }
 

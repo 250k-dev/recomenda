@@ -37,7 +37,7 @@ function invitationRoleLabel(
   accessLevel?: InvitationPreview["access_level"],
 ): string {
   if (kind === "CONSULTANT") {
-    return accessLevel === "ASSISTANT" ? "consultor" : "gestor";
+    return accessLevel === "ASSISTANT" ? "operador" : "gestor";
   }
   return "produtor";
 }

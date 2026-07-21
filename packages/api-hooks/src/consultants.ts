@@ -45,23 +45,31 @@ export function useConsultantActivity(userId: string, enabled = true) {
   });
 }
 
-export function useMemberProducerActions(userId: string) {
+/**
+ * Aplica de uma vez as inclusões e exclusões escolhidas na tela. Existe para o
+ * botão de confirmar: um clique por produtor disparava uma chamada e quatro
+ * invalidações de cache cada, e o acesso ia sendo liberado enquanto a pessoa
+ * ainda estava decidindo.
+ */
+export function useSetMemberProducers(userId: string) {
   const queryClient = useQueryClient();
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: teamKey });
-    queryClient.invalidateQueries({ queryKey: memberProducersKey(userId) });
-    queryClient.invalidateQueries({ queryKey: consultantSummaryKey(userId) });
-    queryClient.invalidateQueries({ queryKey: shareableProducersKey });
-  };
-  const grant = useMutation({
-    mutationFn: (producerId: string) => grantMemberProducer(userId, producerId),
-    onSuccess: invalidate,
+  return useMutation({
+    mutationFn: async ({ add, remove }: { add: string[]; remove: string[] }) => {
+      for (const producerId of add) {
+        await grantMemberProducer(userId, producerId);
+      }
+      for (const producerId of remove) {
+        await revokeMemberProducer(userId, producerId);
+      }
+      return { added: add.length, removed: remove.length };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: teamKey });
+      queryClient.invalidateQueries({ queryKey: memberProducersKey(userId) });
+      queryClient.invalidateQueries({ queryKey: consultantSummaryKey(userId) });
+      queryClient.invalidateQueries({ queryKey: shareableProducersKey });
+    },
   });
-  const revoke = useMutation({
-    mutationFn: (producerId: string) => revokeMemberProducer(userId, producerId),
-    onSuccess: invalidate,
-  });
-  return { grant, revoke };
 }
 
 export function useRemoveConsultant() {
