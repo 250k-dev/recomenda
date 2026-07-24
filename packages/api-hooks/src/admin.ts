@@ -10,6 +10,8 @@ import {
   getAdminProducers,
   patchAdminProducer,
   deleteAdminProducer,
+  getAdminTeamMembers,
+  promoteAdminTeamMember,
   getPlans,
   createAdminPlan,
   updateAdminPlan,
@@ -134,6 +136,26 @@ export function useDeleteAdminProducer() {
     mutationFn: deleteAdminProducer,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminProducers });
+    },
+  });
+}
+
+export function useAdminTeamMembers(filters?: { agronomist_id?: string; temporary?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.adminTeamMembers(filters),
+    queryFn: () => getAdminTeamMembers(filters),
+  });
+}
+
+export function usePromoteAdminTeamMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; planId: string }) =>
+      promoteAdminTeamMember(vars.userId, vars.planId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-team-members"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-agronomists"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-agronomist-detail"] });
     },
   });
 }

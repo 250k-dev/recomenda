@@ -15,9 +15,14 @@ import {
   deletePlot,
 } from "@recomenda/api/farms";
 import { queryKeys } from "./queryKeys";
+import { useWalletScopeKey } from "./use-active-scope";
 
 export function useFarms() {
-  return useQuery({ queryKey: queryKeys.farms, queryFn: getFarms });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({
+    queryKey: [...queryKeys.farms, scopeKey],
+    queryFn: getFarms,
+  });
 }
 
 export function useFarm(id: string) {

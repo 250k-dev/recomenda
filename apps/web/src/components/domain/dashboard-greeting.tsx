@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale/pt-BR";
-import { useMe } from "@recomenda/api-hooks";
+import { useActiveScope, useMe } from "@recomenda/api-hooks";
 
 // Saudação pelo relógio local do usuário, só no cliente: no SSR o fuso é o do
 // servidor, então lá cai no "Olá" neutro para não hidratar com valor errado.
@@ -18,6 +18,7 @@ const getGreeting = () => {
 /** Saudação do Dashboard, exibida na linha do header ao lado da busca e do menu. */
 export function DashboardGreeting() {
   const { data: me } = useMe();
+  const activeScope = useActiveScope();
   const salute = useSyncExternalStore(subscribeNoop, getGreeting, () => "Olá");
 
   const firstName = me?.name?.trim().split(/\s+/)[0] ?? "";
@@ -26,7 +27,9 @@ export function DashboardGreeting() {
   return (
     <div className="min-w-0">
       <p className="truncate font-display text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-        {dateLabel}
+        {activeScope
+          ? `Carteira de ${activeScope.agronomist_name}`
+          : dateLabel}
       </p>
       <h1 className="truncate font-display text-xl font-semibold tracking-[-0.02em] text-text-strong md:text-2xl">
         {salute}

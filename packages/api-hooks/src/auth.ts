@@ -11,6 +11,9 @@ import {
   getPlanQuota,
   impersonateProducer,
   exitImpersonation,
+  getMemberships,
+  switchContext,
+  exitContext,
 } from "@recomenda/api/auth";
 import { useImpersonationStore } from "./impersonation-store";
 import { queryKeys } from "./queryKeys";
@@ -90,6 +93,34 @@ export function useExitImpersonation() {
     onSuccess: () => {
       clearImpersonation();
       queryClient.invalidateQueries();
+    },
+  });
+}
+
+/** Carteiras de outros agrônomos onde o usuário atua (Minhas Gestões). */
+export function useMemberships() {
+  return useQuery({ queryKey: queryKeys.memberships, queryFn: getMemberships });
+}
+
+/**
+ * Entra na carteira de outro agrônomo. Recarrega a app no dashboard para o
+ * contexto ficar 100% naquela carteira (sem resíduos da conta própria).
+ */
+export function useSwitchContext() {
+  return useMutation({
+    mutationFn: (agronomistId: string) => switchContext(agronomistId),
+    onSuccess: () => {
+      window.location.assign("/dashboard");
+    },
+  });
+}
+
+/** Volta para a carteira própria com reload limpo no dashboard. */
+export function useExitContext() {
+  return useMutation({
+    mutationFn: exitContext,
+    onSuccess: () => {
+      window.location.assign("/dashboard");
     },
   });
 }

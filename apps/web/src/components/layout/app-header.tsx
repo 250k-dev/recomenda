@@ -8,6 +8,7 @@ import {
 import { DashboardGreeting } from "@/components/domain/dashboard-greeting";
 import { ProducerSearchButton } from "@/components/domain/producer-search";
 import { useBreadcrumbItems } from "./breadcrumbs-context";
+import { ScopeSwitcher } from "./scope-switcher";
 import { UserMenu } from "./user-menu";
 
 // Raiz de toda trilha na área do agrônomo: o Dashboard, rotulado "Início".
@@ -16,6 +17,7 @@ const HOME: BreadcrumbItem = { label: "Início", href: "/dashboard" };
 // Rótulo da seção quando a página não publica breadcrumbs próprios.
 const SECTION_LABELS: Array<[prefix: string, label: string]> = [
   ["/produtores", "Produtores"],
+  ["/minhas-gestoes", "Minhas Gestões"],
   ["/produtos", "Produtos"],
   ["/relatorios", "Relatórios"],
   ["/equipe", "Equipe"],
@@ -55,6 +57,9 @@ export function AppHeader() {
           {isHome ? <DashboardGreeting /> : <BreadcrumbTrail items={items} />}
         </div>
         <ProducerSearchButton />
+        <div className="shrink-0">
+          <ScopeSwitcher />
+        </div>
         <div className="shrink-0">
           <UserMenu />
         </div>

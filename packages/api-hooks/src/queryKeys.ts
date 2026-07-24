@@ -3,6 +3,7 @@ export const queryKeys = {
     ["timing-templates-archived", producerId] as const,
   seasonsArchived: ["seasons-archived"],
   me: ["me"],
+  memberships: ["memberships"],
   quota: ["quota"],
   farms: ["farms"],
   farm: (id: string) => ["farm", id],
@@ -39,6 +40,8 @@ export const queryKeys = {
   adminAgronomists: (status: "active" | "inactive") => ["admin-agronomists", status] as const,
   adminAgronomistDetail: (id: string) => ["admin-agronomist-detail", id] as const,
   adminProducers: ["admin-producers"],
+  adminTeamMembers: (filters?: { agronomist_id?: string; temporary?: boolean }) =>
+    ["admin-team-members", filters?.agronomist_id ?? "all", filters?.temporary ? "temp" : "all"] as const,
   invitationToken: (token: string) => ["invitation-token", token],
   invitations: (kind?: string) => ["invitations", kind ?? "all"] as const,
   comparativeReport: ["comparative-report"],

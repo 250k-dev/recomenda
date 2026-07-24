@@ -33,6 +33,7 @@ import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { CompactListSkeleton } from "@/components/domain/page-skeletons";
 import {
+  useActiveScope,
   useFarms,
   useProducers,
   usePlanQuota,
@@ -161,9 +162,13 @@ function ShortcutCard({
 }
 
 export default function DashboardPage() {
+  const activeScope = useActiveScope();
   const farms = useFarms();
   const producers = useProducers();
-  const { data: planData, isLoading: planLoading } = usePlanQuota();
+  // Plano é da conta própria — no modo gestão a rail mostra só o resumo da carteira hospedeira.
+  const { data: planData, isLoading: planLoading } = usePlanQuota({
+    enabled: !activeScope,
+  });
   const agenda = useAgronomistAgenda(new Date());
   const canManageTeam = useCan("TEAM_MANAGE");
   const canCreateProducer = useCan("PRODUCER_CREATE");
@@ -464,12 +469,12 @@ export default function DashboardPage() {
             isLoading={priceCoverage.isLoading}
           />
 
-          {planLoading ? (
+          {!activeScope && planLoading ? (
             <div className="rounded-xl border border-primary-border bg-primary-soft p-4.5 shadow-sm">
               <Skeleton className="w-56 h-4" />
               <Skeleton className="w-full h-4 mt-2" />
             </div>
-          ) : planData?.plan ? (
+          ) : !activeScope && planData?.plan ? (
             <div className="rounded-xl border border-primary-border bg-primary-soft p-4.5 shadow-sm">
               <div className="mb-2 flex items-center gap-2.5">
                 <Sparkles className="size-4 text-primary-strong" />

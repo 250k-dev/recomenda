@@ -18,6 +18,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@recomenda/ui/primitives/dialog";
@@ -485,14 +486,14 @@ function InviteTeamDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[560px] rounded-[20px] p-0">
-        <DialogHeader className="px-7 pt-7">
+        <DialogHeader className="shrink-0 px-7 pt-7">
           <DialogTitle className="text-[21px] font-extrabold">Convidar para a equipe</DialogTitle>
           <DialogDescription>
             Escolha o papel, os produtores que ele vai acompanhar e envie o convite por
             e-mail.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-5 px-7 py-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-7 py-5">
           {link ? (
             <div className="flex flex-col gap-3">
               {sentTo ? (
@@ -578,22 +579,23 @@ function InviteTeamDialog({
                 filter={producerFilter}
                 onFilterChange={setProducerFilter}
               />
-
-              <div className="flex justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={submit}
-                  disabled={createInvitation.isPending || !emailValid}
-                  className="gap-2"
-                >
-                  {createInvitation.isPending ? "Enviando…" : "Enviar convite"}
-                </Button>
-              </div>
             </>
           )}
         </div>
+        {!link ? (
+          <DialogFooter className="shrink-0 flex-row justify-end gap-2 px-7">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={submit}
+              disabled={createInvitation.isPending || !emailValid}
+              className="gap-2"
+            >
+              {createInvitation.isPending ? "Enviando…" : "Enviar convite"}
+            </Button>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

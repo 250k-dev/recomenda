@@ -73,6 +73,9 @@ export interface InvitationPreview {
   agronomist_id: string;
   kind?: "PRODUCER" | "CONSULTANT";
   access_level?: "MANAGER" | "ASSISTANT";
+  /** Conta com este e-mail já existe (fluxo "juntar-se à equipe"). */
+  account_exists?: boolean;
+  agronomist_name?: string | null;
 }
 
 export interface Invitation {
@@ -138,11 +141,16 @@ export async function getInvitationByToken(token: string) {
   return data;
 }
 
-export async function acceptInvitation(token: string, payload: { name: string; password: string }) {
-  const { data } = await api.post<{ accepted: boolean; producer_id: string }>(
-    `/invitations/by-token/${token}/accept`,
-    payload,
-  );
+export async function acceptInvitation(
+  token: string,
+  payload: { name?: string; password?: string },
+) {
+  const { data } = await api.post<{
+    accepted: boolean;
+    producer_id: string;
+    existing_account: boolean;
+    is_temporary: boolean;
+  }>(`/invitations/by-token/${token}/accept`, payload);
   return data;
 }
 

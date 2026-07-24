@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { serverEnv } from "@recomenda/config/server";
-import { clearAuthCookies, setAuthCookies } from "@/lib/auth/session-cookies";
+import { setAuthCookies } from "@/lib/auth/session-cookies";
 
 /** Extrai a claim `role` do JWT (sem verificar assinatura — uso interno pós-backend). */
 function jwtPayloadRole(accessToken: string): string | null {
@@ -19,40 +19,34 @@ function jwtPayloadRole(accessToken: string): string | null {
 
 export async function POST() {
   const cookieStore = await cookies();
-  const refreshToken = cookieStore.get("refresh_token")?.value;
+  const accessToken = cookieStore.get("access_token")?.value;
 
-  if (!refreshToken) {
-    clearAuthCookies(cookieStore);
-    return NextResponse.json({ message: "No refresh token" }, { status: 401 });
+  if (!accessToken) {
+    return NextResponse.json({ message: "Unauthenticated" }, { status: 401 });
   }
 
-  const response = await fetch(`${serverEnv.API_INTERNAL_URL}/auth/refresh`, {
+  const response = await fetch(`${serverEnv.API_INTERNAL_URL}/auth/context/exit`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
   });
 
   if (!response.ok) {
-    clearAuthCookies(cookieStore);
-    return NextResponse.json({ message: "Refresh failed" }, { status: 401 });
+    const err = await response.json().catch(() => ({ message: "Context exit failed" }));
+    return NextResponse.json(err, { status: response.status });
   }
 
   const payload = (await response.json()) as {
     access_token: string;
-    refresh_token?: string;
+    refresh_token: string;
   };
-
-  // Preferência: role do access token novo (preserva STAFF em scope_switch).
-  const role =
-    jwtPayloadRole(payload.access_token) ??
-    cookieStore.get("role")?.value ??
-    "AGRONOMIST";
-
+  const role = jwtPayloadRole(payload.access_token) ?? "AGRONOMIST";
   setAuthCookies(cookieStore, {
     access_token: payload.access_token,
-    refresh_token: payload.refresh_token ?? refreshToken,
+    refresh_token: payload.refresh_token,
     role,
   });
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, role });
 }

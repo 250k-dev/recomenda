@@ -5,7 +5,7 @@ import { routes } from "@recomenda/config";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BarChart3, Bell, Check, LogOut, User } from "lucide-react";
+import { BarChart3, Bell, Briefcase, Check, LogOut, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,22 +18,33 @@ import {
 } from "@recomenda/ui/primitives/dropdown-menu";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
-import { useMe, usePlanQuota } from "@recomenda/api-hooks";
+import {
+  useActiveScope,
+  useMe,
+  useMemberships,
+  usePlanQuota,
+} from "@recomenda/api-hooks";
 import { logout } from "@recomenda/api";
 import { NotificationsPanel, useNotificationsList } from "./notifications-bell";
 
 export function UserMenu() {
   const router = useRouter();
   const { data: currentUser, isLoading: userLoading } = useMe();
+  const { data: memberships } = useMemberships();
+  const activeScope = useActiveScope();
+  // Plano/quota é da conta própria de agrônomo — esconde no modo gestão para
+  // não misturar a identidade da carteira hospedeira com a do usuário.
+  const showOwnPlan = !activeScope && currentUser?.role === "AGRONOMIST";
   const { data: planData, isLoading: planLoading } = usePlanQuota({
-    enabled: true,
+    enabled: showOwnPlan,
   });
+  const hasMemberships = (memberships?.memberships.length ?? 0) > 0;
   const { unreadCount } = useNotificationsList();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
   const name = currentUser?.name?.trim() || "";
-  const planName = planData?.plan.name;
+  const planName = showOwnPlan ? planData?.plan.name : undefined;
 
   const current = planData?.quota_usage.current ?? 0;
   const limit = planData?.quota_usage.limit ?? planData?.plan.plot_quota ?? 0;
@@ -88,21 +99,26 @@ export function UserMenu() {
               <p className="text-sm font-semibold tracking-tight truncate">
                 {name}
               </p>
-              {planName && (
+              {activeScope ? (
+                <Badge className="mt-1 gap-1 border-none bg-white/20 px-1.5 text-[0.65rem] font-semibold text-primary-foreground">
+                  <Briefcase className="size-3!" />
+                  Carteira de {activeScope.agronomist_name}
+                </Badge>
+              ) : planName ? (
                 <Badge className="mt-1 gap-1 border-none bg-white/20 px-1.5 text-[0.65rem] font-semibold text-primary-foreground">
                   <Check className="size-3!" />
                   {planName}
                 </Badge>
-              )}
+              ) : null}
             </div>
           </div>
 
-          {planLoading ? (
+          {showOwnPlan && planLoading ? (
             <div className="mt-3.5 space-y-2">
               <Skeleton className="w-24 h-3 bg-white/20" />
               <Skeleton className="h-1.5 w-full rounded-full bg-white/20" />
             </div>
-          ) : planData ? (
+          ) : showOwnPlan && planData ? (
             <div className="mt-3.5">
               <div className="mb-1.5 flex items-baseline justify-between">
                 <span className="text-xs text-primary-foreground/80">
@@ -122,6 +138,11 @@ export function UserMenu() {
                 />
               </div>
             </div>
+          ) : activeScope ? (
+            <p className="mt-3.5 text-xs text-primary-foreground/80">
+              Sessão imersa: produtores, agenda e equipe abaixo são só desta
+              carteira.
+            </p>
           ) : null}
         </div>
 
@@ -168,15 +189,30 @@ export function UserMenu() {
               Meu perfil
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            asChild
-            className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
-          >
-            <Link href={routes.relatorios}>
-              <BarChart3 className="size-4.5" />
-              Relatórios
-            </Link>
-          </DropdownMenuItem>
+          {/* Relatórios agregam a carteira própria — fora do modo gestão. */}
+          {!activeScope ? (
+            <DropdownMenuItem
+              asChild
+              className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
+            >
+              <Link href={routes.relatorios}>
+                <BarChart3 className="size-4.5" />
+                Relatórios
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+          {/* Em escopo ativo o seletor/banner já trocam de carteira. */}
+          {hasMemberships && !activeScope ? (
+            <DropdownMenuItem
+              asChild
+              className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
+            >
+              <Link href={routes.minhasGestoes}>
+                <Briefcase className="size-4.5" />
+                Minhas Gestões
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
         </div>
 
         <DropdownMenuSeparator className="mx-4 my-0" />

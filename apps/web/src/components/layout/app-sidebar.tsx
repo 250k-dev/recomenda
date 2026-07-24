@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   UsersRound,
+  UserCog,
   Package,
   BarChart3,
   CreditCard,
@@ -41,6 +42,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "/admin": <LayoutDashboard className="size-4" />,
   "/admin/planos": <CreditCard className="size-4" />,
   "/admin/agronomos": <Users className="size-4" />,
+  "/admin/equipe": <UserCog className="size-4" />,
   "/admin/produtores": <UsersRound className="size-4" />,
   "/admin/catalogo-global": <Package className="size-4" />,
 };

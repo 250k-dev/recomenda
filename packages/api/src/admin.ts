@@ -20,6 +20,26 @@ export interface AdminAgronomist {
   is_active: boolean;
 }
 
+export type AdminAccessLevel = "MANAGER" | "ASSISTANT";
+
+/** Membro da equipe (gestor/operador) visível no admin. */
+export interface AdminTeamMember {
+  user_id: string;
+  name: string;
+  email: string;
+  is_active: boolean;
+  is_temporary: boolean;
+  access_level: AdminAccessLevel;
+  agronomist_id: string;
+  agronomist_name: string;
+  manager_user_id: string | null;
+  manager_name: string | null;
+  producer_count: number;
+  created_at: string;
+  /** Já possui papel global de agrônomo. */
+  is_agronomist: boolean;
+}
+
 export interface AdminAgronomistDetail {
   user_id: string;
   name: string;
@@ -33,6 +53,9 @@ export interface AdminAgronomistDetail {
     producers: number;
     seasons: number;
     pending_invitations: number;
+    managers: number;
+    assistants: number;
+    temporary_members: number;
   };
   farms: Array<{
     id: string;
@@ -47,6 +70,7 @@ export interface AdminAgronomistDetail {
     email: string;
     is_active: boolean;
   }>;
+  team: AdminTeamMember[];
 }
 
 export interface AdminProducer {
@@ -144,4 +168,28 @@ export async function patchAdminProducer(id: string, payload: { is_active: boole
 
 export async function deleteAdminProducer(id: string) {
   await api.delete(`/admin/producers/${id}`);
+}
+
+export async function getAdminTeamMembers(params?: {
+  agronomist_id?: string;
+  temporary?: boolean;
+}) {
+  const search = new URLSearchParams();
+  if (params?.agronomist_id) search.set("agronomist_id", params.agronomist_id);
+  if (params?.temporary) search.set("temporary", "true");
+  const qs = search.toString();
+  const { data } = await api.get<{ data: AdminTeamMember[] } | AdminTeamMember[]>(
+    `/admin/team-members${qs ? `?${qs}` : ""}`,
+  );
+  return Array.isArray(data) ? data : data.data;
+}
+
+export async function promoteAdminTeamMember(userId: string, planId: string) {
+  const { data } = await api.post<{
+    user_id: string;
+    name: string;
+    email: string;
+    plan_id: string;
+  }>(`/admin/team-members/${userId}/promote`, { plan_id: planId });
+  return data;
 }

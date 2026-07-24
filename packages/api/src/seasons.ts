@@ -73,6 +73,14 @@ export async function createSeason(payload: Record<string, unknown>) {
   return data;
 }
 
+export async function updateSeason(
+  id: string,
+  payload: { planting_date?: string | null; desiccation_date?: string | null },
+) {
+  const { data } = await api.patch<SeasonDetail>(`/seasons/${id}`, payload);
+  return data;
+}
+
 export async function archiveSeason(id: string) {
   const { data } = await api.post(`/seasons/${id}/archive`);
   return data;

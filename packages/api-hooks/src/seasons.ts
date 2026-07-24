@@ -12,6 +12,7 @@ import {
   archiveSeason,
   hardDeleteSeason,
   publishSeason,
+  updateSeason,
   getArchivedSeasons,
   getTimeline,
   getPlotHistory,
@@ -26,6 +27,7 @@ import {
   deleteRecommendationItem,
 } from "@recomenda/api/seasons";
 import { queryKeys } from "./queryKeys";
+import { useWalletScopeKey } from "./use-active-scope";
 
 /** Lista de compra espelha produtos "fora da programação" no servidor — invalida
  *  o cache da lista para a UI atualizar sem F5 (prefix match do React Query). */
@@ -60,11 +62,19 @@ export function invalidateAfterRecommendationExecution(
 }
 
 export function useSeasons() {
-  return useQuery({ queryKey: queryKeys.seasons, queryFn: getSeasons });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({
+    queryKey: [...queryKeys.seasons, scopeKey],
+    queryFn: getSeasons,
+  });
 }
 
 export function useArchivedSeasons() {
-  return useQuery({ queryKey: queryKeys.seasonsArchived, queryFn: getArchivedSeasons });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({
+    queryKey: [...queryKeys.seasonsArchived, scopeKey],
+    queryFn: getArchivedSeasons,
+  });
 }
 
 export function useSeason(id: string) {
@@ -109,6 +119,24 @@ export function usePublishSeason(seasonId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.season(seasonId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+/** Altera âncoras da safra (ex.: planting_date). O servidor recalcula as
+ *  predicted_date das etapas PENDING — invalida season + timeline + agenda. */
+export function useUpdateSeason(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      planting_date?: string | null;
+      desiccation_date?: string | null;
+    }) => updateSeason(seasonId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.season(seasonId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      void queryClient.invalidateQueries({ queryKey: ["agronomist-agenda"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.plotHistory(seasonId) });
     },
   });
 }

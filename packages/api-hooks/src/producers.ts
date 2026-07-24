@@ -21,9 +21,14 @@ import {
 } from "@recomenda/api/producers";
 import { getSeasonShoppingList } from "@recomenda/api/seasons";
 import { queryKeys } from "./queryKeys";
+import { useWalletScopeKey } from "./use-active-scope";
 
 export function useProducers() {
-  return useQuery({ queryKey: queryKeys.producers, queryFn: getProducers });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({
+    queryKey: [...queryKeys.producers, scopeKey],
+    queryFn: getProducers,
+  });
 }
 
 export function useProducer(id: string) {
@@ -165,7 +170,8 @@ export function useInvitationByToken(token: string) {
 
 export function useAcceptInvitation(token: string) {
   return useMutation({
-    mutationFn: (payload: { name: string; password: string }) => acceptInvitation(token, payload),
+    mutationFn: (payload: { name?: string; password?: string }) =>
+      acceptInvitation(token, payload),
   });
 }
 

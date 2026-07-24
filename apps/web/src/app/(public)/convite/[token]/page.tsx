@@ -19,7 +19,7 @@ import { getAuthSession, login, logout } from "@recomenda/api/auth";
 import { useAcceptInvitation, useInvitationByToken } from "@recomenda/api-hooks";
 import type { InvitationPreview } from "@recomenda/api/producers";
 
-const acceptSchema = z
+const signupSchema = z
   .object({
     name: z.string().min(2, "Nome obrigatório"),
     password: z.string().min(6, "Senha deve ter ao menos 6 caracteres"),
@@ -30,7 +30,12 @@ const acceptSchema = z
     path: ["confirmPassword"],
   });
 
-type AcceptFormValues = z.infer<typeof acceptSchema>;
+const joinSchema = z.object({
+  password: z.string().min(1, "Informe a senha da sua conta"),
+});
+
+type SignupFormValues = z.infer<typeof signupSchema>;
+type JoinFormValues = z.infer<typeof joinSchema>;
 
 function invitationRoleLabel(
   kind?: InvitationPreview["kind"],
@@ -63,9 +68,17 @@ export default function InviteTokenPage() {
   const { data: invitation, isLoading, isError } = useInvitationByToken(token);
   const acceptMutation = useAcceptInvitation(token);
 
-  const form = useForm<AcceptFormValues>({
-    resolver: zodResolver(acceptSchema),
+  const isJoinFlow =
+    invitation?.kind === "CONSULTANT" && Boolean(invitation.account_exists);
+
+  const signupForm = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
     defaultValues: { name: "", password: "", confirmPassword: "" },
+  });
+
+  const joinForm = useForm<JoinFormValues>({
+    resolver: zodResolver(joinSchema),
+    defaultValues: { password: "" },
   });
 
   useEffect(() => {
@@ -80,7 +93,14 @@ export default function InviteTokenPage() {
     };
   }, []);
 
-  const onSubmit = form.handleSubmit(async ({ name, password }) => {
+  const finishConsultantLogin = async (email: string, password: string) => {
+    const result = await login(email, password);
+    window.location.assign(
+      result.user.role === "ADMIN" ? "/admin" : "/dashboard",
+    );
+  };
+
+  const onSignup = signupForm.handleSubmit(async ({ name, password }) => {
     setSubmitError(null);
     try {
       await logout();
@@ -93,10 +113,7 @@ export default function InviteTokenPage() {
       }
 
       if (invitation.kind === "CONSULTANT") {
-        const result = await login(email, password);
-        window.location.assign(
-          result.user.role === "ADMIN" ? "/admin" : "/dashboard",
-        );
+        await finishConsultantLogin(email, password);
         return;
       }
 
@@ -104,6 +121,27 @@ export default function InviteTokenPage() {
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Não foi possível concluir o cadastro.",
+      );
+    }
+  });
+
+  const onJoin = joinForm.handleSubmit(async ({ password }) => {
+    setSubmitError(null);
+    try {
+      await logout();
+      await acceptMutation.mutateAsync({ password });
+
+      const email = invitation?.email;
+      if (!email) {
+        router.push("/login?force=1");
+        return;
+      }
+      await finishConsultantLogin(email, password);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível entrar nesta equipe.",
       );
     }
   });
@@ -158,17 +196,38 @@ export default function InviteTokenPage() {
     );
   }
 
-  const isSubmitting = acceptMutation.isPending || form.formState.isSubmitting;
+  const isSubmitting =
+    acceptMutation.isPending ||
+    signupForm.formState.isSubmitting ||
+    joinForm.formState.isSubmitting;
+  const roleLabel = invitationRoleLabel(invitation.kind, invitation.access_level);
+  const agronomistLabel = invitation.agronomist_name ?? "um agrônomo";
 
   return (
     <AuthShell>
       <Card className="p-6">
         <h2 className="font-display text-[1.4rem] font-semibold text-text-strong">
-          Criar sua conta
+          {isJoinFlow ? "Entrar na equipe" : "Criar sua conta"}
         </h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          Você foi convidado para acessar como{" "}
-          {invitationRoleLabel(invitation.kind, invitation.access_level)}.
+          {isJoinFlow ? (
+            <>
+              <strong>{agronomistLabel}</strong> convidou você como {roleLabel}.
+              Você já tem conta — confirme com a sua senha para entrar nesta
+              equipe, sem criar um login novo.
+            </>
+          ) : (
+            <>
+              Você foi convidado para acessar como {roleLabel}
+              {invitation.kind === "CONSULTANT" ? (
+                <>
+                  {" "}
+                  na carteira de <strong>{agronomistLabel}</strong>
+                </>
+              ) : null}
+              .
+            </>
+          )}
         </p>
 
         {activeSessionRole ? (
@@ -176,72 +235,116 @@ export default function InviteTokenPage() {
             <AlertTitle>Sessão ativa detectada</AlertTitle>
             <AlertDescription>
               Há uma conta logada neste navegador ({activeSessionRole}). Ao
-              continuar, essa sessão será encerrada e você entrará com a nova
-              conta.
+              continuar, essa sessão será encerrada
+              {isJoinFlow
+                ? " e você entrará com a conta do convite."
+                : " e você entrará com a nova conta."}
             </AlertDescription>
           </Alert>
         ) : null}
 
-        <form onSubmit={onSubmit} className="mt-5 space-y-4">
-          {submitError || acceptMutation.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>Erro ao aceitar</AlertTitle>
-              <AlertDescription>
-                {submitError ?? "Tente novamente em instantes."}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome completo</Label>
-            <Input id="name" {...form.register("name")} placeholder="Seu nome" />
-            {form.formState.errors.name?.message ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.name.message}
-              </p>
+        {isJoinFlow ? (
+          <form onSubmit={onJoin} className="mt-5 space-y-4">
+            {submitError || acceptMutation.isError ? (
+              <Alert variant="destructive">
+                <AlertTitle>Erro ao aceitar</AlertTitle>
+                <AlertDescription>
+                  {submitError ?? "Tente novamente em instantes."}
+                </AlertDescription>
+              </Alert>
             ) : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email-ro">E-mail</Label>
-            <Input
-              id="email-ro"
-              type="email"
-              value={invitation.email ?? ""}
-              disabled
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <PasswordInput id="password" {...form.register("password")} />
-            {form.formState.errors.password?.message ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.password.message}
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="email-ro">E-mail</Label>
+              <Input
+                id="email-ro"
+                type="email"
+                value={invitation.email ?? ""}
+                disabled
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha da sua conta</Label>
+              <PasswordInput id="password" {...joinForm.register("password")} />
+              {joinForm.formState.errors.password?.message ? (
+                <p className="text-xs text-destructive">
+                  {joinForm.formState.errors.password.message}
+                </p>
+              ) : null}
+            </div>
+            <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Entrando...
+                </>
+              ) : (
+                <>
+                  <Check className="size-4" /> Entrar na equipe
+                </>
+              )}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={onSignup} className="mt-5 space-y-4">
+            {submitError || acceptMutation.isError ? (
+              <Alert variant="destructive">
+                <AlertTitle>Erro ao aceitar</AlertTitle>
+                <AlertDescription>
+                  {submitError ?? "Tente novamente em instantes."}
+                </AlertDescription>
+              </Alert>
             ) : null}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirmar senha</Label>
-            <PasswordInput
-              id="confirmPassword"
-              {...form.register("confirmPassword")}
-            />
-            {form.formState.errors.confirmPassword?.message ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.confirmPassword.message}
-              </p>
-            ) : null}
-          </div>
-          <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="size-4 animate-spin" /> Criando conta...
-              </>
-            ) : (
-              <>
-                <Check className="size-4" /> Criar conta e entrar
-              </>
-            )}
-          </Button>
-        </form>
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome completo</Label>
+              <Input id="name" {...signupForm.register("name")} placeholder="Seu nome" />
+              {signupForm.formState.errors.name?.message ? (
+                <p className="text-xs text-destructive">
+                  {signupForm.formState.errors.name.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-ro">E-mail</Label>
+              <Input
+                id="email-ro"
+                type="email"
+                value={invitation.email ?? ""}
+                disabled
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <PasswordInput id="password" {...signupForm.register("password")} />
+              {signupForm.formState.errors.password?.message ? (
+                <p className="text-xs text-destructive">
+                  {signupForm.formState.errors.password.message}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar senha</Label>
+              <PasswordInput
+                id="confirmPassword"
+                {...signupForm.register("confirmPassword")}
+              />
+              {signupForm.formState.errors.confirmPassword?.message ? (
+                <p className="text-xs text-destructive">
+                  {signupForm.formState.errors.confirmPassword.message}
+                </p>
+              ) : null}
+            </div>
+            <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Criando conta...
+                </>
+              ) : (
+                <>
+                  <Check className="size-4" /> Criar conta e entrar
+                </>
+              )}
+            </Button>
+          </form>
+        )}
       </Card>
     </AuthShell>
   );

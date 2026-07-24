@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Leaf, Plus, Send, Share2 } from "lucide-react";
+import { CalendarDays, Leaf, Plus, Send, Share2 } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
 import { TimelineCardsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
@@ -27,8 +27,76 @@ import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 import { extractError } from "@/components/domain/season/_shared";
 import { RecommendationCard } from "@/components/domain/season/recommendation-card";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
+import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
 import { fmtDate } from "@recomenda/domain/recommendations/format";
 import { routes } from "@recomenda/config";
+
+/**
+ * Card da âncora de plantio — primeiro item visual do cronograma (não é uma
+ * recommendation; ao salvar, o servidor recalcula as datas das etapas PENDING).
+ */
+function PlantingDateBlock({
+  seasonId,
+  plantingDate,
+  canManage,
+}: {
+  seasonId: string;
+  plantingDate?: string | null;
+  canManage: boolean;
+}) {
+  const hasDate = Boolean(plantingDate);
+
+  return (
+    <li
+      className={
+        hasDate
+          ? "rounded-xl border border-border bg-card shadow-sm"
+          : "rounded-xl border-2 border-primary/40 bg-primary/5 shadow-sm ring-1 ring-primary/15"
+      }
+    >
+      <div className="flex w-full flex-wrap items-center gap-3 px-4 py-4">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-sm font-bold tabular-nums text-muted-foreground">
+          <CalendarDays className="size-4 text-primary-strong" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-text-strong">Plantio</p>
+            <span className="inline-flex items-center rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              Âncora do cronograma
+            </span>
+          </div>
+          {hasDate ? (
+            <p className="mt-1 text-sm tabular-nums text-foreground">
+              Data registrada:{" "}
+              <span className="font-semibold">{fmtDate(plantingDate!)}</span>
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sem data registrada — as etapas usam esta data para calcular o DAP.
+            </p>
+          )}
+        </div>
+        {canManage ? (
+          <PlantingDateRegisterPopover
+            seasonId={seasonId}
+            currentPlantingDate={plantingDate}
+            mode={hasDate ? "edit" : "register"}
+            trigger={
+              <Button
+                size="sm"
+                variant={hasDate ? "outline" : "default"}
+                className="h-8 gap-1.5 shrink-0"
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                {hasDate ? "Alterar data" : "Registrar plantio"}
+              </Button>
+            }
+          />
+        ) : null}
+      </div>
+    </li>
+  );
+}
 
 function AddStagePanel({
   seasonId,
@@ -173,6 +241,8 @@ export function SeasonRecommendationsView({
   // Hook antes de qualquer return condicional (regras dos Hooks) — senão a
   // transição loading→carregado dispara "rendered more hooks than previous".
   const canEditStructurePerm = useCan("RECOMMENDATION_EDIT_STRUCTURE");
+  // PATCH /seasons exige SEASON_CRUD — botão de plantio usa essa permissão.
+  const canSeasonCrud = useCan("SEASON_CRUD");
 
   if (isLoading) return <TimelineCardsSkeleton count={5} />;
 
@@ -185,6 +255,9 @@ export function SeasonRecommendationsView({
   const canManageStages =
     (seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS") &&
     canEditStructurePerm;
+  // Plantio pode (e deve) ser registrado também em rascunho — não depende de publicar.
+  const canManagePlanting =
+    canSeasonCrud && seasonStatus !== "ARCHIVED";
 
   const moveStage = (index: number, direction: "up" | "down") => {
     const targetIndex = direction === "up" ? index - 1 : index + 1;
@@ -238,6 +311,16 @@ export function SeasonRecommendationsView({
 
     return (
       <div className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold font-display text-text-strong">
+          Etapas do cronograma
+        </h2>
+        <ul className="flex flex-col gap-3">
+          <PlantingDateBlock
+            seasonId={seasonId}
+            plantingDate={plantingDate}
+            canManage={canManagePlanting}
+          />
+        </ul>
         <EmptyState
           variant="inline"
           title="Nenhuma recomendação encontrada para esta safra."
@@ -287,9 +370,11 @@ export function SeasonRecommendationsView({
         title={title}
         stats={[
           ...(plotName ? [{ label: "Talhão", value: plotName }] : []),
-          ...(plantingDate
-            ? [{ label: "Plantio", value: fmtDate(plantingDate) }]
-            : []),
+          {
+            label: "Plantio",
+            value: plantingDate ? fmtDate(plantingDate) : "Não registrado",
+            tone: plantingDate ? "default" : "danger",
+          },
           ...(statusLabel ? [{ label: "Status", value: statusLabel }] : []),
           {
             label: "Aplicações",
@@ -353,6 +438,11 @@ export function SeasonRecommendationsView({
       ) : null}
 
       <ul className="flex flex-col gap-3">
+        <PlantingDateBlock
+          seasonId={seasonId}
+          plantingDate={plantingDate}
+          canManage={canManagePlanting}
+        />
         {recommendations.map((rec, i) => (
           <RecommendationCard
             key={rec.id}

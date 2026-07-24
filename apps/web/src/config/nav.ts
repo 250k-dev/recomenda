@@ -8,6 +8,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Dashboard", href: routes.admin.dashboard },
   { label: "Planos", href: routes.admin.planos },
   { label: "Agrônomos", href: routes.admin.agronomos.lista },
+  { label: "Equipe", href: routes.admin.equipe },
   { label: "Produtores", href: routes.admin.produtores.lista },
   { label: "Produtos", href: routes.admin.catalogoGlobal },
 ];

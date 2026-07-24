@@ -1,5 +1,5 @@
 import { api } from "./http/axios";
-import type { LoginResponse } from "./auth-types";
+import type { LoginResponse, MembershipsResponse } from "./auth-types";
 import type { AgronomistMePlanResponse } from "./types";
 
 export async function login(email: string, password: string) {
@@ -109,4 +109,36 @@ export async function exitImpersonation(): Promise<{ ok: true; role: string | nu
   }
   const data = (await response.json()) as { ok: true; role: string | null };
   return data;
+}
+
+/** Carteiras de outros agrônomos onde o usuário atua (as "Minhas Gestões"). */
+export async function getMemberships() {
+  const { data } = await api.get<MembershipsResponse>("/auth/memberships");
+  return data;
+}
+
+/** Entra na carteira de outro agrônomo (escopo ativo). Troca o cookie de token no BFF. */
+export async function switchContext(agronomistId: string): Promise<{ ok: true; role: string | null }> {
+  const response = await fetch(`/api/auth/context/switch/${agronomistId}`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? body?.error?.message ?? "Context switch failed");
+  }
+  return (await response.json()) as { ok: true; role: string | null };
+}
+
+/** Volta para a carteira própria (contexto primário). */
+export async function exitContext(): Promise<{ ok: true; role: string | null }> {
+  const response = await fetch("/api/auth/context/exit", {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? body?.error?.message ?? "Context exit failed");
+  }
+  return (await response.json()) as { ok: true; role: string | null };
 }

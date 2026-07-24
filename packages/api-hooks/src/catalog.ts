@@ -21,13 +21,22 @@ import {
   importGlobalCatalogFile,
 } from "@recomenda/api/catalog";
 import { queryKeys } from "./queryKeys";
+import { useWalletScopeKey } from "./use-active-scope";
 
 export function useLocalCatalog() {
-  return useQuery({ queryKey: queryKeys.localCatalog, queryFn: getLocalCatalog });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({
+    queryKey: [...queryKeys.localCatalog, scopeKey],
+    queryFn: getLocalCatalog,
+  });
 }
 
 export function useInactiveLocalCatalog() {
-  return useQuery({ queryKey: queryKeys.inactiveLocalCatalog, queryFn: getInactiveLocalCatalog });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({
+    queryKey: [...queryKeys.inactiveLocalCatalog, scopeKey],
+    queryFn: getInactiveLocalCatalog,
+  });
 }
 
 export function useGlobalCatalog() {
@@ -35,7 +44,11 @@ export function useGlobalCatalog() {
 }
 
 export function usePlatformCatalog() {
-  return useQuery({ queryKey: queryKeys.platformCatalog, queryFn: getPlatformCatalog });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({
+    queryKey: [...queryKeys.platformCatalog, scopeKey],
+    queryFn: getPlatformCatalog,
+  });
 }
 
 export function useAdminPlatformActiveCatalog() {

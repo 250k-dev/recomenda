@@ -67,6 +67,8 @@ export const routes = {
   acessoProdutor: "/acesso-produtor" satisfies Route,
 
   dashboard: "/dashboard" satisfies Route,
+  /** Carteiras de outros agrônomos onde o usuário é gestor/operador. */
+  minhasGestoes: "/minhas-gestoes" satisfies Route,
   cronograma: (ctx?: RouteContext) => withQuery("/cronograma", ctx),
   perfil: "/perfil" satisfies Route,
   relatorios: "/relatorios" satisfies Route,
@@ -148,6 +150,8 @@ export const routes = {
       lista: "/admin/produtores" satisfies Route,
       detalhe: (id: string) => dynamicRoute(`/admin/produtores/${id}`),
     },
+    /** Tipado com cast até o Next regenerar `.next/types` com a rota nova. */
+    equipe: "/admin/equipe" as Route,
     catalogoGlobal: "/admin/catalogo-global" satisfies Route,
     perfil: "/admin/perfil" satisfies Route,
   },

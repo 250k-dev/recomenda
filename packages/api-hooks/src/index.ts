@@ -37,6 +37,7 @@ export * from "./consultants";
 // ---- gates de permissão na UI -----------------------------------------
 // Espelho visual de `can()` de @recomenda/domain; o servidor é a autoridade.
 export { usePrincipal, useCan } from "./use-can";
+export { useActiveScope, useWalletScopeKey } from "./use-active-scope";
 
 // ---- estado de cliente ------------------------------------------------
 // O store de impersonation mora aqui, e não em apps/web/src/stores, porque

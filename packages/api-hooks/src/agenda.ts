@@ -20,6 +20,7 @@ import { recommendationWindowSpanDays } from "@recomenda/domain/timing/window-da
 import { localYmdToDate } from "@recomenda/utils";
 import { queryKeys } from "./queryKeys";
 import { invalidateAfterRecommendationExecution } from "./seasons";
+import { useWalletScopeKey } from "./use-active-scope";
 
 const BATCH_SIZE = 10;
 const MAX_EVENTS = 500;
@@ -297,8 +298,10 @@ export function dedupeAgendaEvents(events: AgendaEvent[]): AgendaEvent[] {
 }
 
 export function useAgronomistAgenda(month: Date, producerId?: string) {
+  const scopeKey = useWalletScopeKey();
+
   const query = useQuery({
-    queryKey: [...queryKeys.agronomistAgenda(producerId)],
+    queryKey: [...queryKeys.agronomistAgenda(producerId), scopeKey],
     queryFn: () => fetchAgendaEvents(producerId),
     staleTime: 60_000,
   });

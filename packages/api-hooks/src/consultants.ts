@@ -10,36 +10,45 @@ import {
   removeConsultant,
   revokeMemberProducer,
 } from "@recomenda/api/consultants";
+import { useWalletScopeKey } from "./use-active-scope";
 
-const teamKey = ["consultants"] as const;
-const shareableProducersKey = ["consultants-shareable-producers"] as const;
-const memberProducersKey = (userId: string) => ["consultant-producers", userId] as const;
-const consultantSummaryKey = (userId: string) => ["consultant-summary", userId] as const;
-const consultantActivityKey = (userId: string) => ["consultant-activity", userId] as const;
+const teamKey = (scope: string) => ["consultants", scope] as const;
+const shareableProducersKey = (scope: string) =>
+  ["consultants-shareable-producers", scope] as const;
+const memberProducersKey = (userId: string, scope: string) =>
+  ["consultant-producers", userId, scope] as const;
+const consultantSummaryKey = (userId: string, scope: string) =>
+  ["consultant-summary", userId, scope] as const;
+const consultantActivityKey = (userId: string, scope: string) =>
+  ["consultant-activity", userId, scope] as const;
 
 export function useConsultants() {
-  return useQuery({ queryKey: teamKey, queryFn: getTeam });
+  const scopeKey = useWalletScopeKey();
+  return useQuery({ queryKey: teamKey(scopeKey), queryFn: getTeam });
 }
 
 export function useShareableProducers(enabled = true) {
+  const scopeKey = useWalletScopeKey();
   return useQuery({
-    queryKey: shareableProducersKey,
+    queryKey: shareableProducersKey(scopeKey),
     queryFn: getShareableProducers,
     enabled,
   });
 }
 
 export function useConsultantSummary(userId: string, enabled = true) {
+  const scopeKey = useWalletScopeKey();
   return useQuery({
-    queryKey: consultantSummaryKey(userId),
+    queryKey: consultantSummaryKey(userId, scopeKey),
     queryFn: () => getConsultantSummary(userId),
     enabled: Boolean(userId) && enabled,
   });
 }
 
 export function useConsultantActivity(userId: string, enabled = true) {
+  const scopeKey = useWalletScopeKey();
   return useQuery({
-    queryKey: consultantActivityKey(userId),
+    queryKey: consultantActivityKey(userId, scopeKey),
     queryFn: () => getConsultantActivity(userId),
     enabled: Boolean(userId) && enabled,
   });
@@ -53,6 +62,7 @@ export function useConsultantActivity(userId: string, enabled = true) {
  */
 export function useSetMemberProducers(userId: string) {
   const queryClient = useQueryClient();
+  const scopeKey = useWalletScopeKey();
   return useMutation({
     mutationFn: async ({ add, remove }: { add: string[]; remove: string[] }) => {
       for (const producerId of add) {
@@ -64,10 +74,10 @@ export function useSetMemberProducers(userId: string) {
       return { added: add.length, removed: remove.length };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: teamKey });
-      queryClient.invalidateQueries({ queryKey: memberProducersKey(userId) });
-      queryClient.invalidateQueries({ queryKey: consultantSummaryKey(userId) });
-      queryClient.invalidateQueries({ queryKey: shareableProducersKey });
+      queryClient.invalidateQueries({ queryKey: ["consultants"] });
+      queryClient.invalidateQueries({ queryKey: memberProducersKey(userId, scopeKey) });
+      queryClient.invalidateQueries({ queryKey: consultantSummaryKey(userId, scopeKey) });
+      queryClient.invalidateQueries({ queryKey: ["consultants-shareable-producers"] });
     },
   });
 }
@@ -76,6 +86,6 @@ export function useRemoveConsultant() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) => removeConsultant(userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKey }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["consultants"] }),
   });
 }
