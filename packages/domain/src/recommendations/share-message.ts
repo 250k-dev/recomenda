@@ -1,5 +1,10 @@
-import type { Recommendation } from "@recomenda/api";
+import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import { displayRecStatus, fmtDate, RECOMMENDATION_STATUS_LABELS } from "./format";
+import {
+  formulationShortLabel,
+  resolveFormulationKey,
+} from "./formulation-mix-order";
+import { sortRecommendationItemsByMixOrder } from "./mix-order";
 
 export interface RecommendationShareData {
   title: string;
@@ -25,16 +30,20 @@ const STATUS_EMOJI: Record<string, string> = {
 // prefill do link wa.me), ao contrário de caracteres de box-drawing.
 const DIVIDER = "————————————————";
 
-function formatDose(item: {
-  product_name: string;
-  dose_per_hectare: number;
-  dose_unit: string;
-}): string {
+function itemFormulationShort(item: RecommendationItem): string {
+  const key =
+    item.formulation_key ?? resolveFormulationKey(item.equivalence_group);
+  return formulationShortLabel(key);
+}
+
+function formatDose(item: RecommendationItem): string {
+  const short = itemFormulationShort(item);
+  const formSuffix = short !== "—" ? ` (${short})` : "";
   const dose =
     item.dose_per_hectare > 0
       ? `: ${item.dose_per_hectare} ${item.dose_unit}/ha`
       : "";
-  return `   • ${item.product_name}${dose}`;
+  return `   • ${item.product_name}${formSuffix}${dose}`;
 }
 
 function formatStage(rec: Recommendation, index: number): string {
@@ -51,7 +60,7 @@ function formatStage(rec: Recommendation, index: number): string {
   }
 
   if (rec.items.length > 0) {
-    lines.push(...rec.items.map(formatDose));
+    lines.push(...sortRecommendationItemsByMixOrder(rec.items).map(formatDose));
   } else {
     lines.push("   • (sem produtos vinculados)");
   }

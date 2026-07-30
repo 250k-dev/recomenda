@@ -25,9 +25,11 @@ export type Permission =
   | "HARVEST_REGISTER"
   | "EXPORT"
   | "REPORTS_VIEW"
-  | "TEAM_MANAGE";
+  | "TEAM_MANAGE"
+  | "PRICE_VIEW"
+  | "FARM_TEAM_MANAGE";
 
-const MANAGER_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
+const CARTEIRA_BASE: Permission[] = [
   "PRODUCER_CREATE",
   "PRODUCER_EDIT",
   "PRODUCER_DELETE",
@@ -47,41 +49,64 @@ const MANAGER_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   "HARVEST_REGISTER",
   "EXPORT",
   "REPORTS_VIEW",
-  "TEAM_MANAGE",
-]);
-
-const ASSISTANT_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
-  "RECOMMENDATION_REGISTER",
-  "RECOMMENDATION_EDIT_ITEM",
-  "EXPORT",
-]);
+  "PRICE_VIEW",
+];
 
 const ACCESS_LEVEL_PERMISSIONS: Record<AccessLevel, ReadonlySet<Permission>> = {
-  MANAGER: MANAGER_PERMISSIONS,
-  ASSISTANT: ASSISTANT_PERMISSIONS,
+  MANAGER: new Set<Permission>([...CARTEIRA_BASE, "TEAM_MANAGE"]),
+  CONSULTANT: new Set<Permission>([...CARTEIRA_BASE, "FARM_TEAM_MANAGE"]),
+  FARM_MANAGER: new Set<Permission>([
+    "RECOMMENDATION_REGISTER",
+    "RECOMMENDATION_EDIT_ITEM",
+    "RECOMMENDATION_EDIT_STRUCTURE",
+    "SEASON_CRUD",
+    "EXPORT",
+    "FARM_TEAM_MANAGE",
+  ]),
+  FARM_OPERATOR: new Set<Permission>(["RECOMMENDATION_REGISTER", "EXPORT"]),
 };
+
+/** Permissões do Produtor (arquétipo próprio — não é STAFF). */
+const PRODUCER_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
+  "RECOMMENDATION_REGISTER",
+  "RECOMMENDATION_EDIT_ITEM",
+  "RECOMMENDATION_EDIT_STRUCTURE",
+  "SEASON_CRUD",
+  "CYCLE_CRUD",
+  "LIST_CRUD",
+  "QUOTE_CRUD",
+  "STOCK_ADJUST",
+  "HARVEST_REGISTER",
+  "EXPORT",
+  "PRICE_VIEW",
+  "FARM_TEAM_MANAGE",
+  "FARM_EDIT",
+]);
 
 export type Principal = { role?: UserRole | null; access_level?: AccessLevel | null };
 
 /**
- * A camada de níveis só se aplica ao membro de equipe (STAFF). Admin/Agrônomo/
- * Produtor não são filtrados por ela no cliente (o servidor cuida do escopo).
+ * A camada de níveis só se aplica a STAFF e PRODUCER. Admin/OrgAdmin/Agrônomo
+ * não são filtrados por ela no cliente (o servidor cuida do escopo).
  */
 export function can(user: Principal | null | undefined, permission: Permission): boolean {
   if (!user) return false;
   if (user.role === "STAFF") {
-    const level = user.access_level ?? "ASSISTANT";
+    const level = user.access_level ?? "CONSULTANT";
     return ACCESS_LEVEL_PERMISSIONS[level].has(permission);
+  }
+  if (user.role === "PRODUCER") {
+    return PRODUCER_PERMISSIONS.has(permission);
   }
   return true;
 }
 
 /** É Gestor (STAFF + MANAGER)? */
 export function isManager(user: Principal | null | undefined): boolean {
-  return user?.role === "STAFF" && (user.access_level ?? "ASSISTANT") === "MANAGER";
+  return user?.role === "STAFF" && (user.access_level ?? "CONSULTANT") === "MANAGER";
 }
 
-/** É Consultor (STAFF + ASSISTANT)? */
-export function isAssistant(user: Principal | null | undefined): boolean {
-  return user?.role === "STAFF" && (user.access_level ?? "ASSISTANT") === "ASSISTANT";
+/** É Consultor (STAFF + CONSULTANT)? */
+export function isConsultant(user: Principal | null | undefined): boolean {
+  return user?.role === "STAFF" && (user.access_level ?? "CONSULTANT") === "CONSULTANT";
 }

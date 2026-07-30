@@ -131,10 +131,27 @@ export function useUpdateSeason(seasonId: string) {
     mutationFn: (payload: {
       planting_date?: string | null;
       desiccation_date?: string | null;
+      mix_formulation_order?: string[] | null;
     }) => updateSeason(seasonId, payload),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.season(seasonId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    onSuccess: async (data) => {
+      // PATCH devolve a entity sem farm_id/plot_name — mescla âncoras no cache.
+      queryClient.setQueryData(queryKeys.season(seasonId), (old: unknown) => {
+        if (old && typeof old === "object") {
+          return {
+            ...old,
+            planting_date: data.planting_date ?? null,
+            desiccation_date: data.desiccation_date ?? null,
+            mix_formulation_order:
+              (data as { mix_formulation_order?: string[] | null })
+                .mix_formulation_order ?? null,
+          };
+        }
+        return data;
+      });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: queryKeys.season(seasonId) }),
+        queryClient.refetchQueries({ queryKey: queryKeys.seasonTimeline(seasonId) }),
+      ]);
       void queryClient.invalidateQueries({ queryKey: ["agronomist-agenda"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.plotHistory(seasonId) });
     },
@@ -232,8 +249,15 @@ export function useCreateRecommendationItem(seasonId: string) {
 export function useUpdateRecommendationItem(seasonId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; dose_per_hectare?: number; dose_unit?: string }) =>
-      updateRecommendationItem(id, payload),
+    mutationFn: ({
+      id,
+      ...payload
+    }: {
+      id: string;
+      dose_per_hectare?: number;
+      dose_unit?: string;
+      mix_order_override?: number | null;
+    }) => updateRecommendationItem(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
       invalidatePurchaseListsAfterRecommendationChange(queryClient);

@@ -27,14 +27,14 @@ export default function MinhasGestoesPage() {
         icon={<Briefcase className="size-5" />}
         section="Carteiras"
         title="Minhas Gestões"
-        description="Carteiras de outros agrônomos onde você atua como gestor ou operador. Entre em uma carteira para operá-la; volte para a sua quando quiser."
+        description="Carteiras de outros agrônomos onde você atua como gestor ou consultor. Entre em uma carteira para operá-la; volte para a sua quando quiser."
       />
 
       {!isLoading && list.length === 0 ? (
         <EmptyState
           icon={Briefcase}
           title="Você ainda não gerencia outras carteiras"
-          description="Quando um agrônomo convidar você como gestor ou operador, a carteira aparecerá aqui."
+          description="Quando um agrônomo convidar você como gestor ou consultor, a carteira aparecerá aqui."
         />
       ) : null}
 
@@ -43,7 +43,7 @@ export default function MinhasGestoesPage() {
           {list.map((membership) => {
             const isActive = activeScope?.agronomist_id === membership.agronomist_id;
             const levelLabel =
-              membership.access_level === "MANAGER" ? "Gestor" : "Operador";
+              membership.access_level === "MANAGER" ? "Gestor" : "Consultor";
             return (
               <Card key={membership.agronomist_id} className={isActive ? "border-primary" : undefined}>
                 <CardContent className="flex items-center justify-between gap-3 py-4">

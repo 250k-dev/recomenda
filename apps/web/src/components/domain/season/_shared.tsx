@@ -166,9 +166,22 @@ export function SummaryCard({ label, value }: { label: string; value: string }) 
 }
 
 export function extractError(e: unknown): string {
+  // Alinhado a `apiErrorMessage`: Nest devolve `{ error: { message } }`.
   if (e && typeof e === "object" && "response" in e) {
-    const resp = (e as { response?: { data?: { message?: string } } }).response;
-    if (resp?.data?.message) return resp.data.message;
+    const resp = (
+      e as {
+        response?: {
+          data?: {
+            error?: { message?: string };
+            message?: string | string[];
+          };
+        };
+      }
+    ).response;
+    const data = resp?.data;
+    if (data?.error?.message) return data.error.message;
+    if (typeof data?.message === "string") return data.message;
+    if (Array.isArray(data?.message) && data.message[0]) return String(data.message[0]);
   }
   if (e instanceof Error) return e.message;
   return "Não foi possível concluir. Tente novamente.";

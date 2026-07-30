@@ -37,7 +37,7 @@ import {
 } from "@recomenda/api-hooks";
 
 function accessLabel(level: AdminTeamMember["access_level"]) {
-  return level === "MANAGER" ? "Gestor" : "Operador";
+  return level === "MANAGER" ? "Gestor" : "Consultor";
 }
 
 export default function AdminAgronomistDetailPage() {
@@ -201,8 +201,8 @@ export default function AdminAgronomistDetailPage() {
         />
         <KpiCell
           icon={<UsersIcon className="h-4 w-4" />}
-          label="Operadores"
-          value={data.counts.assistants ?? 0}
+          label="Consultores"
+          value={data.counts.consultants ?? 0}
         />
       </KpiStrip>
 
@@ -238,7 +238,7 @@ export default function AdminAgronomistDetailPage() {
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <SectionTitle title="Equipe (gestores e operadores)" />
+          <SectionTitle title="Equipe (gestores e consultores)" />
           <Link
             href={routes.admin.equipe}
             className="text-sm font-medium text-primary hover:underline"

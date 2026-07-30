@@ -18,11 +18,30 @@ export interface AdminAgronomist {
   plan_started_at: string;
   active_plots_count: number;
   is_active: boolean;
+  organization_id?: string | null;
 }
 
-export type AdminAccessLevel = "MANAGER" | "ASSISTANT";
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string | null;
+  is_active: boolean;
+  created_at: string;
+  members_count: number;
+  agronomists_count: number;
+}
 
-/** Membro da equipe (gestor/operador) visível no admin. */
+export interface OrganizationMember {
+  user_id: string;
+  name: string;
+  email: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export type AdminAccessLevel = "MANAGER" | "CONSULTANT" | "FARM_MANAGER" | "FARM_OPERATOR";
+
+/** Membro da equipe (gestor/consultor) visível no admin. */
 export interface AdminTeamMember {
   user_id: string;
   name: string;
@@ -54,7 +73,7 @@ export interface AdminAgronomistDetail {
     seasons: number;
     pending_invitations: number;
     managers: number;
-    assistants: number;
+    consultants: number;
     temporary_members: number;
   };
   farms: Array<{
@@ -136,6 +155,7 @@ export async function getAdminAgronomistDetail(id: string) {
 export async function createAdminAgronomist(payload: {
   user: { name: string; email: string; password: string };
   plan_id: string;
+  organization_id?: string | null;
 }) {
   const { data } = await api.post<AdminAgronomist>("/admin/agronomists", payload);
   return data;
@@ -191,5 +211,43 @@ export async function promoteAdminTeamMember(userId: string, planId: string) {
     email: string;
     plan_id: string;
   }>(`/admin/team-members/${userId}/promote`, { plan_id: planId });
+  return data;
+}
+
+export async function getOrganizations() {
+  const { data } = await api.get<{ data: Organization[] } | Organization[]>(
+    "/admin/organizations",
+  );
+  return Array.isArray(data) ? data : data.data;
+}
+
+export async function createOrganization(payload: { name: string; slug?: string | null }) {
+  const { data } = await api.post<Organization>("/admin/organizations", payload);
+  return data;
+}
+
+export async function updateOrganization(
+  id: string,
+  payload: { name?: string; slug?: string | null; is_active?: boolean },
+) {
+  const { data } = await api.patch<Organization>(`/admin/organizations/${id}`, payload);
+  return data;
+}
+
+export async function getOrganizationMembers(id: string) {
+  const { data } = await api.get<{ data: OrganizationMember[] } | OrganizationMember[]>(
+    `/admin/organizations/${id}/members`,
+  );
+  return Array.isArray(data) ? data : data.data;
+}
+
+export async function addOrganizationAdmin(
+  id: string,
+  payload: { name: string; email: string; password: string },
+) {
+  const { data } = await api.post<{ user_id: string; email: string }>(
+    `/admin/organizations/${id}/admins`,
+    payload,
+  );
   return data;
 }

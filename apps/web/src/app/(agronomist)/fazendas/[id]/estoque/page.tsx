@@ -57,7 +57,10 @@ export default function FarmStockPage() {
       </div>
 
       {resolvedProducerId ? (
-        <ProducerStockSection producerId={resolvedProducerId} />
+        <ProducerStockSection
+          producerId={resolvedProducerId}
+          producerName={producer?.name}
+        />
       ) : (
         <EmptyState
           title="Produtor não vinculado"

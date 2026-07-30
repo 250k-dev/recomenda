@@ -49,33 +49,42 @@ export interface PurchaseListPrintContext {
   agronomistName?: string | null;
 }
 
+function hasMoney(n: number | null | undefined): boolean {
+  return n != null && Number.isFinite(Number(n)) && Number(n) > 0;
+}
+
 function summaryHtml(list: PurchaseListDetail): string {
   const items: string[] = [];
   items.push(`
     <div class="summary-item">
       <span class="summary-label">Área total</span>
-      <span class="summary-value">${fmtQty(list.total_hectares)} ha</span>
+      <span class="summary-value">${fmtQty(list.total_hectares ?? 0)} ha</span>
     </div>`);
   items.push(`
     <div class="summary-item">
       <span class="summary-label">Talhões</span>
       <span class="summary-value">${(list.plots ?? []).length}</span>
     </div>`);
-  if (list.cost_summary) {
+  const summary = list.cost_summary;
+  if (summary && hasMoney(summary.total_sacks)) {
     items.push(`
       <div class="summary-item">
         <span class="summary-label">Total de sacas</span>
-        <span class="summary-value">${fmtQty(list.cost_summary.total_sacks)}</span>
+        <span class="summary-value">${fmtQty(summary.total_sacks)}</span>
       </div>`);
+  }
+  if (summary && hasMoney(summary.grand_total_brl)) {
     items.push(`
       <div class="summary-item">
         <span class="summary-label">Custo total</span>
-        <span class="summary-value">${fmtBrl(list.cost_summary.grand_total_brl)}</span>
+        <span class="summary-value">${fmtBrl(summary.grand_total_brl)}</span>
       </div>`);
+  }
+  if (summary && hasMoney(summary.cost_per_ha_brl)) {
     items.push(`
       <div class="summary-item">
         <span class="summary-label">Custo por ha</span>
-        <span class="summary-value">${fmtBrl(list.cost_summary.cost_per_ha_brl)}</span>
+        <span class="summary-value">${fmtBrl(summary.cost_per_ha_brl)}</span>
       </div>`);
   }
   return `<div class="summary">${items.join("")}</div>`;
@@ -85,6 +94,10 @@ function itemsTableHtml(list: PurchaseListDetail): string {
   if (list.items.length === 0) {
     return `<p class="empty">Esta lista ainda não tem produtos.</p>`;
   }
+  // Sem PRICE_VIEW o backend remove unit_price_brl/total_brl — PDF só com volume.
+  const showPrices = list.items.some(
+    (it) => hasMoney(it.unit_price_brl) || hasMoney(it.total_brl),
+  );
   const rows = list.items
     .map((it) => {
       // Produto aplicado em parte da área (ex.: 50% — "áreas sujas"): mostra o
@@ -99,24 +112,30 @@ function itemsTableHtml(list: PurchaseListDetail): string {
         : "";
       const dose = formatDose(it);
       const volume = formatVolume(it);
+      const priceCells = showPrices
+        ? `<td class="num">${hasMoney(it.unit_price_brl) ? fmtBrl(it.unit_price_brl) : "&mdash;"}</td>
+          <td class="num">${hasMoney(it.total_brl) ? fmtBrl(it.total_brl) : "&mdash;"}</td>`
+        : "";
       return `
         <tr>
           <td>${escapeHtml(it.product_name)}${areaLine}</td>
           <td>${escapeHtml(categoryLabel(it.category))}</td>
           <td class="num">${dose === "—" ? "&mdash;" : escapeHtml(dose)}</td>
           <td class="num">${escapeHtml(volume)}</td>
-          <td class="num">${it.unit_price_brl > 0 ? fmtBrl(it.unit_price_brl) : "&mdash;"}</td>
-          <td class="num">${it.total_brl > 0 ? fmtBrl(it.total_brl) : "&mdash;"}</td>
+          ${priceCells}
         </tr>`;
     })
     .join("");
 
-  const total = list.cost_summary?.grand_total_brl ?? 0;
-  const foot = `
+  const total = list.cost_summary?.grand_total_brl;
+  const foot =
+    showPrices && hasMoney(total)
+      ? `
     <tr>
       <td colspan="5">Total estimado</td>
       <td class="num">${fmtBrl(total)}</td>
-    </tr>`;
+    </tr>`
+      : "";
 
   return `
     <table class="data-table">
@@ -126,12 +145,11 @@ function itemsTableHtml(list: PurchaseListDetail): string {
           <th>Categoria</th>
           <th class="num">Dose</th>
           <th class="num">Volume</th>
-          <th class="num">Custo unit.</th>
-          <th class="num">Total</th>
+          ${showPrices ? `<th class="num">Custo unit.</th><th class="num">Total</th>` : ""}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
-      <tfoot>${foot}</tfoot>
+      ${foot ? `<tfoot>${foot}</tfoot>` : ""}
     </table>`;
 }
 
@@ -190,9 +208,9 @@ export function buildPurchaseListWhatsappMessage(
     );
   }
 
-  if (list.cost_summary) {
+  if (hasMoney(list.cost_summary?.grand_total_brl)) {
     lines.push("");
-    lines.push(`*Total estimado:* ${fmtBrl(list.cost_summary.grand_total_brl)}`);
+    lines.push(`*Total estimado:* ${fmtBrl(list.cost_summary!.grand_total_brl)}`);
   }
 
   return lines.join("\n");

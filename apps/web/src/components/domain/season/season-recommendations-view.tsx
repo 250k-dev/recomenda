@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, Leaf, Plus, Send, Share2 } from "lucide-react";
+import { CalendarDays, Leaf, ListOrdered, Plus, Send, Share2 } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
 import { TimelineCardsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
@@ -14,6 +14,7 @@ import {
   useMe,
   useProducer,
   useReorderRecommendations,
+  useSeason,
   useSeasonTimeline,
 } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
@@ -28,7 +29,9 @@ import { extractError } from "@/components/domain/season/_shared";
 import { RecommendationCard } from "@/components/domain/season/recommendation-card";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
 import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
+import { SeasonMixOrderDialog } from "@/components/domain/season/season-mix-order-dialog";
 import { fmtDate } from "@recomenda/domain/recommendations/format";
+import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { routes } from "@recomenda/config";
 
 /**
@@ -37,13 +40,18 @@ import { routes } from "@recomenda/config";
  */
 function PlantingDateBlock({
   seasonId,
-  plantingDate,
+  plantingDate: plantingDateProp,
   canManage,
 }: {
   seasonId: string;
   plantingDate?: string | null;
   canManage: boolean;
 }) {
+  // Lê direto do cache da safra (atualizado no PATCH) — não depende só da prop
+  // do page, que pode ficar stale se o layout/página não re-renderizar a tempo.
+  const { data: season } = useSeason(seasonId);
+  const raw = season?.planting_date ?? plantingDateProp;
+  const plantingDate = raw ? String(raw).slice(0, 10) : null;
   const hasDate = Boolean(plantingDate);
 
   return (
@@ -180,7 +188,7 @@ export function SeasonRecommendationsView({
   seasonId,
   title,
   plotName,
-  plantingDate,
+  plantingDate: plantingDateProp,
   statusLabel,
   seasonStatus,
   producerId,
@@ -201,6 +209,13 @@ export function SeasonRecommendationsView({
   onPublish?: () => void;
   isPublishing?: boolean;
 }) {
+  const { data: seasonLive } = useSeason(seasonId);
+  const plantingDate = (() => {
+    const raw = seasonLive?.planting_date ?? plantingDateProp;
+    return raw ? String(raw).slice(0, 10) : null;
+  })();
+  const mixFormulationOrder = (seasonLive as { mix_formulation_order?: string[] | null } | undefined)
+    ?.mix_formulation_order as FormulationKey[] | null | undefined;
   const { data, isLoading } = useSeasonTimeline(seasonId);
   // Catálogo (global + local) e IDs que já estão na lista de compra desta safra,
   // para o editor de produtos e o alerta "fora da programação".
@@ -235,6 +250,7 @@ export function SeasonRecommendationsView({
   // muitas etapas) para o agrônomo não precisar rolar até o topo.
   const [addingStageBottom, setAddingStageBottom] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [mixOrderOpen, setMixOrderOpen] = useState(false);
   const reorderMut = useReorderRecommendations(seasonId);
   const meData = useMe().data as { name?: string } | undefined;
   const producerQuery = useProducer(producerId ?? "");
@@ -311,9 +327,25 @@ export function SeasonRecommendationsView({
 
     return (
       <div className="flex flex-col gap-4">
-        <h2 className="text-base font-semibold font-display text-text-strong">
-          Etapas do cronograma
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold font-display text-text-strong">
+              Etapas do cronograma
+            </h2>
+            {canManageStages ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setMixOrderOpen(true)}
+              >
+                <ListOrdered className="w-4 h-4 text-muted-foreground" />
+                Ordem de mistura
+              </Button>
+            ) : null}
+          </div>
+          {emptyAction}
+        </div>
         <ul className="flex flex-col gap-3">
           <PlantingDateBlock
             seasonId={seasonId}
@@ -331,7 +363,6 @@ export function SeasonRecommendationsView({
                 ? "Adicione etapas manualmente ou configure o modelo de timing do produtor."
                 : "O cronograma é gerado ao publicar a safra com um modelo de timing que tenha etapas configuradas."
           }
-          action={emptyAction}
         />
         {addingStage && canManageStages ? (
           <AddStagePanel
@@ -339,6 +370,12 @@ export function SeasonRecommendationsView({
             onClose={() => setAddingStage(false)}
           />
         ) : null}
+        <SeasonMixOrderDialog
+          open={mixOrderOpen}
+          onOpenChange={setMixOrderOpen}
+          seasonId={seasonId}
+          currentOrder={mixFormulationOrder}
+        />
       </div>
     );
   }
@@ -401,7 +438,7 @@ export function SeasonRecommendationsView({
       </PageHero>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-base font-semibold font-display text-text-strong">
             Etapas do cronograma
           </h2>
@@ -414,6 +451,17 @@ export function SeasonRecommendationsView({
             <Share2 className="w-4 h-4 text-muted-foreground" />
             Exportar
           </Button>
+          {canManageStages ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 print:hidden"
+              onClick={() => setMixOrderOpen(true)}
+            >
+              <ListOrdered className="w-4 h-4 text-muted-foreground" />
+              Ordem de mistura
+            </Button>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           {canManageStages ? (
@@ -491,6 +539,12 @@ export function SeasonRecommendationsView({
         open={exportOpen}
         onOpenChange={setExportOpen}
         data={shareData}
+      />
+      <SeasonMixOrderDialog
+        open={mixOrderOpen}
+        onOpenChange={setMixOrderOpen}
+        seasonId={seasonId}
+        currentOrder={mixFormulationOrder}
       />
     </div>
   );

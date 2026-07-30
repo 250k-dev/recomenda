@@ -33,6 +33,10 @@ export function useUpdatePurchaseList(id: string, options?: { farmId?: string })
         queryClient.invalidateQueries({
           queryKey: queryKeys.producerPurchaseLists(data.producer_id),
         });
+        // Sync lista → estoque no save: atualiza a tela de estoque / prefill.
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.producerStock(data.producer_id),
+        });
       }
       if (options?.farmId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.farmPurchaseLists(options.farmId) });

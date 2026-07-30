@@ -4,16 +4,23 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { CalendarDays, CheckCircle2 } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
-import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@recomenda/ui/primitives/popover";
+import { BrazilianDateInput } from "@recomenda/ui/forms/brazilian-date-input";
 import { useUpdateSeason } from "@recomenda/api-hooks";
 import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 import { extractError } from "@/components/domain/season/_shared";
+
+/** Garante `YYYY-MM-DD` interno (API / state). Exibição fica em DD/MM/AAAA. */
+function toYmd(value?: string | null): string {
+  if (!value) return todayLocalYmd();
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+  return match ? match[1] : todayLocalYmd();
+}
 
 /**
  * Registra ou altera a data de plantio da safra (âncora do cronograma).
@@ -34,15 +41,13 @@ export function PlantingDateRegisterPopover({
   trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(
-    currentPlantingDate || todayLocalYmd(),
-  );
+  const [date, setDate] = useState(() => toYmd(currentPlantingDate));
   const updateMut = useUpdateSeason(seasonId);
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     if (next) {
-      setDate(currentPlantingDate || todayLocalYmd());
+      setDate(toYmd(currentPlantingDate));
     }
   };
 
@@ -85,10 +90,11 @@ export function PlantingDateRegisterPopover({
             <Label className="text-xs font-semibold text-primary">
               Data de plantio
             </Label>
-            <Input
-              type="date"
+            <BrazilianDateInput
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
+              placeholder="DD/MM/AAAA"
+              aria-label="Data de plantio"
               className="h-10 text-sm font-semibold border-primary/30 bg-card"
             />
             <p className="text-xs text-muted-foreground">

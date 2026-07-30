@@ -38,7 +38,7 @@ export default function LoginPage() {
             Entrar
           </h2>
           <p className="text-sm text-muted-foreground">
-            Área restrita a administradores e agrônomos.
+            Acesse com o e-mail e a senha da sua conta.
           </p>
         </div>
 
@@ -47,20 +47,11 @@ export default function LoginPage() {
             {loginMutation.isError ? (
               (() => {
                 const err = loginMutation.error as { code?: string; message?: string } | null;
-                const isProducer =
-                  err?.code === "PRODUCER_WEB_FORBIDDEN" ||
-                  err?.message?.includes("Produtores");
                 const isDisabled = err?.code === "ACCOUNT_DISABLED";
-                const title = isProducer
-                  ? "Acesso restrito"
-                  : isDisabled
-                    ? "Conta desativada"
-                    : "Não foi possível entrar";
-                const description = isProducer
-                  ? "Contas de produtor não têm acesso ao painel web."
-                  : isDisabled
-                    ? "Sua conta foi desativada. Contate o suporte."
-                    : "Verifique e-mail e senha ou tente novamente em instantes.";
+                const title = isDisabled ? "Conta desativada" : "Não foi possível entrar";
+                const description = isDisabled
+                  ? "Sua conta foi desativada. Contate o suporte."
+                  : "Verifique e-mail e senha ou tente novamente em instantes.";
                 return (
                   <Alert variant="destructive">
                     <AlertCircle />

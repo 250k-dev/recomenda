@@ -12,6 +12,7 @@ import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Button } from "@recomenda/ui/primitives/button";
 import { FieldError } from "@/components/domain/season/_shared";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import {
   useCurrencyStore,
@@ -139,15 +140,23 @@ export function FarmPurchaseListTab({
 }: FarmPurchaseListTabProps) {
   const canListCrud = useCan("LIST_CRUD");
   const canQuoteCrud = useCan("QUOTE_CRUD");
+  const canViewPrices = useCan("PRICE_VIEW");
   const effectiveReadOnly = readOnly || !canListCrud;
   const { data: producerStock } = useProducerStock(producerId ?? "");
-  const stockByProductId = useMemo(
-    () =>
-      Object.fromEntries(
-        (producerStock ?? []).map((s) => [s.local_product_id, s.quantity]),
-      ),
-    [producerStock],
-  );
+  const stockByProductId = useMemo(() => {
+    const map: Record<string, { quantity: number; price_brl: number | null }> =
+      {};
+    for (const s of producerStock ?? []) {
+      map[s.local_product_id] = {
+        quantity: Number(s.quantity) || 0,
+        price_brl:
+          s.price_brl != null && Number.isFinite(Number(s.price_brl))
+            ? Number(s.price_brl)
+            : null,
+      };
+    }
+    return map;
+  }, [producerStock]);
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -303,7 +312,7 @@ export function FarmPurchaseListTab({
       // NÃO engole o erro: marca "não salvo" (o backup local continua guardado).
       setSaveState("error");
       if (!opts?.silent) {
-        setError(e instanceof Error ? e.message : "Não foi possível salvar a lista.");
+        setError(apiErrorMessage(e, "Não foi possível salvar a lista."));
       }
     }
   };
@@ -318,9 +327,7 @@ export function FarmPurchaseListTab({
       toast.success("Metas atualizadas.");
       setTargetsOpen(false);
     } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Não foi possível salvar as metas.",
-      );
+      toast.error(apiErrorMessage(e, "Não foi possível salvar as metas."));
     } finally {
       setSavingTargets(false);
     }
@@ -397,6 +404,7 @@ export function FarmPurchaseListTab({
     return (
       <div className="flex flex-col gap-5">
         <PageHero
+          sticky
           className="mb-7"
           icon={<Leaf className="size-6" />}
           eyebrow="Lista de compra"
@@ -446,6 +454,7 @@ export function FarmPurchaseListTab({
       ) : null}
 
       <PageHero
+        sticky
         className="mb-7"
         icon={<Leaf className="size-6" />}
         eyebrow={`Lista de compra · ${list.name}`}
@@ -488,7 +497,7 @@ export function FarmPurchaseListTab({
                   Editar lista
                 </Button>
               ) : null}
-              {!effectiveReadOnly ? (
+              {canViewPrices && !effectiveReadOnly ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -532,10 +541,8 @@ export function FarmPurchaseListTab({
                 Cotações das lojas
               </Button>
               ) : null}
-              {/* Sem barra de abas, este é o caminho para o plano de custo da
-                  safra. Embutido usa o callback (troca de view sem recarregar);
-                  no modo avulso, o link direto para o plano do talhão. */}
-              {onOpenCostPlan ? (
+              {/* Plano de custo é só preço — Gerente/Operador não têm PRICE_VIEW. */}
+              {canViewPrices && onOpenCostPlan ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -545,7 +552,7 @@ export function FarmPurchaseListTab({
                   <Eye className="h-4 w-4" />
                   Ver plano de custo
                 </Button>
-              ) : list.season_id ? (
+              ) : canViewPrices && list.season_id ? (
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={routes.safras.planoDeCusto(list.season_id)}>
                     <Eye className="h-4 w-4" />
@@ -565,18 +572,26 @@ export function FarmPurchaseListTab({
           )
         }
         stats={[
-          {
-            label: "Valor total",
-            value: kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—",
-          },
-          {
-            label: "Volume de sacas",
-            value: kpis.totalSacks > 0 ? `${fmtQty(kpis.totalSacks)} sc` : "—",
-          },
-          {
-            label: "Custo (sc/ha)",
-            value: kpis.costSacksPerHa > 0 ? `${fmtQty(kpis.costSacksPerHa)} sc/ha` : "—",
-          },
+          ...(canViewPrices
+            ? [
+                {
+                  label: "Valor total",
+                  value: kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—",
+                },
+                {
+                  label: "Volume de sacas",
+                  value:
+                    kpis.totalSacks > 0 ? `${fmtQty(kpis.totalSacks)} sc` : "—",
+                },
+                {
+                  label: "Custo (sc/ha)",
+                  value:
+                    kpis.costSacksPerHa > 0
+                      ? `${fmtQty(kpis.costSacksPerHa)} sc/ha`
+                      : "—",
+                },
+              ]
+            : []),
           { label: "Produtos", value: String(kpis.productsCount) },
           { label: "Hectares", value: `${fmtQty(totalHa)} ha` },
           { label: "Talhões", value: (list.plots ?? []).length },
@@ -619,15 +634,19 @@ export function FarmPurchaseListTab({
           {/* Meta única (sc/ha): barra Real × Meta; a distribuição por categoria
               continua abaixo, sem coluna de meta. Metas antigas por categoria
               seguem na tabela Realizado × Meta de sempre. */}
-          {hasSingleTotalTarget(list.category_targets ?? {}) ? (
+          {canViewPrices &&
+          hasSingleTotalTarget(list.category_targets ?? {}) ? (
             <CategoryMetaProgress
               items={editing ? draftItems : viewItems}
               totalHa={totalHa}
               targets={list.category_targets ?? {}}
             />
           ) : null}
-          {kpis.categoryBreakdown.length > 0 ||
-          Object.values(list.category_targets ?? {}).some((v) => (v ?? 0) > 0) ? (
+          {canViewPrices &&
+          (kpis.categoryBreakdown.length > 0 ||
+            Object.values(list.category_targets ?? {}).some(
+              (v) => (v ?? 0) > 0,
+            )) ? (
             <CategoryDistributionPanel
               breakdown={kpis.categoryBreakdown}
               targets={

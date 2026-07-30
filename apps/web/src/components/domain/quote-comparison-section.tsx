@@ -17,6 +17,7 @@ import {
 } from "@recomenda/ui/primitives/dialog";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
+import { NativeSelect, NativeSelectOption } from "@recomenda/ui/primitives/native-select";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import {
@@ -48,6 +49,7 @@ const AVAILABILITY_LABEL: Record<QuoteAvailability, string> = {
 const PAYMENT_TERM_LABEL: Record<QuotePaymentTerm, string> = {
   CASH: "À vista",
   TERM: "A prazo",
+  BARTER: "Barter",
 };
 
 function statusBadge(r: QuoteComparisonResponse) {
@@ -88,6 +90,7 @@ export function QuoteComparisonSection({
   // cotação entra na comparação como qualquer outra.
   const [manualOpen, setManualOpen] = useState(false);
   const [manualStoreName, setManualStoreName] = useState("");
+  const [manualPaymentTerm, setManualPaymentTerm] = useState<"" | QuotePaymentTerm>("");
   const [manualSaving, setManualSaving] = useState(false);
 
   const startManualQuote = async () => {
@@ -98,14 +101,23 @@ export function QuoteComparisonSection({
     }
     setManualSaving(true);
     try {
-      // Sem link de cotação ainda? Cria na hora (mesmo request das lojas).
-      const token = data?.request?.token ?? (await createQuoteRequest(listId)).token;
+      // Sem link de cotação ainda? Cria na hora (exige condição de pagamento).
+      let token = data?.request?.token;
+      if (!token) {
+        if (!manualPaymentTerm) {
+          toast.error("Selecione a condição de pagamento da cotação.");
+          setManualSaving(false);
+          return;
+        }
+        token = (await createQuoteRequest(listId, manualPaymentTerm)).token;
+      }
       const created = await createQuoteResponse(token, { store_name: name });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.purchaseListQuotes(listId),
       });
       setManualOpen(false);
       setManualStoreName("");
+      setManualPaymentTerm("");
       window.open(
         `/cotacao/${token}/loja/${created.response_token}`,
         "_blank",
@@ -152,6 +164,24 @@ export function QuoteComparisonSection({
             }}
           />
         </div>
+        {!data?.request ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="manual-payment-term">Condição de pagamento</Label>
+            <NativeSelect
+              id="manual-payment-term"
+              className="w-full"
+              value={manualPaymentTerm}
+              onChange={(e) =>
+                setManualPaymentTerm(e.target.value as "" | QuotePaymentTerm)
+              }
+            >
+              <NativeSelectOption value="">Selecione…</NativeSelectOption>
+              <NativeSelectOption value="CASH">À vista</NativeSelectOption>
+              <NativeSelectOption value="TERM">A prazo</NativeSelectOption>
+              <NativeSelectOption value="BARTER">Barter</NativeSelectOption>
+            </NativeSelect>
+          </div>
+        ) : null}
         <DialogFooter>
           <Button variant="ghost" onClick={() => setManualOpen(false)} disabled={manualSaving}>
             Cancelar
@@ -240,6 +270,7 @@ export function QuoteComparisonSection({
   }
 
   const { items, responses } = data;
+  const globalPaymentTerm = data.request.payment_term;
 
   const trashPanel =
     trashCount > 0 && showTrash ? (
@@ -414,18 +445,30 @@ export function QuoteComparisonSection({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-end gap-1.5">
-        {manualQuoteButton}
-        <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
-          <FileDown className="size-3.5" />
-          Exportar
-        </Button>
-        {trashCount > 0 ? (
-          <Button variant="ghost" size="sm" onClick={() => setShowTrash((v) => !v)}>
-            <Trash2 className="size-3.5" />
-            Lixeira ({trashCount})
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {globalPaymentTerm ? (
+          <span className="rounded-md border border-border bg-rail px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            Pagamento:{" "}
+            <span className="font-semibold text-text-strong">
+              {PAYMENT_TERM_LABEL[globalPaymentTerm]}
+            </span>
+          </span>
+        ) : (
+          <span />
+        )}
+        <div className="flex items-center justify-end gap-1.5">
+          {manualQuoteButton}
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
+            <FileDown className="size-3.5" />
+            Exportar
           </Button>
-        ) : null}
+          {trashCount > 0 ? (
+            <Button variant="ghost" size="sm" onClick={() => setShowTrash((v) => !v)}>
+              <Trash2 className="size-3.5" />
+              Lixeira ({trashCount})
+            </Button>
+          ) : null}
+        </div>
       </div>
       {manualQuoteDialog}
       {trashPanel}

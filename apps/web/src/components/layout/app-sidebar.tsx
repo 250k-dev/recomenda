@@ -12,6 +12,7 @@ import {
   CreditCard,
   BadgeCheck,
   EllipsisVertical,
+  Building2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,7 @@ const iconMap: Record<string, React.ReactNode> = {
   "/admin/planos": <CreditCard className="size-4" />,
   "/admin/agronomos": <Users className="size-4" />,
   "/admin/equipe": <UserCog className="size-4" />,
+  "/admin/equipes": <Building2 className="size-4" />,
   "/admin/produtores": <UsersRound className="size-4" />,
   "/admin/catalogo-global": <Package className="size-4" />,
 };
@@ -58,16 +60,25 @@ export function AppSidebar({ role }: { role: UserRole }) {
   const roleLabel =
     role === "ADMIN"
       ? "Administrador"
-      : role === "STAFF"
-        ? accessLevel === "MANAGER"
-          ? "Gestor"
-          : "Operador"
-        : "Agronomista";
+      : role === "ORG_ADMIN"
+        ? "Admin da equipe"
+        : role === "PRODUCER"
+          ? "Produtor"
+          : role === "STAFF"
+            ? accessLevel === "MANAGER"
+              ? "Gestor"
+              : accessLevel === "FARM_MANAGER"
+                ? "Gerente"
+                : accessLevel === "FARM_OPERATOR"
+                  ? "Operador"
+                  : "Consultor"
+            : "Agronomista";
 
   const profileName =
     role === "ADMIN" ? "Administrador" : currentUser?.name?.trim() || "";
   const userInitial = profileName ? profileName.charAt(0).toUpperCase() : "U";
-  const profileHref = role === "ADMIN" ? routes.admin.perfil : routes.perfil;
+  const profileHref =
+    role === "ADMIN" || role === "ORG_ADMIN" ? routes.admin.perfil : routes.perfil;
 
   return (
     <Sidebar collapsible="icon">

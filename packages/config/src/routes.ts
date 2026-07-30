@@ -63,11 +63,11 @@ export const routes = {
   /** Destino do link enviado por e-mail; o token vem no caminho, nunca na query. */
   redefinirSenha: (token: string) => dynamicRoute(`/redefinir-senha/${token}`),
   convite: (token: string) => dynamicRoute(`/convite/${token}`),
-  /** Beco informativo para contas de produtor (sem acesso ao painel web). */
+  /** Legado: redireciona para o dashboard (produtor acessa o painel web). */
   acessoProdutor: "/acesso-produtor" satisfies Route,
 
   dashboard: "/dashboard" satisfies Route,
-  /** Carteiras de outros agrônomos onde o usuário é gestor/operador. */
+  /** Carteiras de outros agrônomos onde o usuário é gestor/consultor. */
   minhasGestoes: "/minhas-gestoes" satisfies Route,
   cronograma: (ctx?: RouteContext) => withQuery("/cronograma", ctx),
   perfil: "/perfil" satisfies Route,
@@ -152,6 +152,7 @@ export const routes = {
     },
     /** Tipado com cast até o Next regenerar `.next/types` com a rota nova. */
     equipe: "/admin/equipe" as Route,
+    equipes: "/admin/equipes" as Route,
     catalogoGlobal: "/admin/catalogo-global" satisfies Route,
     perfil: "/admin/perfil" satisfies Route,
   },

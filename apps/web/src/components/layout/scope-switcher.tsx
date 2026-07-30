@@ -98,7 +98,7 @@ export function ScopeSwitcher() {
               <span className="flex-1 truncate">
                 {membership.agronomist_name}
                 <span className="ml-1.5 text-xs text-muted-foreground">
-                  {membership.access_level === "MANAGER" ? "Gestor" : "Operador"}
+                  {membership.access_level === "MANAGER" ? "Gestor" : "Consultor"}
                 </span>
               </span>
               {isActive && <Check className="size-4 text-primary" />}

@@ -42,6 +42,10 @@ export const queryKeys = {
   adminProducers: ["admin-producers"],
   adminTeamMembers: (filters?: { agronomist_id?: string; temporary?: boolean }) =>
     ["admin-team-members", filters?.agronomist_id ?? "all", filters?.temporary ? "temp" : "all"] as const,
+  organizations: ["organizations"] as const,
+  organizationMembers: (id: string) => ["organization-members", id] as const,
+  farmTeam: (producerId: string) => ["farm-team", producerId] as const,
+  farmTeamAll: ["farm-team-all"] as const,
   invitationToken: (token: string) => ["invitation-token", token],
   invitations: (kind?: string) => ["invitations", kind ?? "all"] as const,
   comparativeReport: ["comparative-report"],

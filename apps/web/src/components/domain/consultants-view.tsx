@@ -29,7 +29,10 @@ import { PageHero } from "@/components/domain/page-hero";
 import {
   useConsultants,
   useCreateInvitation,
+  useDeleteFarmTeamMember,
   useDeleteInvitation,
+  useFarmTeamAll,
+  useFarmTeamProducers,
   useInvitations,
   useMe,
   useResendInvitation,
@@ -40,12 +43,397 @@ import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import type { TeamMemberRow } from "@recomenda/api/consultants";
+import type { FarmTeamMember } from "@recomenda/api/farm-team";
 import type { InvitationRow } from "@recomenda/api/producers";
 import type { AccessLevel } from "@recomenda/api/auth-types";
 
+type TeamInviteLevel = Extract<AccessLevel, "MANAGER" | "CONSULTANT">;
+type FarmInviteLevel = Extract<AccessLevel, "FARM_MANAGER" | "FARM_OPERATOR">;
+
 export function ConsultantsView() {
+  const canTeamManage = useCan("TEAM_MANAGE");
+  const canFarmTeam = useCan("FARM_TEAM_MANAGE");
+  // Consultor (e quem só tem equipe de fazenda): mesma tela, outro modo.
+  if (canFarmTeam && !canTeamManage) {
+    return <FarmTeamEquipeView />;
+  }
+  return <CarteiraEquipeView canManage={canTeamManage} />;
+}
+
+function FarmTeamEquipeView() {
+  const { data, isLoading } = useFarmTeamAll(true);
+  const remove = useDeleteFarmTeamMember();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const { data: invitations } = useInvitations("FARM_TEAM", { enabled: true });
+
+  const members = Array.isArray(data) ? data : [];
+  const gerentes = members.filter((m) => m.access_level === "FARM_MANAGER");
+  const operadores = members.filter((m) => m.access_level === "FARM_OPERATOR");
+  const pending = (invitations ?? []).filter(
+    (i) => i.status !== "ACCEPTED" && i.status !== "REVOKED",
+  );
+  const empty =
+    !isLoading && members.length === 0 && pending.length === 0;
+
+  return (
+    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-8">
+      <PageHero
+        className="mb-4"
+        icon={<Users className="size-6" />}
+        eyebrow="Fazenda"
+        title="Equipe"
+        actions={
+          <Button onClick={() => setInviteOpen(true)} className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Convidar
+          </Button>
+        }
+        stats={[
+          { label: "Gerentes", value: isLoading ? "…" : gerentes.length },
+          { label: "Operadores", value: isLoading ? "…" : operadores.length },
+          ...(pending.length > 0
+            ? [{ label: "Convites pendentes", value: pending.length }]
+            : []),
+        ]}
+      />
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Carregando…</p>
+      ) : empty ? (
+        <EmptyState
+          title="Nenhum gerente ou operador ainda."
+          description="Convide a equipe da fazenda por e-mail — eles definem a própria senha no convite."
+        />
+      ) : (
+        <div className="flex flex-col gap-10">
+          <FarmTeamSection
+            title="Gerentes"
+            microcopy="alteram recomendações e criam operadores · sem ver preços"
+            members={gerentes}
+            onRemove={(id) => remove.mutateAsync(id)}
+            removing={remove.isPending}
+          />
+          <FarmTeamSection
+            title="Operadores"
+            microcopy="visualizam e registram aplicação · sem ver preços"
+            members={operadores}
+            onRemove={(id) => remove.mutateAsync(id)}
+            removing={remove.isPending}
+            emptyLabel={
+              gerentes.length > 0 ? "Nenhum operador ainda. Convide um acima." : undefined
+            }
+          />
+          {pending.length > 0 ? (
+            <PendingInvitationsSection invitations={pending} />
+          ) : null}
+        </div>
+      )}
+
+      <InviteFarmTeamDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+    </div>
+  );
+}
+
+function FarmTeamSection({
+  title,
+  microcopy,
+  members,
+  onRemove,
+  removing,
+  emptyLabel,
+}: {
+  title: string;
+  microcopy: string;
+  members: FarmTeamMember[];
+  onRemove: (id: string) => Promise<unknown>;
+  removing: boolean;
+  emptyLabel?: string;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-extrabold text-[#2B2723]">
+          {title}{" "}
+          <span className="font-semibold text-[#8A857D]">({members.length})</span>
+        </h2>
+        <p className="text-sm text-[#8A857D]">· {microcopy}</p>
+      </div>
+      {members.length === 0 ? (
+        emptyLabel ? <p className="text-sm text-muted-foreground">{emptyLabel}</p> : null
+      ) : (
+        <ul className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(360px,1fr))]">
+          {members.map((m) => (
+            <li key={m.id}>
+              <FarmMemberCard
+                member={m}
+                onRemove={onRemove}
+                removing={removing}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function FarmMemberCard({
+  member,
+  onRemove,
+  removing,
+}: {
+  member: FarmTeamMember;
+  onRemove: (id: string) => Promise<unknown>;
+  removing: boolean;
+}) {
+  const initial = (member.name || "?").trim().charAt(0).toUpperCase();
+  const isGerente = member.access_level === "FARM_MANAGER";
+
+  return (
+    <div className="flex w-full flex-col gap-3 rounded-2xl border border-transparent bg-white px-[22px] py-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-bold",
+            isGerente ? "bg-[#1E5C40] text-white" : "bg-[#EDE9E2] text-[#5C564E]",
+          )}
+        >
+          {initial}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-[17px] font-bold text-[#2B2723]">{member.name}</p>
+            <span className="rounded-full bg-[#E4EEE7] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1E6B4A]">
+              {isGerente ? "Gerente" : "Operador"}
+            </span>
+          </div>
+          <p className="truncate text-[13px] text-[#8A857D]">{member.email || "—"}</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-danger-strong hover:bg-danger-soft"
+          disabled={removing}
+          onClick={async () => {
+            try {
+              await onRemove(member.id);
+              toast.success("Membro removido.");
+            } catch (e) {
+              toast.error(apiErrorMessage(e, "Não foi possível remover."));
+            }
+          }}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+      <div className="border-t border-[#F1EEE8] pt-3 text-[13px] text-[#6B655C]">
+        Produtor: <strong className="text-[#2B2723]">{member.producer_name || "—"}</strong>
+      </div>
+    </div>
+  );
+}
+
+function InviteFarmTeamDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data: me } = useMe();
+  const createInvitation = useCreateInvitation();
+  const isProducer = me?.role === "PRODUCER";
+  const onlyOperator =
+    me?.role === "STAFF" && me.access_level === "FARM_MANAGER";
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<FarmInviteLevel>("FARM_OPERATOR");
+  const [producerIds, setProducerIds] = useState<string[]>([]);
+  const [producerFilter, setProducerFilter] = useState("");
+  const [link, setLink] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const { data: shareableProducers } = useFarmTeamProducers(open);
+
+  const emailValid = /.+@.+\..+/.test(email.trim());
+  const effectiveRole: FarmInviteLevel = onlyOperator ? "FARM_OPERATOR" : role;
+  // Produtor (ou escopo com um único produtor): vínculo implícito — sem picker.
+  const soleProducerId =
+    shareableProducers?.length === 1
+      ? shareableProducers[0].id
+      : isProducer && me?.id
+        ? (shareableProducers?.find((p) => p.id === me.id)?.id ?? me.id)
+        : null;
+  const hideProducerPicker = isProducer || shareableProducers?.length === 1;
+  const resolvedProducerIds =
+    hideProducerPicker && soleProducerId ? [soleProducerId] : producerIds;
+
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setEmail("");
+      setRole("FARM_OPERATOR");
+      setProducerIds([]);
+      setProducerFilter("");
+      setLink(null);
+      setSentTo(null);
+      setCopied(false);
+    }
+  }
+
+  const submit = async () => {
+    if (resolvedProducerIds.length === 0) {
+      toast.error("Selecione ao menos um produtor.");
+      return;
+    }
+    try {
+      const res = await createInvitation.mutateAsync({
+        email: email.trim(),
+        kind: "FARM_TEAM",
+        access_level: effectiveRole,
+        farm_ids: [],
+        producer_ids: resolvedProducerIds,
+      });
+      const full = `${window.location.origin}${routes.convite(res.token)}`;
+      setLink(full);
+      if (res.email_sent) {
+        setSentTo(email.trim());
+        toast.success(
+          hideProducerPicker
+            ? `Convite enviado para ${email.trim()}.`
+            : `Convite enviado para ${email.trim()} com ${resolvedProducerIds.length} produtor(es).`,
+        );
+      } else {
+        toast.success("Convite criado. Envie o link ao membro.");
+      }
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Não foi possível criar o convite."));
+    }
+  };
+
+  const copy = async () => {
+    if (!link) return;
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[560px] rounded-[20px] p-0">
+        <DialogHeader className="shrink-0 px-7 pt-7">
+          <DialogTitle className="text-[21px] font-extrabold">
+            Convidar para a equipe da fazenda
+          </DialogTitle>
+          <DialogDescription>
+            {hideProducerPicker
+              ? "Escolha Gerente ou Operador e envie o convite por e-mail. A pessoa define a própria senha no link."
+              : "Escolha Gerente ou Operador, os produtores e envie o convite por e-mail. A pessoa define a própria senha no link."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-7 py-5">
+          {link ? (
+            <div className="flex flex-col gap-3">
+              {sentTo ? (
+                <div className="rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-4 py-3 text-sm text-[#2B2723]">
+                  Convite enviado para <strong>{sentTo}</strong>. Você também pode
+                  copiar o link abaixo.
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-[#EDE7DC] bg-[#FBF8F1] px-4 py-3 text-sm text-[#2B2723]">
+                  Convite criado. Envie o link abaixo para o convidado.
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input value={link} readOnly className="rounded-xl font-mono text-xs" />
+                <Button type="button" variant="outline" onClick={copy} className="shrink-0 gap-2">
+                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                  {copied ? "Copiado" : "Copiar"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {onlyOperator ? (
+                <div className="rounded-2xl border border-[#EDE7DC] bg-[#FBF8F1] px-4 py-3 text-sm text-[#2B2723]">
+                  Como gerente, você convida <strong>Operadores</strong> da fazenda.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <RoleCard
+                    selected={role === "FARM_MANAGER"}
+                    title="Gerente"
+                    description="Altera recomendações e cria operadores. Não vê preços."
+                    onClick={() => setRole("FARM_MANAGER")}
+                  />
+                  <RoleCard
+                    selected={role === "FARM_OPERATOR"}
+                    title="Operador"
+                    description="Só visualiza e registra aplicação. Não vê preços."
+                    onClick={() => setRole("FARM_OPERATOR")}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="farm-team-email">E-mail</Label>
+                <Input
+                  id="farm-team-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nome@fazenda.com"
+                  className="rounded-xl"
+                />
+              </div>
+
+              {!hideProducerPicker ? (
+                <ProducerPicker
+                  producers={shareableProducers ?? []}
+                  selected={producerIds}
+                  onToggle={(id) =>
+                    setProducerIds((prev) =>
+                      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
+                    )
+                  }
+                  onToggleAll={(ids) => setProducerIds(ids)}
+                  filter={producerFilter}
+                  onFilterChange={setProducerFilter}
+                />
+              ) : null}
+            </>
+          )}
+        </div>
+        {!link ? (
+          <DialogFooter className="shrink-0 flex-row justify-end gap-2 px-7">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={submit}
+              disabled={
+                createInvitation.isPending ||
+                !emailValid ||
+                resolvedProducerIds.length === 0
+              }
+              className="gap-2"
+            >
+              <Send className="size-4" />
+              {createInvitation.isPending ? "Enviando…" : "Enviar convite"}
+            </Button>
+          </DialogFooter>
+        ) : (
+          <DialogFooter className="shrink-0 flex-row justify-end gap-2 px-7">
+            <Button onClick={() => onOpenChange(false)}>Fechar</Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CarteiraEquipeView({ canManage }: { canManage: boolean }) {
   const { data: team, isLoading } = useConsultants();
-  const canManage = useCan("TEAM_MANAGE");
   const [inviteOpen, setInviteOpen] = useState(false);
   // Só quem gerencia equipe pode listar convites — sem isso a chamada volta 403.
   const { data: invitations } = useInvitations("CONSULTANT", { enabled: canManage });
@@ -74,7 +462,7 @@ export function ConsultantsView() {
         }
         stats={[
           { label: "Gestores", value: isLoading ? "…" : managers.length },
-          { label: "Operadores", value: isLoading ? "…" : assistants.length },
+          { label: "Consultores", value: isLoading ? "…" : assistants.length },
           ...(pending.length > 0
             ? [{ label: "Convites pendentes", value: pending.length }]
             : []),
@@ -86,7 +474,7 @@ export function ConsultantsView() {
       ) : empty ? (
         <EmptyState
           title="Nenhum membro na equipe ainda."
-          description="Convide um gestor ou operador e compartilhe os produtores que ele deve acompanhar."
+          description="Convide um gestor ou consultor e compartilhe os produtores que ele deve acompanhar."
         />
       ) : (
         <div className="flex flex-col gap-10">
@@ -99,13 +487,13 @@ export function ConsultantsView() {
             />
           ) : null}
           <TeamSection
-            title="Operadores"
-            microcopy="visualizam produtores compartilhados e registram aplicações"
+            title="Consultores"
+            microcopy="acompanham produtores compartilhados e gerenciam a carteira"
             members={assistants}
             variant="assistant"
             emptyLabel={
               managers.length > 0
-                ? "Nenhum operador ainda. Convide um ou peça a um gestor para criar."
+                ? "Nenhum consultor ainda. Convide um ou peça a um gestor para criar."
                 : undefined
             }
           />
@@ -160,7 +548,14 @@ function PendingInvitationCard({ invitation }: { invitation: InvitationRow }) {
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  const papel = invitation.access_level === "ASSISTANT" ? "Operador" : "Gestor";
+  const papel =
+    invitation.kind === "FARM_TEAM"
+      ? invitation.access_level === "FARM_MANAGER"
+        ? "Gerente"
+        : "Operador"
+      : invitation.access_level === "CONSULTANT"
+        ? "Consultor"
+        : "Gestor";
   const expirado =
     invitation.status === "EXPIRED" || new Date(invitation.expires_at) < new Date();
   const link = `${typeof window === "undefined" ? "" : window.location.origin}${routes.convite(invitation.token)}`;
@@ -341,7 +736,7 @@ function MemberCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-[17px] font-bold text-[#2B2723]">
-              {member.name ?? (isManager ? "Gestor" : "Operador")}
+              {member.name ?? (isManager ? "Gestor" : "Consultor")}
             </p>
             {isManager ? (
               <span className="rounded-full bg-[#E4EEE7] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1E6B4A]">
@@ -362,7 +757,7 @@ function MemberCard({
         {isManager ? (
           <p>
             <strong className="text-[#2B2723]">{member.assistant_count}</strong>{" "}
-            {member.assistant_count === 1 ? "operador" : "operadores"}
+            {member.assistant_count === 1 ? "consultor" : "consultores"}
             {" · "}
             <strong className="text-[#2B2723]">{member.producer_count}</strong>{" "}
             {member.producer_count === 1 ? "produtor" : "produtores"}
@@ -419,7 +814,7 @@ function InviteTeamDialog({
   const isStaffManager = me?.role === "STAFF" && me?.access_level === "MANAGER";
 
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<AccessLevel>("MANAGER");
+  const [role, setRole] = useState<TeamInviteLevel>("MANAGER");
   const [vinculo, setVinculo] = useState<"direto" | string>("direto");
   const [link, setLink] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -430,14 +825,14 @@ function InviteTeamDialog({
   const { data: shareableProducers } = useShareableProducers(open);
 
   const emailValid = /.+@.+\..+/.test(email.trim());
-  const effectiveRole: AccessLevel = isStaffManager ? "ASSISTANT" : role;
+  const effectiveRole: TeamInviteLevel = isStaffManager ? "CONSULTANT" : role;
 
   const [prevOpen, setPrevOpen] = useState(false);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
       setEmail("");
-      setRole(isStaffManager ? "ASSISTANT" : "MANAGER");
+      setRole(isStaffManager ? "CONSULTANT" : "MANAGER");
       setVinculo("direto");
       setLink(null);
       setSentTo(null);
@@ -455,7 +850,7 @@ function InviteTeamDialog({
         farm_ids: [],
         producer_ids: producerIds,
       };
-      if (effectiveRole === "ASSISTANT" && !isStaffManager) {
+      if (effectiveRole === "CONSULTANT" && !isStaffManager) {
         payload.manager_user_id = vinculo === "direto" ? null : vinculo;
       }
       const res = await createInvitation.mutateAsync(payload);
@@ -518,19 +913,19 @@ function InviteTeamDialog({
                   <RoleCard
                     selected={effectiveRole === "MANAGER"}
                     title="Gestor"
-                    description="Cria e gerencia produtores, fazendas, listas e recomendações. Pode convidar operadores."
+                    description="Cria e gerencia produtores, fazendas, listas e recomendações. Pode convidar consultores."
                     onClick={() => setRole("MANAGER")}
                   />
                   <RoleCard
-                    selected={effectiveRole === "ASSISTANT"}
-                    title="Operador"
-                    description="Visualiza produtores compartilhados e registra aplicações das recomendações."
-                    onClick={() => setRole("ASSISTANT")}
+                    selected={effectiveRole === "CONSULTANT"}
+                    title="Consultor"
+                    description="Acompanha produtores compartilhados, cria recomendações e registra aplicações."
+                    onClick={() => setRole("CONSULTANT")}
                   />
                 </div>
               ) : (
                 <div className="rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-4 py-3 text-sm text-[#2B2723]">
-                  Você está convidando um <strong>Operador</strong>, que ficará vinculado a você.
+                  Você está convidando um <strong>Consultor</strong>, que ficará vinculado a você.
                 </div>
               )}
 
@@ -546,7 +941,7 @@ function InviteTeamDialog({
                 />
               </div>
 
-              {effectiveRole === "ASSISTANT" && !isStaffManager ? (
+              {effectiveRole === "CONSULTANT" && !isStaffManager ? (
                 <div className="space-y-2">
                   <Label>Vínculo</Label>
                   <ul className="flex flex-col gap-2">

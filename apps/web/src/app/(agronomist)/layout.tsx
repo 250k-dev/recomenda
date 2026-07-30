@@ -8,14 +8,8 @@ export default async function AgronomistLayout({ children }: { children: ReactNo
   const role = await getSessionRole();
   // Membro de equipe (Gestor/Consultor) usa a mesma área do agrônomo (com escopo
   // e permissões aplicados no backend).
-  if (role !== "AGRONOMIST" && role !== "STAFF") {
-    redirect(
-      role === "ADMIN"
-        ? routes.admin.dashboard
-        : role === "PRODUCER"
-          ? routes.acessoProdutor
-          : routes.login(),
-    );
+  if (role !== "AGRONOMIST" && role !== "STAFF" && role !== "PRODUCER") {
+    redirect(role === "ADMIN" || role === "ORG_ADMIN" ? routes.admin.dashboard : routes.login());
   }
   return <AgronomistShell>{children}</AgronomistShell>;
 }

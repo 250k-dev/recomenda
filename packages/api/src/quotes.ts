@@ -3,8 +3,8 @@ import { api } from "./http/axios";
 export type QuoteRequestStatus = "OPEN" | "CLOSED";
 export type QuoteResponseStatus = "DRAFT" | "SUBMITTED";
 export type QuoteAvailability = "AVAILABLE" | "UNAVAILABLE" | "PARTIAL";
-/** Condição de pagamento do preço da loja: à vista ou a prazo (parcelado). */
-export type QuotePaymentTerm = "CASH" | "TERM";
+/** Condição de pagamento global da cotação (definida pelo agrônomo). */
+export type QuotePaymentTerm = "CASH" | "TERM" | "BARTER";
 
 /** Item da lista exibido na cotação (sem dados de custo do agrônomo). */
 export interface QuoteItemView {
@@ -31,6 +31,7 @@ export interface QuoteListInfo {
 export interface QuoteShare {
   token: string;
   status: QuoteRequestStatus;
+  payment_term: QuotePaymentTerm | null;
   link: string;
 }
 
@@ -61,14 +62,24 @@ export interface QuoteComparisonResponse {
 }
 
 export interface QuoteComparison {
-  request: { token: string; status: QuoteRequestStatus } | null;
+  request: {
+    token: string;
+    status: QuoteRequestStatus;
+    payment_term: QuotePaymentTerm | null;
+  } | null;
   items: QuoteItemView[];
   responses: QuoteComparisonResponse[];
 }
 
 /** Gera (ou retorna) o link público de cotação de uma lista de compras. */
-export async function createQuoteRequest(listId: string) {
-  const { data } = await api.post<QuoteShare>(`/purchase-lists/${listId}/quote-request`);
+export async function createQuoteRequest(
+  listId: string,
+  paymentTerm?: QuotePaymentTerm,
+) {
+  const { data } = await api.post<QuoteShare>(
+    `/purchase-lists/${listId}/quote-request`,
+    paymentTerm ? { payment_term: paymentTerm } : {},
+  );
   return data;
 }
 
@@ -144,6 +155,7 @@ export async function deleteQuoteItem(listId: string, responseId: string, itemId
 export interface QuotePreview {
   token: string;
   status: QuoteRequestStatus;
+  payment_term: QuotePaymentTerm | null;
   list: QuoteListInfo;
   producer_name: string | null;
   agronomist_name: string | null;
@@ -161,6 +173,7 @@ export interface QuoteResponseItem extends QuoteItemView {
 
 export interface QuoteResponseDetail {
   request_status: QuoteRequestStatus;
+  payment_term: QuotePaymentTerm | null;
   response: {
     store_name: string;
     responder_name: string | null;

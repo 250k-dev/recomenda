@@ -26,6 +26,19 @@ import {
 } from "@recomenda/domain/catalog/purchase-list-catalog";
 import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import {
+  recommendedYmdToWindow,
+  todayLocalYmd,
+} from "@recomenda/domain/timing/window-days";
+import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
+import { displayRecStatus, fmtDate } from "@recomenda/domain/recommendations/format";
+import {
+  formulationShortLabel,
+  resolveFormulationKey,
+} from "@recomenda/domain/recommendations/formulation-mix-order";
+import {
+  sortRecommendationItemsByMixOrder,
+} from "@recomenda/domain/recommendations/mix-order";
+import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
@@ -48,12 +61,6 @@ import {
   type RecommendationStageDraft,
 } from "@/components/domain/recommendation-stage-fields";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
-import {
-  recommendedYmdToWindow,
-  todayLocalYmd,
-} from "@recomenda/domain/timing/window-days";
-import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
-import { displayRecStatus, fmtDate } from "@recomenda/domain/recommendations/format";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
@@ -141,12 +148,15 @@ function ProductRow({
   onDelete,
   outOfProgram,
   canDelete = true,
+  mixPosition,
 }: {
   item: RecommendationItem;
   seasonId: string;
   onDelete: (id: string) => void;
   outOfProgram?: boolean;
   canDelete?: boolean;
+  /** Posição 1-based na ordem de mistura (tanque). */
+  mixPosition?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [dose, setDose] = useState(String(item.dose_per_hectare));
@@ -168,6 +178,11 @@ function ProductRow({
     );
   };
 
+  const formKey =
+    item.formulation_key ?? resolveFormulationKey(item.equivalence_group);
+  const formShort = formulationShortLabel(formKey);
+  const showFormBadge = formShort !== "—";
+
   return (
     <div
       className={cn(
@@ -175,7 +190,24 @@ function ProductRow({
         outOfProgram && "border-destructive/40 bg-destructive/5",
       )}
     >
-      <FlaskConical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      {mixPosition != null ? (
+        <span
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground"
+          title={`Ordem de mistura #${mixPosition}`}
+        >
+          {mixPosition}
+        </span>
+      ) : (
+        <FlaskConical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      )}
+      {showFormBadge ? (
+        <span
+          className="inline-flex h-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 px-1.5 text-[10px] font-bold tracking-wide text-muted-foreground"
+          title={`Formulação: ${formShort}`}
+        >
+          {formShort}
+        </span>
+      ) : null}
       <span className="flex-1 min-w-0 font-medium text-foreground">
         {item.product_name}
         {item.is_substitution && (
@@ -674,7 +706,9 @@ export function RecommendationCard({
   // Semente é um item da etapa com unidade Big Bag/Saca (separada dos produtos).
   const isSeedRow = (it: RecommendationItem) =>
     it.dose_unit === "BAG" || it.dose_unit === "SACA";
-  const productItems = rec.items.filter((it) => !isSeedRow(it));
+  const productItems = sortRecommendationItemsByMixOrder(
+    rec.items.filter((it) => !isSeedRow(it)),
+  );
   const seedItems = rec.items.filter((it) => isSeedRow(it));
 
   const [registering, setRegistering] = useState(false);
@@ -946,18 +980,27 @@ export function RecommendationCard({
           </div>
 
           <div className="p-4 border shadow-sm rounded-xl bg-card">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Produtos recomendados
-            </p>
+            <div className="mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Produtos recomendados
+              </p>
+              {productItems.length > 0 ? (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Ordem de mistura da calda (#1 entra primeiro) — configure no
+                  topo da safra.
+                </p>
+              ) : null}
+            </div>
             {productItems.length > 0 ? (
               <div className="flex flex-col gap-1.5">
-                {productItems.map((item) => (
+                {productItems.map((item, index) => (
                   <ProductRow
                     key={item.id}
                     item={item}
                     seasonId={seasonId}
                     onDelete={handleDeleteItem}
                     canDelete={canEditStructure}
+                    mixPosition={index + 1}
                     outOfProgram={
                       listReady && !listProductIds.has(item.local_product_id)
                     }

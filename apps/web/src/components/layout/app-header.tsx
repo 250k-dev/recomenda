@@ -46,21 +46,19 @@ export function AppHeader() {
       ? [HOME, ...published]
       : [HOME, ...(section ? [{ label: section[1] }] : [])];
 
-  // Trilha/saudação com largura natural e prioridade sobre a busca: a busca
-  // (flex-1) fica com a sobra da linha e decide sozinha, por container query,
-  // se cabe como input ou recolhe para ícone. O min-h dá um piso à linha para
-  // que a trilha (uma linha) não deixe o header mais baixo que a saudação (duas).
+  // Trilha/saudação à esquerda; slot flex-1 no meio (busca ou espaço vazio)
+  // empurra ScopeSwitcher + UserMenu para a direita — mesmo sem busca (ex.: Produtor).
   return (
     <header className="px-4 pt-4 pb-2 sm:pt-6 md:px-8">
-      <div className="flex items-center w-full gap-2 mx-auto min-h-14 max-w-7xl">
-        <div className="min-w-0">
+      <div className="mx-auto flex min-h-14 w-full max-w-7xl items-center gap-2">
+        <div className="min-w-0 shrink-0">
           {isHome ? <DashboardGreeting /> : <BreadcrumbTrail items={items} />}
         </div>
-        <ProducerSearchButton />
-        <div className="shrink-0">
-          <ScopeSwitcher />
+        <div className="flex min-w-0 flex-1 items-center justify-end">
+          <ProducerSearchButton />
         </div>
-        <div className="shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
+          <ScopeSwitcher />
           <UserMenu />
         </div>
       </div>

@@ -68,7 +68,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
   const [draft, setDraft] = useState<Set<string> | null>(null);
 
   const isManager = summary?.access_level === "MANAGER";
-  const roleLabel = isManager ? "Gestor" : "Operador";
+  const roleLabel = isManager ? "Gestor" : "Consultor";
 
   const sharedIds = useMemo(
     () => new Set((summary?.producers ?? []).map((p) => p.id)),
@@ -214,7 +214,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
             ? [{ label: "Desde", value: fmtDate(summary.created_at) }]
             : []),
           ...(isManager
-            ? [{ label: "Operadores", value: summary.assistant_count ?? 0 }]
+            ? [{ label: "Consultores", value: summary.assistant_count ?? 0 }]
             : []),
           { label: "Produtores", value: summary.producers.length },
           { label: "Ações · 30 dias", value: summary.activity_count_30d },
@@ -229,9 +229,8 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
         <div className="flex gap-3 rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-5 py-4">
           <Info className="mt-0.5 size-5 shrink-0 text-[#1E6B4A]" />
           <p className="text-sm text-[#2B2723]">
-            Operadores têm acesso somente-leitura: veem os produtores e fazendas
-            compartilhados e podem apenas registrar aplicações das recomendações (e trocar
-            produto/dose na etapa).
+            Consultores acompanham produtores e fazendas compartilhados, criam
+            recomendações e registram aplicações (incluindo trocar produto/dose na etapa).
           </p>
         </div>
       ) : null}
@@ -242,7 +241,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
             <Users className="size-5 text-[#1E6B4A]" />
             <div>
               <h2 className="text-base font-extrabold text-[#2B2723]">
-                Operadores deste gestor
+                Consultores deste gestor
               </h2>
               <p className="text-xs text-[#8A857D]">
                 Criados e gerenciados por {(summary.name ?? "").split(" ")[0] || "este gestor"}.
@@ -258,7 +257,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[#2B2723]">
-                      {a.name ?? "Operador"}
+                      {a.name ?? "Consultor"}
                     </p>
                     <p className="truncate text-xs text-[#8A857D]">{a.email ?? "—"}</p>
                   </div>

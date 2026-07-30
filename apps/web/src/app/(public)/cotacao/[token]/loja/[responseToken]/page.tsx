@@ -15,7 +15,6 @@ import { PublicQuoteHeader } from "@/components/domain/public-quote-header";
 import { CompletionRing } from "@/components/domain/completion-ring";
 import type {
   QuoteAvailability,
-  QuotePaymentTerm,
   QuoteResponseItem,
 } from "@recomenda/api/quotes";
 import { CROP_LABELS, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
@@ -35,7 +34,6 @@ function parseNum(raw: string): number | undefined {
 
 type ItemDraft = {
   availability: "" | QuoteAvailability;
-  payment_term: "" | QuotePaymentTerm;
   unit_price_brl: string;
   substitute_product_name: string;
   substitute_unit_price_brl: string;
@@ -45,7 +43,6 @@ type ItemDraft = {
 function toDraft(it: QuoteResponseItem): ItemDraft {
   return {
     availability: it.availability ?? "",
-    payment_term: it.payment_term ?? "",
     unit_price_brl: it.unit_price_brl != null ? String(it.unit_price_brl) : "",
     substitute_product_name: it.substitute_product_name ?? "",
     substitute_unit_price_brl:
@@ -98,11 +95,6 @@ export default function StoreQuotePage() {
       return {
         purchase_list_item_id: it.purchase_list_item_id,
         availability: d.availability || undefined,
-        // Só envia a condição quando a loja tem o produto.
-        payment_term:
-          d.availability && d.availability !== "UNAVAILABLE"
-            ? d.payment_term || undefined
-            : undefined,
         unit_price_brl: parseNum(d.unit_price_brl),
         substitute_product_name: d.substitute_product_name.trim() || undefined,
         substitute_unit_price_brl: parseNum(d.substitute_unit_price_brl),
@@ -193,13 +185,26 @@ export default function StoreQuotePage() {
       <p className="mb-4 text-sm text-muted-foreground">
         Informe o <strong>preço por unidade</strong> e a disponibilidade de cada
         produto. Se não tiver o produto, você pode indicar um substituto.
+        {data.payment_term ? (
+          <>
+            {" "}
+            Condição de pagamento desta cotação:{" "}
+            <strong>
+              {data.payment_term === "CASH"
+                ? "à vista"
+                : data.payment_term === "TERM"
+                  ? "a prazo"
+                  : "barter"}
+            </strong>
+            .
+          </>
+        ) : null}
       </p>
 
       <div className="space-y-3">
         {data.items.map((it) => {
           const d = drafts[it.purchase_list_item_id] ?? toDraft(it);
           const showSubstitute = d.availability === "UNAVAILABLE" || d.availability === "PARTIAL";
-          const showPaymentTerm = d.availability === "AVAILABLE" || d.availability === "PARTIAL";
           return (
             <div
               key={it.purchase_list_item_id}
@@ -230,7 +235,8 @@ export default function StoreQuotePage() {
                   <Label className="text-xs">Disponibilidade</Label>
                   <NativeSelect
                     className="w-full"
-                    value={d.availability}                    onChange={(e) =>
+                    value={d.availability}
+                    onChange={(e) =>
                       setField(it.purchase_list_item_id, "availability", e.target.value)
                     }
                   >
@@ -246,27 +252,12 @@ export default function StoreQuotePage() {
                     className="h-11"
                     inputMode="decimal"
                     placeholder="0,00"
-                    value={d.unit_price_brl}                    onChange={(e) =>
+                    value={d.unit_price_brl}
+                    onChange={(e) =>
                       setField(it.purchase_list_item_id, "unit_price_brl", e.target.value)
                     }
                   />
                 </div>
-                {showPaymentTerm ? (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Condição de pagamento</Label>
-                    <NativeSelect
-                      className="w-full"
-                      value={d.payment_term}
-                      onChange={(e) =>
-                        setField(it.purchase_list_item_id, "payment_term", e.target.value)
-                      }
-                    >
-                      <NativeSelectOption value="">Selecione…</NativeSelectOption>
-                      <NativeSelectOption value="CASH">À vista</NativeSelectOption>
-                      <NativeSelectOption value="TERM">A prazo (parcelado)</NativeSelectOption>
-                    </NativeSelect>
-                  </div>
-                ) : null}
               </div>
 
               {showSubstitute ? (

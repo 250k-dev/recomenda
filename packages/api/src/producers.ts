@@ -62,7 +62,17 @@ export interface ProducerStock {
   quantity: number;
   product_name?: string;
   dose_unit?: string;
+  category?: string | null;
+  /** Preço unitário deste produtor (R$) — não vem do catálogo global. */
+  price_brl?: number | null;
 }
+
+export type InvitationKind = "PRODUCER" | "CONSULTANT" | "FARM_TEAM";
+export type InvitationAccessLevel =
+  | "MANAGER"
+  | "CONSULTANT"
+  | "FARM_MANAGER"
+  | "FARM_OPERATOR";
 
 export interface InvitationPreview {
   id: string;
@@ -71,10 +81,12 @@ export interface InvitationPreview {
   status: string;
   expires_at: string;
   agronomist_id: string;
-  kind?: "PRODUCER" | "CONSULTANT";
-  access_level?: "MANAGER" | "ASSISTANT";
+  kind?: InvitationKind;
+  access_level?: InvitationAccessLevel;
   /** Conta com este e-mail já existe (fluxo "juntar-se à equipe"). */
   account_exists?: boolean;
+  /** true = definir senha nova; false = confirmar senha atual. */
+  needs_password_setup?: boolean;
   agronomist_name?: string | null;
 }
 
@@ -98,6 +110,17 @@ export async function getProducer(id: string) {
 
 export async function createProducer(payload: { name: string; email?: string; phone?: string }) {
   const { data } = await api.post<CreatedProducer>("/producers", payload);
+  return data;
+}
+
+/** Envia/reenvia convite para o produtor definir senha e acessar o painel web. */
+export async function inviteProducerAccess(producerId: string) {
+  const { data } = await api.post<{
+    id: string;
+    token: string;
+    email_sent: boolean;
+    resent: boolean;
+  }>(`/producers/${producerId}/invite-access`);
   return data;
 }
 
@@ -126,7 +149,12 @@ export async function getProducerStock(producerId: string) {
 
 export async function adjustProducerStock(
   producerId: string,
-  payload: { local_product_id: string; new_quantity: number; notes?: string },
+  payload: {
+    local_product_id: string;
+    new_quantity: number;
+    notes?: string;
+    price_brl?: number | null;
+  },
 ) {
   const { data } = await api.post(`/producers/${producerId}/stock/adjust`, payload);
   return data;
@@ -157,10 +185,10 @@ export async function acceptInvitation(
 export async function createInvitation(payload: {
   email?: string;
   farm_ids?: string[];
-  kind?: "PRODUCER" | "CONSULTANT";
-  /** Só para kind=CONSULTANT: Gestor ou Consultor. */
-  access_level?: "MANAGER" | "ASSISTANT";
-  /** Só para ASSISTANT criado pelo agrônomo: vínculo sob um gestor (null = direto). */
+  kind?: InvitationKind;
+  /** CONSULTANT: Gestor/Consultor · FARM_TEAM: Gerente/Operador. */
+  access_level?: InvitationAccessLevel;
+  /** Só para CONSULTANT criado pelo agrônomo: vínculo sob um gestor (null = direto). */
   manager_user_id?: string | null;
   /** Produtores liberados assim que o convite de equipe for aceito. */
   producer_ids?: string[];
@@ -179,16 +207,16 @@ export interface InvitationRow {
   id: string;
   email?: string | null;
   token: string;
-  kind: "PRODUCER" | "CONSULTANT";
+  kind: InvitationKind;
   status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
-  access_level?: "MANAGER" | "ASSISTANT" | null;
+  access_level?: InvitationAccessLevel | null;
   manager_user_id?: string | null;
   farm_ids: string[];
   expires_at: string;
   created_at: string;
 }
 
-export async function getInvitations(kind?: "PRODUCER" | "CONSULTANT") {
+export async function getInvitations(kind?: InvitationKind) {
   const { data } = await api.get<{ data: InvitationRow[] }>("/invitations", {
     params: kind ? { kind } : undefined,
   });

@@ -14,16 +14,22 @@ import {
   useAdminPlatformActiveCatalog,
   useAdminProducers,
   useAdminTeamMembers,
+  useMe,
   usePlans,
 } from "@recomenda/api-hooks";
 
 export default function AdminHomePage() {
+  const { data: me } = useMe();
+  const isOrgAdmin = me?.role === "ORG_ADMIN";
+
   const { data: agronomists, isLoading: loadingA } = useAdminAgronomists("active");
   const { data: producers, isLoading: loadingProd } = useAdminProducers();
   const { data: team, isLoading: loadingTeam } = useAdminTeamMembers();
-  const { data: plans, isLoading: loadingP } = usePlans();
-  const { data: platformActiveRes, isLoading: loadingCatActive } = useAdminPlatformActiveCatalog();
-  const { data: platformDeactivatedRes, isLoading: loadingCatOff } = useAdminDeactivatedCatalog();
+  const { data: plans, isLoading: loadingP } = usePlans({ enabled: !isOrgAdmin });
+  const { data: platformActiveRes, isLoading: loadingCatActive } =
+    useAdminPlatformActiveCatalog();
+  const { data: platformDeactivatedRes, isLoading: loadingCatOff } =
+    useAdminDeactivatedCatalog();
 
   const counts = useMemo(() => {
     const aList = Array.isArray(agronomists) ? agronomists : [];
@@ -44,7 +50,12 @@ export default function AdminHomePage() {
   }, [agronomists, producers, team, plans, platformActiveRes, platformDeactivatedRes]);
 
   const loading =
-    loadingA || loadingProd || loadingTeam || loadingP || loadingCatActive || loadingCatOff;
+    loadingA ||
+    loadingProd ||
+    loadingTeam ||
+    loadingCatActive ||
+    loadingCatOff ||
+    (!isOrgAdmin && loadingP);
 
   return (
     <>
@@ -52,7 +63,11 @@ export default function AdminHomePage() {
         icon={<LayoutDashboard className="h-5 w-5" />}
         section="Admin"
         title="Painel Admin"
-        description="Visão geral: agrônomos, equipe, produtores, planos e produtos."
+        description={
+          isOrgAdmin
+            ? "Visão da equipe: agrônomos, membros, produtores e produtos."
+            : "Visão geral: agrônomos, equipe, produtores, planos e produtos."
+        }
       />
       {loading ? (
         <DashboardKpiSkeleton cards={4} />
@@ -68,7 +83,9 @@ export default function AdminHomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Contas ativas, plano vinculado e gestão de acesso.
+                  {isOrgAdmin
+                    ? "Agrônomos vinculados a esta equipe."
+                    : "Contas ativas, plano vinculado e gestão de acesso."}
                 </p>
               </CardContent>
             </Card>
@@ -83,7 +100,9 @@ export default function AdminHomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Gestores e operadores nas carteiras
+                  {isOrgAdmin
+                    ? "Gestores e consultores das carteiras desta equipe"
+                    : "Gestores e consultores nas carteiras"}
                   {counts.temporary > 0
                     ? ` · ${counts.temporary} conta${counts.temporary === 1 ? "" : "s"} temporária${counts.temporary === 1 ? "" : "s"}`
                     : ""}
@@ -107,19 +126,21 @@ export default function AdminHomePage() {
               </CardContent>
             </Card>
           </Link>
-          <Link href={routes.admin.planos} className="block transition-opacity hover:opacity-90">
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base">Planos</CardTitle>
-                <span className="font-display text-3xl font-semibold tabular-nums text-text-strong">
-                  {counts.plans}
-                </span>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Quotas, preços mensais e status ativo.</p>
-              </CardContent>
-            </Card>
-          </Link>
+          {!isOrgAdmin ? (
+            <Link href={routes.admin.planos} className="block transition-opacity hover:opacity-90">
+              <Card className="h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-base">Planos</CardTitle>
+                  <span className="font-display text-3xl font-semibold tabular-nums text-text-strong">
+                    {counts.plans}
+                  </span>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Quotas, preços mensais e status ativo.</p>
+                </CardContent>
+              </Card>
+            </Link>
+          ) : null}
           <Link href={routes.admin.catalogoGlobal} className="block transition-opacity hover:opacity-90">
             <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -130,7 +151,9 @@ export default function AdminHomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Total no catálogo da plataforma (oficiais, customizados e removidos).
+                  {isOrgAdmin
+                    ? "Catálogo global da plataforma e produtos criados nas carteiras desta equipe."
+                    : "Total no catálogo da plataforma (oficiais, customizados e removidos)."}
                 </p>
               </CardContent>
             </Card>

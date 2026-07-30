@@ -156,6 +156,14 @@ function deriveItemCrop(it: ListItem, listCrop?: string): string | null {
   return null;
 }
 
+/** Nº de aplicações: só inteiros ≥ 1 (trunca decimais; vazio/inválido → 1). */
+export function parseNApplications(raw: string | undefined): number {
+  const whole = String(raw ?? "").replace(/[.,].*$/, "").replace(/\D/g, "");
+  const n = Number(whole);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.trunc(n);
+}
+
 /** Converte um item do formulário no payload da API (lógica única e compartilhada). */
 export function listItemToPayload(it: ListItem, listCrop?: string): PurchaseListItemInput {
   const seed = isSeedItem(it);
@@ -165,7 +173,7 @@ export function listItemToPayload(it: ListItem, listCrop?: string): PurchaseList
     stage: it.stage,
     dose_per_hectare: seed ? 0 : Number(it.dose),
     dose_unit: it.unit,
-    n_applications: seed ? 1 : Number(it.nApps) || 1,
+    n_applications: seed ? 1 : parseNApplications(it.nApps),
     current_stock: Number(it.stock) || 0,
     price_brl_fixed: it.price ? Number(it.price) : null,
     price_usd: it.priceUsd ? Number(it.priceUsd) : null,
@@ -200,6 +208,14 @@ export function validateListItems(items: ListItem[]): string | null {
         return "O volume de bags/sacos deve ser um número inteiro.";
     } else if (!Number(it.dose)) {
       return "Informe a dose/ha em todos os itens.";
+    } else {
+      const appsRaw = String(it.nApps ?? "").trim();
+      if (appsRaw !== "") {
+        const n = Number(appsRaw.replace(",", "."));
+        if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+          return "O número de aplicações deve ser um inteiro maior ou igual a 1.";
+        }
+      }
     }
   }
   return null;

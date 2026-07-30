@@ -41,10 +41,15 @@ import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
 import { useAgronomistAgenda, useBulkRegisterRecommendations, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
+import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
 
 /** Chave estável de seleção (uma por recomendação, dedupe entre dias). */
 function eventSelectionKey(event: AgendaEvent): string {
-  return `${event.seasonId}:${event.recommendationId}`;
+  return `${event.seasonId}:${event.recommendationId || event.kind}`;
+}
+
+function isApplicationEvent(event: AgendaEvent): boolean {
+  return event.kind !== "PLANTING" && Boolean(event.recommendationId);
 }
 
 const MINI_WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -132,10 +137,12 @@ export function MonthCalendar({
   };
 
   const runBulk = (action: "apply" | "skip") => {
-    const items = [...selected.values()].map((event) => ({
-      seasonId: event.seasonId,
-      recommendationId: event.recommendationId,
-    }));
+    const items = [...selected.values()]
+      .filter((event) => isApplicationEvent(event))
+      .map((event) => ({
+        seasonId: event.seasonId,
+        recommendationId: event.recommendationId,
+      }));
     if (items.length === 0) return;
     bulkMut.mutate(
       { action, date: bulkDate, items },
@@ -982,6 +989,22 @@ function ProducerFilterToggle({
 }
 
 function getEventStatusPresentation(event: AgendaEvent, todayYmd: string) {
+  if (event.kind === "PLANTING") {
+    if (!event.plantingDate) {
+      return {
+        label: "Sem data",
+        borderClass: "bg-warning",
+        badgeClass: "border-warning-border bg-warning-soft text-warning-strong",
+        showWarning: true,
+      };
+    }
+    return {
+      label: "Plantio",
+      borderClass: "bg-primary",
+      badgeClass: "border-primary/30 bg-primary-soft text-primary-strong",
+      showWarning: false,
+    };
+  }
   if (event.isLate) {
     return {
       label: "Atrasada",
@@ -1022,6 +1045,7 @@ function AgendaEventCard({
 }) {
   const status = getEventStatusPresentation(event, todayYmd);
   const eventDate = format(localYmdToDate(event.ymd), "d MMM", { locale: ptBR });
+  const isPlanting = event.kind === "PLANTING";
 
   const body = (
     <>
@@ -1052,7 +1076,31 @@ function AgendaEventCard({
     </span>
   );
 
-  if (selectable) {
+  // Plantio: não entra no registro em massa de aplicações.
+  if (isPlanting) {
+    return (
+      <li>
+        <div className="group flex items-center gap-3 rounded-xl border border-border/80 bg-card px-4 py-3.5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
+          <Link
+            href={routes.safras.cronograma(event.seasonId)}
+            className="flex min-w-0 flex-1 items-center gap-3"
+          >
+            {body}
+          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            {statusBadge}
+            <PlantingDateRegisterPopover
+              seasonId={event.seasonId}
+              currentPlantingDate={event.plantingDate}
+              mode={event.plantingDate ? "edit" : "register"}
+            />
+          </div>
+        </div>
+      </li>
+    );
+  }
+
+  if (selectable && isApplicationEvent(event)) {
     return (
       <li>
         <button

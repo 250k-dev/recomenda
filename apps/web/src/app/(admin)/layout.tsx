@@ -6,14 +6,12 @@ import { routes } from "@recomenda/config";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const role = await getSessionRole();
-  if (role !== "ADMIN") {
+  if (role !== "ADMIN" && role !== "ORG_ADMIN") {
     redirect(
-      role === "AGRONOMIST"
+      role === "AGRONOMIST" || role === "STAFF" || role === "PRODUCER"
         ? routes.dashboard
-        : role === "PRODUCER"
-          ? routes.acessoProdutor
-          : routes.login(),
+        : routes.login(),
     );
   }
-  return <AppShell role="ADMIN">{children}</AppShell>;
+  return <AppShell role={role}>{children}</AppShell>;
 }

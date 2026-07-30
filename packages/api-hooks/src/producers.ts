@@ -5,6 +5,7 @@ import {
   getProducers,
   getProducer,
   createProducer,
+  inviteProducerAccess,
   updateProducer,
   deleteProducer,
   setProducerActive,
@@ -45,6 +46,17 @@ export function useCreateProducer() {
     mutationFn: createProducer,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producers });
+    },
+  });
+}
+
+export function useInviteProducerAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (producerId: string) => inviteProducerAccess(producerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.producers });
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
     },
   });
 }
@@ -101,8 +113,12 @@ export function useProducerStock(producerId: string) {
 export function useAdjustProducerStock(producerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { local_product_id: string; new_quantity: number; notes?: string }) =>
-      adjustProducerStock(producerId, payload),
+    mutationFn: (payload: {
+      local_product_id: string;
+      new_quantity: number;
+      notes?: string;
+      price_brl?: number | null;
+    }) => adjustProducerStock(producerId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(producerId) });
     },
@@ -116,12 +132,17 @@ export function useCreateInvitation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producers });
       queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.farmTeamAll });
+      queryClient.invalidateQueries({ queryKey: ["farm-team"] });
     },
   });
 }
 
-/** Convites de um tipo (a tela de Equipe usa `kind="CONSULTANT"`). */
-export function useInvitations(kind?: "PRODUCER" | "CONSULTANT", options?: { enabled?: boolean }) {
+/** Convites de um tipo (`CONSULTANT` carteira · `FARM_TEAM` fazenda). */
+export function useInvitations(
+  kind?: "PRODUCER" | "CONSULTANT" | "FARM_TEAM",
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: queryKeys.invitations(kind),
     queryFn: () => getInvitations(kind),

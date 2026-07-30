@@ -369,7 +369,7 @@ function StepProducer({
     <div className="flex flex-col flex-1">
       <StepHeader
         title="Comece pelo produtor"
-        subtitle="Você não precisa enviar convite agora. O acesso ao app é opcional e pode ser ativado depois."
+        subtitle="O cadastro cria a ficha na carteira. Depois, use “Enviar convite de acesso” para o produtor definir a senha e entrar no painel web."
       />
 
       <div className="max-w-[560px] space-y-[18px]">

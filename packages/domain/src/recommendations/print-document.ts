@@ -1,5 +1,10 @@
-import type { Recommendation } from "@recomenda/api";
+import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import { displayRecStatus, fmtDate, recommendationStatusLabel } from "./format";
+import {
+  formulationShortLabel,
+  resolveFormulationKey,
+} from "./formulation-mix-order";
+import { sortRecommendationItemsByMixOrder } from "./mix-order";
 import type { RecommendationShareData } from "./share-message";
 import {
   escapeHtml,
@@ -8,6 +13,12 @@ import {
   htmlShell,
   printHtml,
 } from "../print/print-core";
+
+function itemFormulationShort(item: RecommendationItem): string {
+  const key =
+    item.formulation_key ?? resolveFormulationKey(item.equivalence_group);
+  return formulationShortLabel(key);
+}
 
 const STATUS_CLASS: Record<string, string> = {
   PENDING: "is-pending",
@@ -26,10 +37,11 @@ function productRowsHtml(rec: Recommendation): string {
   if (rec.items.length === 0) {
     return `<p class="empty">Nenhum produto vinculado a esta etapa.</p>`;
   }
-  const rows = rec.items
+  const rows = sortRecommendationItemsByMixOrder(rec.items)
     .map(
       (item) => `
         <tr>
+          <td class="form">${escapeHtml(itemFormulationShort(item))}</td>
           <td>${escapeHtml(item.product_name)}${
             item.is_substitution ? `<span class="sub"> (substituído)</span>` : ""
           }</td>
@@ -41,7 +53,7 @@ function productRowsHtml(rec: Recommendation): string {
   return `
     <table class="products">
       <thead>
-        <tr><th>Produto</th><th class="num">Dose/ha</th><th class="num">Quantidade total</th></tr>
+        <tr><th class="form">Form.</th><th>Produto</th><th class="num">Dose/ha</th><th class="num">Quantidade total</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -86,6 +98,7 @@ const REC_CSS = `
   .products th { text-align: left; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #7a7a70; padding: 4px 8px; border-bottom: 1px solid #e2e0d6; }
   .products td { padding: 5px 8px; border-bottom: 1px solid #efeee8; color: #2b2b27; }
   .products .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .products .form { width: 3.2rem; text-align: center; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; color: #6b6b62; white-space: nowrap; }
   .sub { font-size: 10px; color: #9a5a16; }
   .notes { margin: 10px 0 0 32px; font-size: 11px; color: #4a4a42; font-style: italic; }
   .empty { font-size: 11px; color: #7a7a70; margin: 0 0 0 32px; }

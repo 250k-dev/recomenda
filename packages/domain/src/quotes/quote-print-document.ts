@@ -20,6 +20,7 @@ import {
 const TERM_LABEL: Record<QuotePaymentTerm, string> = {
   CASH: "à vista",
   TERM: "a prazo",
+  BARTER: "barter",
 };
 
 const fmtQty = (n: number) =>
@@ -92,10 +93,13 @@ function selectResponses(
   return data.responses.filter((r) => storeIds == null || storeIds.has(r.id));
 }
 
-function titleTags(ctx: QuotePrintContext): string {
+function titleTags(ctx: QuotePrintContext, paymentTerm?: QuotePaymentTerm | null): string {
   const tags: string[] = [];
   if (ctx.producerName)
     tags.push(`<span>Produtor: ${escapeHtml(ctx.producerName)}</span>`);
+  if (paymentTerm) {
+    tags.push(`<span>Pagamento: ${escapeHtml(TERM_LABEL[paymentTerm])}</span>`);
+  }
   return tags.length ? `<div class="tags">${tags.join("")}</div>` : "";
 }
 
@@ -187,7 +191,7 @@ function buildComparisonBody(
     <div class="title-block">
       <p class="kicker">Comparação de cotações</p>
       <h1 class="title">${escapeHtml(ctx.listName || "Cotações das lojas")}</h1>
-      ${titleTags(ctx)}
+      ${titleTags(ctx, data.request?.payment_term)}
     </div>
     <section>
       <h2 class="section-title">Preços por loja (${responses.length} ${responses.length === 1 ? "loja" : "lojas"})</h2>
@@ -257,7 +261,7 @@ function buildBestPricesBody(
     <div class="title-block">
       <p class="kicker">Melhores preços das cotações</p>
       <h1 class="title">${escapeHtml(ctx.listName || "Cotações das lojas")}</h1>
-      ${titleTags(ctx)}
+      ${titleTags(ctx, data.request?.payment_term)}
     </div>
     <section>
       <h2 class="section-title">Melhor preço por produto (${responses.length} ${responses.length === 1 ? "loja consultada" : "lojas consultadas"})</h2>
@@ -357,7 +361,7 @@ function buildStorePricesBody(
     <div class="title-block">
       <p class="kicker">Preços por loja</p>
       <h1 class="title">${escapeHtml(ctx.listName || "Cotações das lojas")}</h1>
-      ${titleTags(ctx)}
+      ${titleTags(ctx, data.request?.payment_term)}
     </div>
     ${sections || `<p class="empty">Sem cotações para exibir.</p>`}
     ${footerHtml(ctx.agronomistName)}

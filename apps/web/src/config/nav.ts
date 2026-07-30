@@ -8,7 +8,17 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Dashboard", href: routes.admin.dashboard },
   { label: "Planos", href: routes.admin.planos },
   { label: "Agrônomos", href: routes.admin.agronomos.lista },
-  { label: "Equipe", href: routes.admin.equipe },
+  { label: "Equipes", href: routes.admin.equipes },
+  { label: "Membros", href: routes.admin.equipe },
+  { label: "Produtores", href: routes.admin.produtores.lista },
+  { label: "Produtos", href: routes.admin.catalogoGlobal },
+];
+
+/** Admin de organização: escopo da equipe (sem planos da plataforma). */
+const ORG_ADMIN_NAV: NavItem[] = [
+  { label: "Dashboard", href: routes.admin.dashboard },
+  { label: "Agrônomos", href: routes.admin.agronomos.lista },
+  { label: "Membros", href: routes.admin.equipe },
   { label: "Produtores", href: routes.admin.produtores.lista },
   { label: "Produtos", href: routes.admin.catalogoGlobal },
 ];
@@ -30,11 +40,19 @@ const MANAGER_NAV: NavItem[] = [
   { label: "Equipe", href: routes.equipe.lista },
 ];
 
-// Consultor: só acompanha e registra — sem Equipe, sem Relatórios.
-const ASSISTANT_NAV: NavItem[] = [
+// Consultor: equipe da fazenda (Gerente/Operador) + produtores.
+const CONSULTANT_NAV: NavItem[] = [
   { label: "Dashboard", href: routes.dashboard },
   { label: "Produtores", href: routes.produtores.lista },
   { label: "Produtos", href: routes.produtos },
+  { label: "Equipe", href: routes.equipe.lista },
+];
+
+/** Produtor: própria operação (sem carteira de terceiros). */
+const PRODUCER_NAV: NavItem[] = [
+  { label: "Dashboard", href: routes.dashboard },
+  { label: "Cronograma", href: routes.cronograma() },
+  { label: "Equipe", href: routes.equipe.lista },
 ];
 
 /** Navegação por papel + nível de acesso (o nível só importa para STAFF). */
@@ -42,10 +60,28 @@ export function navFor(role: UserRole, accessLevel?: AccessLevel | null): NavIte
   switch (role) {
     case "ADMIN":
       return ADMIN_NAV;
+    case "ORG_ADMIN":
+      return ORG_ADMIN_NAV;
     case "AGRONOMIST":
       return AGRONOMIST_NAV;
+    case "PRODUCER":
+      return PRODUCER_NAV;
     case "STAFF":
-      return accessLevel === "MANAGER" ? MANAGER_NAV : ASSISTANT_NAV;
+      if (accessLevel === "MANAGER") return MANAGER_NAV;
+      if (accessLevel === "FARM_MANAGER") {
+        return [
+          { label: "Dashboard", href: routes.dashboard },
+          { label: "Cronograma", href: routes.cronograma() },
+          { label: "Equipe", href: routes.equipe.lista },
+        ];
+      }
+      if (accessLevel === "FARM_OPERATOR") {
+        return [
+          { label: "Dashboard", href: routes.dashboard },
+          { label: "Cronograma", href: routes.cronograma() },
+        ];
+      }
+      return CONSULTANT_NAV;
     default:
       return [];
   }

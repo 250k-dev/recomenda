@@ -57,9 +57,9 @@ import {
   StepFooter,
   SummaryCard,
   fmt,
-  extractError,
   type WizardPlot,
 } from "@/components/domain/season/_shared";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import {
   listItemToBuy,
   listItemToPayload,
@@ -330,7 +330,7 @@ export function PurchaseListWizard({
       toast.success("Rascunho salvo. É só voltar aqui para continuar.");
       onComplete();
     } catch (e) {
-      toast.error(extractError(e));
+      toast.error(apiErrorMessage(e, "Não foi possível salvar."));
     } finally {
       setSavingDraft(false);
     }
@@ -876,7 +876,7 @@ function StepReview({
       }
     },
     onSuccess: (list) => handleSaved(list.id),
-    onError: (e: unknown) => setError(extractError(e)),
+    onError: (e: unknown) => setError(apiErrorMessage(e, "Não foi possível salvar a lista.")),
   });
 
   const totalToBuy = items.reduce((s, it) => s + listItemToBuy(it, totalHa), 0);

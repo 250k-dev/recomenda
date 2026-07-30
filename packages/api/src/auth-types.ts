@@ -1,9 +1,9 @@
-export type UserRole = "ADMIN" | "AGRONOMIST" | "PRODUCER" | "STAFF";
+export type UserRole = "ADMIN" | "ORG_ADMIN" | "AGRONOMIST" | "PRODUCER" | "STAFF";
 
 /** Nível de acesso do membro de equipe (só quando role === "STAFF"). */
-export type AccessLevel = "MANAGER" | "ASSISTANT";
+export type AccessLevel = "MANAGER" | "CONSULTANT" | "FARM_MANAGER" | "FARM_OPERATOR";
 
-/** Carteira de OUTRO agrônomo onde o usuário atua como gestor/operador. */
+/** Carteira de OUTRO agrônomo onde o usuário atua como gestor/consultor. */
 export interface MembershipDto {
   agronomist_id: string;
   agronomist_name: string;
@@ -21,7 +21,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
-  /** Presente para role STAFF: MANAGER = Gestor, ASSISTANT = Consultor. */
+  /** Presente para role STAFF: MANAGER = Gestor, CONSULTANT = Consultor. */
   access_level?: AccessLevel;
   impersonator?: Omit<AuthUser, "impersonator">;
   /** Presente quando o usuário entrou na carteira de outro agrônomo (escopo ativo). */

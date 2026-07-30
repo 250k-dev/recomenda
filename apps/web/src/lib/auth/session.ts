@@ -6,6 +6,7 @@ export async function getSessionRole(): Promise<UserRole | null> {
   const role = cookieStore.get("role")?.value;
   if (
     role === "ADMIN" ||
+    role === "ORG_ADMIN" ||
     role === "AGRONOMIST" ||
     role === "PRODUCER" ||
     role === "STAFF"

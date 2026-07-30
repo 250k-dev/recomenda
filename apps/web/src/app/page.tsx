@@ -4,8 +4,9 @@ import { routes } from "@recomenda/config";
 
 export default async function Home() {
   const role = await getSessionRole();
-  if (role === "ADMIN") redirect(routes.admin.dashboard);
-  if (role === "AGRONOMIST" || role === "STAFF") redirect(routes.dashboard);
-  if (role === "PRODUCER") redirect(routes.acessoProdutor);
+  if (role === "ADMIN" || role === "ORG_ADMIN") redirect(routes.admin.dashboard);
+  if (role === "AGRONOMIST" || role === "STAFF" || role === "PRODUCER") {
+    redirect(routes.dashboard);
+  }
   redirect(routes.login());
 }

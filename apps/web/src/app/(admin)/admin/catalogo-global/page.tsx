@@ -39,6 +39,7 @@ import {
   useUpdateLocalProduct,
   useResolveCustomLink,
   usePromoteCustomToGlobal,
+  useMe,
 } from "@recomenda/api-hooks";
 
 const CATALOG_PAGE_SIZE = 15;
@@ -213,6 +214,9 @@ function suggestGlobalId(name: string, globals: GlobalProduct[]): string {
 }
 
 export default function AdminGlobalCatalogPage() {
+  const { data: me } = useMe();
+  const isOrgAdmin = me?.role === "ORG_ADMIN";
+  const canManagePlatform = !isOrgAdmin;
   const { data: platformRes, isLoading: platformLoading } = useAdminPlatformActiveCatalog();
   const { data: deactivatedRes, isLoading: deactivatedLoading } = useAdminDeactivatedCatalog();
   const { data: globalCatalogRes } = useGlobalCatalog();
@@ -610,6 +614,10 @@ export default function AdminGlobalCatalogPage() {
       );
     }
 
+    if (!canManagePlatform) {
+      return <span className="text-xs text-muted-foreground">—</span>;
+    }
+
     return (
       <div className="flex flex-col gap-1.5">
         <Button size="sm" variant="outline" disabled={mutationPending} onClick={() => openLink(row)}>
@@ -627,12 +635,18 @@ export default function AdminGlobalCatalogPage() {
 
     const actions =
       p.entry_type === "GLOBAL" && p.global_product_id ? (
-        <AdminProductRowActions
-          actionKey={`g-${p.global_product_id}`}
-          onEdit={() => openEditFromPlatform(p)}
-          onDeactivate={() => onDeactivateGlobal(p)}
-          disableActions={mutationPending}
-        />
+        canManagePlatform ? (
+          <AdminProductRowActions
+            actionKey={`g-${p.global_product_id}`}
+            onEdit={() => openEditFromPlatform(p)}
+            onDeactivate={() => onDeactivateGlobal(p)}
+            disableActions={mutationPending}
+          />
+        ) : (
+          <span key={`g-${p.global_product_id}`} className="text-xs text-muted-foreground">
+            Somente leitura
+          </span>
+        )
       ) : p.entry_type === "CUSTOM" && p.local_product_id ? (
         <AdminProductRowActions
           actionKey={`c-${p.local_product_id}`}
@@ -697,21 +711,33 @@ export default function AdminGlobalCatalogPage() {
     ) : (
       "—"
     ),
-    <div key={`ina-${p.entry_type}-${p.global_product_id ?? p.local_product_id}`} className="flex flex-wrap justify-end gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onReactivateDeactivated(p)}
-        disabled={mutationPending}
+    p.entry_type === "GLOBAL_INACTIVE" && !canManagePlatform ? (
+      <span
+        key={`ina-${p.entry_type}-${p.global_product_id ?? p.local_product_id}`}
+        className="text-xs text-muted-foreground"
       >
-        Reativar
-      </Button>
-      <DeletePermanentIconButton
-        disabled={mutationPending}
-        onClick={() => onDeleteDeactivated(p)}
-      />
-    </div>,
+        Somente leitura
+      </span>
+    ) : (
+      <div
+        key={`ina-${p.entry_type}-${p.global_product_id ?? p.local_product_id}`}
+        className="flex flex-wrap justify-end gap-2"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onReactivateDeactivated(p)}
+          disabled={mutationPending}
+        >
+          Reativar
+        </Button>
+        <DeletePermanentIconButton
+          disabled={mutationPending}
+          onClick={() => onDeleteDeactivated(p)}
+        />
+      </div>
+    ),
   ]);
 
   const hasActiveListFilters = Boolean(filterName.trim() || filterCategory || filterDoseUnit || filterOrigin);
@@ -720,9 +746,13 @@ export default function AdminGlobalCatalogPage() {
     <>
       <PageHeader
         icon={<Package className="h-5 w-5" />}
-        section="Plataforma"
-        title="Catálogo Global"
-        description="Como administrador, você pode editar e desativar produtos ativos; a exclusão definitiva fica na aba Removidos."
+        section={isOrgAdmin ? "Equipe" : "Plataforma"}
+        title="Produtos"
+        description={
+          isOrgAdmin
+            ? "Catálogo global da plataforma (somente leitura) e produtos customizados das carteiras desta equipe."
+            : "Como administrador, você pode editar e desativar produtos ativos; a exclusão definitiva fica na aba Removidos."
+        }
       />
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -809,7 +839,7 @@ export default function AdminGlobalCatalogPage() {
               </Button>
             ) : null}
           </div>
-          {activeTab === "global" ? (
+          {activeTab === "global" && canManagePlatform ? (
             <div className="flex flex-wrap items-center gap-2">
               <Sheet
                 open={importOpen}

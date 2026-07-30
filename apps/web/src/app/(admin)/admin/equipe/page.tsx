@@ -21,14 +21,15 @@ import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { AdminTeamMember } from "@recomenda/api";
 import {
   useAdminTeamMembers,
+  useMe,
   usePlans,
   usePromoteAdminTeamMember,
 } from "@recomenda/api-hooks";
 
-type TabKey = "all" | "managers" | "operators" | "temporary";
+type TabKey = "all" | "managers" | "consultants" | "temporary";
 
 function accessLabel(level: AdminTeamMember["access_level"]) {
-  return level === "MANAGER" ? "Gestor" : "Operador";
+  return level === "MANAGER" ? "Gestor" : "Consultor";
 }
 
 function memberKey(m: AdminTeamMember) {
@@ -36,13 +37,15 @@ function memberKey(m: AdminTeamMember) {
 }
 
 export default function AdminEquipePage() {
+  const { data: me } = useMe();
+  const isOrgAdmin = me?.role === "ORG_ADMIN";
   const [tab, setTab] = useState<TabKey>("all");
   const [filter, setFilter] = useState("");
   const [promoteTarget, setPromoteTarget] = useState<AdminTeamMember | null>(null);
   const [planId, setPlanId] = useState("");
 
   const { data, isLoading } = useAdminTeamMembers();
-  const { data: plans } = usePlans();
+  const { data: plans } = usePlans({ enabled: !isOrgAdmin });
   const promoteMutation = usePromoteAdminTeamMember();
 
   const list = useMemo(() => (Array.isArray(data) ? data : []), [data]);
@@ -51,8 +54,8 @@ export default function AdminEquipePage() {
     switch (tab) {
       case "managers":
         return list.filter((m) => m.access_level === "MANAGER");
-      case "operators":
-        return list.filter((m) => m.access_level === "ASSISTANT");
+      case "consultants":
+        return list.filter((m) => m.access_level === "CONSULTANT");
       case "temporary":
         return list.filter((m) => m.is_temporary);
       default:
@@ -74,7 +77,7 @@ export default function AdminEquipePage() {
     () => ({
       all: list.length,
       managers: list.filter((m) => m.access_level === "MANAGER").length,
-      operators: list.filter((m) => m.access_level === "ASSISTANT").length,
+      consultants: list.filter((m) => m.access_level === "CONSULTANT").length,
       temporary: list.filter((m) => m.is_temporary).length,
     }),
     [list],
@@ -135,7 +138,11 @@ export default function AdminEquipePage() {
       {m.is_temporary ? <StatusBadge tone="warning">Temporária</StatusBadge> : null}
       {m.is_agronomist ? <StatusBadge tone="clay">Agrônomo</StatusBadge> : null}
     </div>,
-    m.is_agronomist ? (
+    isOrgAdmin ? (
+      <span key={`a-${memberKey(m)}`} className="text-xs text-muted-foreground">
+        —
+      </span>
+    ) : m.is_agronomist ? (
       <span key={`a-${memberKey(m)}`} className="text-xs text-muted-foreground">
         Já é agrônomo
       </span>
@@ -151,8 +158,12 @@ export default function AdminEquipePage() {
       <PageHeader
         icon={<UserCog className="h-5 w-5" />}
         section="Admin"
-        title="Equipe"
-        description="Gestores e operadores em todas as carteiras. Contas temporárias podem ser promovidas a agrônomo."
+        title="Membros das carteiras"
+        description={
+          isOrgAdmin
+            ? "Gestores e consultores das carteiras vinculadas a esta equipe."
+            : "Gestores e consultores em todas as carteiras. Contas temporárias podem ser promovidas a agrônomo."
+        }
       />
 
       <SegmentedTabs
@@ -161,7 +172,7 @@ export default function AdminEquipePage() {
         items={[
           { value: "all", label: "Todos", badgeCount: counts.all },
           { value: "managers", label: "Gestores", badgeCount: counts.managers },
-          { value: "operators", label: "Operadores", badgeCount: counts.operators },
+          { value: "consultants", label: "Consultores", badgeCount: counts.consultants },
           { value: "temporary", label: "Temporárias", badgeCount: counts.temporary },
         ]}
       />

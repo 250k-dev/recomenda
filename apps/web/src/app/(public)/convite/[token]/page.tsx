@@ -41,10 +41,17 @@ function invitationRoleLabel(
   kind?: InvitationPreview["kind"],
   accessLevel?: InvitationPreview["access_level"],
 ): string {
+  if (kind === "FARM_TEAM") {
+    return accessLevel === "FARM_MANAGER" ? "gerente" : "operador";
+  }
   if (kind === "CONSULTANT") {
-    return accessLevel === "ASSISTANT" ? "operador" : "gestor";
+    return accessLevel === "CONSULTANT" ? "consultor" : "gestor";
   }
   return "produtor";
+}
+
+function isTeamInviteKind(kind?: InvitationPreview["kind"]): boolean {
+  return kind === "CONSULTANT" || kind === "FARM_TEAM";
 }
 
 const INVITATION_STATUS_LABELS: Record<string, string> = {
@@ -68,8 +75,11 @@ export default function InviteTokenPage() {
   const { data: invitation, isLoading, isError } = useInvitationByToken(token);
   const acceptMutation = useAcceptInvitation(token);
 
+  // Conta real já ativa: só confirma senha. Legado/novo: define senha.
   const isJoinFlow =
-    invitation?.kind === "CONSULTANT" && Boolean(invitation.account_exists);
+    Boolean(invitation?.account_exists) && invitation?.needs_password_setup === false;
+  const isPasswordSetup =
+    Boolean(invitation) && !isJoinFlow;
 
   const signupForm = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -93,7 +103,7 @@ export default function InviteTokenPage() {
     };
   }, []);
 
-  const finishConsultantLogin = async (email: string, password: string) => {
+  const finishTeamLogin = async (email: string, password: string) => {
     const result = await login(email, password);
     window.location.assign(
       result.user.role === "ADMIN" ? "/admin" : "/dashboard",
@@ -112,12 +122,8 @@ export default function InviteTokenPage() {
         return;
       }
 
-      if (invitation.kind === "CONSULTANT") {
-        await finishConsultantLogin(email, password);
-        return;
-      }
-
-      router.push("/login?force=1");
+      // Equipe (carteira/fazenda) e Produtor: entra direto no painel web.
+      await finishTeamLogin(email, password);
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Não foi possível concluir o cadastro.",
@@ -136,7 +142,7 @@ export default function InviteTokenPage() {
         router.push("/login?force=1");
         return;
       }
-      await finishConsultantLogin(email, password);
+      await finishTeamLogin(email, password);
     } catch (error) {
       setSubmitError(
         error instanceof Error
@@ -207,22 +213,37 @@ export default function InviteTokenPage() {
     <AuthShell>
       <Card className="p-6">
         <h2 className="font-display text-[1.4rem] font-semibold text-text-strong">
-          {isJoinFlow ? "Entrar na equipe" : "Criar sua conta"}
+          {isJoinFlow
+            ? "Entrar na equipe"
+            : invitation.kind === "PRODUCER" && invitation.account_exists
+              ? "Ativar seu acesso"
+              : "Criar sua conta"}
         </h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
           {isJoinFlow ? (
             <>
               <strong>{agronomistLabel}</strong> convidou você como {roleLabel}.
-              Você já tem conta — confirme com a sua senha para entrar nesta
-              equipe, sem criar um login novo.
+              Você já tem conta — confirme com a sua senha para continuar, sem
+              criar um login novo.
+            </>
+          ) : invitation.kind === "PRODUCER" && invitation.account_exists ? (
+            <>
+              <strong>{agronomistLabel}</strong> liberou seu acesso ao painel
+              web. Defina uma senha para entrar como {roleLabel}.
             </>
           ) : (
             <>
               Você foi convidado para acessar como {roleLabel}
-              {invitation.kind === "CONSULTANT" ? (
+              {isTeamInviteKind(invitation.kind) ? (
                 <>
                   {" "}
-                  na carteira de <strong>{agronomistLabel}</strong>
+                  {invitation.kind === "FARM_TEAM" ? "na fazenda de" : "na carteira de"}{" "}
+                  <strong>{agronomistLabel}</strong>
+                </>
+              ) : invitation.kind === "PRODUCER" ? (
+                <>
+                  {" "}
+                  com <strong>{agronomistLabel}</strong>
                 </>
               ) : null}
               .
@@ -335,11 +356,17 @@ export default function InviteTokenPage() {
             <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Loader2 className="size-4 animate-spin" /> Criando conta...
+                  <Loader2 className="size-4 animate-spin" />{" "}
+                  {isPasswordSetup && invitation.account_exists
+                    ? "Ativando..."
+                    : "Criando conta..."}
                 </>
               ) : (
                 <>
-                  <Check className="size-4" /> Criar conta e entrar
+                  <Check className="size-4" />{" "}
+                  {invitation.kind === "PRODUCER" && invitation.account_exists
+                    ? "Definir senha e entrar"
+                    : "Criar conta e entrar"}
                 </>
               )}
             </Button>

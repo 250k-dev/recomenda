@@ -17,7 +17,8 @@ export const RECOMMENDATION_STATUS_LABELS: Record<string, string> = {
 };
 
 export function fmtDate(d: string): string {
-  return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {
+  const ymd = /^(\d{4}-\d{2}-\d{2})/.exec(d)?.[1] ?? d;
+  return new Date(ymd + "T12:00:00").toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "short",
     year: "numeric",

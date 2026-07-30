@@ -14,7 +14,7 @@ import type { Route } from "next";
 import { Search, Users, Plus, Package } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Dialog, DialogContent, DialogTitle } from "@recomenda/ui/primitives/dialog";
-import { useProducers } from "@recomenda/api-hooks";
+import { useMe, useProducers } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
 
@@ -42,8 +42,13 @@ const normalize = (value: string) =>
  */
 export function ProducerSearchButton() {
   const router = useRouter();
+  const { data: me } = useMe();
   const { data } = useProducers();
   const canCreateProducer = useCan("PRODUCER_CREATE");
+  const hideSearch =
+    me?.role === "PRODUCER" ||
+    (me?.role === "STAFF" &&
+      (me.access_level === "FARM_MANAGER" || me.access_level === "FARM_OPERATOR"));
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -86,6 +91,7 @@ export function ProducerSearchButton() {
 
   // Global ⌘K / Ctrl+K shortcut to open the search modal.
   useEffect(() => {
+    if (hideSearch) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -94,7 +100,7 @@ export function ProducerSearchButton() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [hideSearch]);
 
   const optionEls = () =>
     Array.from(
@@ -148,6 +154,8 @@ export function ProducerSearchButton() {
       activeKey === key ? "bg-accent" : "hover:bg-accent/60",
       extra,
     );
+
+  if (hideSearch) return null;
 
   return (
     <>

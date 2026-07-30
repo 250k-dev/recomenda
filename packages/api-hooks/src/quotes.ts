@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type CreateQuoteResponseInput,
+  type QuotePaymentTerm,
   type UpdateQuoteResponseInput,
   createQuoteRequest,
   createQuoteResponse,
@@ -25,7 +26,8 @@ import { queryKeys } from "./queryKeys";
 export function useCreateQuoteRequest(listId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => createQuoteRequest(listId),
+    mutationFn: (paymentTerm?: QuotePaymentTerm) =>
+      createQuoteRequest(listId, paymentTerm),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListQuotes(listId) });
     },

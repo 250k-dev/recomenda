@@ -82,6 +82,8 @@ export function useUpdateLocalProduct() {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminPlatformActive });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminDeactivatedCatalog });
       queryClient.invalidateQueries({ queryKey: queryKeys.inactiveLocalCatalog });
+      // Preço entra no valor do estoque do produtor.
+      queryClient.invalidateQueries({ queryKey: ["producer-stock"] });
     },
   });
 }

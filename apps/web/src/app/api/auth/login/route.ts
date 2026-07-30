@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { serverEnv } from "@recomenda/config/server";
-import { clearAuthCookies, setAuthCookies } from "@/lib/auth/session-cookies";
+import { setAuthCookies } from "@/lib/auth/session-cookies";
 
 type LoginPayload = {
   access_token: string;
@@ -26,20 +26,6 @@ export async function POST(request: NextRequest) {
 
   const payload = (await response.json()) as LoginPayload;
   const cookieStore = await cookies();
-
-  if (payload.user.role === "PRODUCER") {
-    clearAuthCookies(cookieStore);
-    return NextResponse.json(
-      {
-        error: {
-          code: "PRODUCER_WEB_FORBIDDEN",
-          message:
-            "Produtores não têm acesso ao painel web. Entre em contato com o suporte.",
-        },
-      },
-      { status: 403 },
-    );
-  }
 
   setAuthCookies(cookieStore, {
     access_token: payload.access_token,

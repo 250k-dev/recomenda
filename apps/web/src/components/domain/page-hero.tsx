@@ -96,10 +96,13 @@ function PageHeroStatCell({
  * de métricas embutida (divisores verticais). Serve tanto telas de lista
  * (Produtores, Equipe, Templates) quanto de detalhe (Produtor, Fazenda, Safra).
  * É cartão em todas as larguras; no mobile só o arranjo muda — métricas em grade
- * de 2 colunas e ações em linha própria.
+ * de 2 colunas e ações em linha própria (scroll horizontal quando densas).
  *
  * `variant="inverted"` usa o verde primário como fundo (herói em destaque, ex.:
  * abertura de dashboard).
+ *
+ * `sticky` mantém o herói no topo ao rolar (fundo sólido + sombra) — útil em
+ * barras de ação densas como a Lista de compra.
  *
  * Reserva 3rem (`mb-12`) até o conteúdo abaixo — o respiro que separa o herói
  * do corpo da página. Dentro de um contêiner flex com `gap`, a margem soma ao
@@ -122,6 +125,7 @@ export function PageHero({
   children,
   className,
   variant = "default",
+  sticky = false,
 }: {
   icon: ReactNode;
   eyebrow: string;
@@ -138,6 +142,8 @@ export function PageHero({
   children?: ReactNode;
   className?: string;
   variant?: "default" | "inverted";
+  /** Fixa o herói no topo do viewport ao scrollar (ações permanecem acessíveis). */
+  sticky?: boolean;
 }) {
   const inverted = variant === "inverted";
   return (
@@ -148,6 +154,9 @@ export function PageHero({
         inverted
           ? "bg-primary text-primary-foreground"
           : "border border-border bg-card",
+        sticky &&
+          "sticky top-0 z-20 shadow-md " +
+            (inverted ? "bg-primary" : "bg-card"),
         className,
       )}
     >
@@ -191,11 +200,29 @@ export function PageHero({
           </div>
         </div>
         {actions ? (
-          <div className="flex-wrap justify-end hidden gap-2 shrink-0 sm:flex">
+          // Sem sticky: ocupa a sobra ao lado do título e quebra dentro da largura.
+          // Com sticky (ex.: lista de compra): linha própria em largura total —
+          // barra densa não espreme o título em tablet.
+          <div
+            className={cn(
+              "hidden max-w-full min-w-0 flex-wrap gap-2 sm:flex",
+              sticky
+                ? "w-full basis-full justify-start"
+                : "flex-1 basis-52 justify-end",
+            )}
+          >
             {actions}
           </div>
         ) : null}
       </div>
+
+      {/* Mobile: faixa rolável horizontal logo abaixo do título (antes dos KPIs),
+          alinhada ao desktop e acessível no herói sticky sem empilhar 4 linhas. */}
+      {actions ? (
+        <div className="mt-3.5 -mx-1 flex gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 sm:hidden *:shrink-0">
+          {actions}
+        </div>
+      ) : null}
 
       {/* A faixa quebra em várias linhas quando há muitas métricas. Para que as
           linhas seguintes não comecem com divisor e recuo sobrando, a régua
@@ -218,15 +245,6 @@ export function PageHero({
               />
             ))}
           </div>
-        </div>
-      ) : null}
-
-      {/* Mesmas ações repetidas no mobile, em linha própria abaixo das métricas.
-          2 por linha (basis ~50%): alvos de toque grandes sem espremer/sobrepor
-          quando há muitos botões; um botão sozinho ou o ímpar final ocupa a linha. */}
-      {actions ? (
-        <div className="mt-3.5 flex flex-wrap gap-2 sm:hidden [&>*]:grow [&>*]:basis-[calc(50%-0.25rem)]">
-          {actions}
         </div>
       ) : null}
 

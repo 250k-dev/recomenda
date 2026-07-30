@@ -16,7 +16,7 @@ export function ActiveScopeBanner() {
     return null;
   }
 
-  const levelLabel = activeScope.access_level === "MANAGER" ? "Gestor" : "Operador";
+  const levelLabel = activeScope.access_level === "MANAGER" ? "Gestor" : "Consultor";
 
   return (
     <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-primary/25 bg-primary px-4 py-2.5 text-sm text-primary-foreground md:px-8">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { errors, jwtVerify } from "jose";
 import { serverEnv } from "@recomenda/config/server";
 
-const publicRoutes = ["/login", "/esqueci-senha", "/redefinir-senha", "/convite", "/cotacao", "/acesso-produtor"];
+const publicRoutes = ["/login", "/esqueci-senha", "/redefinir-senha", "/convite", "/cotacao"];
 
 function isPublicPath(pathname: string) {
   return publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
@@ -68,14 +68,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.searchParams.get("force") === "true";
 
   if (isPublicPath(pathname)) {
-    if (
-      accessToken &&
-      role &&
-      role !== "PRODUCER" &&
-      (pathname === "/login" || pathname === "/") &&
-      !forceLogin
-    ) {
-      const redirectTo = role === "ADMIN" ? "/admin" : "/dashboard";
+    if (accessToken && role && (pathname === "/login" || pathname === "/") && !forceLogin) {
+      const redirectTo = role === "ADMIN" || role === "ORG_ADMIN" ? "/admin" : "/dashboard";
       return NextResponse.redirect(new URL(redirectTo, request.url));
     }
     return NextResponse.next();
@@ -106,15 +100,14 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (role === "PRODUCER") {
-    return NextResponse.redirect(new URL("/acesso-produtor", request.url));
-  }
-
-  if ((role === "AGRONOMIST" || role === "STAFF") && pathname.startsWith("/admin")) {
+  if (
+    (role === "AGRONOMIST" || role === "STAFF" || role === "PRODUCER") &&
+    pathname.startsWith("/admin")
+  ) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  if (role === "ADMIN" && pathname.startsWith("/dashboard")) {
+  if ((role === "ADMIN" || role === "ORG_ADMIN") && pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }
 

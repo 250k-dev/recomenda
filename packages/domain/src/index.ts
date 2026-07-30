@@ -15,7 +15,7 @@
 // de negócio pura (quem pode o quê) e porque `@recomenda/api-hooks` precisa
 // dela — deixá-la no app faria um pacote importar de `apps/`.
 export type { Permission, Principal } from "./auth/permissions";
-export { can, isManager, isAssistant } from "./auth/permissions";
+export { can, isManager, isConsultant } from "./auth/permissions";
 
 // ---- catálogo ----------------------------------------------------------
 export type {
@@ -122,6 +122,17 @@ export {
   printRecommendation,
   printRecommendations,
 } from "./recommendations/print-document";
+export type { FormulationKey, FormulationOption } from "./recommendations/formulation-mix-order";
+export {
+  FORMULATION_MIX_OPTIONS,
+  DEFAULT_FORMULATION_MIX_ORDER,
+  resolveFormulationKey,
+  formulationMixIndex,
+  formulationMixScore,
+  normalizeFormulationMixOrder,
+  formulationOptionLabel,
+  formulationShortLabel,
+} from "./recommendations/formulation-mix-order";
 
 // ---- relatórios --------------------------------------------------------
 export {
@@ -130,6 +141,17 @@ export {
   formatReportCurrency,
   formatReportMargin,
 } from "./reports/metrics";
+
+// ---- estoque -----------------------------------------------------------
+export type {
+  StockExportItem,
+  StockExportData,
+} from "./stock/stock-export";
+export {
+  printStock,
+  buildStockWhatsappMessage,
+  downloadStockCsv,
+} from "./stock/stock-export";
 
 // ---- timing ------------------------------------------------------------
 export type { StageProductDraft } from "./timing/types";

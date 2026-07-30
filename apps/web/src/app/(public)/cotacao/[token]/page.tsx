@@ -104,6 +104,15 @@ export default function QuoteEntryPage() {
             {data.list.variety ? ` · ${data.list.variety}` : ""} ·{" "}
             {fmtQty(data.list.total_hectares)} ha
             {data.producer_name ? ` · Produtor: ${data.producer_name}` : ""}
+            {data.payment_term
+              ? ` · Pagamento: ${
+                  data.payment_term === "CASH"
+                    ? "à vista"
+                    : data.payment_term === "TERM"
+                      ? "a prazo"
+                      : "barter"
+                }`
+              : ""}
           </p>
         </div>
       </header>

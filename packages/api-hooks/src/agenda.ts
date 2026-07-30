@@ -33,12 +33,17 @@ export type AgendaSeasonRow = {
   farm_name?: string | null;
   farm_id?: string | null;
   producer_name?: string | null;
+  planting_date?: string | null;
 };
+
+export type AgendaEventKind = "APPLICATION" | "PLANTING";
 
 export type AgendaEvent = {
   id: string;
   ymd: string;
-  /** Id da recomendação (etapa) — permite registrar/pular direto da agenda. */
+  /** APPLICATION = etapa; PLANTING = registro/edição de plantio da safra. */
+  kind: AgendaEventKind;
+  /** Id da recomendação (etapa) — vazio em eventos de plantio. */
   recommendationId: string;
   /** Dia único usado no mini calendário (um ponto por recomendação). */
   displayYmd: string;
@@ -51,6 +56,8 @@ export type AgendaEvent = {
   pillLabel: string;
   windowEndYmd: string;
   isCenterDay: boolean;
+  /** Data de plantio atual (só PLANTING). */
+  plantingDate?: string | null;
 };
 
 export type AgronomistAgendaResult = {
@@ -219,6 +226,46 @@ async function fetchAgendaEvents(
   const countedToday = new Set<string>();
   const countedLate = new Set<string>();
 
+  // Plantio: sem data → painel de pendências (hoje); com data → marker no dia.
+  for (const season of seasons) {
+    const plantingYmd = String(season.planting_date ?? "").slice(0, 10);
+    const hasPlanting = /^\d{4}-\d{2}-\d{2}$/.test(plantingYmd);
+    const displayYmd = hasPlanting ? plantingYmd : today;
+    const plantingKey = `planting-${season.id}`;
+    const basePlanting: Omit<AgendaEvent, "id" | "ymd"> = {
+      kind: "PLANTING",
+      recommendationId: "",
+      displayYmd,
+      applicationTitle: hasPlanting ? "Plantio" : "Registrar plantio",
+      farmName: season.farm_name?.trim() || "Fazenda",
+      producerName: season.producer_name?.trim() || "Produtor",
+      plotName: season.plot_name?.trim() || "Talhão",
+      seasonId: season.id,
+      isLate: false,
+      pillLabel: hasPlanting ? "Plantio" : "Sem data",
+      windowEndYmd: displayYmd,
+      isCenterDay: true,
+      plantingDate: hasPlanting ? plantingYmd : null,
+    };
+
+    if (hasPlanting) {
+      if (!calendarMarkersByDay[displayYmd]) calendarMarkersByDay[displayYmd] = [];
+      calendarMarkersByDay[displayYmd].push({
+        ...basePlanting,
+        id: `${plantingKey}-marker`,
+        ymd: displayYmd,
+      });
+    }
+
+    const panelYmd = hasPlanting ? plantingYmd : today;
+    if (!eventsByDay[panelYmd]) eventsByDay[panelYmd] = [];
+    eventsByDay[panelYmd].push({
+      ...basePlanting,
+      id: `${plantingKey}-${panelYmd}`,
+      ymd: panelYmd,
+    });
+  }
+
   for (const { season, r, window } of ordered) {
     const recommendationKey = `${season.id}-${r.id}`;
     const displayYmd = recommendationDisplayYmd(window, today);
@@ -242,6 +289,7 @@ async function fetchAgendaEvents(
     }
 
     const baseEvent: Omit<AgendaEvent, "id" | "ymd"> = {
+      kind: "APPLICATION",
       recommendationId: r.id,
       displayYmd,
       applicationTitle: recommendationTitle(r),

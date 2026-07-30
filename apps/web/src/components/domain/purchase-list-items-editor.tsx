@@ -16,6 +16,7 @@ import {
   useGlobalCatalog,
   usePlatformCatalog,
 } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import {
   buildPurchaseListCatalog,
@@ -49,7 +50,10 @@ type PurchaseListItemsEditorProps = {
   /** Cultura(s) da lista — "ANY" = soja e milho. Filtra as categorias de semente. */
   crop?: PurchaseListCrop | "ANY" | null;
   /** Estoque do produtor por produto (local_product_id → quantidade) — auto-preenche. */
-  stockByProductId?: Record<string, number>;
+  stockByProductId?: Record<
+    string,
+    number | { quantity: number; price_brl: number | null }
+  >;
   className?: string;
   readOnly?: boolean;
 };
@@ -80,6 +84,7 @@ export function PurchaseListItemsEditor({
   className,
   readOnly = false,
 }: PurchaseListItemsEditorProps) {
+  const canViewPrices = useCan("PRICE_VIEW");
   const platformCatalog = usePlatformCatalog();
   const globalCatalog = useGlobalCatalog();
   const cloneGlobal = useCloneGlobalProduct();
@@ -316,10 +321,17 @@ export function PurchaseListItemsEditor({
       return productUnit;
     };
 
-    const stockPatch = (localId: string) =>
-      stockByProductId?.[localId] != null
-        ? { stock: String(stockByProductId[localId]) }
-        : {};
+    const stockPatch = (localId: string) => {
+      const entry = stockByProductId?.[localId];
+      if (entry == null) return {};
+      if (typeof entry === "number") {
+        return { stock: String(entry) };
+      }
+      return {
+        stock: String(entry.quantity),
+        ...(entry.price_brl != null ? { price: String(entry.price_brl) } : {}),
+      };
+    };
 
     if (!product.globalId || !product.isGlobalOnly) {
       updateItem(itemKey, {
@@ -597,15 +609,21 @@ export function PurchaseListItemsEditor({
                 />
               )}
             </td>
-            {/* Nº aplicações */}
+            {/* Nº aplicações — só inteiros ≥ 1 */}
             <td className="px-1.5 py-1.5 text-right">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">{`${it.nApps}×`}</span>
               ) : (
                 <Input
                   type="number"
+                  step="1"
+                  min="1"
+                  inputMode="numeric"
                   value={it.nApps}
-                  onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
+                  onChange={(e) => {
+                    const whole = e.target.value.replace(/[.,].*$/, "").replace(/\D/g, "");
+                    updateItem(it.key, { nApps: whole === "" ? "" : whole });
+                  }}
                   className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
                 />
               )}
@@ -662,41 +680,45 @@ export function PurchaseListItemsEditor({
             />
           )}
         </td>
-        <td className="px-1.5 py-1.5 text-right">
-          {readOnly ? (
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {it.priceUsd ? fmtUsd(Number(it.priceUsd)) : "—"}
-            </span>
-          ) : (
-            <MoneyInput
-              placeholder="US$"
-              value={it.priceUsd}
-              onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
-              className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
-            />
-          )}
-        </td>
-        <td className="px-1.5 py-1.5 text-right">
-          {readOnly ? (
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {hasPrice ? fmtBrl(rowUnitBrl) : "—"}
-            </span>
-          ) : usdDriven ? (
-            <span
-              title="Convertido automaticamente do US$ pela cotação"
-              className="inline-block text-sm tabular-nums text-muted-foreground"
-            >
-              {fmtBrl(rowUnitBrl)}
-            </span>
-          ) : (
-            <MoneyInput
-              placeholder="R$"
-              value={it.price}
-              onValueChange={(v) => updateItem(it.key, { price: v })}
-              className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
-            />
-          )}
-        </td>
+        {canViewPrices ? (
+          <td className="px-1.5 py-1.5 text-right">
+            {readOnly ? (
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {it.priceUsd ? fmtUsd(Number(it.priceUsd)) : "—"}
+              </span>
+            ) : (
+              <MoneyInput
+                placeholder="US$"
+                value={it.priceUsd}
+                onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
+                className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+              />
+            )}
+          </td>
+        ) : null}
+        {canViewPrices ? (
+          <td className="px-1.5 py-1.5 text-right">
+            {readOnly ? (
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {hasPrice ? fmtBrl(rowUnitBrl) : "—"}
+              </span>
+            ) : usdDriven ? (
+              <span
+                title="Convertido automaticamente do US$ pela cotação"
+                className="inline-block text-sm tabular-nums text-muted-foreground"
+              >
+                {fmtBrl(rowUnitBrl)}
+              </span>
+            ) : (
+              <MoneyInput
+                placeholder="R$"
+                value={it.price}
+                onValueChange={(v) => updateItem(it.key, { price: v })}
+                className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+              />
+            )}
+          </td>
+        ) : null}
         <td className={cn(summaryCellClass, "text-muted-foreground")}>
           {fmt(required)}
         </td>
@@ -712,12 +734,16 @@ export function PurchaseListItemsEditor({
             {fmt(toBuy)}
           </span>
         </td>
-        <td className={cn(summaryCellClass, "font-medium text-foreground")}>
-          {hasPrice ? fmtBrl(totalValue) : "—"}
-        </td>
-        <td className={cn(summaryCellClass, "text-muted-foreground")}>
-          {hasPrice && rowUnitUsd > 0 ? fmtUsd(totalValueUsd) : "—"}
-        </td>
+        {canViewPrices ? (
+          <td className={cn(summaryCellClass, "font-medium text-foreground")}>
+            {hasPrice ? fmtBrl(totalValue) : "—"}
+          </td>
+        ) : null}
+        {canViewPrices ? (
+          <td className={cn(summaryCellClass, "text-muted-foreground")}>
+            {hasPrice && rowUnitUsd > 0 ? fmtUsd(totalValueUsd) : "—"}
+          </td>
+        ) : null}
         {!readOnly ? (
           <td className={cn(summaryCellClass, "text-center")}>
             <button
@@ -739,12 +765,20 @@ export function PurchaseListItemsEditor({
   const sharedHeaderCells = (
     <>
       <td className="px-1.5 py-2 text-right">Estoque</td>
-      <td className="px-1.5 py-2 text-right">Preço US$</td>
-      <td className="px-1.5 py-2 text-right">Valor</td>
+      {canViewPrices ? (
+        <td className="px-1.5 py-2 text-right">Preço US$</td>
+      ) : null}
+      {canViewPrices ? (
+        <td className="px-1.5 py-2 text-right">Valor</td>
+      ) : null}
       <td className={summaryHeaderClass}>Necessário</td>
       <td className={summaryHeaderClass}>Qtde final</td>
-      <td className={summaryHeaderClass}>Total</td>
-      <td className={summaryHeaderClass}>Total US$</td>
+      {canViewPrices ? (
+        <td className={summaryHeaderClass}>Total</td>
+      ) : null}
+      {canViewPrices ? (
+        <td className={summaryHeaderClass}>Total US$</td>
+      ) : null}
       {!readOnly ? <td className={summaryHeaderClass} /> : null}
     </>
   );
@@ -759,16 +793,25 @@ export function PurchaseListItemsEditor({
     items: ListItem[];
   }) => {
     const seedBand = band.seed;
-    // Defensivos ganham 2 colunas extras (% área + obs. área): +264px, o que
-    // iguala a contagem de colunas das duas bandas.
-    const colCount = readOnly ? 14 : 15;
+    // Defensivos ganham 2 colunas extras (% área + obs. área). Sem PRICE_VIEW,
+    // some Preço US$ / Valor / Total / Total US$ (−4).
+    const priceCols = canViewPrices ? 4 : 0;
+    const colCount = (readOnly ? 14 : 15) - (4 - priceCols);
     const tableWidth = seedBand
       ? readOnly
-        ? "w-[1752px]"
-        : "w-[1796px]"
+        ? canViewPrices
+          ? "w-[1752px]"
+          : "w-[1248px]"
+        : canViewPrices
+          ? "w-[1796px]"
+          : "w-[1292px]"
       : readOnly
-        ? "w-[1844px]"
-        : "w-[1888px]";
+        ? canViewPrices
+          ? "w-[1844px]"
+          : "w-[1340px]"
+        : canViewPrices
+          ? "w-[1888px]"
+          : "w-[1384px]";
     return (
       <div
         key={band.id}
@@ -786,12 +829,12 @@ export function PurchaseListItemsEditor({
                 <col className="w-[128px]" />
                 <col className="w-[112px]" />
                 <col className="w-[104px]" />
-                <col className="w-[120px]" />
-                <col className="w-[128px]" />
+                {canViewPrices ? <col className="w-[120px]" /> : null}
+                {canViewPrices ? <col className="w-[128px]" /> : null}
                 <col className="w-[104px]" />
                 <col className="w-[104px]" />
-                <col className="w-[128px]" />
-                <col className="w-[128px]" />
+                {canViewPrices ? <col className="w-[128px]" /> : null}
+                {canViewPrices ? <col className="w-[128px]" /> : null}
                 {!readOnly ? <col className="w-[44px]" /> : null}
               </>
             ) : (
@@ -805,12 +848,12 @@ export function PurchaseListItemsEditor({
                 <col className="w-[104px]" />
                 <col className="w-[160px]" />
                 <col className="w-[104px]" />
-                <col className="w-[120px]" />
-                <col className="w-[128px]" />
+                {canViewPrices ? <col className="w-[120px]" /> : null}
+                {canViewPrices ? <col className="w-[128px]" /> : null}
                 <col className="w-[104px]" />
                 <col className="w-[104px]" />
-                <col className="w-[128px]" />
-                <col className="w-[128px]" />
+                {canViewPrices ? <col className="w-[128px]" /> : null}
+                {canViewPrices ? <col className="w-[128px]" /> : null}
                 {!readOnly ? <col className="w-[44px]" /> : null}
               </>
             )}
@@ -979,68 +1022,72 @@ export function PurchaseListItemsEditor({
 
   return (
     <div className={cn("flex min-w-0 w-full flex-col", className)}>
-      {/* Cotação do dólar — conversão automática US$ → R$ na lista de compra */}
+      {/* Cotação / saca / totais — só quem tem PRICE_VIEW. Espaçamento segue
+          disponível (não é preço). */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
-            <DollarSign className="h-4 w-4" />
-          </span>
-          <div className="flex flex-col">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Cotação do dólar
+        {canViewPrices ? (
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+              <DollarSign className="h-4 w-4" />
             </span>
-            <span className="text-[11px] text-muted-foreground">
-              converte produtos cotados em US$ para R$
-            </span>
-          </div>
-          {readOnly ? (
-            <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
-              {fx > 0 ? fmtBrl(fx) : "—"}
-            </span>
-          ) : (
-            <div className="ml-2 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">US$ 1 =</span>
-              <MoneyInput
-                placeholder="5,50"
-                value={fxRate}
-                onValueChange={(v) => {
-                  fxUserEditedRef.current = true;
-                  setFxRate(v);
-                }}
-                className="h-8 w-24"
-              />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Cotação do dólar
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                converte produtos cotados em US$ para R$
+              </span>
             </div>
-          )}
-        </div>
-        {/* Preço da saca (R$) — ao lado do dólar, default 110. Converte o custo em sacas. */}
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
-            <Sprout className="h-4 w-4" />
-          </span>
-          <div className="flex flex-col">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Preço da saca
-            </span>
-            <span className="text-[11px] text-muted-foreground">
-              converte o custo em sacas
-            </span>
+            {readOnly ? (
+              <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
+                {fx > 0 ? fmtBrl(fx) : "—"}
+              </span>
+            ) : (
+              <div className="ml-2 flex items-center gap-1">
+                <span className="text-sm text-muted-foreground">US$ 1 =</span>
+                <MoneyInput
+                  placeholder="5,50"
+                  value={fxRate}
+                  onValueChange={(v) => {
+                    fxUserEditedRef.current = true;
+                    setFxRate(v);
+                  }}
+                  className="h-8 w-24"
+                />
+              </div>
+            )}
           </div>
-          {readOnly ? (
-            <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
-              {fmtBrl(saca)}
+        ) : null}
+        {canViewPrices ? (
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+              <Sprout className="h-4 w-4" />
             </span>
-          ) : (
-            <div className="ml-2 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">R$</span>
-              <MoneyInput
-                placeholder="110,00"
-                value={grainPrice}
-                onValueChange={(v) => setGrainPrice(v)}
-                className="h-8 w-24"
-              />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Preço da saca
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                converte o custo em sacas
+              </span>
             </div>
-          )}
-        </div>
+            {readOnly ? (
+              <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
+                {fmtBrl(saca)}
+              </span>
+            ) : (
+              <div className="ml-2 flex items-center gap-1">
+                <span className="text-sm text-muted-foreground">R$</span>
+                <MoneyInput
+                  placeholder="110,00"
+                  value={grainPrice}
+                  onValueChange={(v) => setGrainPrice(v)}
+                  className="h-8 w-24"
+                />
+              </div>
+            )}
+          </div>
+        ) : null}
         {/* Espaçamento entre linhas (m) — parâmetro único; deriva a população da semente. */}
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
@@ -1072,24 +1119,26 @@ export function PurchaseListItemsEditor({
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Total R$
-            </span>
-            <span className="text-sm font-semibold tabular-nums text-foreground">
-              {fmtBrl(totals.brl)}
-            </span>
+        {canViewPrices ? (
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Total R$
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-foreground">
+                {fmtBrl(totals.brl)}
+              </span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Total US$
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                {totals.usd > 0 ? fmtUsd(totals.usd) : "—"}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Total US$
-            </span>
-            <span className="text-sm font-semibold tabular-nums text-muted-foreground">
-              {totals.usd > 0 ? fmtUsd(totals.usd) : "—"}
-            </span>
-          </div>
-        </div>
+        ) : null}
       </div>
 
       {!readOnly && stockWarnings.length > 0 ? (
@@ -1171,24 +1220,28 @@ export function PurchaseListItemsEditor({
                       {fmt(toBuy)} {seed ? seedQuantityUnitLabel(it.category) : it.unit}
                     </p>
                   </div>
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">Preço</span>
-                    <p className="mt-0.5 tabular-nums">
-                      {it.priceUsd ? `${fmtUsd(Number(it.priceUsd))} · ` : ""}
-                      {hasPrice ? fmtBrl(rowUnitBrl) : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">Valor total</span>
-                    <p className="mt-0.5 font-semibold tabular-nums">
-                      {hasPrice ? fmtBrl(totalValue) : "—"}
-                      {hasPrice && rowUnitUsd > 0 ? (
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          · {fmtUsd(totalValueUsd)}
-                        </span>
-                      ) : null}
-                    </p>
-                  </div>
+                  {canViewPrices ? (
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Preço</span>
+                      <p className="mt-0.5 tabular-nums">
+                        {it.priceUsd ? `${fmtUsd(Number(it.priceUsd))} · ` : ""}
+                        {hasPrice ? fmtBrl(rowUnitBrl) : "—"}
+                      </p>
+                    </div>
+                  ) : null}
+                  {canViewPrices ? (
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Valor total</span>
+                      <p className="mt-0.5 font-semibold tabular-nums">
+                        {hasPrice ? fmtBrl(totalValue) : "—"}
+                        {hasPrice && rowUnitUsd > 0 ? (
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">
+                            · {fmtUsd(totalValueUsd)}
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );
@@ -1309,8 +1362,16 @@ export function PurchaseListItemsEditor({
                       <Field label="Nº aplicações">
                         <Input
                           type="number"
+                          step="1"
+                          min="1"
+                          inputMode="numeric"
                           value={it.nApps}
-                          onChange={(e) => updateItem(it.key, { nApps: e.target.value })}
+                          onChange={(e) => {
+                            const whole = e.target.value
+                              .replace(/[.,].*$/, "")
+                              .replace(/\D/g, "");
+                            updateItem(it.key, { nApps: whole === "" ? "" : whole });
+                          }}
                         />
                       </Field>
                       <Field
@@ -1344,27 +1405,31 @@ export function PurchaseListItemsEditor({
                       onValueChange={(v) => updateItem(it.key, { stock: v })}
                     />
                   </Field>
-                  <Field label="Preço US$/un.">
-                    <MoneyInput
-                      placeholder="US$"
-                      value={it.priceUsd}
-                      onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
-                    />
-                  </Field>
-                  <Field label="Preço R$/un.">
-                    {it.priceUsd && fx > 0 ? (
-                      <div className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
-                        {fmtBrl(unitBrl(it))}{" "}
-                        <span className="ml-1 text-[10px]">(do US$)</span>
-                      </div>
-                    ) : (
+                  {canViewPrices ? (
+                    <Field label="Preço US$/un.">
                       <MoneyInput
-                        placeholder="R$"
-                        value={it.price}
-                        onValueChange={(v) => updateItem(it.key, { price: v })}
+                        placeholder="US$"
+                        value={it.priceUsd}
+                        onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
                       />
-                    )}
-                  </Field>
+                    </Field>
+                  ) : null}
+                  {canViewPrices ? (
+                    <Field label="Preço R$/un.">
+                      {it.priceUsd && fx > 0 ? (
+                        <div className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
+                          {fmtBrl(unitBrl(it))}{" "}
+                          <span className="ml-1 text-[10px]">(do US$)</span>
+                        </div>
+                      ) : (
+                        <MoneyInput
+                          placeholder="R$"
+                          value={it.price}
+                          onValueChange={(v) => updateItem(it.key, { price: v })}
+                        />
+                      )}
+                    </Field>
+                  ) : null}
                 </div>
 
                 <div className="mt-3 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">

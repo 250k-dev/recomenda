@@ -35,6 +35,7 @@ import { CompactListSkeleton } from "@/components/domain/page-skeletons";
 import {
   useActiveScope,
   useFarms,
+  useMe,
   useProducers,
   usePlanQuota,
   usePortfolioPriceCoverage,
@@ -165,13 +166,23 @@ export default function DashboardPage() {
   const activeScope = useActiveScope();
   const farms = useFarms();
   const producers = useProducers();
+  const { data: me } = useMe();
   // Plano é da conta própria — no modo gestão a rail mostra só o resumo da carteira hospedeira.
   const { data: planData, isLoading: planLoading } = usePlanQuota({
-    enabled: !activeScope,
+    enabled: !activeScope && me?.role === "AGRONOMIST",
   });
   const agenda = useAgronomistAgenda(new Date());
   const canManageTeam = useCan("TEAM_MANAGE");
+  const canFarmTeam = useCan("FARM_TEAM_MANAGE");
   const canCreateProducer = useCan("PRODUCER_CREATE");
+  const canTemplates = useCan("TEMPLATE_CRUD");
+  const canViewPrices = useCan("PRICE_VIEW");
+  const isFarmStaff =
+    me?.role === "STAFF" &&
+    (me.access_level === "FARM_MANAGER" || me.access_level === "FARM_OPERATOR");
+  const isProducer = me?.role === "PRODUCER";
+  /** Dash sem carteira de terceiros: atalho do próprio vínculo, sem templates. */
+  const isOwnOperation = isFarmStaff || isProducer;
 
   const [tab, setTab] = useState<AttentionTab>("late");
 
@@ -247,29 +258,50 @@ export default function DashboardPage() {
       {/* Atalhos de funcionalidades */}
       <div className="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-3 lg:grid-flow-col lg:auto-cols-fr">
         <ShortcutCard
-          href="/cronograma"
+          href={routes.cronograma()}
           icon={CalendarDays}
           title="Cronograma"
           sub="Agenda de aplicações"
         />
-        <ShortcutCard
-          href={routes.produtores.lista}
-          icon={Users}
-          title="Produtores"
-          sub="Carteira completa"
-        />
-        <ShortcutCard
-          href={routes.templatesDeCompra}
-          icon={FileText}
-          title="Templates de compra"
-          sub="Modelos de lista"
-        />
+        {isOwnOperation
+          ? activeProducers.map((producer) => (
+              <ShortcutCard
+                key={producer.producer_id}
+                href={routes.produtores.detalhe(producer.producer_id)}
+                icon={Leaf}
+                title={producer.name}
+                sub={isProducer ? "Minha operação" : "Produtor vinculado"}
+              />
+            ))
+          : (
+              <ShortcutCard
+                href={routes.produtores.lista}
+                icon={Users}
+                title="Produtores"
+                sub="Carteira completa"
+              />
+            )}
+        {!isOwnOperation && canTemplates ? (
+          <ShortcutCard
+            href={routes.templatesDeCompra}
+            icon={FileText}
+            title="Templates de compra"
+            sub="Modelos de lista"
+          />
+        ) : null}
         {canManageTeam ? (
           <ShortcutCard
             href={routes.equipe.lista}
             icon={UserCog}
             title="Equipe"
-            sub="Gestores e operadores"
+            sub="Gestores e consultores"
+          />
+        ) : canFarmTeam ? (
+          <ShortcutCard
+            href={routes.equipe.lista}
+            icon={UserCog}
+            title="Equipe"
+            sub="Gerentes e operadores"
           />
         ) : null}
         {canCreateProducer ? (
@@ -461,13 +493,15 @@ export default function DashboardPage() {
             )}
           </RailCard>
 
-          <PriceCoverageRailCard
-            completeLists={priceCoverage.completeLists}
-            totalLists={priceCoverage.totalLists}
-            pendingLists={priceCoverage.pendingLists}
-            pct={priceCoverage.pct}
-            isLoading={priceCoverage.isLoading}
-          />
+          {canViewPrices ? (
+            <PriceCoverageRailCard
+              completeLists={priceCoverage.completeLists}
+              totalLists={priceCoverage.totalLists}
+              pendingLists={priceCoverage.pendingLists}
+              pct={priceCoverage.pct}
+              isLoading={priceCoverage.isLoading}
+            />
+          ) : null}
 
           {!activeScope && planLoading ? (
             <div className="rounded-xl border border-primary-border bg-primary-soft p-4.5 shadow-sm">

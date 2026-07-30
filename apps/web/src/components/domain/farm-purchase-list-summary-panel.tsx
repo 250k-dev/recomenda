@@ -9,6 +9,7 @@ import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import type { PurchaseListDetail } from "@recomenda/api";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import {
   computePurchaseListMetrics,
   detailItemToListItem,
@@ -85,6 +86,7 @@ export function FarmPurchaseListSummaryPanel({
   onOpenFull: () => void;
   costPlanHref?: Route | null;
 }) {
+  const canViewPrices = useCan("PRICE_VIEW");
   const fxRate = useCurrencyStore((state) => state.fxRate);
   const grainPrice = useCurrencyStore((state) => state.grainPrice);
   if (isLoading) {
@@ -119,23 +121,29 @@ export function FarmPurchaseListSummaryPanel({
       </div>
 
       <div className="px-[18px] pb-4 pt-1.5">
-        <SummaryRow
-          label="Valor total"
-          value={metrics.totalValue > 0 ? fmtBrl(metrics.totalValue) : "—"}
-          largeValue
-        />
-        <SummaryRow
-          label="Volume de sacas"
-          value={metrics.totalSacks > 0 ? `${fmtQty(metrics.totalSacks)} sc` : "—"}
-        />
-        <SummaryRow
-          label="Custo (sc/ha)"
-          value={
-            metrics.costSacksPerHa > 0
-              ? `${fmtQty(metrics.costSacksPerHa)} sc/ha`
-              : "—"
-          }
-        />
+        {canViewPrices ? (
+          <SummaryRow
+            label="Valor total"
+            value={metrics.totalValue > 0 ? fmtBrl(metrics.totalValue) : "—"}
+            largeValue
+          />
+        ) : null}
+        {canViewPrices ? (
+          <SummaryRow
+            label="Volume de sacas"
+            value={metrics.totalSacks > 0 ? `${fmtQty(metrics.totalSacks)} sc` : "—"}
+          />
+        ) : null}
+        {canViewPrices ? (
+          <SummaryRow
+            label="Custo (sc/ha)"
+            value={
+              metrics.costSacksPerHa > 0
+                ? `${fmtQty(metrics.costSacksPerHa)} sc/ha`
+                : "—"
+            }
+          />
+        ) : null}
         <SummaryRow label="Produtos" value={String(productsTotal)} />
 
         <div className="my-3 rounded-[10px] border border-warning-border bg-warning-soft px-[13px] py-[11px] text-[13px] font-medium leading-snug text-warning-strong">

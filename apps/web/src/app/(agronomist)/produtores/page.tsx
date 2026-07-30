@@ -9,11 +9,17 @@ import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Select } from "@recomenda/ui/forms/select";
 import { toast } from "sonner";
-import { useProducers, useSetProducerActive, useDeleteProducer, useRevokeInvitation } from "@recomenda/api-hooks";
+import {
+  useProducers,
+  useSetProducerActive,
+  useDeleteProducer,
+  useRevokeInvitation,
+} from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { ProducerAttentionBadge } from "@/components/domain/producer-attention-badge";
+import { InviteProducerAccessDialog } from "@/components/domain/invite-producer-access-dialog";
 import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
@@ -28,6 +34,7 @@ import {
   Archive,
   RotateCcw,
   Trash2,
+  Mail,
 } from "lucide-react";
 import { cn, deactivateOutlineButtonClass } from "@recomenda/utils";
 import { useCan, usePrincipal } from "@recomenda/api-hooks/use-can";
@@ -66,6 +73,11 @@ export default function ProducersPage() {
   const [sort, setSort] = useState<SortMode>("name");
   const [page, setPage] = useState(1);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<{
+    producerId: string;
+    name: string;
+    email: string;
+  } | null>(null);
 
   // Volta à página 1 quando muda o tab/filtro/ordenação. Ajuste durante o render
   // (padrão recomendado do React — https://react.dev/learn/you-might-not-need-an-effect)
@@ -124,7 +136,10 @@ export default function ProducersPage() {
     }
   };
 
-  const actionPending = setActive.isPending || deleteMutation.isPending || revokeInvitationMutation.isPending;
+  const actionPending =
+    setActive.isPending ||
+    deleteMutation.isPending ||
+    revokeInvitationMutation.isPending;
 
   const list = useMemo(() => data?.data ?? [], [data]);
 
@@ -287,6 +302,7 @@ export default function ProducersPage() {
                       actionPending={actionPending}
                       canArchive={canEditProducer && owns}
                       canHardDelete={canDeleteProducer && owns}
+                      canInviteAccess={canCreateProducer}
                       onOpen={() =>
                         p.producer_id ? router.push(routes.produtores.detalhe(p.producer_id)) : null
                       }
@@ -294,6 +310,14 @@ export default function ProducersPage() {
                       onReactivate={() => p.producer_id && onReactivate(p.producer_id)}
                       onDelete={() => p.producer_id && onDelete(p.producer_id, p.name)}
                       onRevokeInvitation={() => p.invitation_id && onRevokeInvitation(p.invitation_id, p.name)}
+                      onInviteAccess={() =>
+                        p.producer_id &&
+                        setInviteTarget({
+                          producerId: p.producer_id,
+                          name: p.name,
+                          email: p.email ?? "",
+                        })
+                      }
                     />
                     );
                   })}
@@ -340,6 +364,12 @@ export default function ProducersPage() {
         loading={actionPending}
         onConfirm={confirmAction}
       />
+
+      <InviteProducerAccessDialog
+        open={inviteTarget !== null}
+        onOpenChange={(o) => !o && setInviteTarget(null)}
+        target={inviteTarget}
+      />
     </div>
   );
 }
@@ -350,22 +380,26 @@ function ProducerRow({
   actionPending,
   canArchive = true,
   canHardDelete = true,
+  canInviteAccess = false,
   onOpen,
   onArchive,
   onReactivate,
   onDelete,
   onRevokeInvitation,
+  onInviteAccess,
 }: {
   producer: AgronomistProducerListRow;
   tab: Tab;
   actionPending: boolean;
   canArchive?: boolean;
   canHardDelete?: boolean;
+  canInviteAccess?: boolean;
   onOpen: () => void;
   onArchive: () => void;
   onReactivate: () => void;
   onDelete: () => void;
   onRevokeInvitation: () => void;
+  onInviteAccess: () => void;
 }) {
   const initial = (producer.name?.trim().charAt(0) || "?").toUpperCase();
   const isInvitation = producer.row_type === "invitation";
@@ -428,6 +462,19 @@ function ProducerRow({
       </td>
       <td className="px-2 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
+          {canManage && tab === "active" && canInviteAccess ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={stop(onInviteAccess)}
+              disabled={actionPending}
+              className="gap-1.5 text-muted-foreground hover:text-primary"
+              title="Enviar convite para o produtor definir a senha"
+            >
+              <Mail className="h-4 w-4" />
+              <span className="hidden sm:inline">Convite</span>
+            </Button>
+          ) : null}
           {canManage && tab === "active" && canArchive ? (
             <Button
               variant="ghost"

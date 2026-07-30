@@ -25,6 +25,8 @@ import {
   queryKeys,
 } from "@recomenda/api-hooks";
 import { createFarm, grantFarmAccess } from "@recomenda/api";
+import { useCan } from "@recomenda/api-hooks/use-can";
+import { InviteProducerAccessDialog } from "@/components/domain/invite-producer-access-dialog";
 import {
   Sheet,
   SheetContent,
@@ -50,6 +52,7 @@ import {
   CalendarDays,
   Clock,
   TriangleAlert,
+  Mail,
 } from "lucide-react";
 
 const fmtHa = (n: number) =>
@@ -71,6 +74,8 @@ export function ProducerDetailView({
   const { data: producer, isLoading } = useProducer(producerId);
   const { data: farms, isLoading: loadingFarms } = useProducerFarms(producerId);
   const updateProducer = useUpdateProducer(producerId);
+  const canInviteAccess = useCan("PRODUCER_CREATE");
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -234,26 +239,38 @@ export function ProducerDetailView({
           </Button>
         }
         actions={
-          showSeasonActions ? (
-            <>
+          <>
+            {canInviteAccess ? (
               <Button
                 variant="outline"
                 className="gap-2"
-                onClick={() => setTemplatesOpen(true)}
+                onClick={() => setInviteOpen(true)}
               >
-                <Clock className="size-4" />
-                Modelos
+                <Mail className="size-4" />
+                Enviar convite de acesso
               </Button>
-              <Button
-                variant="clay"
-                className="gap-2"
-                onClick={() => setCronogramOpen(true)}
-              >
-                <CalendarDays className="size-4" />
-                Cronograma
-              </Button>
-            </>
-          ) : null
+            ) : null}
+            {showSeasonActions ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setTemplatesOpen(true)}
+                >
+                  <Clock className="size-4" />
+                  Modelos
+                </Button>
+                <Button
+                  variant="clay"
+                  className="gap-2"
+                  onClick={() => setCronogramOpen(true)}
+                >
+                  <CalendarDays className="size-4" />
+                  Cronograma
+                </Button>
+              </>
+            ) : null}
+          </>
         }
         stats={heroStats}
       >
@@ -488,6 +505,16 @@ export function ProducerDetailView({
           </div>
         </SheetContent>
       </Sheet>
+
+      <InviteProducerAccessDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        target={{
+          producerId,
+          name: producer.name,
+          email: producer.email ?? "",
+        }}
+      />
     </>
   );
 }

@@ -15,6 +15,8 @@ export interface SeasonDetail extends Season {
   variety?: string;
   planting_date?: string;
   desiccation_date?: string;
+  /** Ordem customizada das formulações na calda (null = padrão oficial). */
+  mix_formulation_order?: string[] | null;
 }
 
 export interface ShoppingListItem {
@@ -35,6 +37,12 @@ export interface RecommendationItem {
   total_quantity: number;
   dose_unit: string;
   is_substitution: boolean;
+  /** Ordem efetiva (formulacao / override). */
+  mix_order?: number;
+  /** Override por item (legado); null = usa formulacao da safra. */
+  mix_order_override?: number | null;
+  equivalence_group?: string | null;
+  formulation_key?: string | null;
 }
 
 export interface Recommendation {
@@ -75,7 +83,11 @@ export async function createSeason(payload: Record<string, unknown>) {
 
 export async function updateSeason(
   id: string,
-  payload: { planting_date?: string | null; desiccation_date?: string | null },
+  payload: {
+    planting_date?: string | null;
+    desiccation_date?: string | null;
+    mix_formulation_order?: string[] | null;
+  },
 ) {
   const { data } = await api.patch<SeasonDetail>(`/seasons/${id}`, payload);
   return data;
@@ -178,7 +190,11 @@ export async function createRecommendationItem(payload: {
 
 export async function updateRecommendationItem(
   id: string,
-  payload: { dose_per_hectare?: number; dose_unit?: string },
+  payload: {
+    dose_per_hectare?: number;
+    dose_unit?: string;
+    mix_order_override?: number | null;
+  },
 ) {
   const { data } = await api.patch(`/recommendation_items/${id}`, payload);
   return data;
