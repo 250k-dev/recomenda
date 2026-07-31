@@ -8,6 +8,7 @@ import {
 import { DashboardGreeting } from "@/components/domain/dashboard-greeting";
 import { ProducerSearchButton } from "@/components/domain/producer-search";
 import { useBreadcrumbItems } from "./breadcrumbs-context";
+import { NotificationsBell } from "./notifications-bell";
 import { ScopeSwitcher } from "./scope-switcher";
 import { UserMenu } from "./user-menu";
 
@@ -47,7 +48,7 @@ export function AppHeader() {
       : [HOME, ...(section ? [{ label: section[1] }] : [])];
 
   // Trilha/saudação à esquerda; slot flex-1 no meio (busca ou espaço vazio)
-  // empurra ScopeSwitcher + UserMenu para a direita — mesmo sem busca (ex.: Produtor).
+  // empurra ScopeSwitcher + Notificações + UserMenu para a direita.
   return (
     <header className="px-4 pt-4 pb-2 sm:pt-6 md:px-8">
       <div className="mx-auto flex min-h-14 w-full max-w-7xl items-center gap-2">
@@ -59,6 +60,7 @@ export function AppHeader() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ScopeSwitcher />
+          <NotificationsBell />
           <UserMenu />
         </div>
       </div>
