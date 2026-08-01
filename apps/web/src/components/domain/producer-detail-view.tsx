@@ -24,7 +24,7 @@ import {
   useUpdateProducer,
   queryKeys,
 } from "@recomenda/api-hooks";
-import { createFarm, grantFarmAccess } from "@recomenda/api";
+import { createFarm } from "@recomenda/api";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { InviteProducerAccessDialog } from "@/components/domain/invite-producer-access-dialog";
 import {
@@ -109,12 +109,11 @@ export function ProducerDetailView({
 
   const newFarmMutation = useMutation({
     mutationFn: async () => {
-      const farm = await createFarm({
+      return createFarm({
         name: newFarmName.trim(),
         location: newFarmLocation.trim() || undefined,
+        producer_id: producerId,
       });
-      await grantFarmAccess(farm.id, producerId);
-      return farm;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -200,6 +199,9 @@ export function ProducerDetailView({
     { label: "Telefone", value: formatPhoneBR(producer.phone) },
     ...(producer.email?.trim()
       ? [{ label: "E-mail", value: producer.email.trim() }]
+      : []),
+    ...(producer.created_by_name?.trim()
+      ? [{ label: "Criado por", value: producer.created_by_name.trim() }]
       : []),
     { label: "Fazendas", value: statValue(stats.farms) },
     { label: "Talhões", value: statValue(stats.plots) },

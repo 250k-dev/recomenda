@@ -41,4 +41,6 @@ export {
 // `maskPhoneBR` e não tem consumidor externo.
 export { formatPhoneBR, maskPhoneBR } from "./phone";
 
+export { formatCreatedBy } from "./created-by";
+
 export { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "./season-constants";

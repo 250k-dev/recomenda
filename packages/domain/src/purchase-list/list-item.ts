@@ -220,3 +220,37 @@ export function validateListItems(items: ListItem[]): string | null {
   }
   return null;
 }
+
+/** Entrada de estoque do produtor (quantidade + preço opcional). */
+export type ProducerStockPrefillEntry =
+  | number
+  | { quantity: number; price_brl: number | null };
+
+/**
+ * Espelha o estoque real do produtor nos itens da lista (quantidade e, se
+ * houver, preço). Usado ao selecionar produto, ao abrir edição e no wizard.
+ *
+ * `onlyIfEmpty`: não sobrescreve estoque/preço já digitados (wizard/rascunho).
+ */
+export function applyStockPrefill(
+  items: ListItem[],
+  stockByProductId?: Record<string, ProducerStockPrefillEntry> | null,
+  opts?: { onlyIfEmpty?: boolean },
+): ListItem[] {
+  if (!stockByProductId) return items;
+  const onlyIfEmpty = opts?.onlyIfEmpty ?? false;
+  return items.map((it) => {
+    if (!it.productId) return it;
+    const entry = stockByProductId[it.productId];
+    if (entry == null) return it;
+    const qty = typeof entry === "number" ? entry : entry.quantity;
+    const priceBrl = typeof entry === "number" ? null : entry.price_brl;
+    const keepStock = onlyIfEmpty && Number(it.stock || 0) > 0;
+    const keepPrice = onlyIfEmpty && Boolean(it.price?.trim());
+    return {
+      ...it,
+      stock: keepStock ? it.stock : String(qty),
+      ...(priceBrl != null && !keepPrice ? { price: String(priceBrl) } : {}),
+    };
+  });
+}

@@ -41,6 +41,7 @@ import {
 import { useProducerStock } from "@recomenda/api-hooks/producers";
 import type { ListItem } from "@recomenda/domain/purchase-list/list-item";
 import {
+  applyStockPrefill,
   listItemToPayload,
   validateListItems,
 } from "@recomenda/domain/purchase-list/list-item";
@@ -191,13 +192,22 @@ export function FarmPurchaseListTab({
 
   const updateMutation = useUpdatePurchaseList(list?.id ?? "", { farmId });
 
+  const itemsFromList = useCallback(
+    (source: PurchaseListDetail | null | undefined) =>
+      applyStockPrefill(
+        (source?.items ?? []).map(detailItemToListItem),
+        stockByProductId,
+      ),
+    [stockByProductId],
+  );
+
   const resetDraft = useCallback(() => {
     if (!list) {
       setDraftItems([]);
       return;
     }
-    setDraftItems((list.items ?? []).map(detailItemToListItem));
-  }, [list]);
+    setDraftItems(itemsFromList(list));
+  }, [list, itemsFromList]);
 
   // Reseta o estado local quando a lista selecionada muda — padrão recomendado
   // pelo React (https://react.dev/learn/you-might-not-need-an-effect) em vez de
@@ -210,7 +220,7 @@ export function FarmPurchaseListTab({
     setError(null);
     setShowComparison(false);
     setEditing(false);
-    setDraftItems(list ? (list.items ?? []).map(detailItemToListItem) : []);
+    setDraftItems(list ? itemsFromList(list) : []);
     setSaveState("idle");
     setSavedAt(null);
     // Havia trabalho não salvo guardado localmente? (o último autosave pode ter
@@ -219,9 +229,7 @@ export function FarmPurchaseListTab({
     const backup = list
       ? readLocalDraft<{ items: ListItem[] }>(`pl-edit:${list.id}`)
       : null;
-    const serverItems = list
-      ? (list.items ?? []).map(detailItemToListItem)
-      : [];
+    const serverItems = list ? itemsFromList(list) : [];
     const hasUnsaved =
       !!backup?.items &&
       backup.items.length > 0 &&
@@ -244,7 +252,7 @@ export function FarmPurchaseListTab({
 
   const startEditing = () => {
     if (!list) return;
-    setDraftItems((list.items ?? []).map(detailItemToListItem));
+    setDraftItems(itemsFromList(list));
     setError(null);
     setEditing(true);
   };
@@ -333,10 +341,10 @@ export function FarmPurchaseListTab({
     }
   };
 
-  // Itens como estão no servidor (fonte da verdade da visualização).
+  // Visualização: estoque da lista hidratado com o estoque real do produtor.
   const viewItems = useMemo(
-    () => (list?.items ?? []).map(detailItemToListItem),
-    [list?.items],
+    () => itemsFromList(list),
+    [itemsFromList, list],
   );
 
   // Autosave dos itens em edição: persiste sozinho após pausa na digitação,

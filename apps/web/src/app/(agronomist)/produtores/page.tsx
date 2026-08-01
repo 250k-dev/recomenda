@@ -36,7 +36,7 @@ import {
   Trash2,
   Mail,
 } from "lucide-react";
-import { cn, deactivateOutlineButtonClass } from "@recomenda/utils";
+import { cn, deactivateOutlineButtonClass, formatCreatedBy } from "@recomenda/utils";
 import { useCan, usePrincipal } from "@recomenda/api-hooks/use-can";
 
 type Tab = "active" | "archived";
@@ -405,6 +405,8 @@ function ProducerRow({
   const isInvitation = producer.row_type === "invitation";
   const canManage = producer.row_type === "producer" && Boolean(producer.producer_id);
   const canOpen = Boolean(producer.producer_id);
+  const createdByLabel =
+    producer.row_type === "producer" ? formatCreatedBy(producer.created_by_name) : null;
   const stop = (fn: () => void) => (e: MouseEvent) => {
     e.stopPropagation();
     fn();
@@ -436,6 +438,11 @@ function ProducerRow({
             {producer.email ? (
               <div className="truncate text-xs text-muted-foreground">
                 {producer.email}
+              </div>
+            ) : null}
+            {createdByLabel ? (
+              <div className="mt-0.5 truncate text-[0.7rem] text-muted-foreground/90">
+                {createdByLabel}
               </div>
             ) : null}
           </div>

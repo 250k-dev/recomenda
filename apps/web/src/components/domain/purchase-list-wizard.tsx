@@ -45,11 +45,13 @@ import {
   type PurchaseListInput,
 } from "@recomenda/api";
 import { detailItemToListItem } from "@recomenda/domain/purchase-list/breakdown";
+import { applyStockPrefill } from "@recomenda/domain/purchase-list/list-item";
 import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
 import {
   queryKeys,
   usePurchaseListTemplates,
 } from "@recomenda/api-hooks";
+import { useProducerStock } from "@recomenda/api-hooks/producers";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
 import { CROP_LABELS } from "@recomenda/utils";
 import {
@@ -244,6 +246,29 @@ export function PurchaseListWizard({
 
   const queryClient = useQueryClient();
   const totalHa = useMemo(() => plots.reduce((s, p) => s + p.area, 0), [plots]);
+  const { data: producerStock } = useProducerStock(producerId);
+  const stockByProductId = useMemo(() => {
+    const map: Record<string, { quantity: number; price_brl: number | null }> =
+      {};
+    for (const s of producerStock ?? []) {
+      map[s.local_product_id] = {
+        quantity: Number(s.quantity) || 0,
+        price_brl:
+          s.price_brl != null && Number.isFinite(Number(s.price_brl))
+            ? Number(s.price_brl)
+            : null,
+      };
+    }
+    return map;
+  }, [producerStock]);
+
+  // Quando o estoque do produtor chega, preenche itens ainda sem estoque digitado.
+  useEffect(() => {
+    if (Object.keys(stockByProductId).length === 0) return;
+    setItems((prev) =>
+      applyStockPrefill(prev, stockByProductId, { onlyIfEmpty: true }),
+    );
+  }, [stockByProductId]);
 
   // Ao retomar um rascunho, carrega dólar/saca/espaçamento salvos nele na store.
   useEffect(() => {
@@ -372,6 +397,7 @@ export function PurchaseListWizard({
           targets={targets}
           totalHa={totalHa}
           farmName={farmName}
+          stockByProductId={stockByProductId}
           onBack={() => setStep(1)}
           onEditTargets={() => setStep(1)}
           onNext={() => setStep(3)}
@@ -413,6 +439,7 @@ function StepList({
   targets,
   totalHa,
   farmName,
+  stockByProductId,
   onBack,
   onEditTargets,
   onNext,
@@ -428,6 +455,7 @@ function StepList({
   targets: Record<string, number>;
   totalHa: number;
   farmName?: string;
+  stockByProductId: Record<string, { quantity: number; price_brl: number | null }>;
   onBack: () => void;
   onEditTargets: () => void;
   onNext: () => void;
@@ -439,7 +467,13 @@ function StepList({
 
   const importTemplate = (tpl: PurchaseListDetail) => {
     setCrop(tpl.crop ?? "ANY");
-    setItems(tpl.items.map(templateItemToListItem));
+    setItems(
+      applyStockPrefill(
+        tpl.items.map(templateItemToListItem),
+        stockByProductId,
+        { onlyIfEmpty: true },
+      ),
+    );
   };
 
   const next = () => {
@@ -628,6 +662,7 @@ function StepList({
             setItems={setItems}
             totalHa={totalHa}
             crop={crop as "SOYBEAN" | "CORN" | "ANY"}
+            stockByProductId={stockByProductId}
           />
         </div>
       </section>

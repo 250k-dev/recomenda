@@ -212,6 +212,9 @@ export default function FarmPlotsPage() {
         title="Talhões da fazenda"
         stats={[
           ...(farm?.name ? [{ label: "Fazenda", value: farm.name }] : []),
+          ...(farm?.created_by_name?.trim()
+            ? [{ label: "Criado por", value: farm.created_by_name.trim() }]
+            : []),
           { label: "Talhões", value: plots?.length ?? 0 },
           { label: "Área total", value: `${fmtHa(totalHectares)} ha` },
           { label: "Em uso", value: inUseCount },

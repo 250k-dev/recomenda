@@ -69,6 +69,7 @@ export default function FarmsPage() {
       {farm.name}
     </Link>,
     farm.location ?? "—",
+    farm.created_by_name?.trim() || "—",
     <Button
       key={`edit-${farm.id}`}
       variant="outline"
@@ -183,7 +184,7 @@ export default function FarmsPage() {
           }
         />
       ) : (
-        <DataTable headers={["Nome", "Localização", ""]} rows={rows} />
+        <DataTable headers={["Nome", "Localização", "Criado por", ""]} rows={rows} />
       )}
     </>
   );

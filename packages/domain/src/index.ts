@@ -76,7 +76,9 @@ export {
   listItemToBuy,
   listItemToPayload,
   validateListItems,
+  applyStockPrefill,
 } from "./purchase-list/list-item";
+export type { ProducerStockPrefillEntry } from "./purchase-list/list-item";
 export type { PurchaseListMetrics } from "./purchase-list/breakdown";
 export {
   detailItemToListItem,

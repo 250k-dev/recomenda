@@ -7,6 +7,7 @@ import {
   getFarm,
   createFarm,
   updateFarm,
+  deleteFarm,
   getFarmPlots,
   getFarmSeasons,
   getFarmAccess,
@@ -39,6 +40,19 @@ export function useCreateFarm() {
     mutationFn: createFarm,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.farms });
+    },
+  });
+}
+
+export function useDeleteFarm(producerId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteFarm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.farms });
+      if (producerId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.producerFarms(producerId) });
+      }
     },
   });
 }

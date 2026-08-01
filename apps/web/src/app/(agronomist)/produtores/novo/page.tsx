@@ -27,7 +27,7 @@ import {
   formatFarmLocation,
   maskPhoneBR,
 } from "@recomenda/utils";
-import { createFarm, grantFarmAccess } from "@recomenda/api";
+import { createFarm } from "@recomenda/api";
 import {
   queryKeys,
   useCreateProducer,
@@ -478,21 +478,17 @@ function StepFarm({
 
   const queryClient = useQueryClient();
 
-  // Continua `useMutation` inline de propósito: são DUAS chamadas encadeadas
-  // (criar a fazenda, depois conceder o acesso ao produtor), e não existe hook
-  // de um passo que cubra o par. Mesmo formato de producer-detail-view.tsx:105.
   const mutation = useMutation({
     mutationFn: async () => {
       const location =
         city.trim() && stateUf
           ? formatFarmLocation(city.trim(), stateUf)
           : undefined;
-      const created = await createFarm({
+      return createFarm({
         name: name.trim(),
         location,
+        producer_id: producer.id,
       });
-      await grantFarmAccess(created.id, producer.id);
-      return created;
     },
     onSuccess: (f) => {
       // A carteira do produtor conta fazendas/talhões/hectares a partir deste

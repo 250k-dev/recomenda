@@ -6,6 +6,9 @@ export interface Producer {
   name: string;
   email: string | null;
   phone?: string | null;
+  created_by_user_id?: string | null;
+  /** Nome de quem cadastrou (nunca e-mail). */
+  created_by_name?: string | null;
 }
 
 export interface CreatedProducer {
@@ -31,6 +34,8 @@ export interface AgronomistProducerListRow {
   account_status: AdminProducerAccountStatus;
   /** Quem cadastrou o produtor (null = agrônomo / legado). Usado no gate de exclusão do Gestor. */
   created_by_user_id?: string | null;
+  /** Nome de quem cadastrou (quando `created_by` é null, vem o agrônomo). */
+  created_by_name?: string | null;
   total_hectares?: number;
   farms_count?: number | null;
   plots_count?: number | null;
@@ -52,6 +57,9 @@ export interface ProducerFarm {
   id: string;
   name: string;
   location?: string | null;
+  created_by_user_id?: string | null;
+  /** Nome de quem cadastrou a fazenda (quando `created_by` é null, vem o agrônomo). */
+  created_by_name?: string | null;
   plots: { id: string; name: string; area_hectares: string }[];
   seasons: { id: string; crop: string; variety: string; status: string; plot_name: string }[];
 }

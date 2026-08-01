@@ -5,20 +5,23 @@ import { routes } from "@recomenda/config";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
-import { ChevronRight, MapPin, Plus, Tractor } from "lucide-react";
+import { ChevronRight, MapPin, Plus, Tractor, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Card, CardContent } from "@recomenda/ui/primitives/card";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { ProgressBar } from "@recomenda/ui/patterns/progress-bar";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
-import { queryKeys } from "@recomenda/api-hooks";
+import { queryKeys, useCan, useDeleteFarm, usePrincipal } from "@recomenda/api-hooks";
 import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import { getFarmCycles } from "@recomenda/api/cycles";
 import type { ProducerFarm } from "@recomenda/api";
-import { useCan } from "@recomenda/api-hooks/use-can";
+import { formatCreatedBy } from "@recomenda/utils";
+import { extractError } from "@/components/domain/season/_shared";
 
 const RUNNING_SEASON_STATUSES = new Set(["PUBLISHED", "IN_PROGRESS"]);
 
@@ -61,7 +64,16 @@ export function ProducerFarmsSection({
 }) {
   const router = useRouter();
   const canCreateFarm = useCan("FARM_CREATE");
+  const canDeletePerm = useCan("FARM_DELETE");
+  const { role, id: meId } = usePrincipal();
+  const deleteFarm = useDeleteFarm(producerId);
   const [search, setSearch] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<ProducerFarm | null>(null);
+
+  const canDeleteFarm = (farm: ProducerFarm) =>
+    canDeletePerm &&
+    (role !== "STAFF" ||
+      (farm.created_by_user_id != null && farm.created_by_user_id === meId));
 
   const runningSeasonIds = useMemo(() => {
     const ids: string[] = [];
@@ -100,6 +112,14 @@ export function ProducerFarmsSection({
     farms.forEach((farm, index) => {
       const cycles = cycleQueries[index]?.data ?? [];
       map.set(farm.id, cycles.filter((c) => c.status === "ACTIVE").length);
+    });
+    return map;
+  }, [farms, cycleQueries]);
+
+  const cyclesCountByFarm = useMemo(() => {
+    const map = new Map<string, number>();
+    farms.forEach((farm, index) => {
+      map.set(farm.id, cycleQueries[index]?.data?.length ?? 0);
     });
     return map;
   }, [farms, cycleQueries]);
@@ -194,6 +214,8 @@ export function ProducerFarmsSection({
                   .map((season) => season.id),
                 timelinesBySeason,
               )}
+              canDelete={canDeleteFarm(farm)}
+              onDelete={() => setPendingDelete(farm)}
               onOpen={() =>
                 router.push(
                   routes.fazendas.detalhe(farm.id, { producer_id: producerId }),
@@ -212,7 +234,78 @@ export function ProducerFarmsSection({
           </Button>
         </StickyMobileCta>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title={
+          pendingDelete
+            ? `Excluir a fazenda "${pendingDelete.name}" permanentemente?`
+            : "Excluir fazenda?"
+        }
+        description={
+          pendingDelete ? (
+            <FarmDeleteDescription
+              plotCount={pendingDelete.plots.length}
+              seasonCount={pendingDelete.seasons.length}
+              cycleCount={cyclesCountByFarm.get(pendingDelete.id) ?? 0}
+            />
+          ) : undefined
+        }
+        confirmLabel="Excluir definitivamente"
+        tone="destructive"
+        loading={deleteFarm.isPending}
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          try {
+            await deleteFarm.mutateAsync(pendingDelete.id);
+            toast.success("Fazenda excluída.");
+            setPendingDelete(null);
+          } catch (e) {
+            toast.error(extractError(e) || "Não foi possível excluir a fazenda.");
+          }
+        }}
+      />
     </section>
+  );
+}
+
+function FarmDeleteDescription({
+  plotCount,
+  seasonCount,
+  cycleCount,
+}: {
+  plotCount: number;
+  seasonCount: number;
+  cycleCount: number;
+}) {
+  const hasLinkedData = plotCount > 0 || seasonCount > 0 || cycleCount > 0;
+  if (!hasLinkedData) {
+    return (
+      <>
+        A fazenda será removida da carteira. Esta ação não pode ser desfeita.
+      </>
+    );
+  }
+
+  const parts: string[] = [];
+  if (plotCount > 0) {
+    parts.push(`${plotCount} ${plotCount === 1 ? "talhão" : "talhões"}`);
+  }
+  if (cycleCount > 0) {
+    parts.push(`${cycleCount} ${cycleCount === 1 ? "safra" : "safras"}`);
+  }
+  if (seasonCount > 0) {
+    parts.push(
+      `${seasonCount} ${seasonCount === 1 ? "programação de talhão" : "programações de talhão"}`,
+    );
+  }
+
+  return (
+    <>
+      Esta ação apaga a fazenda e todos os dados vinculados ({parts.join(", ")},
+      recomendações e listas de compra). Não pode ser desfeita.
+    </>
   );
 }
 
@@ -223,12 +316,16 @@ function FarmCard({
   showSeasonActions,
   activeCyclesCount,
   progress,
+  canDelete,
+  onDelete,
   onOpen,
 }: {
   farm: ProducerFarm;
   showSeasonActions: boolean;
   activeCyclesCount: number;
   progress: FarmProgress | null;
+  canDelete: boolean;
+  onDelete: () => void;
   onOpen: () => void;
 }) {
   const totalHectares = farm.plots.reduce(
@@ -242,52 +339,77 @@ function FarmCard({
     `${fmtHa(totalHectares)} ha`,
   ].filter(Boolean);
 
+  const createdByLabel = formatCreatedBy(farm.created_by_name);
+
   const showProgress = showSeasonActions && progress != null;
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
-      <button
-        type="button"
-        className="flex w-full items-center gap-3.5 px-4 py-4 text-left transition-colors hover:bg-hover/30"
-        onClick={onOpen}
-      >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-          <Tractor className="size-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-base font-semibold text-text-strong">
-              {farm.name}
+      <div className="flex w-full items-center gap-2 px-2 py-2 sm:gap-3.5 sm:px-4 sm:py-4">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-3.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-hover/30"
+          onClick={onOpen}
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
+            <Tractor className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-base font-semibold text-text-strong">
+                {farm.name}
+              </span>
+              {activeCyclesCount > 0 ? (
+                <Badge variant="neutral" className="shrink-0">
+                  {activeCyclesCount}{" "}
+                  {activeCyclesCount === 1 ? "safra" : "safras"}
+                </Badge>
+              ) : null}
             </span>
-            {activeCyclesCount > 0 ? (
-              <Badge variant="neutral" className="shrink-0">
-                {activeCyclesCount}{" "}
-                {activeCyclesCount === 1 ? "safra" : "safras"}
-              </Badge>
+            <span className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+              {farm.location ? (
+                <MapPin className="size-3.5 shrink-0 text-primary-strong/70" />
+              ) : null}
+              <span className="truncate">{metaParts.join(" · ")}</span>
+            </span>
+            {createdByLabel ? (
+              <span className="mt-0.5 block truncate text-[0.7rem] text-muted-foreground/90">
+                {createdByLabel}
+              </span>
             ) : null}
           </span>
-          <span className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
-            {farm.location ? (
-              <MapPin className="size-3.5 shrink-0 text-primary-strong/70" />
-            ) : null}
-            <span className="truncate">{metaParts.join(" · ")}</span>
-          </span>
-        </span>
-        {showProgress ? (
-          <span className="hidden w-56 shrink-0 lg:block">
-            <span className="mb-1.5 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                {progress.done}/{progress.total} aplicadas
+          {showProgress ? (
+            <span className="hidden w-56 shrink-0 lg:block">
+              <span className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {progress.done}/{progress.total} aplicadas
+                </span>
+                <span className="font-semibold tabular-nums text-primary-strong">
+                  {progress.pct}%
+                </span>
               </span>
-              <span className="font-semibold tabular-nums text-primary-strong">
-                {progress.pct}%
-              </span>
+              <ProgressBar value={progress.pct} className="h-1.5 bg-surface-2" />
             </span>
-            <ProgressBar value={progress.pct} className="h-1.5 bg-surface-2" />
-          </span>
+          ) : null}
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
+        </button>
+
+        {canDelete ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            aria-label={`Excluir fazenda ${farm.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 className="size-4" />
+          </Button>
         ) : null}
-        <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
-      </button>
+      </div>
 
       {showProgress ? (
         <div className="border-t border-border bg-rail px-4 py-3 lg:hidden">

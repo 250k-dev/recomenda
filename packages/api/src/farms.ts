@@ -5,6 +5,8 @@ export interface Farm {
   id: string;
   name: string;
   location?: string;
+  created_by_user_id?: string | null;
+  created_by_name?: string | null;
 }
 
 export interface Plot {
@@ -43,9 +45,19 @@ export async function getFarm(id: string) {
   return data;
 }
 
-export async function createFarm(payload: { name: string; location?: string; agronomist_id?: string }) {
+export async function createFarm(payload: {
+  name: string;
+  location?: string;
+  agronomist_id?: string;
+  /** Quando informado, concede `farm_access` na mesma transação no servidor. */
+  producer_id?: string;
+}) {
   const { data } = await api.post<Farm>("/farms", payload);
   return data;
+}
+
+export async function deleteFarm(id: string) {
+  await api.delete(`/farms/${id}`);
 }
 
 export async function updateFarm(id: string, payload: { name?: string; location?: string }) {
