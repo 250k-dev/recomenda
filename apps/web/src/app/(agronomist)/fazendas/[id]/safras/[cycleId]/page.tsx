@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   Calculator,
-  Leaf,
   Plus,
   ShoppingCart,
 } from "lucide-react";
@@ -22,7 +21,11 @@ import {
   useCyclePage,
 } from "@/components/domain/cycle/cycle-page-shell";
 import { CycleFarmDisclosures } from "@/components/domain/cycle/cycle-farm-disclosures";
-import { useArchiveSeason, useCyclePurchaseList } from "@recomenda/api-hooks";
+import {
+  useArchiveSeason,
+  useCycleAvailablePlots,
+  useCyclePurchaseList,
+} from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
 
 const fmtHa = (n: number) =>
@@ -35,13 +38,31 @@ export default function CycleDetailPage() {
   const { cycleId, producerId, cycle, seasons } = page;
 
   const { data: purchaseList } = useCyclePurchaseList(cycleId);
+  const { data: availablePlots = [] } = useCycleAvailablePlots(cycleId);
   const archiveSeason = useArchiveSeason();
+  const hasActivePurchaseList = purchaseList?.status === "active";
+  const hasAvailablePlots = availablePlots.length > 0;
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<{
     id: string;
     name: string;
   } | null>(null);
+
+  const tryOpenWizard = () => {
+    if (!hasActivePurchaseList) {
+      toast.error(
+        "Finalize a lista de compra da safra antes de programar talhões.",
+      );
+      router.push(
+        purchaseList?.status === "draft"
+          ? page.hrefs.listaDeCompra
+          : page.hrefs.novaListaDeCompra,
+      );
+      return;
+    }
+    setWizardOpen(true);
+  };
 
   const totalRecs = seasons.reduce(
     (s, row) => s + row.recommendations_total,
@@ -67,9 +88,8 @@ export default function CycleDetailPage() {
       ? programmedArea
       : (cycle?.total_cadastral_hectares ?? 0);
   const plotCount = areaByPlot.size;
-  const isPlanning = seasons.length === 0;
 
-  if (wizardOpen && cycle) {
+  if (wizardOpen && cycle && hasActivePurchaseList) {
     return (
       <>
         <BreadcrumbBack
@@ -131,22 +151,34 @@ export default function CycleDetailPage() {
             cycle={cycle}
             producerId={producerId}
             seasons={seasons}
-            onAddPlot={() => setWizardOpen(true)}
+            onAddPlot={tryOpenWizard}
             onArchiveSeason={setArchiveConfirm}
             archivePending={archiveSeason.isPending}
           />
 
-          {isPlanning && !purchaseList && canListCrud ? (
+          {!hasActivePurchaseList && canListCrud ? (
             <div className="mt-6">
               <EmptyState
-                icon={Leaf}
-                title="Monte a lista de compra quando quiser."
-                description="A programação dos talhões pode começar agora; a lista de compra fica disponível a qualquer momento."
+                icon={ShoppingCart}
+                title={
+                  purchaseList?.status === "draft"
+                    ? "Finalize a lista de compra da safra."
+                    : "Primeiro passo: lista de compra."
+                }
+                description="A programação dos talhões só libera depois que a lista de compra estiver finalizada. Assim dose, unidade e hectares ficam alinhados."
                 action={
-                  <Button asChild size="sm" variant="outline" className="gap-1.5">
-                    <Link href={page.hrefs.novaListaDeCompra}>
+                  <Button asChild size="sm" className="gap-1.5">
+                    <Link
+                      href={
+                        purchaseList?.status === "draft"
+                          ? page.hrefs.listaDeCompra
+                          : page.hrefs.novaListaDeCompra
+                      }
+                    >
                       <ShoppingCart className="size-4" />
-                      Montar lista de compra
+                      {purchaseList?.status === "draft"
+                        ? "Continuar lista de compra"
+                        : "Montar lista de compra"}
                     </Link>
                   </Button>
                 }
@@ -155,14 +187,27 @@ export default function CycleDetailPage() {
           ) : null}
 
           <StickyMobileCta>
-            <Button
-              size="lg"
-              className="gap-2"
-              onClick={() => setWizardOpen(true)}
-            >
-              <Plus className="size-4" />
-              Adicionar talhão
-            </Button>
+            {hasActivePurchaseList && hasAvailablePlots ? (
+              <Button size="lg" className="gap-2" onClick={tryOpenWizard}>
+                <Plus className="size-4" />
+                Adicionar talhão
+              </Button>
+            ) : !hasActivePurchaseList && canListCrud ? (
+              <Button asChild size="lg" className="gap-2">
+                <Link
+                  href={
+                    purchaseList?.status === "draft"
+                      ? page.hrefs.listaDeCompra
+                      : page.hrefs.novaListaDeCompra
+                  }
+                >
+                  <ShoppingCart className="size-4" />
+                  {purchaseList?.status === "draft"
+                    ? "Continuar lista de compra"
+                    : "Montar lista de compra"}
+                </Link>
+              </Button>
+            ) : null}
           </StickyMobileCta>
         </>
       ) : null}

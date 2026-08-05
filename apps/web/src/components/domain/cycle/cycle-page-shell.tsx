@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, Leaf, Rocket } from "lucide-react";
+import { ArrowLeft, Leaf, Pencil, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import type { Route } from "next";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
@@ -11,9 +11,24 @@ import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@recomenda/ui/primitives/dialog";
+import { Input } from "@recomenda/ui/primitives/input";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
-import { useCycle, useFarm, useProducer, usePublishCycle } from "@recomenda/api-hooks";
-import { publishBlockedMessage } from "@recomenda/api/api-error";
+import {
+  useCan,
+  useCycle,
+  useFarm,
+  useProducer,
+  usePublishCycle,
+  useUpdateCycle,
+} from "@recomenda/api-hooks";
+import { apiErrorMessage, publishBlockedMessage } from "@recomenda/api/api-error";
 import type { CycleSeasonRow } from "@recomenda/api/cycles";
 import { CROP_LABELS } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
@@ -28,6 +43,9 @@ const CYCLE_STATUS_LABELS: Record<string, string> = {
  * Contexto comum das telas da safra da fazenda (`/fazendas/[id]/safras/[cycleId]`
  * e subrotas): dados do ciclo, produtor do contexto, hrefs e breadcrumbs.
  * As queries são compartilhadas via cache do React Query entre as subrotas.
+ *
+ * Breadcrumb dentro da safra: Produtores → Produtor → Safra
+ * (fazenda só aparece nas telas de talhão/recomendação, abaixo da safra).
  */
 export function useCyclePage() {
   const params = useParams<{ id: string; cycleId: string }>();
@@ -64,7 +82,6 @@ export function useCyclePage() {
           },
         ]
       : []),
-    ...(farm ? [{ label: farm.name, href: hrefs.farm }] : []),
     { label: cycle?.name ?? "Safra" },
   ];
 
@@ -119,7 +136,11 @@ export function CyclePageShell({
 }) {
   const { cycle, farm, isLoading, breadcrumbs, draftSeasons } = page;
   const publishCycle = usePublishCycle(page.cycleId);
+  const updateCycle = useUpdateCycle(page.cycleId);
+  const canEdit = useCan("CYCLE_CRUD");
   const [publishConfirm, setPublishConfirm] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
 
   if (isLoading || !cycle) {
     return (
@@ -145,6 +166,11 @@ export function CyclePageShell({
     ...stats,
   ];
 
+  const openEdit = () => {
+    setEditName(cycle.name);
+    setEditOpen(true);
+  };
+
   return (
     <>
       <BreadcrumbBack items={breadcrumbs} />
@@ -154,6 +180,18 @@ export function CyclePageShell({
         icon={<Leaf className="size-6" />}
         eyebrow="Safra"
         title={cycle.name}
+        titleAction={
+          canEdit ? (
+            <Button
+              variant="secondary"
+              size="icon-xs"
+              onClick={openEdit}
+              aria-label="Editar nome da safra"
+            >
+              <Pencil />
+            </Button>
+          ) : undefined
+        }
         titleBadge={
           <span className="inline-flex flex-wrap items-center gap-1.5">
             {isPlanning ? (
@@ -205,6 +243,57 @@ export function CyclePageShell({
       ) : null}
 
       {children}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar safra</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5 px-6 py-5">
+            <label
+              htmlFor="edit-cycle-name"
+              className="mb-1.5 block text-xs font-medium text-foreground"
+            >
+              Nome
+            </label>
+            <Input
+              id="edit-cycle-name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Ex: Safra 2026/27"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={updateCycle.isPending || !editName.trim()}
+              onClick={() => {
+                updateCycle.mutate(
+                  { name: editName.trim() },
+                  {
+                    onSuccess: () => {
+                      toast.success("Nome da safra atualizado.");
+                      setEditOpen(false);
+                    },
+                    onError: (err) =>
+                      toast.error(
+                        apiErrorMessage(
+                          err,
+                          "Não foi possível atualizar a safra.",
+                        ),
+                      ),
+                  },
+                );
+              }}
+            >
+              {updateCycle.isPending ? "Salvando…" : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={publishConfirm}

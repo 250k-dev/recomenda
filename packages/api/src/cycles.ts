@@ -28,6 +28,8 @@ export interface CycleSummary {
   is_planning: boolean;
   /** Lista ACTIVE incompleta — bloqueia publicar e mostra badge na UI. */
   awaiting_purchase: boolean;
+  /** Incluir fazenda só antes da lista finalizada / programação publicada. */
+  can_add_farms: boolean;
   /** Fazendas participantes da safra (multi-fazenda) — sempre ao menos uma. */
   farms: CycleFarmRow[];
   /** Soma da área cadastrada de todas as fazendas da safra (não só a programada). */
@@ -83,6 +85,8 @@ export interface CycleDetail {
   purchase_list_name: string | null;
   /** Lista ACTIVE incompleta — bloqueia publicar e mostra badge na UI. */
   awaiting_purchase: boolean;
+  /** Incluir fazenda só antes da lista finalizada / programação publicada. */
+  can_add_farms: boolean;
   /** Fazendas participantes da safra (multi-fazenda) — sempre ao menos uma. */
   farms: CycleFarmRow[];
   /** Soma da área cadastrada de todas as fazendas da safra (não só a programada). */
@@ -220,6 +224,18 @@ export async function publishCycle(id: string) {
 
 export async function getCycleCostPlan(id: string) {
   const { data } = await api.get<CycleCostPlan>(`/cycles/${id}/cost-plan`);
+  return data;
+}
+
+/** Exclui (arquiva) a safra e remove a lista de compra vinculada. */
+export async function deleteCycle(id: string) {
+  const { data } = await api.delete<{
+    success: boolean;
+    id: string;
+    producer_id?: string;
+    farm_id?: string;
+    farm_ids?: string[];
+  }>(`/cycles/${id}`);
   return data;
 }
 

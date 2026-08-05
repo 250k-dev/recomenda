@@ -151,7 +151,7 @@ export function NewCycleDialog({
       {
         onSuccess: (cycle) => {
           toast.success(
-            "Safra criada! Agora monte a lista de compra e a programação.",
+            "Safra criada! Monte a lista de compra para liberar a programação.",
           );
           onOpenChange(false);
           onCreated?.(cycle.id);
@@ -378,6 +378,16 @@ export function FarmCyclesSection({
     );
   }, [me?.name, producer?.name, selectedCycle, timelineQueries]);
 
+  /** Após criar safra: vai direto montar a lista (obrigatória antes da programação). */
+  const openCycleListWizard = (cycleId: string) => {
+    router.push(
+      routes.fazendas.novaListaDeCompra(farmId, {
+        producer_id: producerId,
+        cycle_id: cycleId,
+      }),
+    );
+  };
+
   const openCycle = (cycleId: string) => {
     router.push(cycleHref({ id: cycleId, farm_id: farmId }, producerId));
   };
@@ -574,7 +584,7 @@ export function FarmCyclesSection({
           onOpenChange={setNewCycleOpen}
           farmId={farmId}
           producerId={producerId}
-          onCreated={openCycle}
+          onCreated={openCycleListWizard}
         />
       ) : null}
 

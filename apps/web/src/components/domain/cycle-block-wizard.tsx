@@ -608,7 +608,8 @@ function StepPlots({
   const [confirmOtherCycle, setConfirmOtherCycle] = useState(false);
   // Publica a programação junto com o aplicar (como o wizard antigo fazia com o
   // "Publicar agora") — sem isso as seasons ficam DRAFT e nada cai no cronograma.
-  const [publishNow, setPublishNow] = useState(true);
+  // Publicar exige compras 100% — default off para não publicar sem querer.
+  const [publishNow, setPublishNow] = useState(false);
 
   const plots = availablePlots ?? [];
   const selectedPlots = plots.filter((p) => selected.has(p.id));
@@ -803,7 +804,13 @@ function StepPlots({
           }
           onDone();
         },
-        onError: (e) => setError(extractError(e)),
+        onError: (e) =>
+          setError(
+            publishBlockedMessage(
+              e,
+              extractError(e) || "Não foi possível aplicar o modelo.",
+            ),
+          ),
       },
     );
   };
@@ -1093,8 +1100,8 @@ function StepPlots({
             Publicar programação ao aplicar
           </span>
           <span className="mt-0.5 block text-[13px] leading-relaxed text-muted-foreground">
-            As aplicações entram no cronograma e o produtor passa a vê-las. Desmarque
-            para deixar em rascunho e publicar depois pelo botão da safra.
+            Só funciona com a lista de compra 100% comprada. Caso contrário a
+            programação fica em rascunho — publique depois pelo botão da safra.
           </span>
         </span>
       </label>

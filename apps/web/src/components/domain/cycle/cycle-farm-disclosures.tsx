@@ -20,6 +20,7 @@ import { Input } from "@recomenda/ui/primitives/input";
 import { Search } from "lucide-react";
 import {
   useCan,
+  useCycleAvailablePlots,
   useProducerFarms,
   useRemoveCycleFarm,
 } from "@recomenda/api-hooks";
@@ -119,6 +120,7 @@ export function CycleFarmDisclosures({
 }) {
   const canManage = useCan("CYCLE_CRUD");
   const { data: producerFarms } = useProducerFarms(producerId);
+  const { data: availablePlots = [] } = useCycleAvailablePlots(cycle.id);
   const removeCycleFarm = useRemoveCycleFarm(cycle.id);
 
   const [plotFilter, setPlotFilter] = useState("");
@@ -137,6 +139,15 @@ export function CycleFarmDisclosures({
     }
     return map;
   }, [producerFarms]);
+
+  /** Fazendas que ainda têm talhão cadastral fora desta safra. */
+  const farmsWithAvailablePlots = useMemo(() => {
+    const set = new Set<string>();
+    for (const plot of availablePlots) {
+      set.add(plot.farm_id);
+    }
+    return set;
+  }, [availablePlots]);
 
   const farmGroups = useMemo((): FarmGroup[] => {
     const query = plotFilter.trim().toLocaleLowerCase("pt-BR");
@@ -200,7 +211,7 @@ export function CycleFarmDisclosures({
             />
           </div>
         ) : null}
-        {canManage ? (
+        {canManage && cycle.can_add_farms !== false ? (
           <Button
             className="hidden h-10 gap-1.5 sm:inline-flex"
             onClick={() => setAddFarmOpen(true)}
@@ -216,7 +227,7 @@ export function CycleFarmDisclosures({
           title="Nenhuma fazenda nesta safra."
           description="Adicione pelo menos uma fazenda para programar talhões."
           action={
-            canManage ? (
+            canManage && cycle.can_add_farms !== false ? (
               <Button size="sm" onClick={() => setAddFarmOpen(true)}>
                 Adicionar fazenda
               </Button>
@@ -262,6 +273,7 @@ export function CycleFarmDisclosures({
             ]
               .filter(Boolean)
               .join(" · ");
+            const canAddPlotToFarm = farmsWithAvailablePlots.has(group.farmId);
 
             return (
               <div
@@ -320,16 +332,18 @@ export function CycleFarmDisclosures({
                     ) : null}
                   </button>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="hidden shrink-0 gap-1 sm:inline-flex"
-                    onClick={onAddPlot}
-                  >
-                    <Plus className="size-3.5" />
-                    Talhão
-                  </Button>
+                  {canAddPlotToFarm ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="hidden shrink-0 gap-1 sm:inline-flex"
+                      onClick={onAddPlot}
+                    >
+                      <Plus className="size-3.5" />
+                      Talhão
+                    </Button>
+                  ) : null}
 
                   {canManage && canRemoveFarm ? (
                     <Button
@@ -358,9 +372,11 @@ export function CycleFarmDisclosures({
                         <p className="text-sm text-muted-foreground">
                           {plotFilter.trim()
                             ? "Nenhum talhão corresponde ao filtro nesta fazenda."
-                            : "Nenhum talhão programado nesta fazenda."}
+                            : canAddPlotToFarm
+                              ? "Nenhum talhão programado nesta fazenda."
+                              : "Nenhum talhão disponível para programar nesta fazenda."}
                         </p>
-                        {!plotFilter.trim() ? (
+                        {!plotFilter.trim() && canAddPlotToFarm ? (
                           <Button
                             size="sm"
                             className="mt-3 gap-1.5"

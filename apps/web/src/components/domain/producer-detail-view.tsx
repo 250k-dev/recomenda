@@ -84,7 +84,7 @@ export function ProducerDetailView({
   const canInviteAccess = useCan("PRODUCER_CREATE");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [portfolioTab, setPortfolioTab] =
-    useState<ProducerPortfolioTab>("fazendas");
+    useState<ProducerPortfolioTab>("safras");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -214,14 +214,14 @@ export function ProducerDetailView({
       onValueChange={setPortfolioTab}
       items={[
         {
-          value: "fazendas",
-          label: "Fazendas",
-          badgeCount: farmsList.length,
-        },
-        {
           value: "safras",
           label: "Safras",
           badgeCount: visibleCyclesCount,
+        },
+        {
+          value: "fazendas",
+          label: "Fazendas",
+          badgeCount: farmsList.length,
         },
       ]}
     />

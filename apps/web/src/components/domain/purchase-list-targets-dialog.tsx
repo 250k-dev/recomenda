@@ -70,7 +70,7 @@ export function PurchaseListTargetsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Target className="h-5 w-5 text-primary" />
@@ -82,7 +82,7 @@ export function PurchaseListTargetsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 px-6 py-5">
           <Label htmlFor="dialog-total-target">Meta desejada (sc/ha)</Label>
           <div className="flex items-center gap-2">
             <Input

@@ -2,7 +2,7 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import type { BreadcrumbItem } from "@/components/domain/breadcrumb-back";
-import { useFarm, useProducer, useSeason } from "@recomenda/api-hooks";
+import { useCycle, useFarm, useProducer, useSeason } from "@recomenda/api-hooks";
 import { CROP_LABELS, STATUS_LABELS } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 
@@ -10,6 +10,10 @@ import { routes } from "@recomenda/config";
  * Contexto comum das telas da safra do talhão (`/safras/[id]` e subrotas):
  * dados da safra, fazenda/produtor do contexto, títulos, hrefs e breadcrumbs.
  * As queries são compartilhadas via cache do React Query entre layout e páginas.
+ *
+ * Breadcrumb:
+ * - Com ciclo: Produtores → Produtor → Safra → Fazenda → programação
+ * - Sem ciclo (legado): Produtores → Produtor → Fazenda → programação
  */
 export function useSeasonPage() {
   const params = useParams<{ id: string }>();
@@ -24,9 +28,11 @@ export function useSeasonPage() {
   const farmId = farmIdFromQuery ?? "";
   const producerId = producerIdFromQuery ?? season?.producer_id ?? "";
   const openRecommendationId = recommendationIdFromQuery || null;
+  const cycleId = season?.cycle_id ?? "";
 
   const { data: farm } = useFarm(farmId);
   const { data: producer } = useProducer(producerId);
+  const { data: cycle } = useCycle(cycleId);
 
   const cropLabel = season ? (CROP_LABELS[season.crop] ?? season.crop) : "";
   const statusLabel = season
@@ -45,10 +51,21 @@ export function useSeasonPage() {
     historicoDoTalhao: routes.safras.historicoDoTalhao(seasonId, ctx),
   };
 
+  const cycleFarmId = farmId || cycle?.farm_id || "";
+  const cycleHref =
+    cycleId && cycleFarmId
+      ? routes.fazendas.safra(cycleFarmId, cycleId, {
+          producer_id: producerId || undefined,
+        })
+      : null;
+
   const breadcrumbs: BreadcrumbItem[] = [
     { label: "Produtores", href: routes.produtores.lista },
     ...(producerId && producer
       ? [{ label: producer.name, href: routes.produtores.detalhe(producerId) }]
+      : []),
+    ...(cycle && cycleHref
+      ? [{ label: cycle.name, href: cycleHref }]
       : []),
     ...(farmId && farm
       ? [

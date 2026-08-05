@@ -5,6 +5,7 @@ import {
   addCycleFarm,
   applyCycleBlock,
   createCycle,
+  deleteCycle,
   getCycle,
   getCycleAvailablePlots,
   getCycleCostPlan,
@@ -12,6 +13,7 @@ import {
   getProducerCycles,
   publishCycle,
   removeCycleFarm,
+  updateCycle,
   type ApplyBlockPayload,
 } from "@recomenda/api/cycles";
 import { getPurchaseListByCycle } from "@recomenda/api/purchase-lists";
@@ -84,6 +86,60 @@ export function useCreateCycle(farmId: string) {
       for (const farm of cycle.farms) {
         queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
       }
+    },
+  });
+}
+
+/** Atualiza nome/culturas/status da safra. */
+export function useUpdateCycle(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { name?: string; crops?: string[]; status?: string }) =>
+      updateCycle(id, payload),
+    onSuccess: (cycle) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycle(id) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerCycles(cycle.producer_id),
+      });
+      for (const farm of cycle.farms) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
+      }
+      if (cycle.farm_id) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.farmCycles(cycle.farm_id),
+        });
+      }
+    },
+  });
+}
+
+/** Exclui (arquiva) a safra — some das listagens e remove a lista de compra. */
+export function useDeleteCycle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteCycle(id),
+    onSuccess: (result) => {
+      if (result.producer_id) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.producerCycles(result.producer_id),
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.producerFarms(result.producer_id),
+        });
+      }
+      const farmIds = result.farm_ids?.length
+        ? result.farm_ids
+        : result.farm_id
+          ? [result.farm_id]
+          : [];
+      for (const farmId of farmIds) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.farmCycles(farmId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycle(result.id) });
+      void queryClient.invalidateQueries({ queryKey: ["farm-cycles"] });
+      void queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
     },
   });
 }

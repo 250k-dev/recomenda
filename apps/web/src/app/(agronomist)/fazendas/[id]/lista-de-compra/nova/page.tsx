@@ -116,13 +116,22 @@ export default function FarmPurchaseListNewPage() {
     ? routes.produtores.detalhe(producerId)
     : routes.produtores.lista;
   const farmHref = routes.fazendas.detalhe(farmId, { producer_id: producerId });
+  const cycleHrefNav =
+    cycleId && cycle
+      ? routes.fazendas.safra(farmId, cycleId, { producer_id: producerId })
+      : null;
 
+  // Multi-fazenda: o crumb anterior à lista é a safra (não uma fazenda só).
   const breadcrumbs: BreadcrumbItem[] = [
     { label: "Produtores", href: routes.produtores.lista },
     ...(producerId && producer
       ? [{ label: producer.name, href: producerHref }]
       : []),
-    ...(farm ? [{ label: farm.name, href: farmHref }] : []),
+    ...(cycleId && cycle && cycleHrefNav
+      ? [{ label: cycle.name, href: cycleHrefNav }]
+      : farm
+        ? [{ label: farm.name, href: farmHref }]
+        : []),
     { label: "Lista de compra" },
   ];
 

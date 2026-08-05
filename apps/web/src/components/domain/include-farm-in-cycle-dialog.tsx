@@ -53,6 +53,8 @@ export function IncludeFarmInCycleDialog({
   const eligibleCycles = useMemo(() => {
     return (producerCycles ?? []).filter((cycle) => {
       if (cycle.status !== "ACTIVE") return false;
+      // Lista finalizada ou programação publicada — hectares já fechados.
+      if (cycle.can_add_farms === false) return false;
       const alreadyIn = (cycle.farms ?? []).some((f) => f.id === farmId);
       return !alreadyIn;
     });
@@ -129,8 +131,9 @@ export function IncludeFarmInCycleDialog({
         onCreated={(cycleId) => {
           handleOpenChange(false);
           router.push(
-            routes.fazendas.safra(farmId, cycleId, {
+            routes.fazendas.novaListaDeCompra(farmId, {
               producer_id: producerId,
+              cycle_id: cycleId,
             }),
           );
         }}

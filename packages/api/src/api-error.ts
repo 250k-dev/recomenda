@@ -36,5 +36,11 @@ export function publishBlockedMessage(
   if (code === "QUOTA_EXCEEDED") {
     return "Não foi possível publicar. Verifique a quota do plano.";
   }
+  if (code === "PURCHASE_LIST_REQUIRED") {
+    return "Monte e finalize a lista de compra da safra antes de programar ou publicar.";
+  }
+  if (code === "PURCHASES_INCOMPLETE") {
+    return "Finalize 100% das compras da lista antes de publicar a safra.";
+  }
   return apiErrorMessage(error, fallback);
 }

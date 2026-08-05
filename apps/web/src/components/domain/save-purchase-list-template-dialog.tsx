@@ -86,7 +86,7 @@ export function SavePurchaseListTemplateButton({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Salvar como template</DialogTitle>
             <DialogDescription>
@@ -94,7 +94,7 @@ export function SavePurchaseListTemplateButton({
               produtor). Você pode importá-lo em outras safras.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 px-6 py-5">
             <Label htmlFor="save-template-name">Nome do template</Label>
             <Input
               id="save-template-name"
