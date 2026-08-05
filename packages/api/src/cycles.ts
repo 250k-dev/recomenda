@@ -2,6 +2,13 @@ import { api } from "./http/axios";
 
 /** Safra da fazenda (`crop_cycles`): agrupa as programações por talhão. */
 
+/** Fazenda participante de uma safra multi-fazenda, com a área cadastrada somada. */
+export interface CycleFarmRow {
+  id: string;
+  name: string;
+  area_hectares_sum: number;
+}
+
 export interface CycleSummary {
   id: string;
   farm_id: string;
@@ -19,6 +26,12 @@ export interface CycleSummary {
   has_draft_seasons: boolean;
   /** Safra criada mas ainda sem talhões programados. */
   is_planning: boolean;
+  /** Lista ACTIVE incompleta — bloqueia publicar e mostra badge na UI. */
+  awaiting_purchase: boolean;
+  /** Fazendas participantes da safra (multi-fazenda) — sempre ao menos uma. */
+  farms: CycleFarmRow[];
+  /** Soma da área cadastrada de todas as fazendas da safra (não só a programada). */
+  total_cadastral_hectares: number;
 }
 
 /** Uma variedade plantada num talhão, com a área que ocupa. */
@@ -31,6 +44,8 @@ export interface CycleSeasonRow {
   id: string;
   plot_id: string;
   plot_name: string;
+  farm_id?: string;
+  farm_name?: string;
   plot_area_ha: number;
   planted_area_ha: number | null;
   crop: string;
@@ -66,6 +81,12 @@ export interface CycleDetail {
   blocks: CycleBlock[];
   purchase_list_id: string | null;
   purchase_list_name: string | null;
+  /** Lista ACTIVE incompleta — bloqueia publicar e mostra badge na UI. */
+  awaiting_purchase: boolean;
+  /** Fazendas participantes da safra (multi-fazenda) — sempre ao menos uma. */
+  farms: CycleFarmRow[];
+  /** Soma da área cadastrada de todas as fazendas da safra (não só a programada). */
+  total_cadastral_hectares: number;
 }
 
 export interface CycleAvailablePlot {
@@ -74,6 +95,8 @@ export interface CycleAvailablePlot {
   area_hectares: number;
   in_other_cycle: boolean;
   other_cycle_name: string | null;
+  farm_id: string;
+  farm_name: string;
 }
 
 export interface CycleCostPlanPlotRow {
@@ -146,9 +169,22 @@ export async function getFarmCycles(farmId: string) {
   return data;
 }
 
+export async function getProducerCycles(producerId: string) {
+  const { data } = await api.get<CycleSummary[]>(
+    `/producers/${producerId}/cycles`,
+  );
+  return data;
+}
+
 export async function createCycle(
   farmId: string,
-  payload: { producer_id: string; name: string; crops: string[] },
+  payload: {
+    producer_id: string;
+    name: string;
+    crops: string[];
+    /** Fazendas participantes da safra. Vazio/ausente = só a fazenda da URL. */
+    farm_ids?: string[];
+  },
 ) {
   const { data } = await api.post<CycleDetail>(`/farms/${farmId}/cycles`, payload);
   return data;
@@ -184,5 +220,20 @@ export async function publishCycle(id: string) {
 
 export async function getCycleCostPlan(id: string) {
   const { data } = await api.get<CycleCostPlan>(`/cycles/${id}/cost-plan`);
+  return data;
+}
+
+/** Vincula uma fazenda a mais à safra (multi-fazenda). */
+export async function addCycleFarm(cycleId: string, farmId: string) {
+  const { data } = await api.post<CycleDetail>(`/cycles/${cycleId}/farms`, {
+    farm_id: farmId,
+  });
+  return data;
+}
+
+/** Desvincula uma fazenda da safra. Pode falhar com `FARM_HAS_ACTIVE_SEASONS`
+ *  ou `FARM_LOCKED_BY_PURCHASES` — ver `apiErrorMessage`. */
+export async function removeCycleFarm(cycleId: string, farmId: string) {
+  const { data } = await api.delete<CycleDetail>(`/cycles/${cycleId}/farms/${farmId}`);
   return data;
 }

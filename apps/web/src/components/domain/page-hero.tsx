@@ -155,7 +155,7 @@ export function PageHero({
           ? "bg-primary text-primary-foreground"
           : "border border-border bg-card",
         sticky &&
-          "sticky top-0 z-20 shadow-md " +
+          "sticky top-0 z-30 shadow-md " +
             (inverted ? "bg-primary" : "bg-card"),
         className,
       )}

@@ -91,12 +91,31 @@ export async function getAllLocalProducts() {
   return data;
 }
 
-export async function createLocalProduct(payload: { name: string; category?: string; dose_unit?: string; label_url?: string }) {
+export async function createLocalProduct(payload: {
+  name: string;
+  category?: string;
+  dose_unit?: string;
+  label_url?: string;
+  equivalence_group?: string | null;
+}) {
   const { data } = await api.post<Product>("/catalog/local", payload);
   return data;
 }
 
-export async function updateLocalProduct(id: string, payload: { name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean; global_product_id?: string | null }) {
+export async function updateLocalProduct(
+  id: string,
+  payload: {
+    name?: string;
+    category?: string;
+    dose_unit?: string;
+    price_brl?: string;
+    price_usd?: string;
+    label_url?: string;
+    is_active?: boolean;
+    global_product_id?: string | null;
+    equivalence_group?: string | null;
+  },
+) {
   const { data } = await api.patch<Product>(`/catalog/local/${id}`, payload);
   return data;
 }

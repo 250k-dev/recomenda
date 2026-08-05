@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileDown, Loader2, PencilLine, RotateCcw, Share2, Store, Trash2 } from "lucide-react";
+import {
+  CheckSquare,
+  FileDown,
+  Loader2,
+  PencilLine,
+  RotateCcw,
+  Share2,
+  Store,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -21,6 +30,8 @@ import { NativeSelect, NativeSelectOption } from "@recomenda/ui/primitives/nativ
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import {
+  useConfirmPurchaseListPurchases,
+  usePurchaseListProgress,
   usePurchaseListQuoteTrash,
   usePurchaseListQuotes,
   useQuoteTrashActions,
@@ -29,12 +40,31 @@ import { queryKeys } from "@recomenda/api-hooks/queryKeys";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { QuoteExportDialog } from "@/components/domain/quote-export-dialog";
 import {
+  QuoteConfirmQtyDialog,
+  type MultiStoreProductGroup,
+} from "@/components/domain/quote-confirm-qty-dialog";
+import { QuotePurchaseSummary } from "@/components/domain/quote-purchase-summary";
+import {
   createQuoteRequest,
   createQuoteResponse,
   type QuoteAvailability,
   type QuoteComparisonResponse,
+  type QuoteComparisonResponseItem,
   type QuotePaymentTerm,
 } from "@recomenda/api/quotes";
+
+function isBuyableCell(cell: QuoteComparisonResponseItem | undefined): boolean {
+  if (!cell) return false;
+  if (cell.availability !== "AVAILABLE" && cell.availability !== "PARTIAL") {
+    return false;
+  }
+  const price = cell.unit_price_brl ?? cell.substitute_unit_price_brl;
+  return price != null && Number.isFinite(price) && price >= 0;
+}
+
+function cellUnitPrice(cell: QuoteComparisonResponseItem): number {
+  return Number(cell.unit_price_brl ?? cell.substitute_unit_price_brl ?? 0);
+}
 
 const fmtQty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const fmtBrl = (n: number) =>
@@ -78,12 +108,24 @@ export function QuoteComparisonSection({
 }) {
   const { data, isLoading } = usePurchaseListQuotes(listId);
   const { data: trash } = usePurchaseListQuoteTrash(listId);
+  const { data: progress } = usePurchaseListProgress(listId);
+  const confirmPurchases = useConfirmPurchaseListPurchases(listId);
   const actions = useQuoteTrashActions(listId);
   const queryClient = useQueryClient();
 
   const [showTrash, setShowTrash] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [pendingPermanent, setPendingPermanent] = useState<PendingPermanent | null>(null);
+  /** quote_response_item_id selecionados para compra. */
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [qtyDialogOpen, setQtyDialogOpen] = useState(false);
+  const [multiGroups, setMultiGroups] = useState<MultiStoreProductGroup[]>([]);
+  const [pendingSingleLines, setPendingSingleLines] = useState<
+    Array<{
+      quote_response_item_id: string;
+      purchase_list_item_id: string;
+    }>
+  >([]);
 
   // Cotação manual: o agrônomo recebeu os preços por telefone/WhatsApp e
   // preenche ele mesmo — reusa a MESMA tela pública que a loja usaria, então a
@@ -140,7 +182,7 @@ export function QuoteComparisonSection({
 
   const manualQuoteDialog = (
     <Dialog open={manualOpen} onOpenChange={setManualOpen}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PencilLine className="h-5 w-5 text-primary" />
@@ -151,37 +193,39 @@ export function QuoteComparisonSection({
             você mesmo — a cotação entra na comparação igual às respondidas pelo link.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-1.5">
-          <Label htmlFor="manual-store-name">Nome da loja</Label>
-          <Input
-            id="manual-store-name"
-            value={manualStoreName}
-            onChange={(e) => setManualStoreName(e.target.value)}
-            placeholder="Ex: Agro Norte"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void startManualQuote();
-            }}
-          />
-        </div>
-        {!data?.request ? (
+        <div className="flex flex-col gap-4 px-6 py-5">
           <div className="space-y-1.5">
-            <Label htmlFor="manual-payment-term">Condição de pagamento</Label>
-            <NativeSelect
-              id="manual-payment-term"
-              className="w-full"
-              value={manualPaymentTerm}
-              onChange={(e) =>
-                setManualPaymentTerm(e.target.value as "" | QuotePaymentTerm)
-              }
-            >
-              <NativeSelectOption value="">Selecione…</NativeSelectOption>
-              <NativeSelectOption value="CASH">À vista</NativeSelectOption>
-              <NativeSelectOption value="TERM">A prazo</NativeSelectOption>
-              <NativeSelectOption value="BARTER">Barter</NativeSelectOption>
-            </NativeSelect>
+            <Label htmlFor="manual-store-name">Nome da loja</Label>
+            <Input
+              id="manual-store-name"
+              value={manualStoreName}
+              onChange={(e) => setManualStoreName(e.target.value)}
+              placeholder="Ex: Agro Norte"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void startManualQuote();
+              }}
+            />
           </div>
-        ) : null}
+          {!data?.request ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="manual-payment-term">Condição de pagamento</Label>
+              <NativeSelect
+                id="manual-payment-term"
+                className="w-full"
+                value={manualPaymentTerm}
+                onChange={(e) =>
+                  setManualPaymentTerm(e.target.value as "" | QuotePaymentTerm)
+                }
+              >
+                <NativeSelectOption value="">Selecione…</NativeSelectOption>
+                <NativeSelectOption value="CASH">À vista</NativeSelectOption>
+                <NativeSelectOption value="TERM">A prazo</NativeSelectOption>
+                <NativeSelectOption value="BARTER">Barter</NativeSelectOption>
+              </NativeSelect>
+            </div>
+          ) : null}
+        </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setManualOpen(false)} disabled={manualSaving}>
             Cancelar
@@ -443,6 +487,155 @@ export function QuoteComparisonSection({
     }
   };
 
+  const remainingByItem = new Map<string, number>();
+  const confirmedByItem = new Map<string, number>();
+  progress?.items.forEach((it) => {
+    remainingByItem.set(it.purchase_list_item_id, it.remaining_qty);
+    confirmedByItem.set(it.purchase_list_item_id, it.confirmed_purchase_qty);
+  });
+  items.forEach((it) => {
+    if (!remainingByItem.has(it.purchase_list_item_id)) {
+      remainingByItem.set(it.purchase_list_item_id, it.quantity_to_buy);
+    }
+  });
+
+  const toggleSelect = (quoteItemId: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(quoteItemId)) next.delete(quoteItemId);
+      else next.add(quoteItemId);
+      return next;
+    });
+  };
+
+  /** Item com necessidade zerada após confirmação real de compra. */
+  const isItemPurchased = (purchaseListItemId: string) =>
+    (confirmedByItem.get(purchaseListItemId) ?? 0) > 1e-9 &&
+    (remainingByItem.get(purchaseListItemId) ?? 0) <= 1e-9;
+
+  const canSelectItem = (purchaseListItemId: string) =>
+    (remainingByItem.get(purchaseListItemId) ?? 0) > 1e-9;
+
+  const selectAllAvailable = () => {
+    const next = new Set<string>();
+    for (const r of responses) {
+      for (const cell of r.items) {
+        if (!isBuyableCell(cell)) continue;
+        if (!canSelectItem(cell.purchase_list_item_id)) continue;
+        next.add(cell.id);
+      }
+    }
+    setSelectedItemIds(next);
+  };
+
+  const selectedLines: Array<{
+    quote_response_item_id: string;
+    purchase_list_item_id: string;
+    store_name: string;
+    unit_price_brl: number;
+    product_name: string;
+    dose_unit: string;
+  }> = [];
+  for (const r of responses) {
+    for (const cell of r.items) {
+      if (!selectedItemIds.has(cell.id) || !isBuyableCell(cell)) continue;
+      if (!canSelectItem(cell.purchase_list_item_id)) continue;
+      const listItem = items.find(
+        (it) => it.purchase_list_item_id === cell.purchase_list_item_id,
+      );
+      selectedLines.push({
+        quote_response_item_id: cell.id,
+        purchase_list_item_id: cell.purchase_list_item_id,
+        store_name: r.store_name,
+        unit_price_brl: cellUnitPrice(cell),
+        product_name: listItem?.product_name ?? "Produto",
+        dose_unit: listItem?.dose_unit ?? "",
+      });
+    }
+  }
+  const selectedTotalBrl = selectedLines.reduce((s, l) => {
+    const rem = remainingByItem.get(l.purchase_list_item_id) ?? 0;
+    const countSame = selectedLines.filter(
+      (x) => x.purchase_list_item_id === l.purchase_list_item_id,
+    ).length;
+    const qtyGuess = countSame === 1 ? rem : 0;
+    return s + qtyGuess * l.unit_price_brl;
+  }, 0);
+  const selectedMeta = { lines: selectedLines, totalBrl: selectedTotalBrl };
+
+  const submitConfirm = async (
+    lines: Array<{
+      quote_response_item_id: string;
+      purchase_list_item_id: string;
+      quantity?: number;
+    }>,
+  ) => {
+    try {
+      const result = await confirmPurchases.mutateAsync({
+        idempotency_key: crypto.randomUUID(),
+        lines,
+      });
+      setSelectedItemIds(new Set());
+      setQtyDialogOpen(false);
+      setMultiGroups([]);
+      setPendingSingleLines([]);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.producerStock(result.producer_id ?? ""),
+      });
+      toast.success(
+        result.is_complete
+          ? "Compra confirmada — lista 100% comprada."
+          : `Compra confirmada (${result.percent}% da lista).`,
+      );
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Não foi possível confirmar a compra."));
+    }
+  };
+
+  const startConfirm = () => {
+    const byItem = new Map<string, typeof selectedMeta.lines>();
+    for (const line of selectedMeta.lines) {
+      const g = byItem.get(line.purchase_list_item_id) ?? [];
+      g.push(line);
+      byItem.set(line.purchase_list_item_id, g);
+    }
+    const multi: MultiStoreProductGroup[] = [];
+    const singles: Array<{
+      quote_response_item_id: string;
+      purchase_list_item_id: string;
+    }> = [];
+    for (const [itemId, group] of byItem) {
+      if (group.length > 1) {
+        multi.push({
+          purchase_list_item_id: itemId,
+          product_name: group[0].product_name,
+          dose_unit: group[0].dose_unit,
+          remaining_qty: remainingByItem.get(itemId) ?? 0,
+          stores: group.map((g) => ({
+            quote_response_item_id: g.quote_response_item_id,
+            store_name: g.store_name,
+            unit_price_brl: g.unit_price_brl,
+          })),
+        });
+      } else {
+        singles.push({
+          quote_response_item_id: group[0].quote_response_item_id,
+          purchase_list_item_id: group[0].purchase_list_item_id,
+        });
+      }
+    }
+    if (multi.length > 0) {
+      setPendingSingleLines(singles);
+      setMultiGroups(multi);
+      setQtyDialogOpen(true);
+      return;
+    }
+    void submitConfirm(singles);
+  };
+
+  const firstSelectedStore =
+    selectedMeta.lines[0]?.store_name ?? null;
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -457,6 +650,10 @@ export function QuoteComparisonSection({
           <span />
         )}
         <div className="flex items-center justify-end gap-1.5">
+          <Button variant="outline" size="sm" onClick={selectAllAvailable}>
+            <CheckSquare className="size-3.5" />
+            Selecionar todos disponíveis
+          </Button>
           {manualQuoteButton}
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
             <FileDown className="size-3.5" />
@@ -480,18 +677,19 @@ export function QuoteComparisonSection({
           context={{ listName, producerName, agronomistName }}
         />
       ) : null}
+      <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full min-w-[920px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-rail text-left align-bottom">
-              <th className="sticky left-0 z-20 w-[200px] min-w-[200px] bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+              <th className="sticky left-0 z-[2] w-[200px] min-w-[200px] bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
                 Produto
               </th>
-              <th className="sticky left-[200px] z-20 w-[160px] min-w-[160px] max-w-[160px] bg-rail px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-success-strong shadow-[inset_-1px_0_0_0_var(--color-border)]">
+              <th className="sticky left-[200px] z-[2] w-[160px] min-w-[160px] max-w-[160px] bg-rail px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-success-strong shadow-[inset_-1px_0_0_0_var(--color-border)]">
                 Melhor preço
               </th>
               {responses.map((r) => (
-                <th key={r.id} className="min-w-[150px] px-3 py-3 text-right">
+                <th key={r.id} className="min-w-[170px] px-3 py-3 text-right">
                   <div className="flex flex-col items-end gap-1.5">
                     <span className="inline-flex items-center gap-1.5 font-semibold text-text-strong">
                       <Store className="h-3.5 w-3.5 text-primary-strong" />
@@ -516,6 +714,9 @@ export function QuoteComparisonSection({
                       </Button>
                     </span>
                     {statusBadge(r)}
+                    <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                      Preço / seleção
+                    </span>
                   </div>
                 </th>
               ))}
@@ -527,13 +728,13 @@ export function QuoteComparisonSection({
               const cheapest = cheapestByItem.get(it.purchase_list_item_id) ?? null;
               return (
                 <tr key={it.purchase_list_item_id} className="border-b border-border last:border-b-0">
-                  <td className="sticky left-0 z-10 w-[200px] min-w-[200px] max-w-[200px] bg-card px-4 py-2.5">
+                  <td className="sticky left-0 z-[1] w-[200px] min-w-[200px] max-w-[200px] bg-card px-4 py-2.5">
                     <div className="break-words font-semibold text-text-strong">{it.product_name}</div>
                     <div className="text-xs text-muted-foreground tabular-nums">
                       {fmtQty(it.quantity_to_buy)} {unit} · {it.stage}
                     </div>
                   </td>
-                  <td className="sticky left-[200px] z-10 w-[160px] min-w-[160px] max-w-[160px] bg-card px-3 py-2.5 align-top shadow-[inset_-1px_0_0_0_var(--color-border)]">
+                  <td className="sticky left-[200px] z-[1] w-[160px] min-w-[160px] max-w-[160px] bg-card px-3 py-2.5 align-top shadow-[inset_-1px_0_0_0_var(--color-border)]">
                     {cheapest != null ? (
                       <div className="flex flex-col gap-0.5">
                         <span className="font-bold tabular-nums text-success-strong">
@@ -615,6 +816,24 @@ export function QuoteComparisonSection({
                                 {cell.notes}
                               </span>
                             ) : null}
+
+                            {isBuyableCell(cell) ? (
+                              isItemPurchased(it.purchase_list_item_id) ? (
+                                <span className="mt-1 inline-flex items-center rounded-md bg-success-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success-strong">
+                                  Comprado
+                                </span>
+                              ) : canSelectItem(it.purchase_list_item_id) ? (
+                                <label className="mt-1 inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-text-strong">
+                                  <input
+                                    type="checkbox"
+                                    className="size-3.5 accent-[var(--color-primary)]"
+                                    checked={selectedItemIds.has(cell.id)}
+                                    onChange={() => toggleSelect(cell.id)}
+                                  />
+                                  Comprar aqui
+                                </label>
+                              ) : null
+                            ) : null}
                           </div>
                         )}
                         {hasData && cell ? (
@@ -637,10 +856,10 @@ export function QuoteComparisonSection({
           </tbody>
           <tfoot>
             <tr className="border-t border-border bg-rail">
-              <td className="sticky left-0 z-10 w-[200px] min-w-[200px] bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-text-strong">
+              <td className="sticky left-0 z-[1] w-[200px] min-w-[200px] bg-rail px-4 py-3 text-[11px] font-bold uppercase tracking-[0.06em] text-text-strong">
                 Total estimado
               </td>
-              <td className="sticky left-[200px] z-10 w-[160px] min-w-[160px] max-w-[160px] bg-rail px-3 py-3 align-top shadow-[inset_-1px_0_0_0_var(--color-border)]">
+              <td className="sticky left-[200px] z-[1] w-[160px] min-w-[160px] max-w-[160px] bg-rail px-3 py-3 align-top shadow-[inset_-1px_0_0_0_var(--color-border)]">
                 {Number.isFinite(cheapestTotal) && cheapestTotal > 0 ? (
                   <div className="flex flex-col gap-0.5">
                     <span className="font-bold tabular-nums text-success-strong">
@@ -674,6 +893,38 @@ export function QuoteComparisonSection({
           </tfoot>
         </table>
       </div>
+      <QuotePurchaseSummary
+        selectedCount={selectedMeta.lines.length}
+        totalBrl={selectedMeta.totalBrl}
+        hint={
+          selectedMeta.lines.length === 0
+            ? firstSelectedStore
+              ? null
+              : "Marque os itens que quer comprar nas lojas"
+            : progress && !progress.is_complete
+              ? `Lista ${progress.percent}% comprada · ${progress.pending_count} item(ns) pendente(s)`
+              : null
+        }
+        loading={confirmPurchases.isPending}
+        onConfirm={startConfirm}
+      />
+      </div>
+      <QuoteConfirmQtyDialog
+        open={qtyDialogOpen}
+        onOpenChange={setQtyDialogOpen}
+        groups={multiGroups}
+        loading={confirmPurchases.isPending}
+        onConfirm={(quantities) => {
+          const multiLines = multiGroups.flatMap((g) =>
+            g.stores.map((s) => ({
+              quote_response_item_id: s.quote_response_item_id,
+              purchase_list_item_id: g.purchase_list_item_id,
+              quantity: quantities[s.quote_response_item_id],
+            })),
+          );
+          void submitConfirm([...pendingSingleLines, ...multiLines]);
+        }}
+      />
       {confirmDialog}
     </div>
   );

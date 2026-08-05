@@ -2,13 +2,16 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addCycleFarm,
   applyCycleBlock,
   createCycle,
   getCycle,
   getCycleAvailablePlots,
   getCycleCostPlan,
   getFarmCycles,
+  getProducerCycles,
   publishCycle,
+  removeCycleFarm,
   type ApplyBlockPayload,
 } from "@recomenda/api/cycles";
 import { getPurchaseListByCycle } from "@recomenda/api/purchase-lists";
@@ -19,6 +22,14 @@ export function useFarmCycles(farmId: string) {
     queryKey: queryKeys.farmCycles(farmId),
     queryFn: () => getFarmCycles(farmId),
     enabled: Boolean(farmId),
+  });
+}
+
+export function useProducerCycles(producerId: string) {
+  return useQuery({
+    queryKey: queryKeys.producerCycles(producerId),
+    queryFn: () => getProducerCycles(producerId),
+    enabled: Boolean(producerId),
   });
 }
 
@@ -57,10 +68,68 @@ export function useCyclePurchaseList(cycleId: string) {
 export function useCreateCycle(farmId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { producer_id: string; name: string; crops: string[] }) =>
-      createCycle(farmId, payload),
-    onSuccess: () => {
+    mutationFn: (payload: {
+      producer_id: string;
+      name: string;
+      crops: string[];
+      farm_ids?: string[];
+    }) => createCycle(farmId, payload),
+    onSuccess: (cycle) => {
+      // Invalida a fazenda da URL e todas as fazendas participantes da safra —
+      // uma safra multi-fazenda aparece na lista de cada uma.
       queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerCycles(cycle.producer_id),
+      });
+      for (const farm of cycle.farms) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
+      }
+    },
+  });
+}
+
+/** Vincula uma fazenda a mais à safra. Invalida a safra e as listas de safras
+ *  de todas as fazendas afetadas (a nova e as que já faziam parte). */
+export function useAddCycleFarm(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (farmId: string) => addCycleFarm(id, farmId),
+    onSuccess: (cycle, farmId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycle(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycleAvailablePlots(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.cyclePurchaseList(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycleCostPlan(id) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerCycles(cycle.producer_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerFarms(cycle.producer_id),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
+      for (const farm of cycle.farms) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.farmPurchaseLists(farm.id),
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
+    },
+  });
+}
+
+/** Desvincula uma fazenda da safra. Ver códigos de erro em `apiErrorMessage`
+ *  (`FARM_HAS_ACTIVE_SEASONS`, `FARM_LOCKED_BY_PURCHASES`). */
+export function useRemoveCycleFarm(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (farmId: string) => removeCycleFarm(id, farmId),
+    onSuccess: (cycle, farmId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycle(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycleAvailablePlots(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
+      for (const farm of cycle.farms) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
+      }
     },
   });
 }
@@ -72,18 +141,20 @@ export function useApplyCycleBlock(id: string) {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cycle(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.cycleAvailablePlots(id) });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.farmCycles(result.cycle.farm_id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.farmSeasons(result.cycle.farm_id),
-      });
+      const farmIds = new Set<string>([
+        result.cycle.farm_id,
+        ...(result.cycle.farms ?? []).map((f) => f.id),
+      ]);
+      for (const farmId of farmIds) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmSeasons(farmId) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.farmPurchaseLists(farmId),
+        });
+      }
       // Mixes podem espelhar produtos fora da programação na lista de compra.
       queryClient.invalidateQueries({ queryKey: queryKeys.cyclePurchaseList(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.cycleCostPlan(id) });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.farmPurchaseLists(result.cycle.farm_id),
-      });
       void queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
     },
   });

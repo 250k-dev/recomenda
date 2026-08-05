@@ -5,13 +5,14 @@ import { routes } from "@recomenda/config";
 import type { Route } from "next";
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
-import { getFarmCycles } from "@recomenda/api/cycles";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
 import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
+import { ProducerCyclesSection } from "@/components/domain/producer-cycles-section";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { MonthCalendar } from "@/components/domain/agenda/month-calendar";
 import { ProducerTimingTemplatesPanel } from "@/components/domain/timing/producer-timing-templates-section";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -20,6 +21,7 @@ import { Label } from "@recomenda/ui/primitives/label";
 import {
   useAgronomistAgenda,
   useProducer,
+  useProducerCycles,
   useProducerFarms,
   useUpdateProducer,
   queryKeys,
@@ -43,7 +45,8 @@ import {
 } from "@recomenda/ui/primitives/dialog";
 import { ProducerDetailSkeleton } from "@/components/domain/page-skeletons";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
-import { formatPhoneBR, maskPhoneBR } from "@recomenda/utils";
+import { FarmLocationFields } from "@/components/domain/farm-location-fields";
+import { formatPhoneBR, maskPhoneBR, optionalFarmLocation } from "@recomenda/utils";
 import { toast } from "sonner";
 import {
   Pencil,
@@ -54,6 +57,8 @@ import {
   TriangleAlert,
   Mail,
 } from "lucide-react";
+
+type ProducerPortfolioTab = "fazendas" | "safras";
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -73,9 +78,13 @@ export function ProducerDetailView({
   const queryClient = useQueryClient();
   const { data: producer, isLoading } = useProducer(producerId);
   const { data: farms, isLoading: loadingFarms } = useProducerFarms(producerId);
+  const { data: producerCycles = [], isLoading: loadingCycles } =
+    useProducerCycles(producerId);
   const updateProducer = useUpdateProducer(producerId);
   const canInviteAccess = useCan("PRODUCER_CREATE");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [portfolioTab, setPortfolioTab] =
+    useState<ProducerPortfolioTab>("fazendas");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
@@ -83,7 +92,8 @@ export function ProducerDetailView({
   const [editPhone, setEditPhone] = useState("");
   const [newFarmOpen, setNewFarmOpen] = useState(false);
   const [newFarmName, setNewFarmName] = useState("");
-  const [newFarmLocation, setNewFarmLocation] = useState("");
+  const [newFarmStateUf, setNewFarmStateUf] = useState("");
+  const [newFarmCity, setNewFarmCity] = useState("");
   const [cronogramOpen, setCronogramOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
@@ -107,11 +117,17 @@ export function ProducerDetailView({
   const agenda = useAgronomistAgenda(today, producerId);
   const lateCount = showSeasonActions ? agenda.lateCount : 0;
 
+  const resetNewFarmForm = () => {
+    setNewFarmName("");
+    setNewFarmStateUf("");
+    setNewFarmCity("");
+  };
+
   const newFarmMutation = useMutation({
     mutationFn: async () => {
       return createFarm({
         name: newFarmName.trim(),
-        location: newFarmLocation.trim() || undefined,
+        location: optionalFarmLocation(newFarmCity, newFarmStateUf),
         producer_id: producerId,
       });
     },
@@ -121,23 +137,20 @@ export function ProducerDetailView({
       });
       toast.success("Fazenda cadastrada.");
       setNewFarmOpen(false);
-      setNewFarmName("");
-      setNewFarmLocation("");
+      resetNewFarmForm();
     },
     onError: () => toast.error("Não foi possível cadastrar a fazenda."),
   });
 
   const farmsList = useMemo(() => farms ?? [], [farms]);
-
-  // Safras ativas = cycles (safra de verdade), não `f.seasons` (uma linha por
-  // talhão plantado) — do contrário uma safra com 3 talhões virava "3 safras".
-  const cycleQueries = useQueries({
-    queries: farmsList.map((f) => ({
-      queryKey: queryKeys.farmCycles(f.id),
-      queryFn: () => getFarmCycles(f.id),
-      staleTime: 60_000,
-    })),
-  });
+  const activeCyclesCount = useMemo(
+    () => producerCycles.filter((c) => c.status === "ACTIVE").length,
+    [producerCycles],
+  );
+  const visibleCyclesCount = useMemo(
+    () => producerCycles.filter((c) => c.status !== "ARCHIVED").length,
+    [producerCycles],
+  );
 
   const stats = useMemo(() => {
     let plots = 0;
@@ -149,13 +162,13 @@ export function ProducerDetailView({
         0,
       );
     }
-    const activeSeasons = cycleQueries.reduce(
-      (sum, q) =>
-        sum + (q.data ?? []).filter((c) => c.status === "ACTIVE").length,
-      0,
-    );
-    return { farms: farmsList.length, plots, hectares, activeSeasons };
-  }, [farmsList, cycleQueries]);
+    return {
+      farms: farmsList.length,
+      plots,
+      hectares,
+      activeSeasons: activeCyclesCount,
+    };
+  }, [farmsList, activeCyclesCount]);
 
   const openEdit = () => {
     if (!producer) return;
@@ -195,6 +208,25 @@ export function ProducerDetailView({
   const statValue = (value: ReactNode) =>
     loadingFarms ? <Skeleton className="w-12 h-6" /> : value;
 
+  const portfolioTabs = (
+    <SegmentedTabs
+      value={portfolioTab}
+      onValueChange={setPortfolioTab}
+      items={[
+        {
+          value: "fazendas",
+          label: "Fazendas",
+          badgeCount: farmsList.length,
+        },
+        {
+          value: "safras",
+          label: "Safras",
+          badgeCount: visibleCyclesCount,
+        },
+      ]}
+    />
+  );
+
   const heroStats: PageHeroStat[] = [
     { label: "Telefone", value: formatPhoneBR(producer.phone) },
     ...(producer.email?.trim()
@@ -206,7 +238,12 @@ export function ProducerDetailView({
     { label: "Fazendas", value: statValue(stats.farms) },
     { label: "Talhões", value: statValue(stats.plots) },
     { label: "Hectares", value: statValue(`${fmtHa(stats.hectares)} ha`) },
-    { label: "Safras ativas", value: statValue(stats.activeSeasons) },
+    {
+      label: "Safras ativas",
+      value: statValue(
+        loadingCycles ? <Skeleton className="h-6 w-12" /> : stats.activeSeasons,
+      ),
+    },
     // No mobile este dado vira o banner de alerta abaixo das métricas.
     ...(lateCount > 0
       ? [
@@ -290,13 +327,22 @@ export function ProducerDetailView({
         ) : null}
       </PageHero>
 
-      <ProducerFarmsSection
-        producerId={producerId}
-        farms={farmsList}
-        loadingFarms={loadingFarms}
-        showSeasonActions={showSeasonActions}
-        onNewFarm={() => setNewFarmOpen(true)}
-      />
+      {portfolioTab === "fazendas" ? (
+        <ProducerFarmsSection
+          producerId={producerId}
+          farms={farmsList}
+          loadingFarms={loadingFarms}
+          showSeasonActions={showSeasonActions}
+          onNewFarm={() => setNewFarmOpen(true)}
+          toolbarLeading={portfolioTabs}
+        />
+      ) : (
+        <ProducerCyclesSection
+          producerId={producerId}
+          anchorFarmId={farmsList[0]?.id ?? null}
+          toolbarLeading={portfolioTabs}
+        />
+      )}
 
       {showSeasonActions ? (
         <>
@@ -455,7 +501,13 @@ export function ProducerDetailView({
       </Dialog>
 
       {/* Nova fazenda — formulário em página (sem navegar) */}
-      <Sheet open={newFarmOpen} onOpenChange={setNewFarmOpen}>
+      <Sheet
+        open={newFarmOpen}
+        onOpenChange={(open) => {
+          setNewFarmOpen(open);
+          if (!open) resetNewFarmForm();
+        }}
+      >
         <SheetContent side="right" className="sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Nova fazenda</SheetTitle>
@@ -476,20 +528,13 @@ export function ProducerDetailView({
                 }
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="new-farm-location">Localização (opcional)</Label>
-              <Input
-                id="new-farm-location"
-                value={newFarmLocation}
-                onChange={(e) => setNewFarmLocation(e.target.value)}
-                placeholder="Cidade, UF"
-                onKeyDown={(e) =>
-                  e.key === "Enter" &&
-                  newFarmName.trim() &&
-                  newFarmMutation.mutate()
-                }
-              />
-            </div>
+            <FarmLocationFields
+              idPrefix="new-farm"
+              stateUf={newFarmStateUf}
+              city={newFarmCity}
+              onStateChange={setNewFarmStateUf}
+              onCityChange={setNewFarmCity}
+            />
             <div className="flex gap-2 pt-2">
               <Button
                 className="flex-1"

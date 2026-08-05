@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CalendarDays, Leaf, ListOrdered, Plus, Send, Share2 } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
@@ -194,6 +194,7 @@ export function SeasonRecommendationsView({
   producerId,
   crop,
   farmId,
+  openRecommendationId,
   onPublish,
   isPublishing,
 }: {
@@ -206,6 +207,8 @@ export function SeasonRecommendationsView({
   producerId?: string;
   crop?: string;
   farmId?: string;
+  /** Deep-link: abre e rola até a etapa correspondente. */
+  openRecommendationId?: string | null;
   onPublish?: () => void;
   isPublishing?: boolean;
 }) {
@@ -260,13 +263,23 @@ export function SeasonRecommendationsView({
   // PATCH /seasons exige SEASON_CRUD — botão de plantio usa essa permissão.
   const canSeasonCrud = useCan("SEASON_CRUD");
 
-  if (isLoading) return <TimelineCardsSkeleton count={5} />;
+  const recommendations = useMemo(() => {
+    return (
+      Array.isArray(data)
+        ? data
+        : ((data as { data?: unknown[] } | undefined)?.data ?? [])
+    ) as Recommendation[];
+  }, [data]);
 
-  const recommendations = (
-    Array.isArray(data)
-      ? data
-      : ((data as { data?: unknown[] } | undefined)?.data ?? [])
-  ) as Recommendation[];
+  // Deep-link: rola até a etapa alvo após o timeline carregar.
+  useEffect(() => {
+    if (!openRecommendationId || isLoading) return;
+    const el = document.getElementById(`rec-${openRecommendationId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [openRecommendationId, isLoading, recommendations]);
+
+  if (isLoading) return <TimelineCardsSkeleton count={5} />;
 
   const canManageStages =
     (seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS") &&
@@ -497,6 +510,7 @@ export function SeasonRecommendationsView({
             rec={rec}
             index={i}
             seasonId={seasonId}
+            defaultOpen={openRecommendationId === rec.id}
             canMoveUp={canManageStages && i > 0}
             canMoveDown={canManageStages && i < recommendations.length - 1}
             onMoveUp={() => moveStage(i, "up")}

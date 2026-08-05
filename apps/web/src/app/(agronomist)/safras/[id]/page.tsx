@@ -5,6 +5,8 @@ import { PageHeaderSkeleton } from "@/components/domain/page-skeletons";
 import { SeasonRecommendationsView } from "@/components/domain/season/season-recommendations-view";
 import { useSeasonPage } from "@/components/domain/season/use-season-page";
 import { usePublishSeason } from "@recomenda/api-hooks";
+import { publishBlockedMessage } from "@recomenda/api/api-error";
+import { usePublishSeasonGuard } from "@/components/domain/season/use-publish-season-guard";
 
 /** Cronograma de recomendações — tela padrão da safra (era `?tab=recommendations`). */
 export default function SeasonSchedulePage() {
@@ -13,11 +15,13 @@ export default function SeasonSchedulePage() {
     season,
     farmId,
     producerId,
+    openRecommendationId,
     loadingSeason,
     statusLabel,
     title,
   } = useSeasonPage();
   const publishMutation = usePublishSeason(seasonId || "");
+  const publishGuard = usePublishSeasonGuard(season?.cycle_id);
 
   if (!seasonId) {
     return (
@@ -26,12 +30,17 @@ export default function SeasonSchedulePage() {
   }
 
   const handlePublish = () => {
+    if (!publishGuard.canPublish) {
+      toast.error(
+        publishGuard.reason ??
+          "Finalize 100% das compras da lista antes de publicar a safra.",
+      );
+      return;
+    }
     publishMutation.mutate([], {
       onSuccess: () => toast.success("Safra publicada com sucesso!"),
       onError: (error: unknown) => {
-        const msg =
-          error instanceof Error ? error.message : "Falha ao publicar safra";
-        toast.error(`Erro: ${msg || "Falha ao publicar safra"}`);
+        toast.error(publishBlockedMessage(error, "Falha ao publicar safra"));
       },
     });
   };
@@ -49,8 +58,9 @@ export default function SeasonSchedulePage() {
       producerId={producerId || undefined}
       crop={season?.crop}
       farmId={farmId || undefined}
+      openRecommendationId={openRecommendationId}
       onPublish={season?.status === "DRAFT" ? handlePublish : undefined}
-      isPublishing={publishMutation.isPending}
+      isPublishing={publishMutation.isPending || publishGuard.isLoading}
     />
   );
 }

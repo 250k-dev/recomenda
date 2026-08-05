@@ -11,6 +11,7 @@ import {
   Leaf,
   ListChecks,
   MapPin,
+  MapPinned,
   Plus,
   Sprout,
   Trash2,
@@ -45,6 +46,7 @@ import {
   createTimingStage,
   updateTimingTemplate,
 } from "@recomenda/api";
+import { publishBlockedMessage } from "@recomenda/api/api-error";
 import type { CycleDetail } from "@recomenda/api/cycles";
 import {
   TimingStagesEditor,
@@ -610,6 +612,19 @@ function StepPlots({
 
   const plots = availablePlots ?? [];
   const selectedPlots = plots.filter((p) => selected.has(p.id));
+  // Agrupa os talhões por fazenda (safra multi-fazenda) preservando a ordem
+  // alfabética que já vem do backend dentro de cada grupo.
+  const plotGroups = useMemo(() => {
+    const list = availablePlots ?? [];
+    const map = new Map<string, { farmId: string; farmName: string; plots: typeof list }>();
+    for (const plot of list) {
+      const group = map.get(plot.farm_id);
+      if (group) group.plots.push(plot);
+      else map.set(plot.farm_id, { farmId: plot.farm_id, farmName: plot.farm_name, plots: [plot] });
+    }
+    return [...map.values()];
+  }, [availablePlots]);
+  const showFarmHeaders = plotGroups.length > 1;
   const totalHa = selectedPlots.reduce((s, p) => {
     const planted = sumPlantedArea(configs[p.id]);
     return s + (planted > 0 ? planted : p.area_hectares);
@@ -777,9 +792,9 @@ function StepPlots({
                 );
                 onDone();
               },
-              onError: () => {
+              onError: (err: unknown) => {
                 toast.error(
-                  "Talhões aplicados, mas a publicação falhou (verifique a quota do plano). Use o botão \"Revisar e publicar\" na safra.",
+                  `Talhões aplicados, mas a publicação falhou: ${publishBlockedMessage(err)}. Use o botão "Revisar e publicar" na safra.`,
                 );
                 onDone();
               },
@@ -828,210 +843,237 @@ function StepPlots({
         </div>
       ) : plots.length === 0 ? (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          Todos os talhões da fazenda já estão nesta safra. Cadastre novos
-          talhões na fazenda para ampliá-la.
+          Todos os talhões das fazendas desta safra já foram programados.
+          Cadastre novos talhões nas fazendas para ampliá-la.
         </div>
       ) : (
-        <div className="space-y-3">
-          {plots.map((plot) => {
-            const isSelected = selected.has(plot.id);
-            const cfg = configs[plot.id];
+        <div className="space-y-6">
+          {plotGroups.map((group) => {
+            const groupHa = group.plots.reduce(
+              (sum, p) => sum + (Number(p.area_hectares) || 0),
+              0,
+            );
             return (
-              <div
-                key={plot.id}
-                className={cn(
-                  "rounded-xl border transition-colors",
-                  isSelected ? "border-primary bg-primary/5" : "border-border",
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggle(plot.id, plot.area_hectares)}
-                  className="flex w-full items-center gap-3 p-4 text-left"
-                >
-                  <span
+            <div key={group.farmId} className="space-y-3">
+              {showFarmHeaders ? (
+                <div className="flex items-center gap-2.5 border-b border-border/70 pb-2.5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+                    <MapPinned className="size-4.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-base font-semibold tracking-tight text-text-strong">
+                      {group.farmName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {group.plots.length}{" "}
+                      {group.plots.length === 1 ? "talhão" : "talhões"}
+                      {groupHa > 0 ? ` · ${fmt(groupHa)} ha` : ""}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              {group.plots.map((plot) => {
+                const isSelected = selected.has(plot.id);
+                const cfg = configs[plot.id];
+                return (
+                  <div
+                    key={plot.id}
                     className={cn(
-                      "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md transition-colors",
-                      isSelected
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border bg-surface text-transparent",
+                      "rounded-xl border transition-colors",
+                      isSelected ? "border-primary bg-primary/5" : "border-border",
                     )}
                   >
-                    {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-foreground">{plot.name}</span>
-                      {plot.in_other_cycle ? (
-                        <Badge variant="neutral" className="gap-1 text-amber-700">
-                          <CircleAlert className="h-3 w-3" />
-                          já está na {plot.other_cycle_name ?? "outra safra"}
-                        </Badge>
-                      ) : null}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                    {fmt(plot.area_hectares)} ha
-                  </span>
-                </button>
-
-                {isSelected ? (
-                  <div className="flex flex-col gap-4 border-t border-border/60 p-4">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium text-foreground">
-                          Variedades / Híbridos
+                    <button
+                      type="button"
+                      onClick={() => toggle(plot.id, plot.area_hectares)}
+                      className="flex w-full items-center gap-3 p-4 text-left"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md transition-colors",
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border bg-surface text-transparent",
+                        )}
+                      >
+                        {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-foreground">{plot.name}</span>
+                          {plot.in_other_cycle ? (
+                            <Badge variant="neutral" className="gap-1 text-amber-700">
+                              <CircleAlert className="h-3 w-3" />
+                              já está na {plot.other_cycle_name ?? "outra safra"}
+                            </Badge>
+                          ) : null}
                         </span>
-                        {(() => {
-                          const planted = sumPlantedArea(cfg);
-                          if (planted <= 0) return null;
-                          const over = planted > plot.area_hectares;
-                          return (
-                            <span
-                              className={
-                                over
-                                  ? "text-xs tabular-nums text-warning-strong"
-                                  : "text-xs tabular-nums text-muted-foreground"
-                              }
-                            >
-                              {fmt(planted)} de {fmt(plot.area_hectares)} ha
-                            </span>
-                          );
-                        })()}
-                      </div>
+                      </span>
+                      <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                        {fmt(plot.area_hectares)} ha
+                      </span>
+                    </button>
 
-                      {(cfg?.varieties ?? []).map((row, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <Input
-                              list={
-                                varietyOptions.length > 0
-                                  ? `varieties-${plot.id}`
-                                  : undefined
-                              }
-                              value={row.variety}
-                              onChange={(e) =>
-                                updateVariety(plot.id, index, { variety: e.target.value })
-                              }
-                              placeholder={
-                                varietyOptions.length > 0
-                                  ? "Selecione ou digite"
-                                  : "Ex: BMX Potência RR"
-                              }
-                              aria-label={`Variedade ${index + 1} do talhão ${plot.name}`}
-                            />
+                    {isSelected ? (
+                      <div className="flex flex-col gap-4 border-t border-border/60 p-4">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground">
+                              Variedades / Híbridos
+                            </span>
                             {(() => {
-                              // Referência da lista de compra: área que os bags
-                              // desta semente cobrem, e aviso se a alocação passar.
-                              const name = row.variety.trim();
-                              const listArea = name ? seedAreaByVariety.get(name) : undefined;
-                              if (listArea == null) return null;
-                              const allocated = allocatedForVariety(name);
-                              const over = allocated > listArea;
+                              const planted = sumPlantedArea(cfg);
+                              if (planted <= 0) return null;
+                              const over = planted > plot.area_hectares;
                               return (
-                                <p
+                                <span
                                   className={
                                     over
-                                      ? "mt-1 text-xs tabular-nums text-warning-strong"
-                                      : "mt-1 text-xs tabular-nums text-muted-foreground"
+                                      ? "text-xs tabular-nums text-warning-strong"
+                                      : "text-xs tabular-nums text-muted-foreground"
                                   }
                                 >
-                                  Na lista de compra: {fmt(listArea)} ha
-                                  {over
-                                    ? ` — alocado ${fmt(allocated)} ha, acima do que os bags cobrem`
-                                    : ""}
-                                </p>
+                                  {fmt(planted)} de {fmt(plot.area_hectares)} ha
+                                </span>
                               );
                             })()}
                           </div>
-                          <div className="w-32 shrink-0">
+
+                          {(cfg?.varieties ?? []).map((row, index) => (
+                            <div key={index} className="flex items-start gap-2">
+                              <div className="min-w-0 flex-1">
+                                <Input
+                                  list={
+                                    varietyOptions.length > 0
+                                      ? `varieties-${plot.id}`
+                                      : undefined
+                                  }
+                                  value={row.variety}
+                                  onChange={(e) =>
+                                    updateVariety(plot.id, index, { variety: e.target.value })
+                                  }
+                                  placeholder={
+                                    varietyOptions.length > 0
+                                      ? "Selecione ou digite"
+                                      : "Ex: BMX Potência RR"
+                                  }
+                                  aria-label={`Variedade ${index + 1} do talhão ${plot.name}`}
+                                />
+                                {(() => {
+                                  // Referência da lista de compra: área que os bags
+                                  // desta semente cobrem, e aviso se a alocação passar.
+                                  const name = row.variety.trim();
+                                  const listArea = name ? seedAreaByVariety.get(name) : undefined;
+                                  if (listArea == null) return null;
+                                  const allocated = allocatedForVariety(name);
+                                  const over = allocated > listArea;
+                                  return (
+                                    <p
+                                      className={
+                                        over
+                                          ? "mt-1 text-xs tabular-nums text-warning-strong"
+                                          : "mt-1 text-xs tabular-nums text-muted-foreground"
+                                      }
+                                    >
+                                      Na lista de compra: {fmt(listArea)} ha
+                                      {over
+                                        ? ` — alocado ${fmt(allocated)} ha, acima do que os bags cobrem`
+                                        : ""}
+                                    </p>
+                                  );
+                                })()}
+                              </div>
+                              <div className="w-32 shrink-0">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={row.plantedArea}
+                                  onChange={(e) =>
+                                    updateVariety(plot.id, index, {
+                                      plantedArea: e.target.value,
+                                    })
+                                  }
+                                  placeholder="ha"
+                                  aria-label={`Área da variedade ${index + 1} (ha)`}
+                                />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0 text-muted-foreground hover:text-danger-strong"
+                                disabled={(cfg?.varieties.length ?? 0) <= 1}
+                                title="Remover esta variedade"
+                                onClick={() => removeVariety(plot.id, index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+
+                          {varietyOptions.length > 0 ? (
+                            <datalist id={`varieties-${plot.id}`}>
+                              {varietyOptions.map((name) => (
+                                <option key={name} value={name} />
+                              ))}
+                            </datalist>
+                          ) : null}
+
+                          <div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5 text-primary-strong"
+                              onClick={() => addVariety(plot.id)}
+                            >
+                              <Plus className="h-4 w-4" />
+                              Adicionar variedade
+                            </Button>
+                          </div>
+
+                          {(() => {
+                            const planted = sumPlantedArea(cfg);
+                            return planted > plot.area_hectares ? (
+                              <p className="text-xs text-warning-strong">
+                                As variedades somam {fmt(planted)} ha, acima dos{" "}
+                                {fmt(plot.area_hectares)} ha cadastrados — liberado, só confira
+                                a área do talhão.
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                Talhão tem {fmt(plot.area_hectares)} ha. Divida a área entre as
+                                variedades (ex.: 15 ha de cada).
+                              </p>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Field label="Data de plantio">
+                            <Input
+                              type="date"
+                              value={cfg?.plantingDate ?? ""}
+                              onChange={(e) =>
+                                updateConfig(plot.id, { plantingDate: e.target.value })
+                              }
+                            />
+                          </Field>
+                          <Field label="Ciclo (dias)">
                             <Input
                               type="number"
-                              min={0}
-                              step="0.01"
-                              value={row.plantedArea}
-                              onChange={(e) =>
-                                updateVariety(plot.id, index, {
-                                  plantedArea: e.target.value,
-                                })
-                              }
-                              placeholder="ha"
-                              aria-label={`Área da variedade ${index + 1} (ha)`}
+                              min={1}
+                              value={cfg?.cycleDays ?? ""}
+                              onChange={(e) => updateConfig(plot.id, { cycleDays: e.target.value })}
+                              placeholder="Ex: 115"
                             />
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 text-muted-foreground hover:text-danger-strong"
-                            disabled={(cfg?.varieties.length ?? 0) <= 1}
-                            title="Remover esta variedade"
-                            onClick={() => removeVariety(plot.id, index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </Field>
                         </div>
-                      ))}
-
-                      {varietyOptions.length > 0 ? (
-                        <datalist id={`varieties-${plot.id}`}>
-                          {varietyOptions.map((name) => (
-                            <option key={name} value={name} />
-                          ))}
-                        </datalist>
-                      ) : null}
-
-                      <div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1.5 text-primary-strong"
-                          onClick={() => addVariety(plot.id)}
-                        >
-                          <Plus className="h-4 w-4" />
-                          Adicionar variedade
-                        </Button>
                       </div>
-
-                      {(() => {
-                        const planted = sumPlantedArea(cfg);
-                        return planted > plot.area_hectares ? (
-                          <p className="text-xs text-warning-strong">
-                            As variedades somam {fmt(planted)} ha, acima dos{" "}
-                            {fmt(plot.area_hectares)} ha cadastrados — liberado, só confira
-                            a área do talhão.
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            Talhão tem {fmt(plot.area_hectares)} ha. Divida a área entre as
-                            variedades (ex.: 15 ha de cada).
-                          </p>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field label="Data de plantio">
-                        <Input
-                          type="date"
-                          value={cfg?.plantingDate ?? ""}
-                          onChange={(e) =>
-                            updateConfig(plot.id, { plantingDate: e.target.value })
-                          }
-                        />
-                      </Field>
-                      <Field label="Ciclo (dias)">
-                        <Input
-                          type="number"
-                          min={1}
-                          value={cfg?.cycleDays ?? ""}
-                          onChange={(e) => updateConfig(plot.id, { cycleDays: e.target.value })}
-                          placeholder="Ex: 115"
-                        />
-                      </Field>
-                    </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
+                );
+              })}
+            </div>
             );
           })}
         </div>
@@ -1060,7 +1102,7 @@ function StepPlots({
       <div className="mt-4 flex items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack} className="gap-1.5">
           <ArrowLeft className="h-4 w-4" />
-          Voltar
+          Trocar modelo
         </Button>
         <Button
           onClick={trySubmit}

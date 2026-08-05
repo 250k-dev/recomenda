@@ -114,6 +114,8 @@ export interface PurchaseListDetail {
     local_product_id: string;
     product_name: string;
     category: string;
+    /** Grupo de equivalência / tipo de formulação do produto. */
+    equivalence_group?: string | null;
     crop?: string | null;
     stage: string;
     dose_per_hectare: number;

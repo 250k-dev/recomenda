@@ -19,6 +19,11 @@ import {
   softDeleteQuoteResponse,
   updateQuoteResponse,
 } from "@recomenda/api/quotes";
+import {
+  type ConfirmPurchaseLine,
+  confirmPurchaseListPurchases,
+  getPurchaseListProgress,
+} from "@recomenda/api/purchases";
 import { queryKeys } from "./queryKeys";
 
 // --- Agrônomo -----------------------------------------------------------------
@@ -127,6 +132,31 @@ export function useUpdateQuoteResponse(responseToken: string) {
       updateQuoteResponse(responseToken, payload),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.quoteResponse(responseToken), data);
+    },
+  });
+}
+
+export function usePurchaseListProgress(listId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.purchaseListProgress(listId),
+    queryFn: () => getPurchaseListProgress(listId),
+    enabled: Boolean(listId) && enabled,
+  });
+}
+
+export function useConfirmPurchaseListPurchases(listId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      idempotency_key: string;
+      lines: ConfirmPurchaseLine[];
+    }) => confirmPurchaseListPurchases(listId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListProgress(listId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListQuotes(listId) });
+      queryClient.invalidateQueries({ queryKey: ["producer-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["cycle-purchase-list"] });
+      queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
     },
   });
 }

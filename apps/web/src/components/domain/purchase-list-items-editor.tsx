@@ -38,6 +38,10 @@ import {
   SEED_CATEGORIES,
   type ListItem,
 } from "@recomenda/domain/purchase-list/list-item";
+import {
+  formulationShortLabel,
+  resolveFormulationKey,
+} from "@recomenda/domain/recommendations/formulation-mix-order";
 
 const DEFAULT_ITEM_STAGE = "Outra";
 /** Ciclo padrão da semente (dias) — soja gira em ~110 dias. */
@@ -283,6 +287,7 @@ export function PurchaseListItemsEditor({
     if (category !== previousCategory) {
       patch.productId = "";
       patch.productName = "";
+      patch.equivalenceGroup = null;
       // Alterna entre campos de dose e campos de semente conforme a categoria.
       if (SEED_CATEGORIES.includes(category)) {
         patch.dose = "";
@@ -337,6 +342,7 @@ export function PurchaseListItemsEditor({
       updateItem(itemKey, {
         productId: product.optionValue,
         productName: product.name,
+        equivalenceGroup: product.equivalence_group ?? null,
         unit: unitForSelection(product.dose_unit),
         ...stockPatch(product.optionValue),
       });
@@ -349,6 +355,10 @@ export function PurchaseListItemsEditor({
       updateItem(itemKey, {
         productId: cloned.id,
         productName: cloned.name ?? product.name,
+        equivalenceGroup:
+          (cloned as { equivalence_group?: string | null }).equivalence_group ??
+          product.equivalence_group ??
+          null,
         unit: unitForSelection(cloned.dose_unit ?? product.dose_unit),
         ...stockPatch(cloned.id),
       });
@@ -503,6 +513,18 @@ export function PurchaseListItemsEditor({
             renderProductField(it, rowProducts, "min-w-0")
           )}
         </td>
+        {!seed ? (
+          <td className="px-1.5 py-1.5 text-center">
+            <span
+              className="inline-flex h-6 min-w-[2.5rem] items-center justify-center rounded-md border border-border bg-surface-2 px-1.5 text-[10px] font-bold tracking-wide text-muted-foreground"
+              title={it.equivalenceGroup ?? undefined}
+            >
+              {formulationShortLabel(
+                resolveFormulationKey(it.equivalenceGroup),
+              )}
+            </span>
+          </td>
+        ) : null}
         {seed ? (
           <>
             {/* Semente/metro */}
@@ -793,10 +815,11 @@ export function PurchaseListItemsEditor({
     items: ListItem[];
   }) => {
     const seedBand = band.seed;
-    // Defensivos ganham 2 colunas extras (% área + obs. área). Sem PRICE_VIEW,
-    // some Preço US$ / Valor / Total / Total US$ (−4).
+    // Defensivos: Form. + Dose/Un/Nº + % área + obs. Sem PRICE_VIEW, −4 cols de preço.
     const priceCols = canViewPrices ? 4 : 0;
-    const colCount = (readOnly ? 14 : 15) - (4 - priceCols);
+    const colCount = seedBand
+      ? (readOnly ? 14 : 15) - (4 - priceCols)
+      : (readOnly ? 15 : 16) - (4 - priceCols);
     const tableWidth = seedBand
       ? readOnly
         ? canViewPrices
@@ -807,11 +830,11 @@ export function PurchaseListItemsEditor({
           : "w-[1292px]"
       : readOnly
         ? canViewPrices
-          ? "w-[1844px]"
-          : "w-[1340px]"
+          ? "w-[1924px]"
+          : "w-[1420px]"
         : canViewPrices
-          ? "w-[1888px]"
-          : "w-[1384px]";
+          ? "w-[1968px]"
+          : "w-[1464px]";
     return (
       <div
         key={band.id}
@@ -841,6 +864,7 @@ export function PurchaseListItemsEditor({
               <>
                 <col className="w-[144px]" />
                 <col className="w-[260px]" />
+                <col className="w-[80px]" />
                 <col className="w-[120px]" />
                 <col className="w-[120px]" />
                 <col className="w-[120px]" />
@@ -908,6 +932,7 @@ export function PurchaseListItemsEditor({
                 </>
               ) : (
                 <>
+                  <td className="px-1.5 py-2 text-center leading-tight">Form.</td>
                   <td className="px-1.5 py-2 text-right leading-tight">Dose</td>
                   <td className="px-1.5 py-2 text-right leading-tight">Un.</td>
                   <td className="px-1.5 py-2 text-right leading-tight">Nº apl.</td>

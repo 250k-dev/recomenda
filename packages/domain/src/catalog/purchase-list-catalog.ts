@@ -12,6 +12,7 @@ export type PurchaseListCatalogProduct = {
   isGlobalOnly: boolean;
   /** Cultura vinculada (variedades/híbridos). */
   crop?: PurchaseListCrop | null;
+  equivalence_group?: string | null;
 };
 
 export function buildPurchaseListCatalog(
@@ -34,6 +35,7 @@ export function buildPurchaseListCatalog(
       globalId: entry.global_product_id,
       isGlobalOnly: false,
       crop: parseVarietyCrop(entry.equivalence_group),
+      equivalence_group: entry.equivalence_group ?? null,
     });
   }
 
@@ -50,6 +52,7 @@ export function buildPurchaseListCatalog(
       globalId: globalProduct.id,
       isGlobalOnly: true,
       crop,
+      equivalence_group: globalProduct.equivalence_group ?? null,
     });
   }
 

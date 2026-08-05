@@ -443,7 +443,9 @@ export default function DashboardPage() {
                       title={ev.applicationTitle}
                     />
                     <Link
-                      href={routes.safras.cronograma(ev.seasonId)}
+                      href={routes.safras.cronograma(ev.seasonId, {
+                        recommendation_id: ev.recommendationId || null,
+                      })}
                       aria-label={`Abrir ${ev.applicationTitle}`}
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
                     >

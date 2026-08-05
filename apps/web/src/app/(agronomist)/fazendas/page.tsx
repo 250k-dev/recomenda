@@ -5,11 +5,9 @@ import { routes } from "@recomenda/config";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { PageHeader } from "@/components/domain/page-header";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
+import { FarmLocationFields } from "@/components/domain/farm-location-fields";
 import { DataTable } from "@recomenda/ui/patterns/data-table";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
@@ -19,14 +17,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@rec
 import { Alert, AlertDescription, AlertTitle } from "@recomenda/ui/primitives/alert";
 import { useCreateFarm, useFarms } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
+import { optionalFarmLocation } from "@recomenda/utils";
 import { Building2, Info, Plus } from "lucide-react";
-
-const createSchema = z.object({
-  name: z.string().min(1, "Nome obrigatório"),
-  location: z.string().optional(),
-});
-
-type CreateFormValues = z.infer<typeof createSchema>;
 
 export default function FarmsPage() {
   const router = useRouter();
@@ -36,21 +28,39 @@ export default function FarmsPage() {
   const [open, setOpen] = useState(false);
   const [filterName, setFilterName] = useState("");
   const [filterLocation, setFilterLocation] = useState("");
+  const [name, setName] = useState("");
+  const [stateUf, setStateUf] = useState("");
+  const [city, setCity] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
 
-  const form = useForm<CreateFormValues>({
-    resolver: zodResolver(createSchema),
-    defaultValues: { name: "", location: "" },
-  });
+  const resetCreateForm = () => {
+    setName("");
+    setStateUf("");
+    setCity("");
+    setNameError(null);
+  };
 
-  const onSubmit = form.handleSubmit((values) => {
-    createMutation.mutate(values, {
-      onSuccess: (farm) => {
-        setOpen(false);
-        form.reset();
-        router.push(routes.fazendas.detalhe(farm.id));
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setNameError("Nome obrigatório");
+      return;
+    }
+    setNameError(null);
+    createMutation.mutate(
+      {
+        name: name.trim(),
+        location: optionalFarmLocation(city, stateUf),
       },
-    });
-  });
+      {
+        onSuccess: (farm) => {
+          setOpen(false);
+          resetCreateForm();
+          router.push(routes.fazendas.detalhe(farm.id));
+        },
+      },
+    );
+  };
 
   const filteredFarms = useMemo(() => {
     return data?.data?.filter((farm) => {
@@ -103,14 +113,20 @@ export default function FarmsPage() {
 
       {canCreateFarm ? (
       <div className="mb-6 flex justify-end">
-        <Sheet open={open} onOpenChange={setOpen}>
+        <Sheet
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) resetCreateForm();
+          }}
+        >
           <SheetTrigger asChild>
             <Button>
               <Plus className="h-4 w-4" />
               Nova fazenda
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-full sm:w-96">
+          <SheetContent side="right" className="w-full sm:max-w-md">
             <SheetHeader>
               <SheetTitle>Nova fazenda</SheetTitle>
             </SheetHeader>
@@ -119,22 +135,22 @@ export default function FarmsPage() {
                 <Label htmlFor="farm-name">Nome da fazenda</Label>
                 <Input
                   id="farm-name"
-                  {...form.register("name")}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Ex.: Fazenda Santa Rosa"
                   autoFocus
                 />
-                {form.formState.errors.name && (
-                  <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
-                )}
+                {nameError ? (
+                  <p className="text-xs text-destructive">{nameError}</p>
+                ) : null}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="farm-location">Localização</Label>
-                <Input
-                  id="farm-location"
-                  {...form.register("location")}
-                  placeholder="Ex.: Chapadão do Sul, MS"
-                />
-              </div>
+              <FarmLocationFields
+                idPrefix="list-farm"
+                stateUf={stateUf}
+                city={city}
+                onStateChange={setStateUf}
+                onCityChange={setCity}
+              />
               <div className="flex gap-2 pt-2">
                 <Button type="submit" disabled={createMutation.isPending} className="flex-1">
                   {createMutation.isPending ? "Criando…" : "Criar"}

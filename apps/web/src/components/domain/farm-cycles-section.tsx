@@ -28,6 +28,7 @@ import {
   useFarmCycles,
   useMe,
   useProducer,
+  useProducerFarms,
 } from "@recomenda/api-hooks";
 import type { CycleSummary } from "@recomenda/api/cycles";
 import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
@@ -44,7 +45,7 @@ const CROP_CHOICES = [
 
 const CYCLE_STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Ativa",
-  HARVESTED: "Colhida",
+  HARVESTED: "Encerrada",
   ARCHIVED: "Removida",
 };
 
@@ -82,7 +83,20 @@ export function NewCycleDialog({
     `Safra ${currentYear}/${String(currentYear + 1).slice(-2)}`,
   );
   const [crops, setCrops] = useState<Set<string>>(new Set(["SOYBEAN"]));
+  const [selectedFarms, setSelectedFarms] = useState<Set<string>>(
+    new Set([farmId]),
+  );
   const createCycle = useCreateCycle(farmId);
+  const { data: producerFarms } = useProducerFarms(producerId);
+  const farms = producerFarms ?? [];
+
+  // Onboarding / reabertura: realinha a seleção quando o dialog abre (ou muda a fazenda).
+  const openSeed = open ? farmId : null;
+  const [prevOpenSeed, setPrevOpenSeed] = useState<string | null>(null);
+  if (openSeed !== prevOpenSeed) {
+    setPrevOpenSeed(openSeed);
+    if (openSeed) setSelectedFarms(new Set([farmId]));
+  }
 
   const toggleCrop = (value: string) => {
     setCrops((prev) => {
@@ -93,6 +107,27 @@ export function NewCycleDialog({
     });
   };
 
+  const toggleFarm = (id: string) => {
+    setSelectedFarms((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        // Sempre precisa sobrar ao menos uma fazenda selecionada.
+        if (next.size > 1) next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectedFarmsArea = farms
+    .filter((f) => selectedFarms.has(f.id))
+    .reduce(
+      (sum, f) =>
+        sum + f.plots.reduce((s, p) => s + Number(p.area_hectares || 0), 0),
+      0,
+    );
+
   const submit = () => {
     if (!name.trim()) {
       toast.error("Dê um nome à safra.");
@@ -102,8 +137,17 @@ export function NewCycleDialog({
       toast.error("Selecione pelo menos uma cultura.");
       return;
     }
+    if (selectedFarms.size === 0) {
+      toast.error("Selecione pelo menos uma fazenda.");
+      return;
+    }
     createCycle.mutate(
-      { producer_id: producerId, name: name.trim(), crops: [...crops] },
+      {
+        producer_id: producerId,
+        name: name.trim(),
+        crops: [...crops],
+        farm_ids: [...selectedFarms],
+      },
       {
         onSuccess: (cycle) => {
           toast.success(
@@ -119,7 +163,7 @@ export function NewCycleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Nova safra</DialogTitle>
         </DialogHeader>
@@ -174,6 +218,60 @@ export function NewCycleDialog({
               })}
             </div>
           </div>
+          {farms.length > 1 ? (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-foreground">
+                Fazendas da safra
+              </label>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Uma safra pode reunir talhões de mais de uma fazenda do mesmo
+                produtor.
+              </p>
+              <div className="flex max-h-48 flex-col gap-2 overflow-y-auto">
+                {farms.map((farm) => {
+                  const checked = selectedFarms.has(farm.id);
+                  const farmArea = farm.plots.reduce(
+                    (s, p) => s + Number(p.area_hectares || 0),
+                    0,
+                  );
+                  return (
+                    <label
+                      key={farm.id}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-hover/40"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-md transition-colors",
+                          checked
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border bg-surface text-transparent",
+                        )}
+                      >
+                        {checked ? <Check className="h-3.5 w-3.5" /> : null}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleFarm(farm.id)}
+                        className="sr-only"
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {farm.name}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {fmtHa(farmArea)} ha
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {selectedFarms.size}{" "}
+                {selectedFarms.size === 1 ? "fazenda" : "fazendas"} ·{" "}
+                {fmtHa(selectedFarmsArea)} ha
+              </p>
+            </div>
+          ) : null}
           <div className="flex gap-2 pt-1">
             <Button
               className="flex-1"
@@ -196,9 +294,12 @@ export function NewCycleDialog({
 export function FarmCyclesSection({
   farmId,
   producerId,
+  /** Botão "Nova safra" no toolbar — desligado na ficha da fazenda (criação fica no produtor). */
+  showCreateCycle = true,
 }: {
   farmId: string;
   producerId: string | null;
+  showCreateCycle?: boolean;
 }) {
   const router = useRouter();
   const { data: cycles, isLoading } = useFarmCycles(farmId);
@@ -316,26 +417,24 @@ export function FarmCyclesSection({
               : undefined
           }
           actions={
-            <>
-              {producerId ? (
-                <Button
-                  className="hidden gap-1.5 sm:inline-flex"
-                  onClick={() => setNewCycleOpen(true)}
-                >
-                  <Plus className="w-4 h-4" />
-                  Nova safra
-                </Button>
-              ) : null}
-            </>
+            showCreateCycle && producerId ? (
+              <Button
+                className="hidden h-10 gap-1.5 sm:inline-flex"
+                onClick={() => setNewCycleOpen(true)}
+              >
+                <Plus className="w-4 h-4" />
+                Nova safra
+              </Button>
+            ) : null
           }
         />
 
         {visibleCycles.length === 0 ? (
           <EmptyState
             title="Nenhuma safra nesta fazenda."
-            description="Crie a safra (nome + culturas), monte a lista de compra e depois a programação dos talhões."
+            description="Crie a safra pelo produtor (aba Safras) ou inclua esta fazenda em uma safra existente."
             action={
-              producerId ? (
+              showCreateCycle && producerId ? (
                 <Button size="sm" onClick={() => setNewCycleOpen(true)}>
                   Criar primeira safra
                 </Button>
@@ -389,6 +488,11 @@ export function FarmCyclesSection({
                                 cycle.status}
                             </Badge>
                           )}
+                          {cycle.awaiting_purchase ? (
+                            <Badge variant="warning" className="shrink-0">
+                              Aguardando compra
+                            </Badge>
+                          ) : null}
                         </span>
                         <span className="mt-0.5 block truncate text-sm text-muted-foreground">
                           {[
@@ -400,6 +504,9 @@ export function FarmCyclesSection({
                               : `${cycle.plots_count} ${cycle.plots_count === 1 ? "talhão" : "talhões"}`,
                             cycle.area_ha > 0
                               ? `${fmtHa(cycle.area_ha)} ha`
+                              : null,
+                            cycle.recommendations_total > 0
+                              ? `${cycle.recommendations_done}/${cycle.recommendations_total} aplicadas`
                               : null,
                           ]
                             .filter(Boolean)

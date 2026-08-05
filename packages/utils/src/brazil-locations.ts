@@ -37,6 +37,34 @@ export function formatFarmLocation(city: string, uf: string): string {
   return `${city}, ${uf}`;
 }
 
+/** Separa `"Cidade, UF"` (formato do onboarding) em partes editáveis. */
+export function parseFarmLocation(location: string | null | undefined): {
+  city: string;
+  uf: string;
+} {
+  const raw = (location ?? "").trim();
+  if (!raw) return { city: "", uf: "" };
+  const match = raw.match(/^(.*),\s*([A-Za-z]{2})$/);
+  if (match) {
+    const uf = match[2].toUpperCase();
+    if (BRAZIL_STATES.some((state) => state.uf === uf)) {
+      return { city: match[1].trim(), uf };
+    }
+  }
+  // Texto livre legado: mantém como cidade para o usuário reescolher o estado.
+  return { city: raw, uf: "" };
+}
+
+/** Monta `location` opcional no formato canônico, ou `undefined` se incompleto. */
+export function optionalFarmLocation(
+  city: string,
+  uf: string,
+): string | undefined {
+  const trimmedCity = city.trim();
+  if (!trimmedCity || !uf) return undefined;
+  return formatFarmLocation(trimmedCity, uf);
+}
+
 export async function fetchCitiesByState(uf: string): Promise<string[]> {
   const response = await fetch(
     `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${encodeURIComponent(uf)}/municipios?orderBy=nome`,

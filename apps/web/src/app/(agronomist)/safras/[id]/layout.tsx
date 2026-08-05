@@ -9,7 +9,9 @@ import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { usePublishSeason } from "@recomenda/api-hooks";
+import { publishBlockedMessage } from "@recomenda/api/api-error";
 import { useSeasonPage } from "@/components/domain/season/use-season-page";
+import { usePublishSeasonGuard } from "@/components/domain/season/use-publish-season-guard";
 import { cn, STATUS_VARIANTS } from "@recomenda/utils";
 
 /**
@@ -25,6 +27,7 @@ export default function SeasonDetailLayout({
   const pathname = usePathname();
   const { seasonId, season, statusLabel, breadcrumbs, hrefs } = useSeasonPage();
   const publishMutation = usePublishSeason(seasonId || "");
+  const publishGuard = usePublishSeasonGuard(season?.cycle_id);
 
   const activeTab = pathname.endsWith("/plano-de-custo")
     ? "plano-de-custo"
@@ -33,12 +36,17 @@ export default function SeasonDetailLayout({
       : "cronograma";
 
   const handlePublish = () => {
+    if (!publishGuard.canPublish) {
+      toast.error(
+        publishGuard.reason ??
+          "Finalize 100% das compras da lista antes de publicar a safra.",
+      );
+      return;
+    }
     publishMutation.mutate([], {
       onSuccess: () => toast.success("Safra publicada com sucesso!"),
       onError: (error: unknown) => {
-        const msg =
-          error instanceof Error ? error.message : "Falha ao publicar safra";
-        toast.error(`Erro: ${msg || "Falha ao publicar safra"}`);
+        toast.error(publishBlockedMessage(error, "Falha ao publicar safra"));
       },
     });
   };
@@ -91,7 +99,12 @@ export default function SeasonDetailLayout({
               size="sm"
               className="gap-2"
               onClick={handlePublish}
-              disabled={publishMutation.isPending}
+              disabled={
+                publishMutation.isPending ||
+                publishGuard.isLoading ||
+                !publishGuard.canPublish
+              }
+              title={publishGuard.reason ?? undefined}
             >
               <Send className="w-4 h-4" />
               {publishMutation.isPending ? "Publicando..." : "Publicar safra"}

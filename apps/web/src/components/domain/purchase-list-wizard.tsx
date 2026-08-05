@@ -147,6 +147,7 @@ function templateItemToListItem(it: PurchaseListDetail["items"][number]): ListIt
     category: it.category ?? "OTHER",
     productId: it.local_product_id,
     productName: it.product_name,
+    equivalenceGroup: it.equivalence_group ?? null,
     stage: it.stage,
     dose: String(it.dose_per_hectare),
     unit: it.dose_unit,
@@ -463,9 +464,16 @@ function StepList({
   savingDraft: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [importedTemplateId, setImportedTemplateId] = useState<string | null>(
+    null,
+  );
+  const [importedTemplateName, setImportedTemplateName] = useState<
+    string | null
+  >(null);
   const { data: templates } = usePurchaseListTemplates();
 
   const importTemplate = (tpl: PurchaseListDetail) => {
+    const replacing = items.length > 0 && importedTemplateId !== tpl.id;
     setCrop(tpl.crop ?? "ANY");
     setItems(
       applyStockPrefill(
@@ -474,6 +482,11 @@ function StepList({
         { onlyIfEmpty: true },
       ),
     );
+    setImportedTemplateId(tpl.id);
+    setImportedTemplateName(tpl.name);
+    if (replacing) {
+      toast.success(`Template trocado para “${tpl.name}”. Ajuste o que precisar.`);
+    }
   };
 
   const next = () => {
@@ -574,42 +587,56 @@ function StepList({
         </div>
       </section>
 
-      {items.length === 0 ? (
-        <section className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">Começar de um template</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {templates && templates.length > 0
-                  ? "Importe um modelo pronto e ajuste o que precisar. Você ainda escolhe os talhões no próximo passo."
+      <section className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {importedTemplateId ? "Template da lista" : "Começar de um template"}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {importedTemplateId && importedTemplateName
+                ? `Usando “${importedTemplateName}”. Selecione outro abaixo para trocar (substitui os produtos atuais).`
+                : templates && templates.length > 0
+                  ? "Importe um modelo pronto e ajuste o que precisar. Quantidades usam os hectares das fazendas da safra."
                   : "Você ainda não tem templates. Crie um para reaproveitar listas em outras safras."}
-              </p>
-            </div>
-            <Button asChild type="button" variant="outline" size="sm" className="gap-1.5">
-              <Link href={routes.templatesDeCompra} target="_blank" rel="noopener noreferrer">
-                <Settings2 className="h-4 w-4" />
-                Criar/gerenciar templates
-              </Link>
-            </Button>
+            </p>
           </div>
-          {templates && templates.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {templates.map((tpl) => (
+          <Button asChild type="button" variant="outline" size="sm" className="gap-1.5">
+            <Link href={routes.templatesDeCompra} target="_blank" rel="noopener noreferrer">
+              <Settings2 className="h-4 w-4" />
+              Criar/gerenciar templates
+            </Link>
+          </Button>
+        </div>
+        {templates && templates.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {templates.map((tpl) => {
+              const selected = importedTemplateId === tpl.id;
+              return (
                 <Button
                   key={tpl.id}
                   type="button"
-                  variant="outline"
+                  variant={selected ? "default" : "outline"}
                   size="sm"
                   onClick={() => importTemplate(tpl)}
                 >
+                  {selected ? <Check className="mr-1 h-3.5 w-3.5" /> : null}
                   {tpl.name}
-                  <span className="ml-1 text-muted-foreground">· {tpl.items.length}</span>
+                  <span
+                    className={
+                      selected
+                        ? "ml-1 text-primary-foreground/80"
+                        : "ml-1 text-muted-foreground"
+                    }
+                  >
+                    · {tpl.items.length}
+                  </span>
                 </Button>
-              ))}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
 
       {/* Metas definidas no passo anterior — o agrônomo acompanha o Real × Meta
           enquanto monta a lista, e pode voltar para editá-las. */}

@@ -38,13 +38,30 @@ import {
   PRODUCT_CATEGORY_LABELS,
 } from "@recomenda/utils";
 import type { PlatformCatalogEntry } from "@recomenda/api";
+import {
+  FORMULATION_MIX_OPTIONS,
+  formulationEquivalenceGroup,
+  formulationShortLabel,
+  resolveFormulationKey,
+  type FormulationKey,
+} from "@recomenda/domain/recommendations/formulation-mix-order";
 
 const CATALOG_PAGE_SIZE = 15;
+
+const FORMULATION_SELECT_OPTIONS = FORMULATION_MIX_OPTIONS.map((o) => ({
+  value: o.key,
+  label: o.label,
+}));
+
+function formulationCellLabel(equivalenceGroup: string | null | undefined): string {
+  return formulationShortLabel(resolveFormulationKey(equivalenceGroup));
+}
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
   category: z.string().optional(),
   label_url: z.string().optional(),
+  formulation_key: z.string().optional(),
 });
 
 const editSchema = z.object({
@@ -54,6 +71,7 @@ const editSchema = z.object({
   price_brl: z.string().optional(),
   price_usd: z.string().optional(),
   label_url: z.string().optional(),
+  formulation_key: z.string().optional(),
 });
 
 type CreateFormValues = z.infer<typeof createSchema>;
@@ -95,17 +113,31 @@ export default function CatalogPage() {
 
   const createForm = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
-    defaultValues: { name: "", category: "", label_url: "" },
+    defaultValues: {
+      name: "",
+      category: "",
+      label_url: "",
+      formulation_key: "",
+    },
   });
 
   const editForm = useForm<EditFormValues>({
     resolver: zodResolver(editSchema),
-    defaultValues: { name: "", category: "" },
+    defaultValues: { name: "", category: "", formulation_key: "" },
   });
 
   const onCreateSubmit = createForm.handleSubmit((values) => {
+    const key = (values.formulation_key || "") as FormulationKey | "";
     createProduct.mutate(
-      { ...values, dose_unit: "DOSE" },
+      {
+        name: values.name,
+        category: values.category,
+        label_url: values.label_url,
+        dose_unit: "DOSE",
+        equivalence_group: key
+          ? formulationEquivalenceGroup(key)
+          : null,
+      },
       {
         onSuccess: () => {
           setOpenCreate(false);
@@ -119,8 +151,20 @@ export default function CatalogPage() {
 
   const onEditSubmit = editForm.handleSubmit((values) => {
     if (editingId) {
+      const key = (values.formulation_key || "") as FormulationKey | "";
       updateProduct.mutate(
-        { id: editingId, ...values },
+        {
+          id: editingId,
+          name: values.name,
+          category: values.category,
+          dose_unit: values.dose_unit,
+          price_brl: values.price_brl,
+          price_usd: values.price_usd,
+          label_url: values.label_url,
+          equivalence_group: key
+            ? formulationEquivalenceGroup(key)
+            : null,
+        },
         {
           onSuccess: () => {
             setEditingId(null);
@@ -132,6 +176,26 @@ export default function CatalogPage() {
       );
     }
   });
+
+  const handleFormulationChange = (
+    localProductId: string,
+    key: string,
+  ) => {
+    const formulationKey = (key || "OTHER") as FormulationKey;
+    updateProduct.mutate(
+      {
+        id: localProductId,
+        equivalence_group: formulationEquivalenceGroup(
+          formulationKey === "OTHER" ? null : formulationKey,
+        ),
+      },
+      {
+        onSuccess: () => toast.success("Tipo de formulação atualizado."),
+        onError: () =>
+          toast.error("Não foi possível atualizar a formulação."),
+      },
+    );
+  };
 
   const platformRows = (platformRes?.data ?? []) as PlatformCatalogEntry[];
   const inactiveProducts = (inactiveData?.data ?? []) as Array<{
@@ -257,6 +321,11 @@ export default function CatalogPage() {
         : "",
     );
     editForm.setValue("label_url", row.label_url ?? "");
+    const formKey = resolveFormulationKey(row.equivalence_group);
+    editForm.setValue(
+      "formulation_key",
+      formKey === "OTHER" ? "" : formKey,
+    );
   };
 
   const renderActions = (row: PlatformCatalogEntry) => (
@@ -320,6 +389,13 @@ export default function CatalogPage() {
     PRODUCT_CATEGORY_LABELS[
       p.category as keyof typeof PRODUCT_CATEGORY_LABELS
     ] ?? p.category,
+    <span
+      key={`gf-${p.global_product_id ?? p.name}`}
+      className="font-semibold tracking-wide text-muted-foreground"
+      title={p.equivalence_group ?? undefined}
+    >
+      {formulationCellLabel(p.equivalence_group)}
+    </span>,
     DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ??
       p.dose_unit,
     p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "—",
@@ -341,6 +417,31 @@ export default function CatalogPage() {
       ) : (
         "—"
       );
+    const formKey = resolveFormulationKey(p.equivalence_group);
+    const canEditFormulation =
+      p.can_edit && Boolean(p.local_product_id) && p.entry_type === "OWN_CUSTOM";
+    const formulationCell = canEditFormulation ? (
+      <Select
+        key={`cf-${p.local_product_id}`}
+        value={formKey === "OTHER" ? "" : formKey}
+        onValueChange={(v) =>
+          handleFormulationChange(p.local_product_id!, v)
+        }
+        placeholder="—"
+        filterLabel="Formulação"
+        options={FORMULATION_SELECT_OPTIONS}
+        className="min-w-[7rem] max-w-[11rem]"
+        disabled={updateProduct.isPending}
+      />
+    ) : (
+      <span
+        key={`cf-${p.local_product_id ?? p.peer_local_product_id ?? p.name}`}
+        className="font-semibold tracking-wide text-muted-foreground"
+        title={p.equivalence_group ?? undefined}
+      >
+        {formulationCellLabel(p.equivalence_group)}
+      </span>
+    );
     return [
       <TruncatedNameCell
         key={`c-${p.local_product_id ?? p.peer_local_product_id ?? p.name}`}
@@ -349,6 +450,7 @@ export default function CatalogPage() {
       PRODUCT_CATEGORY_LABELS[
         p.category as keyof typeof PRODUCT_CATEGORY_LABELS
       ] ?? p.category,
+      formulationCell,
       DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ??
         p.dose_unit,
       p.price_brl ? `R$ ${parseFloat(String(p.price_brl)).toFixed(2)}` : "—",
@@ -435,6 +537,19 @@ export default function CatalogPage() {
                       value: c,
                       label: PRODUCT_CATEGORY_LABELS[c],
                     }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="catalog-formulation">Tipo de formulação</Label>
+                  <Select
+                    id="catalog-formulation"
+                    value={createForm.watch("formulation_key") ?? ""}
+                    onValueChange={(v) =>
+                      createForm.setValue("formulation_key", v)
+                    }
+                    placeholder="Selecionar…"
+                    filterLabel="Formulação"
+                    options={FORMULATION_SELECT_OPTIONS}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -547,7 +662,7 @@ export default function CatalogPage() {
       {activeTab === "global" && (
         <>
           {platformLoading ? (
-            <TableRowsSkeleton rows={10} columns={5} />
+            <TableRowsSkeleton rows={10} columns={6} />
           ) : globalEntries.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Nenhum produto no catálogo da plataforma.
@@ -558,10 +673,18 @@ export default function CatalogPage() {
             </p>
           ) : (
             <DataTable
-              headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]}
+              headers={[
+                "Nome",
+                "Categoria",
+                "Formulação",
+                "Unidade",
+                "Preço",
+                "Ações",
+              ]}
               rows={globalTableRows}
               columnCellClassNames={[
                 "max-w-0 min-w-0",
+                "whitespace-nowrap",
                 "whitespace-nowrap",
                 "whitespace-nowrap",
                 "whitespace-nowrap",
@@ -583,7 +706,7 @@ export default function CatalogPage() {
       {activeTab === "customizados" && (
         <>
           {platformLoading ? (
-            <TableRowsSkeleton rows={10} columns={6} />
+            <TableRowsSkeleton rows={10} columns={7} />
           ) : customEntries.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Nenhum produto customizado ainda.
@@ -597,6 +720,7 @@ export default function CatalogPage() {
               headers={[
                 "Nome",
                 "Categoria",
+                "Formulação",
                 "Unidade",
                 "Preço",
                 "Criado por",
@@ -605,6 +729,7 @@ export default function CatalogPage() {
               rows={customTableRows}
               columnCellClassNames={[
                 "max-w-0 min-w-0",
+                "whitespace-nowrap",
                 "whitespace-nowrap",
                 "whitespace-nowrap",
                 "whitespace-nowrap",
@@ -696,6 +821,22 @@ export default function CatalogPage() {
                     value: c,
                     label: PRODUCT_CATEGORY_LABELS[c],
                   }))}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="catalog-edit-formulation">
+                  Tipo de formulação
+                </Label>
+                <Select
+                  id="catalog-edit-formulation"
+                  value={editForm.watch("formulation_key") ?? ""}
+                  onValueChange={(v) =>
+                    editForm.setValue("formulation_key", v)
+                  }
+                  placeholder="Selecionar…"
+                  filterLabel="Formulação"
+                  options={FORMULATION_SELECT_OPTIONS}
                 />
               </div>
 

@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import {
   Boxes,
   Download,
+  Eye,
+  History,
   Pencil,
   Plus,
   Save,
@@ -17,6 +19,8 @@ import { MoneyInput } from "@recomenda/ui/forms/money-input";
 import { SearchableSelect } from "@recomenda/ui/forms/select";
 import { PageHero } from "@/components/domain/page-hero";
 import { StockExportDialog } from "@/components/domain/stock-export-dialog";
+import { StockHistoryDialog } from "@/components/domain/stock-history-dialog";
+import { StockOriginsDialog } from "@/components/domain/stock-origins-dialog";
 import { useLocalCatalog } from "@recomenda/api-hooks";
 import { useProducerStock, useAdjustProducerStock } from "@recomenda/api-hooks/producers";
 import { apiErrorMessage } from "@recomenda/api/api-error";
@@ -50,6 +54,11 @@ export function ProducerStockSection({
 
   const [formOpen, setFormOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [originProduct, setOriginProduct] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [priceBrl, setPriceBrl] = useState("");
@@ -222,6 +231,16 @@ export function ProducerStockSection({
               variant="outline"
               size="sm"
               className="gap-1.5"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="h-4 w-4" />
+              Histórico
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
               onClick={() => setExportOpen(true)}
               disabled={enrichedRows.length === 0}
             >
@@ -284,7 +303,7 @@ export function ProducerStockSection({
                 />
               </div>
               <div className="space-y-1.5 sm:w-40">
-                <Label>Preço R$/un.</Label>
+                <Label>Preço médio R$/un.</Label>
                 <MoneyInput
                   placeholder="R$"
                   value={priceBrl}
@@ -332,8 +351,9 @@ export function ProducerStockSection({
                   <th className="px-3 py-2 text-left">Produto</th>
                   <th className="px-3 py-2 text-left">Categoria</th>
                   <th className="px-3 py-2 text-right">Quantidade</th>
-                  <th className="px-3 py-2 text-right">Preço</th>
+                  <th className="px-3 py-2 text-right">Preço médio</th>
                   <th className="px-3 py-2 text-right">Valor</th>
+                  <th className="px-3 py-2 text-center">Origem</th>
                   <th className="w-10 px-3 py-2" />
                 </tr>
               </thead>
@@ -355,6 +375,22 @@ export function ProducerStockSection({
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium text-foreground">
                       {item.value_brl != null ? fmtBrl(item.value_brl) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOriginProduct({
+                            id: item.local_product_id,
+                            name: item.product_name,
+                          })
+                        }
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Ver origem"
+                        title="Ver origem"
+                      >
+                        <Eye className="mx-auto h-4 w-4" />
+                      </button>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <button
@@ -378,6 +414,20 @@ export function ProducerStockSection({
         open={exportOpen}
         onOpenChange={setExportOpen}
         data={exportData}
+      />
+      <StockHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        producerId={producerId}
+      />
+      <StockOriginsDialog
+        open={originProduct != null}
+        onOpenChange={(v) => {
+          if (!v) setOriginProduct(null);
+        }}
+        producerId={producerId}
+        localProductId={originProduct?.id ?? ""}
+        productName={originProduct?.name ?? ""}
       />
     </>
   );

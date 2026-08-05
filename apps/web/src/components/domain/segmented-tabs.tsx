@@ -31,7 +31,8 @@ export function SegmentedTabs<T extends string>({
     <div
       role="tablist"
       className={cn(
-        "inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-surface-2 p-1",
+        // Mesma altura do Button size default (h-10).
+        "inline-flex h-10 w-fit max-w-full items-stretch gap-0.5 overflow-x-auto rounded-lg border border-border bg-surface-2 p-0.5",
         className,
       )}
     >
@@ -45,9 +46,8 @@ export function SegmentedTabs<T extends string>({
             aria-selected={isActive}
             onClick={() => onValueChange(item.value)}
             className={cn(
-              "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold transition-all duration-200 outline-none",
+              "group relative inline-flex h-full items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-semibold transition-all duration-200 outline-none",
               "focus-visible:ring-[3px] focus-visible:ring-ring/40",
-              "rounded-lg px-4 py-2 text-sm",
               isActive
                 ? item.activeClassName
                   ? `${item.activeClassName} shadow-sm`

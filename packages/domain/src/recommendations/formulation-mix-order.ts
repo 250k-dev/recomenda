@@ -188,6 +188,17 @@ export function formulationOptionLabel(key: FormulationKey): string {
   return OPTION_BY_KEY.get(key)?.label ?? key;
 }
 
+/**
+ * Valor a persistir em `equivalence_group` a partir da chave de formulação.
+ * Usa o label canônico para o resolver continuar reconhecendo o tipo.
+ */
+export function formulationEquivalenceGroup(
+  key: FormulationKey | null | undefined,
+): string | null {
+  if (!key || key === "OTHER") return null;
+  return formulationOptionLabel(key);
+}
+
 const TECHNICAL_SHORT_CODES = new Set<string>([
   "SG",
   "SP",

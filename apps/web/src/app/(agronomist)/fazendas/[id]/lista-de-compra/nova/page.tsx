@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useQueries } from "@tanstack/react-query";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { routes } from "@recomenda/config";
 import { PurchaseListWizard } from "@/components/domain/purchase-list-wizard";
 import { Button } from "@recomenda/ui/primitives/button";
+import { getFarmPlots } from "@recomenda/api/farms";
 import {
+  queryKeys,
+  useCycle,
   useCyclePurchaseList,
   useFarm,
   useFarmPlots,
@@ -25,7 +29,9 @@ export default function FarmPurchaseListNewPage() {
 
   const { data: farm } = useFarm(farmId);
   const { data: producer } = useProducer(producerId);
-  const { data: plotsData } = useFarmPlots(farmId);
+  const { data: cycle, isLoading: cycleLoading } = useCycle(cycleId ?? "");
+  // Fallback: fazenda da URL (lista sem safra / legado).
+  const { data: anchorPlots } = useFarmPlots(cycleId ? "" : farmId);
 
   // Uma safra tem apenas UMA lista de compra. Se já existe FINALIZADA, não deixa
   // criar outra — redireciona para a lista. Se for RASCUNHO, reabre o wizard
@@ -46,17 +52,65 @@ export default function FarmPurchaseListNewPage() {
     }
   }, [cycleId, hasActiveList, cycleHref, router]);
 
-  const plots = useMemo(
-    () =>
-      (plotsData ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        area: Number(p.area_hectares) || 0,
-        farmId,
-        farmName: farm?.name ?? "Fazenda",
-      })),
-    [plotsData, farmId, farm?.name],
-  );
+  // Safra multi-fazenda: talhões cadastrais de TODAS as fazendas do ciclo.
+  const cycleFarmIds = useMemo(() => {
+    if (!cycleId) return [] as string[];
+    const fromCycle = (cycle?.farms ?? []).map((f) => f.id);
+    if (fromCycle.length > 0) return fromCycle;
+    return farmId ? [farmId] : [];
+  }, [cycleId, cycle?.farms, farmId]);
+
+  const cyclePlotQueries = useQueries({
+    queries: cycleFarmIds.map((id) => ({
+      queryKey: queryKeys.farmPlots(id),
+      queryFn: () => getFarmPlots(id),
+      enabled: Boolean(cycleId && id),
+    })),
+  });
+
+  const plotsLoading =
+    Boolean(cycleId) &&
+    (cycleLoading || cyclePlotQueries.some((q) => q.isLoading || q.isFetching));
+
+  const cyclePlotsReady = cyclePlotQueries.map((q) => q.data ?? null);
+
+  const plots = useMemo(() => {
+    if (cycleId) {
+      const nameByFarm = new Map(
+        (cycle?.farms ?? []).map((f) => [f.id, f.name] as const),
+      );
+      if (farm?.name) nameByFarm.set(farmId, farm.name);
+      return cycleFarmIds.flatMap((fId, index) => {
+        const rows = cyclePlotsReady[index] ?? [];
+        return rows.map((p) => ({
+          id: p.id,
+          name: p.name,
+          area: Number(p.area_hectares) || 0,
+          farmId: fId,
+          farmName: nameByFarm.get(fId) ?? "Fazenda",
+        }));
+      });
+    }
+    return (anchorPlots ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      area: Number(p.area_hectares) || 0,
+      farmId,
+      farmName: farm?.name ?? "Fazenda",
+    }));
+  }, [
+    cycleId,
+    cycle?.farms,
+    cycleFarmIds,
+    cyclePlotsReady,
+    anchorPlots,
+    farmId,
+    farm,
+  ]);
+
+  const farmCount = cycle?.farms?.length ?? 0;
+  const farmLabel =
+    cycleId && farmCount > 1 ? `${farmCount} fazendas` : farm?.name;
 
   const producerHref = producerId
     ? routes.produtores.detalhe(producerId)
@@ -89,13 +143,28 @@ export default function FarmPurchaseListNewPage() {
     );
   }
 
+  if (plotsLoading) {
+    return (
+      <>
+        <BreadcrumbBack items={breadcrumbs} />
+        <div className="rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            Carregando talhões das fazendas da safra…
+          </p>
+        </div>
+      </>
+    );
+  }
+
   if (plots.length === 0) {
     return (
       <>
         <BreadcrumbBack items={breadcrumbs} />
         <div className="rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            Cadastre pelo menos um talhão nesta fazenda antes de montar a lista de compra.
+            {cycleId
+              ? "Cadastre pelo menos um talhão nas fazendas desta safra antes de montar a lista de compra."
+              : "Cadastre pelo menos um talhão nesta fazenda antes de montar a lista de compra."}
           </p>
           <Button asChild className="mt-4" variant="outline">
             <Link href={farmHref}>Voltar à fazenda</Link>
@@ -134,7 +203,7 @@ export default function FarmPurchaseListNewPage() {
         producerId={producerId}
         producerName={producer?.name ?? "Produtor"}
         plots={plots}
-        farmName={farm?.name}
+        farmName={farmLabel}
         cycleId={cycleId}
         draftList={isDraft ? existingList : null}
         successRedirectLabel={cycleId ? "Ir para a safra" : "Ir para o produtor"}

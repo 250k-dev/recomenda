@@ -359,16 +359,29 @@ function payloadSeasonId(
   return typeof v === "string" && v.length > 0 ? v : null;
 }
 
+function payloadRecommendationId(
+  payload: Record<string, unknown> | undefined,
+): string | null {
+  if (!payload) return null;
+  const v = payload.recommendation_id ?? payload.recommendationId;
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
 function getNotificationPath(notification: Notification): Route | null {
   const { type, payload } = notification;
   const seasonId = payloadSeasonId(payload);
+  const recommendationId = payloadRecommendationId(payload);
   switch (type) {
     case "SEASON_PUBLISHED":
     case "HARVEST_REGISTERED":
     case "RECOMMENDATION_DUE":
     case "RECOMMENDATION_LATE":
     case "PRODUCT_SUBSTITUTED":
-      return seasonId ? routes.safras.cronograma(seasonId) : null;
+      return seasonId
+        ? routes.safras.cronograma(seasonId, {
+            recommendation_id: recommendationId,
+          })
+        : null;
     case "TEAM_ACTIVITY": {
       const farmId = payload?.farm_id;
       return typeof farmId === "string" && farmId

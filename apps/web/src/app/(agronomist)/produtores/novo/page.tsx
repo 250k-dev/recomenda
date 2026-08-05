@@ -3,8 +3,8 @@
 import { routes } from "@recomenda/config";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   User,
@@ -19,14 +19,8 @@ import {
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
-import { SearchableSelect } from "@recomenda/ui/forms/select";
-import {
-  BRAZIL_STATES,
-  cn,
-  fetchCitiesByState,
-  formatFarmLocation,
-  maskPhoneBR,
-} from "@recomenda/utils";
+import { FarmLocationFields } from "@/components/domain/farm-location-fields";
+import { cn, maskPhoneBR, optionalFarmLocation } from "@recomenda/utils";
 import { createFarm } from "@recomenda/api";
 import {
   queryKeys,
@@ -450,43 +444,13 @@ function StepFarm({
   const [city, setCity] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const citiesQuery = useQuery({
-    queryKey: ["ibge-cities", stateUf],
-    queryFn: () => fetchCitiesByState(stateUf),
-    enabled: Boolean(stateUf),
-    staleTime: 1000 * 60 * 60 * 24,
-  });
-
-  const stateOptions = useMemo(
-    () =>
-      BRAZIL_STATES.map((state) => ({
-        value: state.uf,
-        label: `${state.name}`,
-        keywords: `${state.name} ${state.uf}`,
-      })),
-    [],
-  );
-
-  const cityOptions = useMemo(
-    () =>
-      (citiesQuery.data ?? []).map((cityName) => ({
-        value: cityName,
-        label: cityName,
-      })),
-    [citiesQuery.data],
-  );
-
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const location =
-        city.trim() && stateUf
-          ? formatFarmLocation(city.trim(), stateUf)
-          : undefined;
       return createFarm({
         name: name.trim(),
-        location,
+        location: optionalFarmLocation(city, stateUf),
         producer_id: producer.id,
       });
     },
@@ -533,64 +497,13 @@ function StepFarm({
           />
         </Field>
 
-        <Field label="Localização (opcional)">
-          <div className="grid gap-[18px] sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="farm-state"
-                className="text-xs font-semibold text-muted-foreground"
-              >
-                Estado
-              </Label>
-              <SearchableSelect
-                id="farm-state"
-                value={stateUf}
-                onValueChange={(nextUf) => {
-                  setStateUf(nextUf);
-                  setCity("");
-                }}
-                options={stateOptions}
-                placeholder="Selecione…"
-                searchPlaceholder="Buscar estado…"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="farm-city"
-                className="text-xs font-semibold text-muted-foreground"
-              >
-                Cidade
-              </Label>
-              <SearchableSelect
-                id="farm-city"
-                value={city}
-                onValueChange={setCity}
-                options={cityOptions}
-                placeholder={
-                  !stateUf
-                    ? "Selecione o estado"
-                    : citiesQuery.isError
-                      ? "Erro ao carregar"
-                      : "Selecione…"
-                }
-                searchPlaceholder="Buscar cidade…"
-                disabled={
-                  !stateUf || citiesQuery.isLoading || citiesQuery.isError
-                }
-                loading={Boolean(stateUf) && citiesQuery.isLoading}
-                loadingMessage="Carregando cidades…"
-                emptyMessage="Nenhuma cidade encontrada."
-              />
-            </div>
-          </div>
-        </Field>
-
-        {citiesQuery.isError ? (
-          <p className="text-xs text-destructive">
-            Não foi possível carregar as cidades. Verifique a conexão e
-            selecione o estado novamente.
-          </p>
-        ) : null}
+        <FarmLocationFields
+          idPrefix="onboarding-farm"
+          stateUf={stateUf}
+          city={city}
+          onStateChange={setStateUf}
+          onCityChange={setCity}
+        />
 
         <FieldError message={error ?? undefined} />
       </div>

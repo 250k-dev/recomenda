@@ -1136,7 +1136,9 @@ function AgendaEventCard({
     <li>
       <div className="group flex items-center gap-3 rounded-xl border border-border/80 bg-card px-4 py-3.5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
         <Link
-          href={routes.safras.cronograma(event.seasonId)}
+          href={routes.safras.cronograma(event.seasonId, {
+            recommendation_id: event.recommendationId || null,
+          })}
           className="flex min-w-0 flex-1 items-center gap-3"
         >
           {body}

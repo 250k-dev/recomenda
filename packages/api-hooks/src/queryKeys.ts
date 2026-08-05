@@ -11,6 +11,8 @@ export const queryKeys = {
   farmSeasons: (farmId: string) => ["farm-seasons", farmId],
   farmAccess: (farmId: string) => ["farm-access", farmId],
   farmCycles: (farmId: string) => ["farm-cycles", farmId] as const,
+  producerCycles: (producerId: string) =>
+    ["producer-cycles", producerId] as const,
   cycle: (id: string) => ["cycle", id] as const,
   cycleAvailablePlots: (id: string) => ["cycle-available-plots", id] as const,
   cycleCostPlan: (id: string) => ["cycle-cost-plan", id] as const,
@@ -55,6 +57,11 @@ export const queryKeys = {
   seasonCostPlan: (seasonId: string) => ["season-cost-plan", seasonId] as const,
   purchaseListQuotes: (listId: string) => ["purchase-list-quotes", listId] as const,
   purchaseListQuoteTrash: (listId: string) => ["purchase-list-quote-trash", listId] as const,
+  purchaseListProgress: (listId: string) => ["purchase-list-progress", listId] as const,
+  stockOrigins: (producerId: string, localProductId: string) =>
+    ["stock-origins", producerId, localProductId] as const,
+  stockHistory: (producerId: string, q?: string) =>
+    ["stock-history", producerId, q ?? ""] as const,
   quoteByToken: (token: string) => ["quote-by-token", token] as const,
   quoteResponse: (responseToken: string) => ["quote-response", responseToken] as const,
   agronomistAgenda: (producerId?: string) =>

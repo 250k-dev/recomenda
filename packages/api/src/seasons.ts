@@ -12,6 +12,8 @@ export interface SeasonDetail extends Season {
   producer_id: string;
   agronomist_id: string;
   plot_id: string;
+  /** Safra da fazenda (fluxo novo); null em dados legados. */
+  cycle_id?: string | null;
   variety?: string;
   planting_date?: string;
   desiccation_date?: string;
@@ -197,6 +199,18 @@ export async function updateRecommendationItem(
   },
 ) {
   const { data } = await api.patch(`/recommendation_items/${id}`, payload);
+  return data;
+}
+
+/** Ordem manual dos produtos da etapa (override da ordem de mistura da safra). */
+export async function reorderRecommendationItems(
+  recommendationId: string,
+  itemIds: string[],
+) {
+  const { data } = await api.post(
+    `/recommendations/${recommendationId}/items/reorder`,
+    { item_ids: itemIds },
+  );
   return data;
 }
 

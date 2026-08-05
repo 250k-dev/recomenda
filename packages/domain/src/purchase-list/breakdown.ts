@@ -23,6 +23,7 @@ export function detailItemToListItem(
     category: it.category ?? "OTHER",
     productId: it.local_product_id,
     productName: it.product_name,
+    equivalenceGroup: it.equivalence_group ?? null,
     stage: it.stage,
     dose: String(it.dose_per_hectare),
     unit: it.dose_unit,

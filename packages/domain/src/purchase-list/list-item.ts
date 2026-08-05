@@ -16,6 +16,8 @@ export type ListItem = {
   category: string;
   productId: string;
   productName: string;
+  /** Tipo de formulação (`equivalence_group` do catálogo). */
+  equivalenceGroup?: string | null;
   stage: string;
   dose: string;
   unit: string;

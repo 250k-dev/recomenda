@@ -14,8 +14,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@recomenda/ui/primitives/sheet";
-import { useCreateQuoteRequest } from "@recomenda/api-hooks";
-import { apiErrorCode, apiErrorMessage } from "@recomenda/api/api-error";
+import {
+  useCreateQuoteRequest,
+  usePurchaseListQuotes,
+} from "@recomenda/api-hooks";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { QuotePaymentTerm } from "@recomenda/api/quotes";
 import { toast } from "sonner";
 import { cn } from "@recomenda/utils";
@@ -40,44 +43,35 @@ export function ShareQuoteSheet({
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [paymentTerm, setPaymentTerm] = useState<"" | QuotePaymentTerm>("");
-  const [needsPaymentTerm, setNeedsPaymentTerm] = useState(false);
   const [copied, setCopied] = useState(false);
   const createRequest = useCreateQuoteRequest(listId);
-  const { mutate } = createRequest;
 
-  // Ao abrir: tenta recuperar cotação existente; se for nova, exige condição.
+  // Leitura apenas — não cria cotação. Se já existir link, preenche o sheet.
+  const quotesQuery = usePurchaseListQuotes(listId, open);
+
   useEffect(() => {
-    if (!open || token) return;
-    mutate(undefined, {
-      onSuccess: (data) => {
-        setToken(data.token);
-        setNeedsPaymentTerm(false);
-        if (data.payment_term) setPaymentTerm(data.payment_term);
-      },
-      onError: (error) => {
-        if (apiErrorCode(error) === "PAYMENT_TERM_REQUIRED") {
-          setNeedsPaymentTerm(true);
-          return;
-        }
-        toast.error(apiErrorMessage(error, "Não foi possível gerar o link de cotação."));
-      },
-    });
-  }, [open, token, mutate]);
+    if (!open) return;
+    const existing = quotesQuery.data?.request;
+    if (!existing?.token) return;
+    setToken(existing.token);
+    if (existing.payment_term) setPaymentTerm(existing.payment_term);
+  }, [open, quotesQuery.data?.request]);
 
-  const generateWithTerm = () => {
+  const generateLink = () => {
     if (!paymentTerm) {
       toast.error("Selecione a condição de pagamento.");
       return;
     }
-    mutate(paymentTerm, {
+    createRequest.mutate(paymentTerm, {
       onSuccess: (data) => {
         setToken(data.token);
-        setNeedsPaymentTerm(false);
         if (data.payment_term) setPaymentTerm(data.payment_term);
         toast.success("Link de cotação gerado.");
       },
       onError: (error) => {
-        toast.error(apiErrorMessage(error, "Não foi possível gerar o link de cotação."));
+        toast.error(
+          apiErrorMessage(error, "Não foi possível gerar o link de cotação."),
+        );
       },
     });
   };
@@ -85,13 +79,15 @@ export function ShareQuoteSheet({
   const updatePaymentTerm = (next: QuotePaymentTerm) => {
     setPaymentTerm(next);
     if (!token) return;
-    mutate(next, {
+    createRequest.mutate(next, {
       onSuccess: (data) => {
         if (data.payment_term) setPaymentTerm(data.payment_term);
         toast.success("Condição de pagamento atualizada.");
       },
       onError: (error) => {
-        toast.error(apiErrorMessage(error, "Não foi possível atualizar o pagamento."));
+        toast.error(
+          apiErrorMessage(error, "Não foi possível atualizar o pagamento."),
+        );
       },
     });
   };
@@ -121,11 +117,12 @@ export function ShareQuoteSheet({
     setOpen(next);
     if (!next) {
       setToken(null);
-      setNeedsPaymentTerm(false);
       setPaymentTerm("");
       setCopied(false);
     }
   };
+
+  const loadingExisting = open && quotesQuery.isLoading && !token;
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -146,7 +143,7 @@ export function ShareQuoteSheet({
             Link de cotação
           </SheetTitle>
           <SheetDescription className="text-sm">
-            Defina a condição de pagamento e envie o link ao produtor. As lojas
+            Defina a condição de pagamento e confirme para gerar o link. As lojas
             informam preço e disponibilidade — o pagamento é único para a cotação.
           </SheetDescription>
         </SheetHeader>
@@ -167,6 +164,7 @@ export function ShareQuoteSheet({
               id="quote-payment-term"
               className="w-full"
               value={paymentTerm}
+              disabled={loadingExisting || createRequest.isPending}
               onChange={(e) => {
                 const value = e.target.value as "" | QuotePaymentTerm;
                 if (!value) {
@@ -189,17 +187,17 @@ export function ShareQuoteSheet({
             </p>
           </div>
 
-          {createRequest.isPending && !token && !needsPaymentTerm ? (
+          {loadingExisting ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Gerando link…
+              Carregando…
             </div>
-          ) : needsPaymentTerm && !token ? (
+          ) : !token ? (
             <Button
               type="button"
               size="lg"
               className="gap-2"
-              onClick={generateWithTerm}
+              onClick={generateLink}
               disabled={!paymentTerm || createRequest.isPending}
             >
               {createRequest.isPending ? (
@@ -209,7 +207,7 @@ export function ShareQuoteSheet({
               )}
               Gerar link de cotação
             </Button>
-          ) : token ? (
+          ) : (
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Link público</label>
@@ -253,10 +251,6 @@ export function ShareQuoteSheet({
                 recebidos em <strong>Cotações das lojas</strong>.
               </p>
             </>
-          ) : (
-            <p className="text-sm text-destructive">
-              Não foi possível gerar o link. Feche e abra novamente.
-            </p>
           )}
         </div>
       </SheetContent>

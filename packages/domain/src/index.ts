@@ -133,6 +133,7 @@ export {
   formulationMixScore,
   normalizeFormulationMixOrder,
   formulationOptionLabel,
+  formulationEquivalenceGroup,
   formulationShortLabel,
 } from "./recommendations/formulation-mix-order";
 

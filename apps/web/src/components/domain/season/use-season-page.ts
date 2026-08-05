@@ -17,11 +17,13 @@ export function useSeasonPage() {
   const searchParams = useSearchParams();
   const farmIdFromQuery = searchParams.get("farm_id");
   const producerIdFromQuery = searchParams.get("producer_id");
+  const recommendationIdFromQuery = searchParams.get("recommendation_id");
 
   const { data: season, isLoading: loadingSeason } = useSeason(seasonId || "");
 
   const farmId = farmIdFromQuery ?? "";
   const producerId = producerIdFromQuery ?? season?.producer_id ?? "";
+  const openRecommendationId = recommendationIdFromQuery || null;
 
   const { data: farm } = useFarm(farmId);
   const { data: producer } = useProducer(producerId);
@@ -63,6 +65,7 @@ export function useSeasonPage() {
     seasonId,
     farmId,
     producerId,
+    openRecommendationId,
     season,
     farm,
     producer,

@@ -74,8 +74,21 @@ export function useCreateLocalProduct() {
 export function useUpdateLocalProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; name?: string; category?: string; dose_unit?: string; price_brl?: string; price_usd?: string; label_url?: string; is_active?: boolean; global_product_id?: string | null }) =>
-      updateLocalProduct(id, payload),
+    mutationFn: ({
+      id,
+      ...payload
+    }: {
+      id: string;
+      name?: string;
+      category?: string;
+      dose_unit?: string;
+      price_brl?: string;
+      price_usd?: string;
+      label_url?: string;
+      is_active?: boolean;
+      global_product_id?: string | null;
+      equivalence_group?: string | null;
+    }) => updateLocalProduct(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });
       queryClient.invalidateQueries({ queryKey: queryKeys.platformCatalog });

@@ -16,6 +16,8 @@ export type RouteContext = {
   farm_id?: string | null;
   cycle_id?: string | null;
   season_id?: string | null;
+  /** Abre a etapa correspondente no cronograma da safra. */
+  recommendation_id?: string | null;
   onboarding?: string | null;
 };
 

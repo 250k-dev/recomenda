@@ -25,6 +25,7 @@ import {
   createRecommendationItem,
   updateRecommendationItem,
   deleteRecommendationItem,
+  reorderRecommendationItems,
 } from "@recomenda/api/seasons";
 import { queryKeys } from "./queryKeys";
 import { useWalletScopeKey } from "./use-active-scope";
@@ -269,6 +270,22 @@ export function useDeleteRecommendationItem(seasonId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteRecommendationItem,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useReorderRecommendationItems(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      recommendationId,
+      itemIds,
+    }: {
+      recommendationId: string;
+      itemIds: string[];
+    }) => reorderRecommendationItems(recommendationId, itemIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
     },

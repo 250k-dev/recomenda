@@ -13,6 +13,7 @@ import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { useCycle, useFarm, useProducer, usePublishCycle } from "@recomenda/api-hooks";
+import { publishBlockedMessage } from "@recomenda/api/api-error";
 import type { CycleSeasonRow } from "@recomenda/api/cycles";
 import { CROP_LABELS } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
@@ -130,13 +131,17 @@ export function CyclePageShell({
   }
 
   const isPlanning = page.seasons.length === 0;
+  const isMultiFarm = cycle.farms.length > 1;
 
   const heroStats: PageHeroStat[] = [
     {
       label: "Culturas",
       value: cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "),
     },
-    ...(farm?.name ? [{ label: "Fazenda", value: farm.name }] : []),
+    // Multi-fazenda: as fazendas já aparecem na seção abaixo — evita chips no hero.
+    ...(!isMultiFarm && farm?.name
+      ? [{ label: "Fazenda", value: farm.name }]
+      : []),
     ...stats,
   ];
 
@@ -150,19 +155,24 @@ export function CyclePageShell({
         eyebrow="Safra"
         title={cycle.name}
         titleBadge={
-          isPlanning ? (
-            <Badge variant="neutral">Em planejamento</Badge>
-          ) : (
-            <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"}>
-              {CYCLE_STATUS_LABELS[cycle.status] ?? cycle.status}
-            </Badge>
-          )
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            {isPlanning ? (
+              <Badge variant="neutral">Em planejamento</Badge>
+            ) : (
+              <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"}>
+                {CYCLE_STATUS_LABELS[cycle.status] ?? cycle.status}
+              </Badge>
+            )}
+            {cycle.awaiting_purchase ? (
+              <Badge variant="warning">Aguardando compra</Badge>
+            ) : null}
+          </span>
         }
         actions={
           <>
             {draftSeasons.length > 0 ? (
               <Button
-                className="gap-1.5"
+                className="gap-1.5 border-0 bg-primary-soft text-primary-strong shadow-sm hover:bg-primary-soft/85 hover:text-primary-strong"
                 onClick={() => setPublishConfirm(true)}
                 disabled={publishCycle.isPending}
               >
@@ -216,9 +226,7 @@ export function CyclePageShell({
                 resolve();
               },
               onError: (err) => {
-                toast.error(
-                  "Não foi possível publicar. Verifique a quota do plano.",
-                );
+                toast.error(publishBlockedMessage(err));
                 reject(err);
               },
             }),

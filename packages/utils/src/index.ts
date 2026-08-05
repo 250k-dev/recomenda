@@ -10,6 +10,8 @@ export {
   BRAZIL_STATES,
   fetchCitiesByState,
   formatFarmLocation,
+  optionalFarmLocation,
+  parseFarmLocation,
   type BrazilState,
 } from "./brazil-locations";
 

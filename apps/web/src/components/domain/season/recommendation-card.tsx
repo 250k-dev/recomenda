@@ -1,6 +1,12 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
@@ -14,11 +20,13 @@ import {
   useCreateRecommendationItem,
   useDeleteRecommendationItem,
   usePatchRecommendation,
+  useReorderRecommendationItems,
   useSeasonCostPlan,
   useSkipRecommendation,
   useUndoRecommendation,
   useUpdateRecommendationItem,
 } from "@recomenda/api-hooks";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import {
   productsForPurchaseListCategory,
   purchaseListProductLabel,
@@ -47,6 +55,7 @@ import {
   CircleAlert,
   Clock,
   FlaskConical,
+  GripVertical,
   Pencil,
   Plus,
   Save,
@@ -148,20 +157,36 @@ function ProductRow({
   onDelete,
   outOfProgram,
   canDelete = true,
+  canReorder = false,
   mixPosition,
+  isDragging,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
 }: {
   item: RecommendationItem;
   seasonId: string;
   onDelete: (id: string) => void;
   outOfProgram?: boolean;
   canDelete?: boolean;
+  canReorder?: boolean;
   /** Posição 1-based na ordem de mistura (tanque). */
   mixPosition?: number;
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragOver?: (e: DragEvent) => void;
+  onDragEnd?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [dose, setDose] = useState(String(item.dose_per_hectare));
   const [unit, setUnit] = useState<string>(item.dose_unit ?? "L");
   const updateMut = useUpdateRecommendationItem(seasonId);
+
+  const startEditing = () => {
+    setDose(String(item.dose_per_hectare));
+    setUnit(item.dose_unit ?? "L");
+    setEditing(true);
+  };
 
   const handleSave = () => {
     const parsed = parseFloat(dose.replace(",", "."));
@@ -181,15 +206,26 @@ function ProductRow({
   const formKey =
     item.formulation_key ?? resolveFormulationKey(item.equivalence_group);
   const formShort = formulationShortLabel(formKey);
-  const showFormBadge = formShort !== "—";
 
   return (
     <div
+      draggable={canReorder}
+      onDragStart={canReorder ? onDragStart : undefined}
+      onDragOver={canReorder ? onDragOver : undefined}
+      onDragEnd={canReorder ? onDragEnd : undefined}
       className={cn(
         "flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm",
         outOfProgram && "border-destructive/40 bg-destructive/5",
+        canReorder && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-60 ring-1 ring-primary/40",
       )}
     >
+      {canReorder ? (
+        <GripVertical
+          className="h-4 w-4 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
+      ) : null}
       {mixPosition != null ? (
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground"
@@ -200,14 +236,12 @@ function ProductRow({
       ) : (
         <FlaskConical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       )}
-      {showFormBadge ? (
-        <span
-          className="inline-flex h-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 px-1.5 text-[10px] font-bold tracking-wide text-muted-foreground"
-          title={`Formulação: ${formShort}`}
-        >
-          {formShort}
-        </span>
-      ) : null}
+      <span
+        className="inline-flex h-6 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 px-1 text-[10px] font-bold tracking-wide text-muted-foreground"
+        title={`Formulação: ${formShort}`}
+      >
+        {formShort}
+      </span>
       <span className="flex-1 min-w-0 font-medium text-foreground">
         {item.product_name}
         {item.is_substitution && (
@@ -276,7 +310,7 @@ function ProductRow({
             size="icon"
             variant="ghost"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            onClick={() => setEditing(true)}
+            onClick={startEditing}
           >
             <Pencil className="w-3 h-3" />
           </Button>
@@ -669,6 +703,7 @@ export function RecommendationCard({
   rec,
   index,
   seasonId,
+  defaultOpen = false,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -684,6 +719,8 @@ export function RecommendationCard({
   rec: Recommendation;
   index: number;
   seasonId: string;
+  /** Abre a etapa no mount (deep-link da home/cronograma). */
+  defaultOpen?: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
@@ -696,7 +733,7 @@ export function RecommendationCard({
   listDoseByProductId: Map<string, { dose: number; unit: string }>;
   listReady: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [addingProduct, setAddingProduct] = useState(false);
   const [addingSeed, setAddingSeed] = useState(false);
   const [stageDraft, setStageDraft] = useState<RecommendationStageDraft>(() =>
@@ -706,10 +743,50 @@ export function RecommendationCard({
   // Semente é um item da etapa com unidade Big Bag/Saca (separada dos produtos).
   const isSeedRow = (it: RecommendationItem) =>
     it.dose_unit === "BAG" || it.dose_unit === "SACA";
-  const productItems = sortRecommendationItemsByMixOrder(
-    rec.items.filter((it) => !isSeedRow(it)),
+  const serverProductItems = useMemo(
+    () =>
+      sortRecommendationItemsByMixOrder(
+        rec.items.filter((it) => !isSeedRow(it)),
+      ),
+    [rec.items],
   );
   const seedItems = rec.items.filter((it) => isSeedRow(it));
+  /** Inclui mix_order para resetar override local quando a safra muda a ordem global. */
+  const serverProductOrderKey = serverProductItems
+    .map((i) => `${i.id}:${i.mix_order ?? ""}`)
+    .join("|");
+
+  const [orderedProductIds, setOrderedProductIds] = useState<string[]>(() =>
+    serverProductItems.map((i) => i.id),
+  );
+  const [orderDirty, setOrderDirty] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setOrderedProductIds(serverProductItems.map((i) => i.id));
+    setOrderDirty(false);
+    setDragIndex(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server order/set changes
+  }, [serverProductOrderKey]);
+
+  const productById = useMemo(
+    () => new Map(serverProductItems.map((i) => [i.id, i] as const)),
+    [serverProductItems],
+  );
+  const productItems = orderedProductIds
+    .map((id) => productById.get(id))
+    .filter((it): it is RecommendationItem => Boolean(it));
+
+  const moveProduct = (from: number, to: number) => {
+    if (to < 0 || to >= orderedProductIds.length || from === to) return;
+    setOrderedProductIds((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    setOrderDirty(true);
+  };
 
   const [registering, setRegistering] = useState(false);
   const [executedDate, setExecutedDate] = useState(
@@ -724,12 +801,14 @@ export function RecommendationCard({
   const applyMut = useApplyRecommendation(seasonId);
   const skipMut = useSkipRecommendation(seasonId);
   const undoMut = useUndoRecommendation(seasonId);
+  const reorderItemsMut = useReorderRecommendationItems(seasonId);
   const isBusy =
     patchMut.isPending ||
     deleteMut.isPending ||
     applyMut.isPending ||
     skipMut.isPending ||
-    undoMut.isPending;
+    undoMut.isPending ||
+    reorderItemsMut.isPending;
 
   const isPending = rec.status === "PENDING";
   const isDone =
@@ -809,8 +888,9 @@ export function RecommendationCard({
 
   return (
     <li
+      id={`rec-${rec.id}`}
       className={cn(
-        "overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow",
+        "overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow scroll-mt-24",
         isPending && "border-primary/30 shadow-md ring-1 ring-primary/10",
         open && isPending && "ring-2 ring-primary/20",
       )}
@@ -980,19 +1060,76 @@ export function RecommendationCard({
           </div>
 
           <div className="p-4 border shadow-sm rounded-xl bg-card">
-            <div className="mb-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Produtos recomendados
-              </p>
-              {productItems.length > 0 ? (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Ordem de mistura da calda (#1 entra primeiro) — configure no
-                  topo da safra.
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Produtos recomendados
                 </p>
+                {productItems.length > 0 ? (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Ordem de mistura (#1 entra primeiro). Arraste para ajustar
+                    só nesta etapa.
+                  </p>
+                ) : null}
+              </div>
+              {orderDirty && canEditStructure ? (
+                <div className="flex shrink-0 gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={isBusy}
+                    onClick={() => {
+                      setOrderedProductIds(serverProductItems.map((i) => i.id));
+                      setOrderDirty(false);
+                      setDragIndex(null);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    disabled={isBusy}
+                    onClick={() => {
+                      reorderItemsMut.mutate(
+                        {
+                          recommendationId: rec.id,
+                          itemIds: orderedProductIds,
+                        },
+                        {
+                          onSuccess: () => {
+                            setOrderDirty(false);
+                            toast.success("Ordem da etapa salva.");
+                          },
+                          onError: (e: unknown) => {
+                            toast.error(
+                              apiErrorMessage(
+                                e,
+                                "Não foi possível salvar a ordem.",
+                              ),
+                            );
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Salvar
+                  </Button>
+                </div>
               ) : null}
             </div>
             {productItems.length > 0 ? (
               <div className="flex flex-col gap-1.5">
+                <div className="mb-0.5 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {canEditStructure ? <span className="w-4" /> : null}
+                  <span className="w-6 text-center">#</span>
+                  <span className="w-10 text-center">Form.</span>
+                  <span className="flex-1">Produto</span>
+                </div>
                 {productItems.map((item, index) => (
                   <ProductRow
                     key={item.id}
@@ -1000,7 +1137,17 @@ export function RecommendationCard({
                     seasonId={seasonId}
                     onDelete={handleDeleteItem}
                     canDelete={canEditStructure}
+                    canReorder={canEditStructure}
                     mixPosition={index + 1}
+                    isDragging={dragIndex === index}
+                    onDragStart={() => setDragIndex(index)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragIndex == null || dragIndex === index) return;
+                      moveProduct(dragIndex, index);
+                      setDragIndex(index);
+                    }}
+                    onDragEnd={() => setDragIndex(null)}
                     outOfProgram={
                       listReady && !listProductIds.has(item.local_product_id)
                     }

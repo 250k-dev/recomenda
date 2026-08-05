@@ -20,6 +20,7 @@ import {
   getInvitationByToken,
   acceptInvitation,
 } from "@recomenda/api/producers";
+import { getStockHistory, getStockOrigins } from "@recomenda/api/purchases";
 import { getSeasonShoppingList } from "@recomenda/api/seasons";
 import { queryKeys } from "./queryKeys";
 import { useWalletScopeKey } from "./use-active-scope";
@@ -122,6 +123,22 @@ export function useAdjustProducerStock(producerId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(producerId) });
     },
+  });
+}
+
+export function useStockOrigins(producerId: string, localProductId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.stockOrigins(producerId, localProductId),
+    queryFn: () => getStockOrigins(producerId, localProductId),
+    enabled: Boolean(producerId && localProductId) && enabled,
+  });
+}
+
+export function useStockHistory(producerId: string, q?: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.stockHistory(producerId, q),
+    queryFn: () => getStockHistory(producerId, q),
+    enabled: Boolean(producerId) && enabled,
   });
 }
 
