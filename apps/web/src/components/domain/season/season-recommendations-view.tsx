@@ -281,8 +281,12 @@ export function SeasonRecommendationsView({
 
   if (isLoading) return <TimelineCardsSkeleton count={5} />;
 
+  // Rascunho também: o agrônomo precisa deixar etapas/produtos na ordem certa
+  // antes de publicar — não só depois que o produtor já vê o cronograma.
   const canManageStages =
-    (seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS") &&
+    (seasonStatus === "DRAFT" ||
+      seasonStatus === "PUBLISHED" ||
+      seasonStatus === "IN_PROGRESS") &&
     canEditStructurePerm;
   // Plantio pode (e deve) ser registrado também em rascunho — não depende de publicar.
   const canManagePlanting =

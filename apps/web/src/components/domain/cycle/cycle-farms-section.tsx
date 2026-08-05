@@ -53,7 +53,7 @@ export function CycleFarmsSection({
       <SectionToolbar
         title="Fazendas desta safra"
         actions={
-          canManage ? (
+          canManage && cycle.can_add_farms !== false ? (
             <Button
               variant="outline"
               size="sm"
