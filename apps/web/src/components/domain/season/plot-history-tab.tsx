@@ -2,11 +2,11 @@
 
 import { CheckCircle2, AlertTriangle, Clock, SkipForward, Leaf } from "lucide-react";
 import { Badge } from "@recomenda/ui/primitives/badge";
-import { cn, CROP_LABELS } from "@recomenda/utils";
+import { cn, CROP_LABELS, STATUS_LABELS, labelStatus } from "@recomenda/utils";
 import { usePlotHistory } from "@recomenda/api-hooks";
 import type { PlotHistorySeason, PlotHistoryRec } from "@recomenda/api/seasons";
 
-const STATUS_LABEL: Record<string, string> = {
+const REC_STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
   APPLIED_ON_TIME: "Aplicado no prazo",
   APPLIED_LATE: "Aplicado com atraso",
@@ -35,14 +35,6 @@ const SEASON_STATUS_VARIANT: Record<string, "default" | "success" | "warning" | 
   ARCHIVED: "secondary",
 };
 
-const SEASON_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Rascunho",
-  PUBLISHED: "Publicada",
-  IN_PROGRESS: "Em execução",
-  HARVESTED: "Colhida",
-  ARCHIVED: "Arquivada",
-};
-
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
   const [y, m, day] = d.slice(0, 10).split("-");
@@ -61,7 +53,7 @@ function RecRow({ rec }: { rec: PlotHistoryRec }) {
           )}
         >
           {STATUS_ICON[rec.status]}
-          {STATUS_LABEL[rec.status] ?? rec.status}
+          {labelStatus(REC_STATUS_LABEL, rec.status)}
         </span>
       </div>
       <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
@@ -117,7 +109,7 @@ function SeasonCard({ season }: { season: PlotHistorySeason }) {
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Badge variant={SEASON_STATUS_VARIANT[season.status] ?? "default"}>
-            {SEASON_STATUS_LABEL[season.status] ?? season.status}
+            {labelStatus(STATUS_LABELS, season.status)}
           </Badge>
           {season.planting_date ? (
             <span className="text-xs text-muted-foreground">

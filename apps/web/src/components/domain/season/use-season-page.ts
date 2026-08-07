@@ -3,7 +3,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import type { BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { useCycle, useFarm, useProducer, useSeason } from "@recomenda/api-hooks";
-import { CROP_LABELS, STATUS_LABELS } from "@recomenda/utils";
+import { CROP_LABELS, STATUS_LABELS, labelStatus } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 
 /**
@@ -36,7 +36,7 @@ export function useSeasonPage() {
 
   const cropLabel = season ? (CROP_LABELS[season.crop] ?? season.crop) : "";
   const statusLabel = season
-    ? (STATUS_LABELS[season.status] ?? season.status)
+    ? labelStatus(STATUS_LABELS, season.status)
     : "";
   const title = season
     ? season.variety

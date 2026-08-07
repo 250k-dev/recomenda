@@ -27,7 +27,7 @@ type Mode = "choose" | "existing" | "create";
 
 /**
  * Fluxo do botão "Incluir em safra" no card da fazenda:
- * 1) incluir em safra ACTIVE já existente do produtor, ou
+ * 1) incluir em safra ativa já existente do produtor, ou
  * 2) criar uma safra nova (NewCycleDialog).
  * Incluir recalcula a lista de compra (hectares da fazenda entram no total).
  */
@@ -172,8 +172,8 @@ export function IncludeFarmInCycleDialog({
                     Incluir em safra existente
                   </span>
                   <span className="mt-0.5 block text-sm text-muted-foreground">
-                    Soma esta fazenda a uma safra ACTIVE do produtor e recalcula
-                    a área da lista.
+                    Soma esta fazenda a uma safra ativa do produtor e recalcula a
+                    área da lista.
                   </span>
                 </span>
               </button>
@@ -203,7 +203,7 @@ export function IncludeFarmInCycleDialog({
                 <EmptyState
                   variant="inline"
                   title="Nenhuma safra disponível."
-                  description="Não há safra ACTIVE deste produtor sem esta fazenda. Crie uma nova."
+                  description="Não há safra aberta deste produtor sem esta fazenda (ou a programação já foi publicada). Crie uma nova."
                   action={
                     <Button
                       size="sm"

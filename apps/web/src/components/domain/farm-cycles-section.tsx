@@ -36,18 +36,18 @@ import {
   FarmSeasonsExportDialog,
   type FarmExportItem,
 } from "@/components/domain/farm-seasons-export-dialog";
-import { cn, CROP_LABELS, STATUS_LABELS } from "@recomenda/utils";
+import {
+  cn,
+  CROP_LABELS,
+  CYCLE_STATUS_LABELS,
+  STATUS_LABELS,
+  labelStatus,
+} from "@recomenda/utils";
 
 const CROP_CHOICES = [
   { value: "SOYBEAN", label: "Soja" },
   { value: "CORN", label: "Milho" },
 ];
-
-const CYCLE_STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Ativa",
-  HARVESTED: "Encerrada",
-  ARCHIVED: "Removida",
-};
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
 
@@ -363,7 +363,7 @@ export function FarmCyclesSection({
             title,
             plotName: season.plot_name,
             plantingDate: season.planting_date,
-            statusLabel: STATUS_LABELS[season.status] ?? season.status,
+            statusLabel: labelStatus(STATUS_LABELS, season.status),
             producerName: producer?.name ?? null,
             agronomistName: me?.name ?? null,
             done,
@@ -494,8 +494,7 @@ export function FarmCyclesSection({
                               }
                               className="shrink-0"
                             >
-                              {CYCLE_STATUS_LABELS[cycle.status] ??
-                                cycle.status}
+                              {labelStatus(CYCLE_STATUS_LABELS, cycle.status)}
                             </Badge>
                           )}
                           {cycle.awaiting_purchase ? (

@@ -21,7 +21,12 @@ import {
   useProducer,
 } from "@recomenda/api-hooks";
 import { Eye, Leaf, MapPin, Sprout } from "lucide-react";
-import { CROP_LABELS, STATUS_LABELS, STATUS_VARIANTS } from "@recomenda/utils";
+import {
+  CROP_LABELS,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+  labelStatus,
+} from "@recomenda/utils";
 
 const SEASON_PRIORITY: Record<string, number> = {
   IN_PROGRESS: 0,
@@ -248,7 +253,7 @@ function PlotProgressTab({
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Badge variant={STATUS_VARIANTS[season.status] ?? "default"}>
-                    {STATUS_LABELS[season.status] ?? season.status}
+                    {labelStatus(STATUS_LABELS, season.status)}
                   </Badge>
                   {season.planting_date ? (
                     <span className="text-xs text-muted-foreground">

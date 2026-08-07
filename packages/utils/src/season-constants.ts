@@ -4,6 +4,7 @@ export const CROP_LABELS: Record<string, string> = {
   ANY: "Soja e Milho",
 };
 
+/** Status da programação do talhão (`seasons.status`). */
 export const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Rascunho",
   PUBLISHED: "Publicada",
@@ -11,6 +12,19 @@ export const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Concluída",
   HARVESTED: "Colhida",
   ARCHIVED: "Removida",
+};
+
+/** Status da safra (`crop_cycles.status`). */
+export const CYCLE_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Ativa",
+  HARVESTED: "Colhida",
+  ARCHIVED: "Removida",
+};
+
+/** Status da lista de compra (`purchase_lists.status`). */
+export const PURCHASE_LIST_STATUS_LABELS: Record<string, string> = {
+  draft: "Rascunho",
+  active: "Finalizada",
 };
 
 export const STATUS_VARIANTS: Record<
@@ -23,4 +37,20 @@ export const STATUS_VARIANTS: Record<
   COMPLETED: "success",
   HARVESTED: "success",
   ARCHIVED: "neutral",
+  ACTIVE: "success",
 };
+
+/** Traduz enum do servidor para label PT (aceita caixa mista). */
+export function labelStatus(
+  labels: Record<string, string>,
+  status: string | null | undefined,
+  fallback = "—",
+): string {
+  if (!status) return fallback;
+  return (
+    labels[status] ??
+    labels[status.toUpperCase()] ??
+    labels[status.toLowerCase()] ??
+    fallback
+  );
+}

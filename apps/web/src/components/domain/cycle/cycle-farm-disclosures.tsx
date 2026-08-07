@@ -31,6 +31,7 @@ import {
   CROP_LABELS,
   STATUS_LABELS,
   STATUS_VARIANTS,
+  labelStatus,
 } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { AddCycleFarmDialog } from "@/components/domain/cycle/cycle-farms-section";
@@ -455,8 +456,7 @@ export function CycleFarmDisclosures({
                                       "default"
                                     }
                                   >
-                                    {STATUS_LABELS[season.status] ??
-                                      season.status}
+                                    {labelStatus(STATUS_LABELS, season.status)}
                                   </Badge>
                                 </span>
                                 <span className="flex justify-end gap-4">
@@ -520,8 +520,7 @@ export function CycleFarmDisclosures({
                                       "default"
                                     }
                                   >
-                                    {STATUS_LABELS[season.status] ??
-                                      season.status}
+                                    {labelStatus(STATUS_LABELS, season.status)}
                                   </Badge>
                                 </div>
                                 {season.recommendations_total > 0 ? (

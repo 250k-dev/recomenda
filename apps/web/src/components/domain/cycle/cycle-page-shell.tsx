@@ -30,14 +30,8 @@ import {
 } from "@recomenda/api-hooks";
 import { apiErrorMessage, publishBlockedMessage } from "@recomenda/api/api-error";
 import type { CycleSeasonRow } from "@recomenda/api/cycles";
-import { CROP_LABELS } from "@recomenda/utils";
+import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
-
-const CYCLE_STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Ativa",
-  HARVESTED: "Colhida",
-  ARCHIVED: "Removida",
-};
 
 /**
  * Contexto comum das telas da safra da fazenda (`/fazendas/[id]/safras/[cycleId]`
@@ -198,7 +192,7 @@ export function CyclePageShell({
               <Badge variant="neutral">Em planejamento</Badge>
             ) : (
               <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"}>
-                {CYCLE_STATUS_LABELS[cycle.status] ?? cycle.status}
+                {labelStatus(CYCLE_STATUS_LABELS, cycle.status)}
               </Badge>
             )}
             {cycle.awaiting_purchase ? (

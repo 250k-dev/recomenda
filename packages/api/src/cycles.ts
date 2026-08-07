@@ -28,7 +28,7 @@ export interface CycleSummary {
   is_planning: boolean;
   /** Lista ACTIVE incompleta — bloqueia publicar e mostra badge na UI. */
   awaiting_purchase: boolean;
-  /** Incluir fazenda só antes da lista finalizada / programação publicada. */
+  /** Incluir fazenda enquanto a programação ainda não foi publicada. */
   can_add_farms: boolean;
   /** Fazendas participantes da safra (multi-fazenda) — sempre ao menos uma. */
   farms: CycleFarmRow[];
@@ -85,7 +85,7 @@ export interface CycleDetail {
   purchase_list_name: string | null;
   /** Lista ACTIVE incompleta — bloqueia publicar e mostra badge na UI. */
   awaiting_purchase: boolean;
-  /** Incluir fazenda só antes da lista finalizada / programação publicada. */
+  /** Incluir fazenda enquanto a programação ainda não foi publicada. */
   can_add_farms: boolean;
   /** Fazendas participantes da safra (multi-fazenda) — sempre ao menos uma. */
   farms: CycleFarmRow[];

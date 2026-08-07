@@ -21,7 +21,13 @@ import {
   useHardDeleteSeason,
   useSeasons,
 } from "@recomenda/api-hooks";
-import { cn, CROP_LABELS, deactivateOutlineButtonClass, STATUS_LABELS } from "@recomenda/utils";
+import {
+  cn,
+  CROP_LABELS,
+  deactivateOutlineButtonClass,
+  STATUS_LABELS,
+  labelStatus,
+} from "@recomenda/utils";
 
 const STATUS_CLASSES: Record<string, string> = {
   DRAFT: "bg-muted text-muted-foreground",
@@ -62,7 +68,7 @@ export default function SeasonsPage() {
   };
 
   const makeRow = (season: SeasonRow, isActive: boolean) => {
-    const statusLabel = STATUS_LABELS[season.status] ?? season.status;
+    const statusLabel = labelStatus(STATUS_LABELS, season.status);
     const statusClass = STATUS_CLASSES[season.status] ?? "bg-muted text-muted-foreground";
     const displayName = formatDisplay(season);
 

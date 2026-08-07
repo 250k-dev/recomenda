@@ -20,15 +20,9 @@ import {
   useProducerCycles,
 } from "@recomenda/api-hooks";
 import type { CycleSummary } from "@recomenda/api/cycles";
-import { CROP_LABELS } from "@recomenda/utils";
+import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { extractError } from "@/components/domain/season/_shared";
-
-const CYCLE_STATUS_LABELS: Record<string, string> = {
-  ACTIVE: "Ativa",
-  HARVESTED: "Colhida",
-  ARCHIVED: "Removida",
-};
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -162,8 +156,7 @@ export function ProducerCyclesSection({
                               }
                               className="shrink-0"
                             >
-                              {CYCLE_STATUS_LABELS[cycle.status] ??
-                                cycle.status}
+                              {labelStatus(CYCLE_STATUS_LABELS, cycle.status)}
                             </Badge>
                           )}
                           {cycle.awaiting_purchase ? (
