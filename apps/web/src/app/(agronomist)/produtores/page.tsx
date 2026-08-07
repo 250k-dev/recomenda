@@ -42,7 +42,7 @@ import { useCan, usePrincipal } from "@recomenda/api-hooks/use-can";
 type Tab = "active" | "archived";
 type SortMode = "name" | "hectares-desc" | "hectares-asc";
 
-const PRODUCERS_PAGE_SIZE = 5;
+const PRODUCERS_PAGE_SIZE = 7;
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 const fmtHa = (n: number) =>
@@ -181,6 +181,7 @@ export default function ProducersPage() {
   // KPIs derivados das listas (visão geral, independente do tab).
   const producersOnly = list.filter((p) => p.row_type === "producer");
   const totalProducers = producersOnly.length;
+  const totalFarms = producersOnly.reduce((s, p) => s + (p.farms_count ?? 0), 0);
   const totalHectares = producersOnly.reduce(
     (s, p) => s + (p.total_hectares ?? 0),
     0,
@@ -207,6 +208,7 @@ export default function ProducersPage() {
           }
           stats={[
             { label: "Produtores", value: fmt(totalProducers) },
+            { label: "Fazendas", value: fmt(totalFarms) },
             { label: "Hectares totais", value: `${fmtHa(totalHectares)} ha` },
           ]}
         />

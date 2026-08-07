@@ -1,37 +1,37 @@
 "use client";
 
-import { routes } from "@recomenda/config";
-
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
-  Check,
-  Info,
-  Loader2,
-  Search,
+  ArrowUpRight,
+  Link2,
   Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { routes } from "@recomenda/config";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { ManageMemberLinksDialog } from "@/components/domain/manage-member-links-dialog";
 import { PageHero } from "@/components/domain/page-hero";
 import { Button } from "@recomenda/ui/primitives/button";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
-import { Input } from "@recomenda/ui/primitives/input";
+import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import {
   useConsultantActivity,
   useConsultantSummary,
   useConsultants,
-  useSetMemberProducers,
-  useShareableProducers,
   useRemoveConsultant,
 } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
+
+const fmt = (n: number) => n.toLocaleString("pt-BR");
+const fmtHa = (n: number) =>
+  n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", {
@@ -48,91 +48,42 @@ const fmtDateTime = (iso: string) =>
     minute: "2-digit",
   });
 
+function initials(name: string | null) {
+  const parts = (name ?? "?").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+}
+
+function severityTone(severity?: string) {
+  if (severity === "critical") return "bg-danger/15 text-danger-strong";
+  if (severity === "attention") return "bg-warning/20 text-warning-strong";
+  return "bg-muted text-muted-foreground";
+}
+
 /**
- * Detalhe do membro de equipe: checklist de produtores compartilhados,
- * stats e feed de ações.
+ * Detalhe do membro de equipe: vínculos, consultores subordinados e trilha.
  */
 export function ConsultantDetailView({ userId }: { userId: string }) {
   const router = useRouter();
   const canManage = useCan("TEAM_MANAGE");
-  const { data: summary, isLoading: summaryLoading, isError } = useConsultantSummary(userId);
-  const { data: activity, isLoading: activityLoading } = useConsultantActivity(userId);
-  const { data: shareable } = useShareableProducers(canManage);
+  const { data: summary, isLoading: summaryLoading, isError } =
+    useConsultantSummary(userId);
+  const { data: activity, isLoading: activityLoading } =
+    useConsultantActivity(userId);
   const { data: team } = useConsultants();
-  const setProducers = useSetMemberProducers(userId);
   const removeMutation = useRemoveConsultant();
 
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [producerFilter, setProducerFilter] = useState("");
-  /** Seleção em edição. `null` = intocada, espelhando o servidor. */
-  const [draft, setDraft] = useState<Set<string> | null>(null);
+  const [linksOpen, setLinksOpen] = useState(false);
 
   const isManager = summary?.access_level === "MANAGER";
   const roleLabel = isManager ? "Gestor" : "Consultor";
-
-  const sharedIds = useMemo(
-    () => new Set((summary?.producers ?? []).map((p) => p.id)),
-    [summary?.producers],
-  );
-
-  const allProducers = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }>();
-    for (const p of shareable ?? []) map.set(p.id, p);
-    for (const p of summary?.producers ?? []) map.set(p.id, p);
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [shareable, summary?.producers]);
-
-  const filteredProducers = useMemo(() => {
-    const q = producerFilter.trim().toLowerCase();
-    if (!q) return allProducers;
-    return allProducers.filter((p) => p.name.toLowerCase().includes(q));
-  }, [allProducers, producerFilter]);
 
   const linkedAssistants = useMemo(() => {
     if (!isManager || !team) return [];
     return (team.assistants ?? []).filter((a) => a.manager_user_id === userId);
   }, [isManager, team, userId]);
-
-  // O que está marcado na tela: o rascunho quando houve edição, senão o servidor.
-  const selecionados = draft ?? sharedIds;
-
-  const aIncluir = useMemo(
-    () => [...selecionados].filter((id) => !sharedIds.has(id)),
-    [selecionados, sharedIds],
-  );
-  const aRemover = useMemo(
-    () => [...sharedIds].filter((id) => !selecionados.has(id)),
-    [selecionados, sharedIds],
-  );
-  const temMudanca = aIncluir.length > 0 || aRemover.length > 0;
-
-  const toggleProducer = (producerId: string) => {
-    if (!canManage || setProducers.isPending) return;
-    setDraft((anterior) => {
-      const proximo = new Set(anterior ?? sharedIds);
-      if (proximo.has(producerId)) proximo.delete(producerId);
-      else proximo.add(producerId);
-      return proximo;
-    });
-  };
-
-  const salvarCompartilhamento = async () => {
-    try {
-      const res = await setProducers.mutateAsync({ add: aIncluir, remove: aRemover });
-      setDraft(null);
-      toast.success(
-        [
-          res.added > 0 ? `${res.added} produtor(es) liberado(s)` : "",
-          res.removed > 0 ? `${res.removed} removido(s)` : "",
-        ]
-          .filter(Boolean)
-          .join(" · ") || "Compartilhamento atualizado.",
-      );
-    } catch (e) {
-      // O rascunho fica de pé: a pessoa não perde a seleção e pode tentar de novo.
-      toast.error(apiErrorMessage(e, "Não foi possível atualizar o compartilhamento."));
-    }
-  };
 
   const confirmRemoveMember = async () => {
     try {
@@ -140,7 +91,9 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
       toast.success(`${roleLabel} removido.`);
       router.push(routes.equipe.lista);
     } catch (e) {
-      toast.error(apiErrorMessage(e, `Não foi possível remover o ${roleLabel.toLowerCase()}.`));
+      toast.error(
+        apiErrorMessage(e, `Não foi possível remover o ${roleLabel.toLowerCase()}.`),
+      );
     }
   };
 
@@ -165,9 +118,10 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
     );
   }
 
-  const initial = (summary.name ?? "?").trim().charAt(0).toUpperCase();
-  const selectedCount = selecionados.size;
-  const totalCount = allProducers.length;
+  const farmCount = summary.farm_count ?? 0;
+  const hectares = summary.hectares ?? 0;
+  const createdCount = summary.created_producers_count ?? 0;
+  const firstName = (summary.name ?? roleLabel).trim().split(/\s+/)[0] || roleLabel;
 
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
@@ -179,257 +133,241 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
       />
 
       <PageHero
-        className="mb-6"
-        icon={<span className="text-xl font-semibold">{initial}</span>}
+        className="mb-2"
+        icon={
+          <span className="text-sm font-bold">{initials(summary.name)}</span>
+        }
         eyebrow={roleLabel}
         title={summary.name ?? roleLabel}
         titleBadge={
-          !isManager ? (
-            summary.manager_user_id && summary.manager_name ? (
-              <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-strong">
-                via {summary.manager_name}
-              </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isManager ? (
+              summary.manager_user_id && summary.manager_name ? (
+                <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-strong">
+                  via {summary.manager_name}
+                </span>
+              ) : (
+                <span className="rounded-full bg-clay-soft px-2.5 py-0.5 text-xs font-medium text-clay-strong">
+                  direto com você
+                </span>
+              )
             ) : (
-              <span className="rounded-full bg-clay-soft px-2.5 py-0.5 text-xs font-medium text-clay-strong">
-                direto com você
+              <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-strong">
+                Administra a equipe
               </span>
-            )
-          ) : null
+            )}
+            {summary.email ? (
+              <span className="text-xs text-muted-foreground">{summary.email}</span>
+            ) : null}
+          </div>
         }
         actions={
-          canManage ? (
-            <Button
-              variant="outline"
-              className="gap-2 border-danger-border text-danger-strong hover:bg-danger-soft hover:text-danger-strong"
-              onClick={() => setConfirmRemove(true)}
-            >
-              <Trash2 className="size-4" />
-              Remover {roleLabel.toLowerCase()}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link href={routes.equipe.auditoria({ actor: userId })}>
+                Ver trilha
+                <ArrowUpRight className="size-4" />
+              </Link>
             </Button>
-          ) : undefined
+            {canManage ? (
+              <Button
+                variant="outline"
+                className="gap-2 border-danger-border text-danger-strong hover:bg-danger-soft hover:text-danger-strong"
+                onClick={() => setConfirmRemove(true)}
+              >
+                <Trash2 className="size-4" />
+                Remover
+              </Button>
+            ) : null}
+          </div>
         }
         stats={[
-          { label: "E-mail", value: summary.email ?? "—" },
+          { label: "Ações · 30 dias", value: fmt(summary.activity_count_30d) },
+          {
+            label: "Carteira",
+            value: `${fmt(summary.producers.length)} prod.`,
+            sub:
+              farmCount > 0
+                ? `${fmt(farmCount)} faz.${hectares > 0 ? ` · ${fmtHa(hectares)} ha` : ""}`
+                : undefined,
+          },
+          {
+            label: "Última atividade",
+            value: summary.last_activity_at
+              ? fmtDate(summary.last_activity_at)
+              : "—",
+          },
           ...(summary.created_at
             ? [{ label: "Desde", value: fmtDate(summary.created_at) }]
             : []),
           ...(isManager
-            ? [{ label: "Consultores", value: summary.assistant_count ?? 0 }]
+            ? [{ label: "Consultores", value: fmt(summary.assistant_count ?? 0) }]
             : []),
-          { label: "Produtores", value: summary.producers.length },
-          { label: "Ações · 30 dias", value: summary.activity_count_30d },
-          {
-            label: "Última ação",
-            value: summary.last_activity_at ? fmtDate(summary.last_activity_at) : "—",
-          },
         ]}
       />
 
-      {!isManager ? (
-        <div className="flex gap-3 rounded-2xl border border-[#D9E6DD] bg-[#F2F7F3] px-5 py-4">
-          <Info className="mt-0.5 size-5 shrink-0 text-[#1E6B4A]" />
-          <p className="text-sm text-[#2B2723]">
-            Consultores acompanham produtores e fazendas compartilhados, criam
-            recomendações e registram aplicações (incluindo trocar produto/dose na etapa).
-          </p>
-        </div>
-      ) : null}
-
-      {isManager && linkedAssistants.length > 0 ? (
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <Users className="size-5 text-[#1E6B4A]" />
-            <div>
-              <h2 className="text-base font-extrabold text-[#2B2723]">
-                Consultores deste gestor
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface-2 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Activity className="size-4 text-primary" />
+              <h2 className="font-display text-base font-semibold text-text-strong">
+                Trilha recente
               </h2>
-              <p className="text-xs text-[#8A857D]">
-                Criados e gerenciados por {(summary.name ?? "").split(" ")[0] || "este gestor"}.
-              </p>
             </div>
+            <Button asChild variant="ghost" size="sm" className="gap-1.5">
+              <Link href={routes.equipe.auditoria({ actor: userId })}>
+                Ver completa
+                <ArrowUpRight className="size-3.5" />
+              </Link>
+            </Button>
           </div>
-          <ul className="flex flex-col gap-2">
-            {linkedAssistants.map((a) => (
-              <li key={a.user_id}>
-                <Link
-                  href={routes.equipe.membro(a.user_id)}
-                  className="flex items-center justify-between rounded-xl bg-[#F7F5F1] px-4 py-3 transition hover:bg-[#EFEBE4]"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[#2B2723]">
-                      {a.name ?? "Consultor"}
-                    </p>
-                    <p className="truncate text-xs text-[#8A857D]">{a.email ?? "—"}</p>
-                  </div>
-                  <span className="text-sm font-bold text-[#1E6B4A]">abrir</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {canManage ? (
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-extrabold text-[#2B2723]">
-                Produtores compartilhados
-              </h2>
-              <p className="text-xs text-[#8A857D]">
-                {selectedCount} de {totalCount} selecionados
-                {temMudanca ? (
-                  <span className="ml-1.5 font-semibold text-[#7A6B3F]">
-                    ·{" "}
-                    {[
-                      aIncluir.length > 0 ? `${aIncluir.length} a liberar` : "",
-                      aRemover.length > 0 ? `${aRemover.length} a remover` : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" e ")}
-                  </span>
-                ) : null}
-              </p>
-            </div>
-            <div className="relative w-full max-w-[260px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#A39D93]" />
-              <Input
-                value={producerFilter}
-                onChange={(e) => setProducerFilter(e.target.value)}
-                placeholder="Buscar produtor…"
-                className="rounded-xl border-[#E3DFD8] pl-9"
+          <div className="p-4">
+            {activityLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : !activity || activity.length === 0 ? (
+              <EmptyState
+                title="Nenhuma ação registrada ainda."
+                description="Aplicações, ajustes e alterações de acesso aparecem aqui."
               />
-            </div>
-          </div>
-          {allProducers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhum produtor disponível para compartilhar.
-            </p>
-          ) : (
-            <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredProducers.map((p) => {
-                const on = selecionados.has(p.id);
-                const alterado = on !== sharedIds.has(p.id);
-                return (
-                  <li key={p.id}>
-                    <div
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {activity.slice(0, 12).map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-text-strong">{row.summary}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {fmtDateTime(row.created_at)}
+                        {row.producer_name || row.farm_name
+                          ? ` · ${[row.producer_name, row.farm_name].filter(Boolean).join(" · ")}`
+                          : ""}
+                      </p>
+                    </div>
+                    <span
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition",
-                        on
-                          ? "border-[#BFD7C8] bg-[#F2F7F3]"
-                          : "border-transparent bg-[#F7F5F1]",
-                        // Contorno âmbar no que ainda não foi salvo.
-                        alterado && "border-[#D9C48A] bg-[#FBF7EC]",
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+                        severityTone(row.severity),
                       )}
                     >
-                      <button
-                        type="button"
-                        disabled={setProducers.isPending}
-                        onClick={() => toggleProducer(p.id)}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-90"
-                      >
-                        <span
-                          className={cn(
-                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border-2",
-                            on ? "border-[#1E6B4A] bg-[#1E6B4A]" : "border-[#C9C4BB] bg-white",
-                          )}
-                        >
-                          {on ? <Check className="size-3 text-white" strokeWidth={3} /> : null}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#2B2723]">
-                          {p.name}
-                        </span>
-                      </button>
-                      {on ? (
-                        <Link
-                          href={routes.produtores.detalhe(p.id)}
-                          className="shrink-0 text-xs font-bold text-[#1E6B4A] hover:underline"
-                        >
-                          abrir
-                        </Link>
-                      ) : null}
-                    </div>
+                      {row.severity === "critical"
+                        ? "Crítica"
+                        : row.severity === "attention"
+                          ? "Atenção"
+                          : "Rotina"}
+                    </span>
                   </li>
-                );
-              })}
-            </ul>
-          )}
-          {temMudanca ? (
-            <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-[#F1EEE8] pt-4">
-              <p className="mr-auto text-xs text-[#8A857D]">
-                Alterações ainda não aplicadas.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => setDraft(null)}
-                disabled={setProducers.isPending}
-              >
-                Descartar
-              </Button>
-              <Button onClick={salvarCompartilhamento} disabled={setProducers.isPending}>
-                {setProducers.isPending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" /> Salvando…
-                  </>
-                ) : (
-                  "Confirmar alterações"
-                )}
-              </Button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="mb-3 text-base font-extrabold text-[#2B2723]">
-            Produtores que {isManager ? "ele gerencia" : "ele atende"}
-          </h2>
-          {summary.producers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum produtor compartilhado ainda.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {summary.producers.map((p) => (
-                <li key={p.id}>
-                  <Link
-                    href={routes.produtores.detalhe(p.id)}
-                    className="flex items-center justify-between rounded-xl bg-[#F7F5F1] px-4 py-3 transition hover:bg-[#EFEBE4]"
-                  >
-                    <span className="text-sm font-medium text-[#2B2723]">{p.name}</span>
-                    <span className="text-sm font-bold text-[#1E6B4A]">abrir</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <div className="mb-3 flex items-center gap-2">
-            <Activity className="size-4 text-[#1E6B4A]" />
-            <h2 className="text-base font-extrabold text-[#2B2723]">Últimas ações</h2>
+                ))}
+              </ul>
+            )}
           </div>
-          {activityLoading ? (
-            <p className="text-sm text-muted-foreground">Carregando…</p>
-          ) : !activity || activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma ação registrada ainda. Os registros de aplicação aparecem aqui.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {activity.slice(0, 20).map((row) => (
-                <li key={row.id} className="flex gap-3">
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#1E6B4A]" />
-                  <div className="min-w-0">
-                    <p className="text-sm text-[#2B2723]">{row.summary}</p>
-                    <p className="text-xs text-[#8A857D]">{fmtDateTime(row.created_at)}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
         </section>
+
+        <div className="flex flex-col gap-6">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Link2 className="size-4 text-primary" />
+                <h2 className="font-display text-base font-semibold text-text-strong">
+                  Vínculos
+                </h2>
+              </div>
+              {canManage ? (
+                <Button size="sm" variant="outline" onClick={() => setLinksOpen(true)}>
+                  Gerenciar
+                </Button>
+              ) : null}
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              {summary.producers.length} produtor
+              {summary.producers.length === 1 ? "" : "es"}
+              {createdCount > 0
+                ? ` · ${createdCount} ${firstName} gerencia diretamente`
+                : ""}
+            </p>
+            {summary.producers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum produtor compartilhado ainda.
+              </p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {summary.producers.slice(0, 12).map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      href={routes.produtores.detalhe(p.id)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs font-medium text-text-strong hover:border-primary/40 hover:bg-primary-soft/50"
+                    >
+                      {p.name}
+                      {typeof p.farm_count === "number" ? (
+                        <span className="text-muted-foreground">
+                          · {p.farm_count} faz.
+                        </span>
+                      ) : null}
+                    </Link>
+                  </li>
+                ))}
+                {summary.producers.length > 12 ? (
+                  <li className="text-xs text-muted-foreground self-center">
+                    +{summary.producers.length - 12} mais
+                  </li>
+                ) : null}
+              </ul>
+            )}
+          </section>
+
+          {isManager ? (
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <Users className="size-4 text-primary" />
+                <h2 className="font-display text-base font-semibold text-text-strong">
+                  Consultores deste gestor
+                </h2>
+              </div>
+              {linkedAssistants.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum consultor vinculado a {firstName}.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {linkedAssistants.map((a) => (
+                    <li key={a.user_id}>
+                      <Link
+                        href={routes.equipe.membro(a.user_id)}
+                        className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2.5 transition hover:bg-hover"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-text-strong">
+                            {a.name ?? "Consultor"}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {a.email ?? "—"}
+                          </span>
+                        </span>
+                        <span className="text-xs font-semibold text-primary">abrir</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
+        </div>
       </div>
+
+      {canManage ? (
+        <ManageMemberLinksDialog
+          open={linksOpen}
+          onOpenChange={setLinksOpen}
+          userId={userId}
+          memberName={summary.name}
+          linkedProducers={summary.producers}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={confirmRemove}

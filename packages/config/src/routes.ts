@@ -97,6 +97,8 @@ export const routes = {
 
   equipe: {
     lista: "/equipe" satisfies Route,
+    auditoria: (opts?: { actor?: string | null }) =>
+      withQuery("/equipe/auditoria", { actor: opts?.actor }),
     membro: (userId: string) => dynamicRoute(`/equipe/${userId}`),
   },
 

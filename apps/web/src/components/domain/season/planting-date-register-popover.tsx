@@ -60,7 +60,7 @@ export function PlantingDateRegisterPopover({
           toast.success(
             mode === "edit"
               ? "Data de plantio atualizada. Etapas pendentes recalculadas."
-              : "Data de plantio registrada. Etapas pendentes atualizadas.",
+              : "Data de plantio adicionada. Etapas pendentes recalculadas.",
           );
           setOpen(false);
         },
@@ -77,13 +77,13 @@ export function PlantingDateRegisterPopover({
         {trigger ?? (
           <Button size="sm" variant="outline" className="h-8 gap-1.5">
             <CalendarDays className="h-3.5 w-3.5" />
-            {mode === "edit" ? "Alterar" : "Registrar"}
+            {mode === "edit" ? "Alterar data" : "Adicionar data"}
           </Button>
         )}
       </PopoverTrigger>
       <PopoverContent align={align} className="w-80">
         <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-          {mode === "edit" ? "Alterar · Plantio" : "Registrar · Plantio"}
+          {mode === "edit" ? "Alterar · Data de plantio" : "Adicionar · Data de plantio"}
         </p>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">

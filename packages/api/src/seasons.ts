@@ -68,6 +68,42 @@ export async function getSeasons() {
   return data;
 }
 
+/** Agenda agregada da carteira (1 request — dash/cronograma). */
+export type AgendaApiSeason = {
+  id: string;
+  status: string;
+  producer_id: string;
+  planting_date: string | null;
+  plot_name: string | null;
+  farm_name: string | null;
+  farm_id: string | null;
+  producer_name: string | null;
+};
+
+export type AgendaApiPending = {
+  id: string;
+  season_id: string;
+  name: string | null;
+  status: string;
+  predicted_date_current: string | null;
+  predicted_date_original: string | null;
+  window_start_days: number;
+  window_end_days: number;
+};
+
+export type AgendaApiResponse = {
+  draft_count: number;
+  seasons: AgendaApiSeason[];
+  pending: AgendaApiPending[];
+};
+
+export async function getAgenda(producerId?: string) {
+  const { data } = await api.get<AgendaApiResponse>("/seasons/agenda", {
+    params: producerId ? { producer_id: producerId } : undefined,
+  });
+  return data;
+}
+
 export async function getArchivedSeasons() {
   const { data } = await api.get<Season[]>("/seasons/archived");
   return data;

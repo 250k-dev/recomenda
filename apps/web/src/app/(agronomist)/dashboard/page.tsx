@@ -5,7 +5,7 @@ import { routes } from "@recomenda/config";
 import type { Route } from "next";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { addDays, format } from "date-fns";
+import { format } from "date-fns";
 import {
   Users,
   Leaf,
@@ -28,6 +28,7 @@ import {
 import { RailCard, RailRow } from "@/components/domain/rail-card";
 import { PriceCoverageRailCard } from "@/components/domain/price-coverage-rail-card";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
+import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
@@ -45,9 +46,20 @@ import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
 import { useAgronomistAgenda, type AgendaEvent } from "@recomenda/api-hooks/agenda";
 import { cn } from "@recomenda/utils";
 
-type AttentionTab = "late" | "today" | "pending" | "week";
+type AttentionTab = "late" | "today" | "pending" | "nodate";
+
+/** Plantio sem planting_date — antes inchava o bucket Hoje. */
+function isMissingPlantingDate(event: AgendaEvent): boolean {
+  return event.kind === "PLANTING" && !event.plantingDate;
+}
 
 const DOT_PENDING_CLASS = "bg-muted-foreground/35";
+
+/** yyyy-MM-dd → DD/MM (prefixo da lista de atenção). */
+function formatAttentionDay(ymd: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  return `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}`;
+}
 
 /**
  * Modelo limpo da lista "Precisa de atenção": o ponto colorido carrega o status
@@ -65,6 +77,13 @@ function attentionRowPresentation(event: AgendaEvent): {
       dotClass: DOT_PENDING_CLASS,
       timeLabel: "Manual",
       timeClass: "text-muted-foreground",
+    };
+  }
+  if (isMissingPlantingDate(event) || event.pillLabel === "Sem data") {
+    return {
+      dotClass: "bg-warning",
+      timeLabel: "Sem data",
+      timeClass: "text-foreground",
     };
   }
   if (event.isLate) {
@@ -226,7 +245,6 @@ export default function DashboardPage() {
   // Dedupe agenda events (one per recommendation) and bucket by state.
   const buckets = useMemo(() => {
     const today = format(new Date(), "yyyy-MM-dd");
-    const weekEnd = format(addDays(new Date(), 7), "yyyy-MM-dd");
     const byRec = new Map<string, AgendaEvent>();
     for (const ev of Object.values(agenda.eventsByDay).flat()) {
       const key = ev.id.replace(/-\d{4}-\d{2}-\d{2}$/, "");
@@ -234,19 +252,24 @@ export default function DashboardPage() {
       if (!existing || ev.ymd < existing.ymd) byRec.set(key, ev);
     }
     const recs = [...byRec.values()];
+    const nodate = recs
+      .filter(isMissingPlantingDate)
+      .sort((a, b) => a.farmName.localeCompare(b.farmName, "pt-BR"));
     // Dessecação nunca é "atrasada" (isLate já vem false do agenda) — cai em Pendentes.
+    // Plantios sem data ficam só em "Sem data" (não incham Hoje).
     const inToday = (r: AgendaEvent) =>
-      !r.isLate && r.ymd <= today && r.windowEndYmd >= today;
-    const inWeek = (r: AgendaEvent) =>
-      !r.isLate && r.ymd > today && r.ymd <= weekEnd;
+      !r.isLate &&
+      !isMissingPlantingDate(r) &&
+      r.ymd <= today &&
+      r.windowEndYmd >= today;
     return {
       late: recs
         .filter((r) => r.isLate)
         .sort((a, b) => a.windowEndYmd.localeCompare(b.windowEndYmd)),
       today: recs.filter(inToday).sort((a, b) => a.ymd.localeCompare(b.ymd)),
-      week: recs.filter(inWeek).sort((a, b) => a.ymd.localeCompare(b.ymd)),
+      nodate,
       pending: recs
-        .filter((r) => !r.isLate && !inToday(r) && !inWeek(r))
+        .filter((r) => !r.isLate && !isMissingPlantingDate(r) && !inToday(r))
         .sort((a, b) => a.ymd.localeCompare(b.ymd)),
     };
   }, [agenda.eventsByDay]);
@@ -372,9 +395,9 @@ export default function DashboardPage() {
                     activeClassName: "bg-amber-500 text-white",
                   },
                   {
-                    value: "week",
-                    label: "Semana",
-                    badgeCount: buckets.week.length,
+                    value: "nodate",
+                    label: "Sem data",
+                    badgeCount: buckets.nodate.length,
                     activeClassName: "bg-sky-600 text-white",
                   },
                 ]}
@@ -403,13 +426,17 @@ export default function DashboardPage() {
                     ? "Nenhuma aplicação para hoje."
                     : tab === "pending"
                       ? "Nenhuma etapa pendente fora da janela."
-                      : "Nenhuma aplicação nos próximos 7 dias."
+                      : "Todas as safras já têm data de plantio."
               }
             />
           ) : (
             <div>
               {list.slice(0, 6).map((ev) => {
                 const row = attentionRowPresentation(ev);
+                const dayPrefix =
+                  tab !== "nodate" && !isMissingPlantingDate(ev)
+                    ? formatAttentionDay(ev.displayYmd)
+                    : null;
                 return (
                   <div
                     key={ev.id}
@@ -422,9 +449,17 @@ export default function DashboardPage() {
                       )}
                     />
                     <div className="flex-1 min-w-0">
-                      <b className="text-[0.95rem] font-semibold text-text-strong">
-                        {ev.applicationTitle}
-                      </b>
+                      <p className="truncate text-[0.95rem] text-text-strong">
+                        <span className="font-semibold">
+                          {ev.applicationTitle}
+                        </span>
+                        {dayPrefix ? (
+                          <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                            {" "}
+                            {dayPrefix}
+                          </span>
+                        ) : null}
+                      </p>
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {ev.farmName} · {ev.plotName} · {ev.producerName}
                       </div>
@@ -437,15 +472,27 @@ export default function DashboardPage() {
                     >
                       {row.timeLabel}
                     </div>
-                    <RecommendationRegisterPopover
-                      seasonId={ev.seasonId}
-                      recommendationId={ev.recommendationId}
-                      title={ev.applicationTitle}
-                    />
+                    {ev.kind === "PLANTING" ? (
+                      <PlantingDateRegisterPopover
+                        seasonId={ev.seasonId}
+                        currentPlantingDate={ev.plantingDate}
+                        mode={ev.plantingDate ? "edit" : "register"}
+                      />
+                    ) : (
+                      <RecommendationRegisterPopover
+                        seasonId={ev.seasonId}
+                        recommendationId={ev.recommendationId}
+                        title={ev.applicationTitle}
+                      />
+                    )}
                     <Link
-                      href={routes.safras.cronograma(ev.seasonId, {
-                        recommendation_id: ev.recommendationId || null,
-                      })}
+                      href={
+                        ev.kind === "PLANTING"
+                          ? routes.safras.cronograma(ev.seasonId)
+                          : routes.safras.cronograma(ev.seasonId, {
+                              recommendation_id: ev.recommendationId || null,
+                            })
+                      }
                       aria-label={`Abrir ${ev.applicationTitle}`}
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
                     >
@@ -457,7 +504,7 @@ export default function DashboardPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3.5">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                   <LegendDot dotClass="bg-danger" label="Atrasada" />
-                  <LegendDot dotClass="bg-warning" label="Na janela / hoje" />
+                  <LegendDot dotClass="bg-warning" label="Na janela / sem data" />
                   <LegendDot
                     dotClass={DOT_PENDING_CLASS}
                     label="Pendente / futura"

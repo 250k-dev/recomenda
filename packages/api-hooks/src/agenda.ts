@@ -11,10 +11,10 @@ import {
 } from "date-fns";
 import {
   applyRecommendation,
-  getSeasons,
-  getTimeline,
+  getAgenda,
   skipRecommendation,
-  type Recommendation,
+  type AgendaApiPending,
+  type AgendaApiSeason,
 } from "@recomenda/api/seasons";
 import { recommendationWindowSpanDays } from "@recomenda/domain/timing/window-days";
 import { localYmdToDate } from "@recomenda/utils";
@@ -22,19 +22,9 @@ import { queryKeys } from "./queryKeys";
 import { invalidateAfterRecommendationExecution } from "./seasons";
 import { useWalletScopeKey } from "./use-active-scope";
 
-const BATCH_SIZE = 10;
 const MAX_EVENTS = 500;
 
-export type AgendaSeasonRow = {
-  id: string;
-  status: string;
-  producer_id: string;
-  plot_name?: string | null;
-  farm_name?: string | null;
-  farm_id?: string | null;
-  producer_name?: string | null;
-  planting_date?: string | null;
-};
+export type AgendaSeasonRow = AgendaApiSeason;
 
 export type AgendaEventKind = "APPLICATION" | "PLANTING";
 
@@ -85,42 +75,33 @@ function ymdFromDate(d: Date): string {
 // hooks de agenda. A implementação é a de `@recomenda/utils`.
 export { localYmdToDate };
 
-function recommendationTitle(r: Recommendation): string {
+function recommendationTitle(r: AgendaApiPending): string {
   return r.name?.trim() || "Aplicação";
 }
 
-function recommendationYmd(raw: unknown): string | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  const dateRaw =
-    r.predicted_date_current ??
-    r.predicted_date_original ??
-    r.predictedDateCurrent ??
-    r.predictedDateOriginal;
-  const ymd = String(dateRaw ?? "").slice(0, 10);
+function recommendationYmd(r: AgendaApiPending): string | null {
+  const ymd = String(
+    r.predicted_date_current ?? r.predicted_date_original ?? "",
+  ).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
   return ymd;
 }
 
-function recommendationStatus(raw: unknown): string | null {
-  if (!raw || typeof raw !== "object") return null;
-  const status = (raw as Record<string, unknown>).status;
-  return typeof status === "string" ? status : null;
-}
-
-function recommendationWindowDays(raw: unknown): {
+function recommendationWindowDays(r: AgendaApiPending): {
   startYmd: string;
   endYmd: string;
   centerYmd: string;
   days: string[];
 } | null {
-  const predictedYmd = recommendationYmd(raw);
-  if (!predictedYmd || !raw || typeof raw !== "object") return null;
+  const predictedYmd = recommendationYmd(r);
+  if (!predictedYmd) return null;
 
   // Janela centrada na data prevista (data ± metade do span). Atrasada só depois
   // do fim da janela (data + metade do span).
-  const r = raw as Recommendation;
-  const span = recommendationWindowSpanDays(r.window_start_days ?? 0, r.window_end_days ?? 0);
+  const span = recommendationWindowSpanDays(
+    r.window_start_days ?? 0,
+    r.window_end_days ?? 0,
+  );
   const half = Math.round(span / 2);
   const predictedDate = localYmdToDate(predictedYmd);
   const startYmd = ymdFromDate(addDays(predictedDate, -half));
@@ -177,42 +158,24 @@ async function fetchAgendaEvents(
 ): Promise<Omit<AgronomistAgendaResult, "isLoading" | "isError" | "monthEventCount">> {
   const today = localTodayYmd();
 
-  const seasonsResponse = await getSeasons();
-  const allSeasons = (seasonsResponse.data ?? []) as unknown as AgendaSeasonRow[];
-
-  let seasons = allSeasons.filter(
-    (s) => s.status === "PUBLISHED" || s.status === "IN_PROGRESS",
-  );
-  if (producerId) {
-    seasons = seasons.filter((s) => s.producer_id === producerId);
-  }
-
-  // Rascunhos não aparecem no cronograma — contamos para poder explicar um
-  // calendário vazio ("publique a safra") em vez de sumir com o trabalho.
-  const draftCount = allSeasons.filter(
-    (s) => s.status === "DRAFT" && (!producerId || s.producer_id === producerId),
-  ).length;
+  // 1 request: safras ativas + PENDING (substitui N timelines).
+  const agenda = await getAgenda(producerId);
+  const seasons = agenda.seasons;
+  const draftCount = agenda.draft_count;
+  const seasonById = new Map(seasons.map((s) => [s.id, s]));
 
   const pendingCandidates: {
     season: AgendaSeasonRow;
-    r: Recommendation;
+    r: AgendaApiPending;
     window: NonNullable<ReturnType<typeof recommendationWindowDays>>;
   }[] = [];
 
-  for (let i = 0; i < seasons.length; i += BATCH_SIZE) {
-    const chunk = seasons.slice(i, i + BATCH_SIZE);
-    const timelines = await Promise.all(
-      chunk.map((s) => getTimeline(s.id).then((rows) => ({ season: s, rows }))),
-    );
-
-    for (const { season, rows } of timelines) {
-      for (const raw of rows) {
-        if (recommendationStatus(raw) !== "PENDING") continue;
-        const window = recommendationWindowDays(raw);
-        if (!window) continue;
-        pendingCandidates.push({ season, r: raw as Recommendation, window });
-      }
-    }
+  for (const r of agenda.pending) {
+    const season = seasonById.get(r.season_id);
+    if (!season) continue;
+    const window = recommendationWindowDays(r);
+    if (!window) continue;
+    pendingCandidates.push({ season, r, window });
   }
 
   const ordered = pendingCandidates
@@ -236,7 +199,7 @@ async function fetchAgendaEvents(
       kind: "PLANTING",
       recommendationId: "",
       displayYmd,
-      applicationTitle: hasPlanting ? "Plantio" : "Registrar plantio",
+      applicationTitle: hasPlanting ? "Plantio" : "Adicionar data de plantio",
       farmName: season.farm_name?.trim() || "Fazenda",
       producerName: season.producer_name?.trim() || "Produtor",
       plotName: season.plot_name?.trim() || "Talhão",

@@ -96,7 +96,7 @@ function PlantingDateBlock({
                 className="h-8 gap-1.5 shrink-0"
               >
                 <CalendarDays className="h-3.5 w-3.5" />
-                {hasDate ? "Alterar data" : "Registrar plantio"}
+                {hasDate ? "Alterar data" : "Adicionar data"}
               </Button>
             }
           />

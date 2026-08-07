@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
   Check,
-  ChevronRight,
   Copy,
   MailWarning,
   Send,
@@ -26,6 +24,7 @@ import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
 import { PageHero } from "@/components/domain/page-hero";
+import { TeamAuditHome } from "@/components/domain/team-audit-home";
 import {
   useConsultants,
   useCreateInvitation,
@@ -433,76 +432,26 @@ function InviteFarmTeamDialog({
 }
 
 function CarteiraEquipeView({ canManage }: { canManage: boolean }) {
-  const { data: team, isLoading } = useConsultants();
+  const { data: team } = useConsultants();
   const [inviteOpen, setInviteOpen] = useState(false);
-  // Só quem gerencia equipe pode listar convites — sem isso a chamada volta 403.
   const { data: invitations } = useInvitations("CONSULTANT", { enabled: canManage });
 
   const managers = team?.managers ?? [];
-  const assistants = team?.assistants ?? [];
-  // Aceito virou membro e já aparece nos cards; revogado é ruído.
-  const pending = (invitations ?? []).filter((i) => i.status !== "ACCEPTED" && i.status !== "REVOKED");
-  const empty =
-    !isLoading && managers.length === 0 && assistants.length === 0 && pending.length === 0;
+  const pending = (invitations ?? []).filter(
+    (i) => i.status !== "ACCEPTED" && i.status !== "REVOKED",
+  );
 
   return (
-    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-8">
-      <PageHero
-        className="mb-4"
-        icon={<Users className="size-6" />}
-        eyebrow="Organização"
-        title="Equipe"
-        actions={
-          canManage ? (
-            <Button onClick={() => setInviteOpen(true)} className="gap-2">
-              <UserPlus className="h-4 w-4" />
-              Convidar
-            </Button>
-          ) : undefined
-        }
-        stats={[
-          { label: "Gestores", value: isLoading ? "…" : managers.length },
-          { label: "Consultores", value: isLoading ? "…" : assistants.length },
-          ...(pending.length > 0
-            ? [{ label: "Convites pendentes", value: pending.length }]
-            : []),
-        ]}
-      />
-
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando…</p>
-      ) : empty ? (
-        <EmptyState
-          title="Nenhum membro na equipe ainda."
-          description="Convide um gestor ou consultor e compartilhe os produtores que ele deve acompanhar."
-        />
-      ) : (
-        <div className="flex flex-col gap-10">
-          {managers.length > 0 ? (
-            <TeamSection
-              title="Gestores"
-              microcopy="criam produtores, fazendas e recomendações"
-              members={managers}
-              variant="manager"
-            />
-          ) : null}
-          <TeamSection
-            title="Consultores"
-            microcopy="acompanham produtores compartilhados e gerenciam a carteira"
-            members={assistants}
-            variant="assistant"
-            emptyLabel={
-              managers.length > 0
-                ? "Nenhum consultor ainda. Convide um ou peça a um gestor para criar."
-                : undefined
-            }
-          />
-          {canManage && pending.length > 0 ? (
+    <>
+      <TeamAuditHome
+        canManage={canManage}
+        onInvite={() => setInviteOpen(true)}
+        pendingInvitesSlot={
+          canManage && pending.length > 0 ? (
             <PendingInvitationsSection invitations={pending} />
-          ) : null}
-        </div>
-      )}
-
+          ) : null
+        }
+      />
       {canManage ? (
         <InviteTeamDialog
           open={inviteOpen}
@@ -510,7 +459,7 @@ function CarteiraEquipeView({ canManage }: { canManage: boolean }) {
           managers={managers}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -668,136 +617,6 @@ function formatarData(iso: string): string {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function TeamSection({
-  title,
-  microcopy,
-  members,
-  variant,
-  emptyLabel,
-}: {
-  title: string;
-  microcopy: string;
-  members: TeamMemberRow[];
-  variant: "manager" | "assistant";
-  emptyLabel?: string;
-}) {
-  return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-extrabold text-[#2B2723]">
-          {title}{" "}
-          <span className="font-semibold text-[#8A857D]">({members.length})</span>
-        </h2>
-        <p className="text-sm text-[#8A857D]">· {microcopy}</p>
-      </div>
-      {members.length === 0 ? (
-        emptyLabel ? (
-          <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-        ) : null
-      ) : (
-        <ul className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(360px,1fr))]">
-          {members.map((m) => (
-            <li key={m.user_id}>
-              <MemberCard member={m} variant={variant} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function MemberCard({
-  member,
-  variant,
-}: {
-  member: TeamMemberRow;
-  variant: "manager" | "assistant";
-}) {
-  const initial = (member.name ?? "?").trim().charAt(0).toUpperCase();
-  const isManager = variant === "manager";
-
-  return (
-    <Link
-      href={routes.equipe.membro(member.user_id)}
-      className="group flex w-full flex-col gap-3 rounded-2xl border border-transparent bg-white px-[22px] py-5 shadow-sm transition-all hover:border-[#CBDDD2] hover:shadow-[0_4px_14px_rgba(30,92,64,0.08)]"
-    >
-      <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-bold",
-            isManager ? "bg-[#1E5C40] text-white" : "bg-[#EDE9E2] text-[#5C564E]",
-          )}
-        >
-          {initial}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-[17px] font-bold text-[#2B2723]">
-              {member.name ?? (isManager ? "Gestor" : "Consultor")}
-            </p>
-            {isManager ? (
-              <span className="rounded-full bg-[#E4EEE7] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1E6B4A]">
-                Gestor
-              </span>
-            ) : null}
-            {!member.is_active ? (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                Inativo
-              </span>
-            ) : null}
-          </div>
-          <p className="truncate text-[13px] text-[#8A857D]">{member.email ?? "—"}</p>
-        </div>
-        <ChevronRight className="mt-1 size-5 shrink-0 text-[#B5AFA5] transition group-hover:text-[#1E6B4A]" />
-      </div>
-      <div className="flex items-center justify-between border-t border-[#F1EEE8] pt-3 text-[13px] text-[#6B655C]">
-        {isManager ? (
-          <p>
-            <strong className="text-[#2B2723]">{member.assistant_count}</strong>{" "}
-            {member.assistant_count === 1 ? "consultor" : "consultores"}
-            {" · "}
-            <strong className="text-[#2B2723]">{member.producer_count}</strong>{" "}
-            {member.producer_count === 1 ? "produtor" : "produtores"}
-          </p>
-        ) : (
-          <>
-            <p>
-              <strong className="text-[#2B2723]">{member.producer_count}</strong>{" "}
-              {member.producer_count === 1 ? "produtor" : "produtores"}
-            </p>
-            <VinculoChip
-              managerName={member.manager_name}
-              managerUserId={member.manager_user_id}
-            />
-          </>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-function VinculoChip({
-  managerName,
-  managerUserId,
-}: {
-  managerName: string | null;
-  managerUserId: string | null;
-}) {
-  if (managerUserId && managerName) {
-    return (
-      <span className="rounded-full bg-[#E4EEE7] px-2.5 py-0.5 text-[12px] font-medium text-[#1E6B4A]">
-        via {managerName}
-      </span>
-    );
-  }
-  return (
-    <span className="rounded-full bg-[#F3EEDD] px-2.5 py-0.5 text-[12px] font-medium text-[#7A6B3F]">
-      direto com você
-    </span>
-  );
 }
 
 function InviteTeamDialog({

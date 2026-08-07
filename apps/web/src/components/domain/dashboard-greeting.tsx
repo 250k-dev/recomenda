@@ -3,7 +3,9 @@
 import { useSyncExternalStore } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale/pt-BR";
+import { Sparkles } from "lucide-react";
 import { useActiveScope, useMe } from "@recomenda/api-hooks";
+import { scopeRoleLabel } from "@/lib/scope-label";
 
 // Saudação pelo relógio local do usuário, só no cliente: no SSR o fuso é o do
 // servidor, então lá cai no "Olá" neutro para não hidratar com valor errado.
@@ -21,19 +23,36 @@ export function DashboardGreeting() {
   const activeScope = useActiveScope();
   const salute = useSyncExternalStore(subscribeNoop, getGreeting, () => "Olá");
 
-  const firstName = me?.name?.trim().split(/\s+/)[0] ?? "";
+  // Primeiro + segundo nome (ex.: "João Victor"); ignora partículas curtas sozinhas.
+  const displayName = (() => {
+    const parts = (me?.name ?? "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "";
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[1]}`;
+  })();
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
+  const roleLabel = scopeRoleLabel(activeScope?.access_level).toUpperCase();
 
   return (
     <div className="min-w-0">
-      <p className="truncate font-display text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
-        {activeScope
-          ? `Carteira de ${activeScope.agronomist_name}`
-          : dateLabel}
-      </p>
+      {activeScope ? (
+        <div className="mb-0.5 flex min-w-0 items-center gap-2">
+          <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-primary px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground">
+            <Sparkles className="size-2.5" aria-hidden />
+            {roleLabel}
+          </span>
+          <p className="truncate font-display text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+            Carteira de {activeScope.agronomist_name}
+          </p>
+        </div>
+      ) : (
+        <p className="truncate font-display text-[11px] font-bold uppercase tracking-[0.12em] text-primary-strong">
+          {dateLabel}
+        </p>
+      )}
       <h1 className="truncate font-display text-xl font-semibold tracking-[-0.02em] text-text-strong md:text-2xl">
         {salute}
-        {firstName ? `, ${firstName}` : ""}
+        {displayName ? `, ${displayName}` : ""}
       </h1>
     </div>
   );

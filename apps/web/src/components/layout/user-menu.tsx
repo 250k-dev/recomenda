@@ -21,6 +21,7 @@ import {
   usePlanQuota,
 } from "@recomenda/api-hooks";
 import { logout } from "@recomenda/api";
+import { scopeOfLabel } from "@/lib/scope-label";
 
 export function UserMenu() {
   const router = useRouter();
@@ -82,7 +83,7 @@ export function UserMenu() {
               {activeScope ? (
                 <Badge className="mt-1 gap-1 border-none bg-white/20 px-1.5 text-[0.65rem] font-semibold text-primary-foreground">
                   <Briefcase className="size-3!" />
-                  Carteira de {activeScope.agronomist_name}
+                  {scopeOfLabel(activeScope.agronomist_name, activeScope.access_level)}
                 </Badge>
               ) : planName ? (
                 <Badge className="mt-1 gap-1 border-none bg-white/20 px-1.5 text-[0.65rem] font-semibold text-primary-foreground">
