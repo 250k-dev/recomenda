@@ -18,6 +18,7 @@ import {
   useApplyRecommendation,
   useCloneGlobalProduct,
   useCreateRecommendationItem,
+  useDeleteRecommendation,
   useDeleteRecommendationItem,
   usePatchRecommendation,
   useReorderRecommendationItems,
@@ -70,6 +71,7 @@ import {
   type RecommendationStageDraft,
 } from "@/components/domain/recommendation-stage-fields";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
@@ -798,6 +800,8 @@ export function RecommendationCard({
 
   const patchMut = usePatchRecommendation(seasonId);
   const deleteMut = useDeleteRecommendationItem(seasonId);
+  const deleteStageMut = useDeleteRecommendation(seasonId);
+  const [deleteStageOpen, setDeleteStageOpen] = useState(false);
   const applyMut = useApplyRecommendation(seasonId);
   const skipMut = useSkipRecommendation(seasonId);
   const undoMut = useUndoRecommendation(seasonId);
@@ -805,6 +809,7 @@ export function RecommendationCard({
   const isBusy =
     patchMut.isPending ||
     deleteMut.isPending ||
+    deleteStageMut.isPending ||
     applyMut.isPending ||
     skipMut.isPending ||
     undoMut.isPending ||
@@ -1041,7 +1046,7 @@ export function RecommendationCard({
               readOnly={!isPending || !canEditStructure}
             />
             {isPending && canEditStructure ? (
-              <div className="flex gap-2 mt-3">
+              <div className="flex flex-wrap gap-2 mt-3">
                 <Button
                   size="sm"
                   onClick={handleSaveStage}
@@ -1050,6 +1055,16 @@ export function RecommendationCard({
                 >
                   <Save className="h-3.5 w-3.5" />
                   Salvar etapa
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDeleteStageOpen(true)}
+                  disabled={isBusy}
+                  className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Excluir etapa
                 </Button>
               </div>
             ) : (
@@ -1378,6 +1393,33 @@ export function RecommendationCard({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteStageOpen}
+        onOpenChange={setDeleteStageOpen}
+        title="Excluir etapa"
+        description={`Excluir “${rec.name}” e todos os produtos desta etapa? Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir"
+        tone="destructive"
+        loading={deleteStageMut.isPending}
+        onConfirm={async () => {
+          await new Promise<void>((resolve, reject) =>
+            deleteStageMut.mutate(rec.id, {
+              onSuccess: () => {
+                toast.success("Etapa excluída.");
+                setDeleteStageOpen(false);
+                resolve();
+              },
+              onError: (err) => {
+                toast.error(
+                  apiErrorMessage(err, "Não foi possível excluir a etapa."),
+                );
+                reject(err);
+              },
+            }),
+          );
+        }}
+      />
     </li>
   );
 }

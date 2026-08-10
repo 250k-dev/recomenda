@@ -19,6 +19,7 @@ import {
   createRecommendation,
   reorderRecommendations,
   patchRecommendation,
+  deleteRecommendation,
   applyRecommendation,
   skipRecommendation,
   undoRecommendation,
@@ -200,6 +201,17 @@ export function usePatchRecommendation(seasonId: string) {
       patchRecommendation(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+    },
+  });
+}
+
+export function useDeleteRecommendation(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteRecommendation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      invalidatePurchaseListsAfterRecommendationChange(queryClient);
     },
   });
 }

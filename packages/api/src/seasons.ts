@@ -198,6 +198,11 @@ export async function patchRecommendation(
   return data;
 }
 
+export async function deleteRecommendation(id: string) {
+  const { data } = await api.delete(`/recommendations/${id}`);
+  return data;
+}
+
 export async function applyRecommendation(
   id: string,
   payload: { executed_date: string; notes?: string },
