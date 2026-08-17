@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, Leaf, ListOrdered, Plus, Send, Share2 } from "lucide-react";
+import { CalendarDays, LayoutTemplate, Leaf, ListOrdered, Pencil, Plus, Send, Share2 } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
 import { TimelineCardsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
@@ -30,6 +30,8 @@ import { RecommendationCard } from "@/components/domain/season/recommendation-ca
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
 import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
 import { SeasonMixOrderDialog } from "@/components/domain/season/season-mix-order-dialog";
+import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
+import { ApplySeasonTemplateDialog } from "@/components/domain/season/apply-season-template-dialog";
 import { fmtDate } from "@recomenda/domain/recommendations/format";
 import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { routes } from "@recomenda/config";
@@ -254,6 +256,8 @@ export function SeasonRecommendationsView({
   const [addingStageBottom, setAddingStageBottom] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [mixOrderOpen, setMixOrderOpen] = useState(false);
+  const [cropEditOpen, setCropEditOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const reorderMut = useReorderRecommendations(seasonId);
   const meData = useMe().data as { name?: string } | undefined;
   const producerQuery = useProducer(producerId ?? "");
@@ -309,39 +313,6 @@ export function SeasonRecommendationsView({
   };
 
   if (!recommendations.length) {
-    const emptyAction =
-      seasonStatus === "DRAFT" && onPublish ? (
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={onPublish}
-          disabled={isPublishing}
-        >
-          <Send className="w-4 h-4" />
-          {isPublishing ? "Publicando…" : "Publicar safra"}
-        </Button>
-      ) : canManageStages ? (
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={() => setAddingStage(true)}
-        >
-          <Plus className="w-4 h-4" />
-          Adicionar etapa
-        </Button>
-      ) : producerId ? (
-        <Button asChild size="sm" variant="outline">
-          <Link
-            href={routes.produtores.detalhe(producerId, {
-              hash: "timing-templates",
-            })}
-          >
-            Configurar modelo de timing
-          </Link>
-        </Button>
-      ) : undefined;
-
     return (
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -349,6 +320,17 @@ export function SeasonRecommendationsView({
             <h2 className="text-base font-semibold font-display text-text-strong">
               Etapas do cronograma
             </h2>
+            {canSeasonCrud && seasonStatus !== "ARCHIVED" && seasonStatus !== "HARVESTED" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setCropEditOpen(true)}
+              >
+                <Pencil className="w-4 h-4 text-muted-foreground" />
+                Editar cultivo
+              </Button>
+            ) : null}
             {canManageStages ? (
               <Button
                 variant="outline"
@@ -361,7 +343,51 @@ export function SeasonRecommendationsView({
               </Button>
             ) : null}
           </div>
-          {emptyAction}
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageStages ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setTemplateOpen(true)}
+                >
+                  <LayoutTemplate className="w-4 h-4" />
+                  Aplicar modelo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setAddingStage(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar etapa
+                </Button>
+              </>
+            ) : producerId ? (
+              <Button asChild size="sm" variant="outline">
+                <Link
+                  href={routes.produtores.detalhe(producerId, {
+                    hash: "timing-templates",
+                  })}
+                >
+                  Configurar modelo de timing
+                </Link>
+              </Button>
+            ) : null}
+            {seasonStatus === "DRAFT" && onPublish ? (
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={onPublish}
+                disabled={isPublishing}
+              >
+                <Send className="w-4 h-4" />
+                {isPublishing ? "Publicando…" : "Publicar safra"}
+              </Button>
+            ) : null}
+          </div>
         </div>
         <ul className="flex flex-col gap-3">
           <PlantingDateBlock
@@ -374,11 +400,9 @@ export function SeasonRecommendationsView({
           variant="inline"
           title="Nenhuma recomendação encontrada para esta safra."
           description={
-            seasonStatus === "DRAFT"
-              ? "Publique a safra para gerar o cronograma de aplicações a partir do modelo de timing."
-              : canManageStages
-                ? "Adicione etapas manualmente ou configure o modelo de timing do produtor."
-                : "O cronograma é gerado ao publicar a safra com um modelo de timing que tenha etapas configuradas."
+            canManageStages
+              ? "Adicione etapas manualmente ou aplique um modelo de timing neste talhão."
+              : "O cronograma é gerado ao programar o talhão com um modelo de timing."
           }
         />
         {addingStage && canManageStages ? (
@@ -393,6 +417,29 @@ export function SeasonRecommendationsView({
           seasonId={seasonId}
           currentOrder={mixFormulationOrder}
         />
+        <EditSeasonCropDialog
+          open={cropEditOpen}
+          onOpenChange={setCropEditOpen}
+          seasonId={seasonId}
+          cycleId={seasonLive?.cycle_id}
+          crop={crop ?? seasonLive?.crop}
+          fallbackVariety={seasonLive?.variety}
+          initialVarieties={seasonLive?.varieties?.map((v) => ({
+            variety: v.variety,
+            planted_area_ha: v.planted_area_ha,
+            thousand_plants_per_ha: v.thousand_plants_per_ha ?? null,
+          }))}
+        />
+        {producerId ? (
+          <ApplySeasonTemplateDialog
+            open={templateOpen}
+            onOpenChange={setTemplateOpen}
+            seasonId={seasonId}
+            producerId={producerId}
+            crop={crop ?? seasonLive?.crop}
+            hasPendingStages={false}
+          />
+        ) : null}
       </div>
     );
   }
@@ -479,18 +526,40 @@ export function SeasonRecommendationsView({
               Ordem de mistura
             </Button>
           ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          {canManageStages ? (
+          {canSeasonCrud && seasonStatus !== "ARCHIVED" && seasonStatus !== "HARVESTED" ? (
             <Button
               variant="outline"
               size="sm"
-              aria-label="Adicionar etapa"
-              onClick={() => setAddingStage((v) => !v)}
+              className="gap-1.5 print:hidden"
+              onClick={() => setCropEditOpen(true)}
             >
-              <Plus className="w-4 h-4" />
-              Adicionar etapa
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+              Editar cultivo
             </Button>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          {canManageStages ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 print:hidden"
+                onClick={() => setTemplateOpen(true)}
+              >
+                <LayoutTemplate className="w-4 h-4" />
+                Aplicar modelo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="Adicionar etapa"
+                onClick={() => setAddingStage((v) => !v)}
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar etapa
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
@@ -564,6 +633,29 @@ export function SeasonRecommendationsView({
         seasonId={seasonId}
         currentOrder={mixFormulationOrder}
       />
+      <EditSeasonCropDialog
+        open={cropEditOpen}
+        onOpenChange={setCropEditOpen}
+        seasonId={seasonId}
+        cycleId={seasonLive?.cycle_id}
+        crop={crop ?? seasonLive?.crop}
+        fallbackVariety={seasonLive?.variety}
+        initialVarieties={seasonLive?.varieties?.map((v) => ({
+          variety: v.variety,
+          planted_area_ha: v.planted_area_ha,
+          thousand_plants_per_ha: v.thousand_plants_per_ha ?? null,
+        }))}
+      />
+      {producerId ? (
+        <ApplySeasonTemplateDialog
+          open={templateOpen}
+          onOpenChange={setTemplateOpen}
+          seasonId={seasonId}
+          producerId={producerId}
+          crop={crop ?? seasonLive?.crop}
+          hasPendingStages={recommendations.some((r) => r.status === "PENDING")}
+        />
+      ) : null}
     </div>
   );
 }

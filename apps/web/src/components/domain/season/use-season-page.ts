@@ -38,9 +38,15 @@ export function useSeasonPage() {
   const statusLabel = season
     ? labelStatus(STATUS_LABELS, season.status)
     : "";
+  const varietyLabel = season
+    ? (season.varieties ?? [])
+        .map((v) => v.variety)
+        .filter(Boolean)
+        .join(" + ") || season.variety
+    : "";
   const title = season
-    ? season.variety
-      ? `${cropLabel} — ${season.variety}`
+    ? varietyLabel
+      ? `${cropLabel} — ${varietyLabel}`
       : cropLabel
     : "Safra";
 

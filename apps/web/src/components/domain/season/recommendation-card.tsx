@@ -18,14 +18,17 @@ import {
   useApplyRecommendation,
   useCloneGlobalProduct,
   useCreateRecommendationItem,
+  useCyclePurchaseList,
   useDeleteRecommendation,
   useDeleteRecommendationItem,
   usePatchRecommendation,
   useReorderRecommendationItems,
+  useSeason,
   useSeasonCostPlan,
   useSkipRecommendation,
   useUndoRecommendation,
   useUpdateRecommendationItem,
+  useUpdateSeasonVarieties,
 } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import {
@@ -571,16 +574,170 @@ function AddProductRow({
 /** Linha de semente numa etapa: mostra população e Big Bags/sacos (sem dose). */
 function SeedRow({
   item,
+  seasonId,
   onDelete,
   canDelete = true,
+  canEdit = false,
 }: {
   item: RecommendationItem;
+  seasonId: string;
   onDelete: (id: string) => void;
   canDelete?: boolean;
+  canEdit?: boolean;
 }) {
+  const { data: season } = useSeason(seasonId);
+  const { data: purchaseList } = useCyclePurchaseList(season?.cycle_id ?? "");
+  const updateItem = useUpdateRecommendationItem(seasonId);
+  const updateVars = useUpdateSeasonVarieties(seasonId);
+  const [editing, setEditing] = useState(false);
   const seedsPerUnit = item.dose_unit === "SACA" ? 60000 : 5000000;
-  const population = Number(item.dose_per_hectare) * seedsPerUnit;
+  const currentPop = Number(item.dose_per_hectare) * seedsPerUnit;
+  const [productId, setProductId] = useState(item.local_product_id);
+  const [population, setPopulation] = useState(String(Math.round(currentPop)));
+
+  const listSeeds = (purchaseList?.items ?? []).filter((it) =>
+    SEED_CATEGORIES.includes(it.category),
+  );
+
+  const startEditing = () => {
+    setProductId(item.local_product_id);
+    setPopulation(String(Math.round(currentPop)));
+    setEditing(true);
+  };
+
+  const persistVarieties = (
+    productName: string,
+    plants: number,
+  ) => {
+    const existing = season?.varieties ?? [];
+    if (existing.length === 0) {
+      return updateVars.mutateAsync([
+        {
+          variety: productName,
+          planted_area_ha:
+            season?.planted_area_ha != null ? Number(season.planted_area_ha) : null,
+          thousand_plants_per_ha: plants,
+        },
+      ]);
+    }
+    const lower = productName.trim().toLowerCase();
+    const oldLower = item.product_name.trim().toLowerCase();
+    let matched = false;
+    const next = existing.map((v) => {
+      const name = v.variety.trim().toLowerCase();
+      if (name === lower || name === oldLower) {
+        matched = true;
+        return {
+          variety: productName,
+          planted_area_ha: v.planted_area_ha,
+          thousand_plants_per_ha: plants,
+        };
+      }
+      return {
+        variety: v.variety,
+        planted_area_ha: v.planted_area_ha,
+        thousand_plants_per_ha: v.thousand_plants_per_ha,
+      };
+    });
+    if (!matched) {
+      next[0] = {
+        variety: productName,
+        planted_area_ha: next[0]?.planted_area_ha ?? null,
+        thousand_plants_per_ha: plants,
+      };
+    }
+    return updateVars.mutateAsync(next);
+  };
+
+  const handleSave = () => {
+    const plants = Number(population.replace(",", ".").trim());
+    if (!plants || plants <= 0) {
+      toast.error("Informe a população em plantas/ha.");
+      return;
+    }
+    const selected =
+      listSeeds.find((s) => s.local_product_id === productId) ??
+      listSeeds.find((s) => s.product_name === item.product_name);
+    const unit = selected
+      ? selected.category === "HIBRIDO_MILHO"
+        ? "SACA"
+        : "BAG"
+      : item.dose_unit;
+    const perUnit = unit === "SACA" ? 60000 : 5000000;
+    const productName = selected?.product_name ?? item.product_name;
+    updateItem.mutate(
+      {
+        id: item.id,
+        local_product_id: selected?.local_product_id ?? item.local_product_id,
+        dose_per_hectare: plants / perUnit,
+        dose_unit: unit,
+      },
+      {
+        onSuccess: () => {
+          void persistVarieties(productName, plants).then(
+            () => {
+              toast.success("Semente atualizada.");
+              setEditing(false);
+            },
+            () => {
+              toast.success("População da etapa atualizada.");
+              setEditing(false);
+            },
+          );
+        },
+        onError: () => toast.error("Não foi possível atualizar a semente."),
+      },
+    );
+  };
+
   const unitLabel = item.dose_unit === "SACA" ? "sacos" : "Big Bags";
+
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-2">
+        <div className="grid gap-2 sm:grid-cols-[1fr_8rem]">
+          {listSeeds.length > 0 ? (
+            <SearchableSelect
+              value={productId}
+              onValueChange={setProductId}
+              placeholder="Cultivar"
+              options={listSeeds.map((s) => ({
+                value: s.local_product_id,
+                label: s.product_name,
+              }))}
+            />
+          ) : (
+            <span className="text-sm font-medium">{item.product_name}</span>
+          )}
+          <Input
+            inputMode="decimal"
+            value={population}
+            onChange={(e) => setPopulation(e.target.value)}
+            aria-label="Plantas por hectare"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            className="h-8"
+            onClick={handleSave}
+            disabled={updateItem.isPending || updateVars.isPending}
+          >
+            Salvar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8"
+            onClick={() => setEditing(false)}
+          >
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg bg-card">
       <Sprout className="h-3.5 w-3.5 shrink-0 text-primary-strong" />
@@ -588,11 +745,22 @@ function SeedRow({
         {item.product_name}
       </span>
       <span className="text-xs shrink-0 tabular-nums text-muted-foreground">
-        {population.toLocaleString("pt-BR")} plantas/ha
+        {currentPop.toLocaleString("pt-BR")} plantas/ha
         {item.total_quantity
           ? ` · ${item.total_quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unitLabel}`
           : ""}
       </span>
+      {canEdit ? (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground"
+          onClick={startEditing}
+          aria-label="Editar semente"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      ) : null}
       {canDelete ? (
         <Button
           size="icon"
@@ -619,6 +787,7 @@ function AddSeedRow({
   onClose: () => void;
 }) {
   const { data: plan } = useSeasonCostPlan(seasonId);
+  const { data: season } = useSeason(seasonId);
   const [selectedId, setSelectedId] = useState("");
   const createMut = useCreateRecommendationItem(seasonId);
 
@@ -626,13 +795,21 @@ function AddSeedRow({
     SEED_CATEGORIES.includes(it.category),
   );
   const selected = listSeeds.find((s) => s.local_product_id === selectedId);
+  const plotPop = (season?.varieties ?? []).find(
+    (v) =>
+      selected &&
+      v.variety.trim().toLowerCase() === selected.product_name.trim().toLowerCase(),
+  )?.thousand_plants_per_ha;
 
   const handleAdd = () => {
     if (!selected) return toast.error("Selecione a semente.");
     const seedsPerUnit =
       selected.category === "HIBRIDO_MILHO" ? 60000 : 5000000;
     const unit = selected.category === "HIBRIDO_MILHO" ? "SACA" : "BAG";
-    const pop = selected.thousand_plants_per_ha ?? 0;
+    const pop =
+      plotPop && plotPop > 0
+        ? plotPop
+        : (selected.thousand_plants_per_ha ?? 0);
     createMut.mutate(
       {
         recommendation_id: recommendationId,
@@ -1185,8 +1362,10 @@ export function RecommendationCard({
                     <SeedRow
                       key={item.id}
                       item={item}
+                      seasonId={seasonId}
                       onDelete={handleDeleteItem}
                       canDelete={canEditStructure}
+                      canEdit={canEditStructure}
                     />
                   ))}
                 </div>

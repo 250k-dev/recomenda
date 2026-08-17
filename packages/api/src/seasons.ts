@@ -15,10 +15,16 @@ export interface SeasonDetail extends Season {
   /** Safra da fazenda (fluxo novo); null em dados legados. */
   cycle_id?: string | null;
   variety?: string;
+  planted_area_ha?: string | number | null;
   planting_date?: string;
   desiccation_date?: string;
   /** Ordem customizada das formulações na calda (null = padrão oficial). */
   mix_formulation_order?: string[] | null;
+  varieties?: Array<{
+    variety: string;
+    planted_area_ha: number | null;
+    thousand_plants_per_ha?: number | null;
+  }>;
 }
 
 export interface ShoppingListItem {
@@ -131,6 +137,27 @@ export async function updateSeason(
   return data;
 }
 
+export async function updateSeasonVarieties(
+  id: string,
+  varieties: Array<{
+    variety: string;
+    planted_area_ha?: number | null;
+    thousand_plants_per_ha?: number | null;
+  }>,
+) {
+  const { data } = await api.patch<SeasonDetail>(`/seasons/${id}/varieties`, {
+    varieties,
+  });
+  return data;
+}
+
+export async function applySeasonTemplate(id: string, timingTemplateId: string) {
+  const { data } = await api.post<SeasonDetail>(`/seasons/${id}/apply-template`, {
+    timing_template_id: timingTemplateId,
+  });
+  return data;
+}
+
 export async function archiveSeason(id: string) {
   const { data } = await api.post(`/seasons/${id}/archive`);
   return data;
@@ -236,6 +263,7 @@ export async function updateRecommendationItem(
   payload: {
     dose_per_hectare?: number;
     dose_unit?: string;
+    local_product_id?: string;
     mix_order_override?: number | null;
   },
 ) {

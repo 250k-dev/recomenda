@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   MapPinned,
+  Pencil,
   Plus,
   SquareCheckBig,
   Trash2,
@@ -35,6 +36,7 @@ import {
 } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { AddCycleFarmDialog } from "@/components/domain/cycle/cycle-farms-section";
+import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -120,6 +122,7 @@ export function CycleFarmDisclosures({
   archivePending?: boolean;
 }) {
   const canManage = useCan("CYCLE_CRUD");
+  const canEditCrop = useCan("SEASON_CRUD");
   const { data: producerFarms } = useProducerFarms(producerId);
   const { data: availablePlots = [] } = useCycleAvailablePlots(cycle.id);
   const removeCycleFarm = useRemoveCycleFarm(cycle.id);
@@ -132,6 +135,7 @@ export function CycleFarmDisclosures({
   } | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [openFarms, setOpenFarms] = useState<Set<string>>(new Set());
+  const [editingCrop, setEditingCrop] = useState<CycleSeasonRow | null>(null);
 
   const locationByFarm = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -415,8 +419,24 @@ export function CycleFarmDisclosures({
                                   Talhão {season.plot_name}
                                 </span>
                                 <span className="min-w-0">
-                                  <span className="block truncate text-muted-foreground">
-                                    {row.displayName}
+                                  <span className="flex min-w-0 items-center gap-1.5">
+                                    <span className="block truncate text-muted-foreground">
+                                      {row.displayName}
+                                    </span>
+                                    {canEditCrop &&
+                                    season.status !== "ARCHIVED" &&
+                                    season.status !== "HARVESTED" ? (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        className="size-7 shrink-0 text-muted-foreground"
+                                        title="Editar cultivar e população"
+                                        onClick={() => setEditingCrop(season)}
+                                      >
+                                        <Pencil className="size-3.5" />
+                                      </Button>
+                                    ) : null}
                                   </span>
                                   {row.varietiesBreakdown ? (
                                     <span className="block truncate text-xs text-muted-foreground/80">
@@ -512,6 +532,17 @@ export function CycleFarmDisclosures({
                                         : ""}{" "}
                                       ha
                                     </p>
+                                    {canEditCrop &&
+                                    season.status !== "ARCHIVED" &&
+                                    season.status !== "HARVESTED" ? (
+                                      <button
+                                        type="button"
+                                        className="mt-1 text-xs font-medium text-primary-strong"
+                                        onClick={() => setEditingCrop(season)}
+                                      >
+                                        Editar cultivo
+                                      </button>
+                                    ) : null}
                                   </div>
                                   <Badge
                                     className="shrink-0"
@@ -584,6 +615,22 @@ export function CycleFarmDisclosures({
           })}
         </div>
       )}
+
+      <EditSeasonCropDialog
+        open={!!editingCrop}
+        onOpenChange={(open) => {
+          if (!open) setEditingCrop(null);
+        }}
+        seasonId={editingCrop?.id ?? ""}
+        cycleId={cycle.id}
+        crop={editingCrop?.crop}
+        fallbackVariety={editingCrop?.variety}
+        initialVarieties={editingCrop?.varieties?.map((v) => ({
+          variety: v.variety,
+          planted_area_ha: v.planted_area_ha,
+          thousand_plants_per_ha: v.thousand_plants_per_ha ?? null,
+        }))}
+      />
 
       <AddCycleFarmDialog
         open={addFarmOpen}

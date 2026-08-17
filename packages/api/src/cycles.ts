@@ -40,6 +40,7 @@ export interface CycleSummary {
 export interface SeasonVariety {
   variety: string;
   planted_area_ha: number | null;
+  thousand_plants_per_ha?: number | null;
 }
 
 export interface CycleSeasonRow {

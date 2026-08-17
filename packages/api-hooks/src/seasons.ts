@@ -13,6 +13,8 @@ import {
   hardDeleteSeason,
   publishSeason,
   updateSeason,
+  updateSeasonVarieties,
+  applySeasonTemplate,
   getArchivedSeasons,
   getTimeline,
   getPlotHistory,
@@ -160,6 +162,48 @@ export function useUpdateSeason(seasonId: string) {
   });
 }
 
+function invalidateSeasonCropCaches(queryClient: QueryClient, seasonId: string) {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.season(seasonId) });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.seasonCostPlan(seasonId) });
+  void queryClient.invalidateQueries({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      (query.queryKey[0] === "cycle" ||
+        query.queryKey[0] === "farm-cycles" ||
+        query.queryKey[0] === "producer-cycles" ||
+        query.queryKey[0] === "farm-seasons"),
+  });
+}
+
+export function useUpdateSeasonVarieties(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      varieties: Array<{
+        variety: string;
+        planted_area_ha?: number | null;
+        thousand_plants_per_ha?: number | null;
+      }>,
+    ) => updateSeasonVarieties(seasonId, varieties),
+    onSuccess: () => {
+      invalidateSeasonCropCaches(queryClient, seasonId);
+    },
+  });
+}
+
+export function useApplySeasonTemplate(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (timingTemplateId: string) =>
+      applySeasonTemplate(seasonId, timingTemplateId),
+    onSuccess: () => {
+      invalidateSeasonCropCaches(queryClient, seasonId);
+      invalidatePurchaseListsAfterRecommendationChange(queryClient);
+    },
+  });
+}
+
 export function useSeasonTimeline(seasonId: string) {
   return useQuery({
     queryKey: queryKeys.seasonTimeline(seasonId),
@@ -269,6 +313,7 @@ export function useUpdateRecommendationItem(seasonId: string) {
       id: string;
       dose_per_hectare?: number;
       dose_unit?: string;
+      local_product_id?: string;
       mix_order_override?: number | null;
     }) => updateRecommendationItem(id, payload),
     onSuccess: () => {
