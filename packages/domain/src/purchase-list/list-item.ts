@@ -23,6 +23,8 @@ export type ListItem = {
   unit: string;
   nApps: string;
   stock: string;
+  /** Volume já aplicado nesta safra (não vai para o payload). */
+  applied?: number;
   /** Preço unitário em R$ (manual). */
   price: string;
   /** Preço unitário em US$ (manual) — convertido para R$ pela cotação do dólar. */
@@ -144,8 +146,9 @@ export function listItemQuantity(it: ListItem, totalHa: number): number {
  */
 export function listItemToBuy(it: ListItem, totalHa: number): number {
   const required = listItemQuantity(it, totalHa);
-  const stock = Number(it.stock || 0);
-  return Math.max(0, (required - stock) * areaFactorOf(it));
+  const stock = Math.max(0, Number(it.stock || 0));
+  const applied = Math.max(0, Number(it.applied || 0));
+  return Math.max(0, (required - applied - stock) * areaFactorOf(it));
 }
 
 /** Cultura do item numa lista multi-cultura: sementes são inequívocas pela
@@ -245,7 +248,9 @@ export function applyStockPrefill(
     if (!it.productId) return it;
     const entry = stockByProductId[it.productId];
     if (entry == null) return it;
-    const qty = typeof entry === "number" ? entry : entry.quantity;
+    // Estoque físico não é negativo: um saldo negativo (dado anômalo) vira 0.
+    const rawQty = typeof entry === "number" ? entry : entry.quantity;
+    const qty = Math.max(0, Number(rawQty) || 0);
     const priceBrl = typeof entry === "number" ? null : entry.price_brl;
     const keepStock = onlyIfEmpty && Number(it.stock || 0) > 0;
     const keepPrice = onlyIfEmpty && Boolean(it.price?.trim());

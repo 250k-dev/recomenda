@@ -65,6 +65,7 @@ interface EditableItem {
   dose_unit: string;
   n_applications: number;
   current_stock: number;
+  applied_quantity?: number;
   area_factor: number;
   price_usd: number | null;
   price_brl_fixed: number | null;
@@ -137,6 +138,7 @@ export function CostPlanView({
         dose_unit: it.dose_unit,
         n_applications: it.n_applications,
         current_stock: it.current_stock,
+        applied_quantity: it.applied_quantity ?? 0,
         area_factor: it.area_factor,
         price_usd: it.price_usd,
         price_brl_fixed: it.price_brl_fixed,
@@ -169,7 +171,7 @@ export function CostPlanView({
       dose_per_hectare: it.dose_per_hectare,
       dose_unit: it.dose_unit,
       n_applications: it.n_applications,
-      current_stock: it.current_stock,
+      current_stock: it.current_stock + (it.applied_quantity ?? 0),
       area_factor: it.area_factor,
       price_usd: it.price_usd,
       price_brl_fixed: it.price_brl_fixed,

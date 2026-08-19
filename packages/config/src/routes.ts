@@ -93,6 +93,8 @@ export const routes = {
       ctx?: RouteContext,
     ) =>
       withQuery(`/produtores/${produtorId}/modelos-de-timing/${templateId}`, ctx),
+    safrasArquivadas: (produtorId: string, ctx?: RouteContext) =>
+      withQuery(`/produtores/${produtorId}/safras-arquivadas`, ctx),
   },
 
   equipe: {
@@ -132,7 +134,6 @@ export const routes = {
    * a safra da fazenda como um todo vive em `fazendas.safra`.
    */
   safras: {
-    lista: "/safras" satisfies Route,
     nova: (ctx?: RouteContext) => withQuery("/safras/nova", ctx),
     /** Tela padrão da safra do talhão: o cronograma de recomendações. */
     cronograma: (id: string, ctx?: RouteContext) =>

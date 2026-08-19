@@ -97,7 +97,8 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
   const area = params.area_hectares;
   const dose = item.dose_per_hectare;
   const nApps = item.n_applications || 1;
-  const stock = item.current_stock || 0;
+  // Estoque negativo (dado anômalo) não pode inflar a quantidade/custo: trata como 0.
+  const stock = Math.max(0, item.current_stock || 0);
 
   // G — Qtde final
   let G: number;

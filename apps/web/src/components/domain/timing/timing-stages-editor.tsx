@@ -18,6 +18,7 @@ import {
   useProducerPurchaseLists,
   useFarmPurchaseLists,
 } from "@recomenda/api-hooks";
+import { useProducerStock } from "@recomenda/api-hooks/producers";
 import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 import {
@@ -66,6 +67,9 @@ export function usePurchaseListCatalogProducts(
   const { data: farmLists, isLoading: farmListsLoading } = useFarmPurchaseLists(
     farmId ?? "",
   );
+  const { data: producerStock, isLoading: stockLoading } = useProducerStock(
+    producerId ?? "",
+  );
 
   const purchaseLists = useMemo(() => {
     const source =
@@ -95,14 +99,35 @@ export function usePurchaseListCatalogProducts(
     [purchaseLists],
   );
 
+  // Produtos que o produtor já tem em estoque (quantity > 0) — também contam
+  // como "na programação": o produtor pode usar o que já tem sem estar na lista.
+  const stockProductIds = useMemo(
+    () =>
+      new Set(
+        (producerStock ?? [])
+          .filter((stock) => Number(stock.quantity) > 0)
+          .map((stock) => stock.local_product_id),
+      ),
+    [producerStock],
+  );
+
+  // Conjunto "na programação" = lista de compra ∪ estoque disponível.
+  const inProgramProductIds = useMemo(
+    () => new Set([...listProductIds, ...stockProductIds]),
+    [listProductIds, stockProductIds],
+  );
+
   return {
     catalogProducts,
     listProductIds,
+    stockProductIds,
+    inProgramProductIds,
     purchaseLists,
     isLoading:
       platformCatalog.isLoading ||
       globalCatalog.isLoading ||
       (Boolean(producerId) && listsLoading) ||
+      (Boolean(producerId) && stockLoading) ||
       (Boolean(farmId) && farmListsLoading),
   };
 }
@@ -201,7 +226,7 @@ function StageProductsEditor({
   farmId?: string;
   overBudgetProductIds: Set<string>;
 }) {
-  const { catalogProducts, listProductIds, purchaseLists, isLoading } =
+  const { catalogProducts, inProgramProductIds, purchaseLists, isLoading } =
     usePurchaseListCatalogProducts(producerId, crop, farmId);
   const cloneGlobal = useCloneGlobalProduct();
 
@@ -238,10 +263,11 @@ function StageProductsEditor({
     [],
   );
 
-  // Produtos que já estão na lista de compra (mostrados por padrão na recomendação).
+  // Produtos "na programação" — lista de compra ∪ estoque do produtor. Mostrados
+  // por padrão na recomendação (o produtor pode usar o que já tem em estoque).
   const listCatalog = useMemo(
-    () => catalogProducts.filter((product) => listProductIds.has(product.optionValue)),
-    [catalogProducts, listProductIds],
+    () => catalogProducts.filter((product) => inProgramProductIds.has(product.optionValue)),
+    [catalogProducts, inProgramProductIds],
   );
 
   const updateProduct = (key: string, patch: Partial<StageProductDraft>) => {
@@ -269,7 +295,7 @@ function StageProductsEditor({
         productName: name,
         unit: planned?.unit ?? unit ?? "L",
         dose: currentDose || (planned ? String(planned.dose) : currentDose),
-        outOfProgram: !listProductIds.has(localId),
+        outOfProgram: !inProgramProductIds.has(localId),
       });
     };
     if (!product.globalId || !product.isGlobalOnly) {
@@ -324,9 +350,9 @@ function StageProductsEditor({
               </button>
             </TooltipTrigger>
             <TooltipContent sideOffset={6} className="max-w-xs text-left leading-relaxed">
-              O ideal é usar os insumos da lista de compra. Mas dá pra buscar qualquer produto do
-              catálogo (global + local) ou cadastrar um novo — itens fora da lista entram marcados
-              como “fora da programação”.
+              O ideal é usar os insumos da lista de compra ou o que o produtor já tem em estoque.
+              Mas dá pra buscar qualquer produto do catálogo (global + local) ou cadastrar um novo —
+              itens fora da lista e sem estoque entram marcados como “fora da programação”.
             </TooltipContent>
           </Tooltip>
         </div>

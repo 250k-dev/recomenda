@@ -41,7 +41,6 @@ import {
 import { useProducerStock } from "@recomenda/api-hooks/producers";
 import type { ListItem } from "@recomenda/domain/purchase-list/list-item";
 import {
-  applyStockPrefill,
   listItemToPayload,
   validateListItems,
 } from "@recomenda/domain/purchase-list/list-item";
@@ -149,7 +148,7 @@ export function FarmPurchaseListTab({
       {};
     for (const s of producerStock ?? []) {
       map[s.local_product_id] = {
-        quantity: Number(s.quantity) || 0,
+        quantity: Number(s.available ?? s.quantity) || 0,
         price_brl:
           s.price_brl != null && Number.isFinite(Number(s.price_brl))
             ? Number(s.price_brl)
@@ -194,11 +193,8 @@ export function FarmPurchaseListTab({
 
   const itemsFromList = useCallback(
     (source: PurchaseListDetail | null | undefined) =>
-      applyStockPrefill(
-        (source?.items ?? []).map(detailItemToListItem),
-        stockByProductId,
-      ),
-    [stockByProductId],
+      (source?.items ?? []).map(detailItemToListItem),
+    [],
   );
 
   const resetDraft = useCallback(() => {

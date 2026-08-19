@@ -253,7 +253,7 @@ export function PurchaseListWizard({
       {};
     for (const s of producerStock ?? []) {
       map[s.local_product_id] = {
-        quantity: Number(s.quantity) || 0,
+        quantity: Number(s.available ?? s.quantity) || 0,
         price_brl:
           s.price_brl != null && Number.isFinite(Number(s.price_brl))
             ? Number(s.price_brl)

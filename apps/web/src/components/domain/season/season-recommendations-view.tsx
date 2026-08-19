@@ -226,7 +226,7 @@ export function SeasonRecommendationsView({
   // para o editor de produtos e o alerta "fora da programação".
   const {
     catalogProducts,
-    listProductIds,
+    inProgramProductIds,
     purchaseLists,
     isLoading: catalogLoading,
   } = usePurchaseListCatalogProducts(producerId, crop, farmId);
@@ -592,7 +592,7 @@ export function SeasonRecommendationsView({
             canReorder={canManageStages}
             canEditStructure={canManageStages}
             catalogProducts={catalogProducts}
-            listProductIds={listProductIds}
+            inProgramProductIds={inProgramProductIds}
             listDoseByProductId={listDoseByProductId}
             listReady={listReady}
           />

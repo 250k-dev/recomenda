@@ -8,7 +8,7 @@
  */
 import {
   isSeedItem,
-  listItemQuantity,
+  listItemToBuy,
   type ListItem,
 } from "./list-item";
 import { CATEGORY_ORDER, type CategoryBreakdown } from "../cost-plan/calculate";
@@ -29,6 +29,7 @@ export function detailItemToListItem(
     unit: it.dose_unit,
     nApps: String(it.n_applications),
     stock: String(it.current_stock),
+    applied: Number(it.applied_quantity) || 0,
     price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
     priceUsd: it.price_usd != null ? String(it.price_usd) : "",
     seedsPerMeter: it.seeds_per_meter != null ? String(it.seeds_per_meter) : "",
@@ -85,8 +86,7 @@ export function computePurchaseListMetrics(
   const categoryTotals = new Map<string, number>();
 
   for (const it of items) {
-    const required = listItemQuantity(it, totalHa);
-    const toBuy = Math.max(0, required - Number(it.stock || 0));
+    const toBuy = listItemToBuy(it, totalHa);
     const unitPrice =
       it.priceUsd && fxRate > 0 ? Number(it.priceUsd) * fxRate : Number(it.price || 0);
     const seed = isSeedItem(it);

@@ -340,14 +340,15 @@ function AddProductRow({
   seasonId,
   onClose,
   catalogProducts,
-  listProductIds,
+  inProgramProductIds,
   listDoseByProductId,
 }: {
   recommendationId: string;
   seasonId: string;
   onClose: () => void;
   catalogProducts: PurchaseListCatalogProduct[];
-  listProductIds: Set<string>;
+  /** Produtos "na programação": lista de compra ∪ estoque do produtor. */
+  inProgramProductIds: Set<string>;
   /** Dose planejada na lista de compra, por produto — pré-preenche a dose. */
   listDoseByProductId: Map<string, { dose: number; unit: string }>;
 }) {
@@ -361,14 +362,15 @@ function AddProductRow({
   const createMut = useCreateRecommendationItem(seasonId);
   const cloneGlobal = useCloneGlobalProduct();
 
-  // Por padrão só a lista de compra; ao expandir, o catálogo completo (global +
-  // local). Produtos fora da lista entram marcados como "fora da programação".
+  // Por padrão a lista de compra e o estoque do produtor; ao expandir, o catálogo
+  // completo (global + local). Produtos fora da lista e sem estoque entram
+  // marcados como "fora da programação".
   const listCatalog = useMemo(
     () =>
       catalogProducts.filter((product) =>
-        listProductIds.has(product.optionValue),
+        inProgramProductIds.has(product.optionValue),
       ),
-    [catalogProducts, listProductIds],
+    [catalogProducts, inProgramProductIds],
   );
   const rowProducts = productsForPurchaseListCategory(
     expanded ? catalogProducts : listCatalog,
@@ -376,7 +378,7 @@ function AddProductRow({
     productId,
     productName,
   );
-  const outOfProgram = Boolean(productId) && !listProductIds.has(productId);
+  const outOfProgram = Boolean(productId) && !inProgramProductIds.has(productId);
 
   const handleCategoryChange = (nextCategory: string) => {
     setCategory(nextCategory);
@@ -498,7 +500,7 @@ function AddProductRow({
               emptyMessage={
                 expanded
                   ? "Nenhum produto encontrado no catálogo."
-                  : "Nenhum produto desta categoria na lista de compra."
+                  : "Nenhum produto desta categoria na lista de compra ou em estoque."
               }
               selectedLabel={productName || undefined}
               options={rowProducts.map((product) => ({
@@ -891,7 +893,7 @@ export function RecommendationCard({
   canReorder,
   canEditStructure = true,
   catalogProducts,
-  listProductIds,
+  inProgramProductIds,
   listDoseByProductId,
   listReady,
 }: {
@@ -908,7 +910,8 @@ export function RecommendationCard({
   canReorder: boolean;
   canEditStructure?: boolean;
   catalogProducts: PurchaseListCatalogProduct[];
-  listProductIds: Set<string>;
+  /** Produtos "na programação": lista de compra ∪ estoque do produtor. */
+  inProgramProductIds: Set<string>;
   listDoseByProductId: Map<string, { dose: number; unit: string }>;
   listReady: boolean;
 }) {
@@ -1341,7 +1344,7 @@ export function RecommendationCard({
                     }}
                     onDragEnd={() => setDragIndex(null)}
                     outOfProgram={
-                      listReady && !listProductIds.has(item.local_product_id)
+                      listReady && !inProgramProductIds.has(item.local_product_id)
                     }
                   />
                 ))}
@@ -1406,7 +1409,7 @@ export function RecommendationCard({
                   seasonId={seasonId}
                   onClose={() => setAddingProduct(false)}
                   catalogProducts={catalogProducts}
-                  listProductIds={listProductIds}
+                  inProgramProductIds={inProgramProductIds}
                   listDoseByProductId={listDoseByProductId}
                 />
               </div>

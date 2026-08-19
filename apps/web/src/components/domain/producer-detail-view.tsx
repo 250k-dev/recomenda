@@ -3,6 +3,7 @@
 import { routes } from "@recomenda/config";
 
 import type { Route } from "next";
+import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -56,6 +57,7 @@ import {
   Clock,
   TriangleAlert,
   Mail,
+  Boxes,
 } from "lucide-react";
 
 type ProducerPortfolioTab = "fazendas" | "safras";
@@ -291,6 +293,18 @@ export function ProducerDetailView({
             ) : null}
             {showSeasonActions ? (
               <>
+                {farmsList[0] ? (
+                  <Button asChild variant="outline" className="gap-2">
+                    <Link
+                      href={routes.fazendas.estoque(farmsList[0].id, {
+                        producer_id: producerId,
+                      })}
+                    >
+                      <Boxes className="size-4" />
+                      Estoque
+                    </Link>
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   className="gap-2"

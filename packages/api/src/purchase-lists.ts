@@ -122,6 +122,7 @@ export interface PurchaseListDetail {
     dose_unit: string;
     n_applications: number;
     current_stock: number;
+    applied_quantity?: number;
     required_quantity: number;
     quantity_to_buy: number;
     supplier: string | null;

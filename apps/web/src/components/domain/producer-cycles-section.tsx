@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Leaf, Plus, Search, Trash2 } from "lucide-react";
+import { Archive, ChevronRight, Leaf, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -58,6 +59,11 @@ export function ProducerCyclesSection({
     [cycles],
   );
 
+  const archivedCount = useMemo(
+    () => cycles.filter((c) => c.status === "ARCHIVED").length,
+    [cycles],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("pt-BR");
     if (!q) return visible;
@@ -86,6 +92,30 @@ export function ProducerCyclesSection({
             />
           </div>
         ) : null}
+        <Button
+          asChild={archivedCount > 0}
+          variant="outline"
+          disabled={archivedCount === 0}
+          className="inline-flex h-10 gap-1.5"
+        >
+          {archivedCount > 0 ? (
+            <Link href={routes.produtores.safrasArquivadas(producerId)}>
+              <Archive className="size-4" />
+              Arquivadas
+              <Badge variant="neutral" className="ml-0.5">
+                {archivedCount}
+              </Badge>
+            </Link>
+          ) : (
+            <>
+              <Archive className="size-4" />
+              Arquivadas
+              <Badge variant="neutral" className="ml-0.5">
+                0
+              </Badge>
+            </>
+          )}
+        </Button>
         {anchorFarmId ? (
           <Button
             className="hidden h-10 gap-1.5 sm:inline-flex"

@@ -73,6 +73,15 @@ export interface ProducerStock {
   category?: string | null;
   /** Preço unitário deste produtor (R$) — não vem do catálogo global. */
   price_brl?: number | null;
+  /** Produto está referenciado em ao menos uma lista de compra ativa. */
+  in_use?: boolean;
+  /** Nomes das listas ativas que usam o produto (tooltip da flag). */
+  list_names?: string[];
+  /**
+   * Saldo físico ainda não reservado por listas ativas.
+   * Prefill da próxima safra: 0 se outra lista já tomou o estoque.
+   */
+  available?: number;
 }
 
 export type InvitationKind = "PRODUCER" | "CONSULTANT" | "FARM_TEAM";

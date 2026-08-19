@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
@@ -95,6 +96,8 @@ export function ProducerStockSection({
         dose_unit: item.dose_unit ?? catalog?.dose_unit ?? "",
         price_brl: price,
         value_brl: price != null ? price * qty : null,
+        in_use: Boolean(item.in_use),
+        list_names: item.list_names ?? [],
       };
     });
   }, [stock, productById]);
@@ -361,7 +364,21 @@ export function ProducerStockSection({
                 {enrichedRows.map((item) => (
                   <tr key={item.id}>
                     <td className="px-3 py-2 font-medium text-foreground">
-                      {item.product_name}
+                      <div className="flex flex-col items-start gap-1">
+                        <span>{item.product_name}</span>
+                        {item.in_use ? (
+                          <Badge
+                            variant="warning"
+                            title={
+                              item.list_names.length
+                                ? `Em uso em: ${item.list_names.join(", ")}`
+                                : undefined
+                            }
+                          >
+                            Em uso
+                          </Badge>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {item.categoryLabel}
