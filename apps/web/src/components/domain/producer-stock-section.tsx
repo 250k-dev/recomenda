@@ -9,11 +9,13 @@ import {
   Pencil,
   Plus,
   Save,
+  Trash2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
 import { MoneyInput } from "@recomenda/ui/forms/money-input";
@@ -23,7 +25,7 @@ import { StockExportDialog } from "@/components/domain/stock-export-dialog";
 import { StockHistoryDialog } from "@/components/domain/stock-history-dialog";
 import { StockOriginsDialog } from "@/components/domain/stock-origins-dialog";
 import { useLocalCatalog } from "@recomenda/api-hooks";
-import { useProducerStock, useAdjustProducerStock } from "@recomenda/api-hooks/producers";
+import { useProducerStock, useAdjustProducerStock, useDeleteProducerStock } from "@recomenda/api-hooks/producers";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { StockExportData } from "@recomenda/domain/stock/stock-export";
 import { PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
@@ -52,6 +54,7 @@ export function ProducerStockSection({
   const { data: stock, isLoading } = useProducerStock(producerId);
   const { data: catalogData } = useLocalCatalog();
   const adjust = useAdjustProducerStock(producerId);
+  const removeStock = useDeleteProducerStock(producerId);
 
   const [formOpen, setFormOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -59,6 +62,12 @@ export function ProducerStockSection({
   const [originProduct, setOriginProduct] = useState<{
     id: string;
     name: string;
+  } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    local_product_id: string;
+    product_name: string;
+    in_use: boolean;
+    list_names: string[];
   } | null>(null);
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -410,14 +419,31 @@ export function ProducerStockSection({
                       </button>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => editEntry(item)}
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label="Editar item"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => editEntry(item)}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="Editar item"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingDelete({
+                              local_product_id: item.local_product_id,
+                              product_name: item.product_name,
+                              in_use: item.in_use,
+                              list_names: item.list_names,
+                            })
+                          }
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label="Excluir item"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -445,6 +471,43 @@ export function ProducerStockSection({
         producerId={producerId}
         localProductId={originProduct?.id ?? ""}
         productName={originProduct?.name ?? ""}
+      />
+      <ConfirmDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={
+          pendingDelete
+            ? `Excluir ${pendingDelete.product_name} do estoque?`
+            : "Excluir produto do estoque?"
+        }
+        description={
+          pendingDelete?.in_use ? (
+            <>
+              Este produto está vinculado a{" "}
+              {pendingDelete.list_names.length
+                ? pendingDelete.list_names.join(", ")
+                : "uma safra ativa"}
+              . A necessidade de compra dessas safras será recalculada.
+            </>
+          ) : (
+            "O produto sai do estoque deste produtor. Esta ação não pode ser desfeita."
+          )
+        }
+        confirmLabel="Excluir"
+        tone="destructive"
+        loading={removeStock.isPending}
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          try {
+            await removeStock.mutateAsync(pendingDelete.local_product_id);
+            toast.success("Produto excluído do estoque.");
+            setPendingDelete(null);
+          } catch (e) {
+            toast.error(apiErrorMessage(e, "Não foi possível excluir o estoque."));
+          }
+        }}
       />
     </>
   );

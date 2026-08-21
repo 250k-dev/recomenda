@@ -12,6 +12,7 @@ import {
   getProducerFarms,
   getProducerStock,
   adjustProducerStock,
+  deleteProducerStock,
   createInvitation,
   revokeInvitation,
   getInvitations,
@@ -122,6 +123,20 @@ export function useAdjustProducerStock(producerId: string) {
     }) => adjustProducerStock(producerId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(producerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerPurchaseLists(producerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerCycles(producerId) });
+    },
+  });
+}
+
+export function useDeleteProducerStock(producerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (localProductId: string) => deleteProducerStock(producerId, localProductId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(producerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerPurchaseLists(producerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerCycles(producerId) });
     },
   });
 }
