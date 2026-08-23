@@ -63,7 +63,7 @@ import {
 } from "@/components/domain/season/_shared";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import {
-  listItemToBuy,
+  listItemsToBuyByKey,
   listItemToPayload,
   validateListItems,
   type ListItem,
@@ -941,7 +941,8 @@ function StepReview({
     onError: (e: unknown) => setError(apiErrorMessage(e, "Não foi possível salvar a lista.")),
   });
 
-  const totalToBuy = items.reduce((s, it) => s + listItemToBuy(it, totalHa), 0);
+  const toBuyByKey = listItemsToBuyByKey(items, totalHa);
+  const totalToBuy = [...toBuyByKey.values()].reduce((s, n) => s + n, 0);
 
   if (savedId) {
     return (
@@ -1006,7 +1007,7 @@ function StepReview({
 
         <div className="mt-3 flex flex-col gap-2">
           {items.map((it) => {
-            const toBuy = listItemToBuy(it, totalHa);
+            const toBuy = toBuyByKey.get(it.key) ?? 0;
             return (
               <div
                 key={it.key}

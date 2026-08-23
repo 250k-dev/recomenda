@@ -7,8 +7,10 @@
  * é reutilizável tanto na aba da lista quanto no wizard de criação.
  */
 import {
+  areaFactorOf,
   isSeedItem,
-  listItemToBuy,
+  listItemQuantity,
+  listItemsToBuyByKey,
   type ListItem,
 } from "./list-item";
 import { CATEGORY_ORDER, type CategoryBreakdown } from "../cost-plan/calculate";
@@ -53,18 +55,21 @@ export interface PurchaseListMetrics {
   totalProductsValue: number;
   /** Custo total das sementes (R$). */
   totalSeedsValue: number;
-  /** Custo total geral (produtos + sementes) — VALOR TOTAL da planilha. */
+  /** Custo total geral da programação (produtos + sementes) — VALOR TOTAL. */
   totalValue: number;
   /** Volume total de sacas/BAGs de semente a comprar (só o físico da semente). */
   seedVolume: number;
   /** Sacas de semente por hectare (físico da semente ÷ hectares). */
   seedSacksPerHa: number;
   /**
-   * VOLUME SC TOTAL da planilha: o **valor total** (produtos + sementes)
-   * convertido em sacas de grão pelo preço da saca (valor ÷ saca).
+   * VOLUME SC TOTAL: custo da **programação** (dose × área, sem descontar
+   * estoque) convertido em sacas de grão (valor ÷ saca).
    */
   totalSacks: number;
-  /** VOLUME SC/HÁ: custo total convertido em sacas por hectare (valor ÷ saca ÷ ha). */
+  /**
+   * VOLUME SC/HÁ: custo da programação ÷ saca ÷ ha.
+   * Estoque só reduz a qtde a comprar — não o custo sc/ha da lavoura.
+   */
   costSacksPerHa: number;
   productsCount: number;
   categoriesCount: number;
@@ -85,12 +90,16 @@ export function computePurchaseListMetrics(
   let pricedCount = 0;
   const categoryTotals = new Map<string, number>();
 
+  const toBuyByKey = listItemsToBuyByKey(items, totalHa);
   for (const it of items) {
-    const toBuy = listItemToBuy(it, totalHa);
+    const toBuy = toBuyByKey.get(it.key) ?? 0;
     const unitPrice =
       it.priceUsd && fxRate > 0 ? Number(it.priceUsd) * fxRate : Number(it.price || 0);
     const seed = isSeedItem(it);
-    const lineTotal = toBuy * unitPrice;
+    // Custo da lavoura: volume programado (dose × ha × % área). Galpão e
+    // aplicação não entram — senão sc/ha cai só porque já tem produto no pátio.
+    const programQty = listItemQuantity(it, totalHa) * areaFactorOf(it);
+    const lineTotal = programQty * unitPrice;
 
     if (seed) seedVolume += toBuy;
     if (unitPrice > 0) {

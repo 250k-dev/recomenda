@@ -151,6 +151,33 @@ export function listItemToBuy(it: ListItem, totalHa: number): number {
   return Math.max(0, (required - applied - stock) * areaFactorOf(it));
 }
 
+/**
+ * Quanto comprar por linha, descontando o galpão uma vez por produto (FIFO).
+ * O campo de estoque é o total do galpão — se cada linha subtrair sozinha,
+ * o mesmo 1020 zera duas etapas.
+ */
+export function listItemsToBuyByKey(
+  items: ListItem[],
+  totalHa: number,
+): Map<string, number> {
+  const remaining = new Map<string, number>();
+  const result = new Map<string, number>();
+  for (const it of items) {
+    const pid = it.productId || it.key;
+    if (!remaining.has(pid)) {
+      remaining.set(pid, Math.max(0, Number(it.stock || 0)));
+    }
+    const required = listItemQuantity(it, totalHa);
+    const applied = Math.max(0, Number(it.applied || 0));
+    const stillNeed = Math.max(0, required - applied);
+    const left = remaining.get(pid) ?? 0;
+    const used = Math.min(left, stillNeed);
+    remaining.set(pid, left - used);
+    result.set(it.key, Math.max(0, (stillNeed - used) * areaFactorOf(it)));
+  }
+  return result;
+}
+
 /** Cultura do item numa lista multi-cultura: sementes são inequívocas pela
  *  categoria; os demais herdam a cultura única da lista (null quando "ANY" —
  *  produto comum às culturas). */

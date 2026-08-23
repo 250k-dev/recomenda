@@ -31,7 +31,7 @@ import {
   areaFactorOf,
   isSeedItem,
   listItemQuantity,
-  listItemToBuy,
+  listItemsToBuyByKey,
   populationFromSeeds,
   seedQuantityUnitLabel,
   DEFAULT_SPACING_M,
@@ -131,6 +131,10 @@ export function PurchaseListItemsEditor({
       ),
     [platformCatalog.data?.data, globalCatalog.data?.data],
   );
+  const toBuyByKey = useMemo(
+    () => listItemsToBuyByKey(items, totalHa),
+    [items, totalHa],
+  );
 
   const addItem = () => {
     setItems((prev) => [
@@ -178,7 +182,19 @@ export function PurchaseListItemsEditor({
   };
 
   const updateItem = (key: string, patch: Partial<ListItem>) => {
-    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+    setItems((prev) => {
+      const current = prev.find((it) => it.key === key);
+      const nextStock = patch.stock;
+      if (nextStock !== undefined && current?.productId) {
+        const productId = current.productId;
+        return prev.map((it) => {
+          if (it.key === key) return { ...it, ...patch, stock: nextStock };
+          if (it.productId === productId) return { ...it, stock: nextStock };
+          return it;
+        });
+      }
+      return prev.map((it) => (it.key === key ? { ...it, ...patch } : it));
+    });
   };
 
   // Área derivada (ha), formatada com 2 casas ("" quando não há bags/população).
@@ -274,7 +290,7 @@ export function PurchaseListItemsEditor({
 
   const totals = items.reduce(
     (acc, it) => {
-      const toBuy = listItemToBuy(it, totalHa);
+      const toBuy = toBuyByKey.get(it.key) ?? 0;
       acc.brl += toBuy * unitBrl(it);
       acc.usd += toBuy * unitUsd(it);
       return acc;
@@ -453,7 +469,7 @@ export function PurchaseListItemsEditor({
   const renderRow = (it: ListItem) => {
     const seed = isSeedItem(it);
     const required = listItemQuantity(it, totalHa);
-    const toBuy = listItemToBuy(it, totalHa);
+    const toBuy = toBuyByKey.get(it.key) ?? 0;
     const rowUnitBrl = unitBrl(it);
     const rowUnitUsd = unitUsd(it);
     const totalValue = toBuy * rowUnitBrl;
@@ -690,7 +706,10 @@ export function PurchaseListItemsEditor({
         <td className="px-1.5 py-1.5 text-right">
           {readOnly ? (
             <span className="text-sm tabular-nums text-muted-foreground">
-              {fmt(Number(it.stock || 0))}
+              {Number(it.stock || 0).toLocaleString("pt-BR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </span>
           ) : (
             // pt-BR: aceita "1.410,5". `type="number"` leria o ponto de milhar
@@ -698,6 +717,8 @@ export function PurchaseListItemsEditor({
             <MoneyInput
               value={it.stock}
               onValueChange={(v) => updateItem(it.key, { stock: v })}
+              decimals={2}
+              grouping={false}
               className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
             />
           )}
@@ -786,7 +807,7 @@ export function PurchaseListItemsEditor({
   // defensivos. As de resumo (Necessário → Total US$) ganham o tom "rail".
   const sharedHeaderCells = (
     <>
-      <td className="px-1.5 py-2 text-right">Estoque</td>
+      <td className="px-1.5 py-2 text-right">Estoque disponível</td>
       {canViewPrices ? (
         <td className="px-1.5 py-2 text-right">Preço US$</td>
       ) : null}
@@ -1036,7 +1057,7 @@ export function PurchaseListItemsEditor({
   const stockWarnings = items
     .map((it) => {
       const stock = Number(it.stock || 0);
-      const excess = listItemToBuy(it, totalHa);
+      const excess = toBuyByKey.get(it.key) ?? 0;
       if (stock <= 0 || excess <= 0) return null;
       const unit = isSeedItem(it) ? seedQuantityUnitLabel(it.category) : it.unit;
       return { key: it.key, name: it.productName || "Produto", excess, unit };
@@ -1207,7 +1228,7 @@ export function PurchaseListItemsEditor({
         ) : readOnly ? (
           items.map((it) => {
             const seed = isSeedItem(it);
-            const toBuy = listItemToBuy(it, totalHa);
+            const toBuy = toBuyByKey.get(it.key) ?? 0;
             const rowUnitBrl = unitBrl(it);
             const rowUnitUsd = unitUsd(it);
             const hasPrice = Boolean(it.price || it.priceUsd);
@@ -1229,6 +1250,18 @@ export function PurchaseListItemsEditor({
                 </p>
                 <p className="mt-1 text-base font-medium text-foreground">{it.productName || "—"}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Estoque disponível
+                    </span>
+                    <p className="mt-0.5 tabular-nums">
+                      {Number(it.stock || 0).toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      {seed ? seedQuantityUnitLabel(it.category) : it.unit}
+                    </p>
+                  </div>
                   <div>
                     <span className="text-xs font-medium text-muted-foreground">
                       {seed ? "População" : "Dose/ha"}
@@ -1282,7 +1315,7 @@ export function PurchaseListItemsEditor({
             );
             const seed = isSeedItem(it);
             const required = listItemQuantity(it, totalHa);
-            const toBuy = listItemToBuy(it, totalHa);
+            const toBuy = toBuyByKey.get(it.key) ?? 0;
             return (
               <div key={it.key} className="rounded-xl border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -1424,10 +1457,12 @@ export function PurchaseListItemsEditor({
                       </Field>
                     </>
                   )}
-                  <Field label="Estoque atual">
+                  <Field label="Estoque disponível">
                     <MoneyInput
                       value={it.stock}
                       onValueChange={(v) => updateItem(it.key, { stock: v })}
+                      decimals={2}
+                      grouping={false}
                     />
                   </Field>
                   {canViewPrices ? (

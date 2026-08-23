@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { serverEnv } from "@recomenda/config/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 const HOP_BY_HOP = new Set([
   "connection",
@@ -57,6 +59,7 @@ async function proxyToNest(
     headers,
     body,
     redirect: "manual",
+    cache: "no-store",
   });
 
   const responseHeaders = new Headers();
@@ -69,6 +72,7 @@ async function proxyToNest(
   });
   responseHeaders.delete("content-encoding");
   responseHeaders.delete("content-length");
+  responseHeaders.set("Cache-Control", "no-store");
 
   return new NextResponse(upstream.body, {
     status: upstream.status,

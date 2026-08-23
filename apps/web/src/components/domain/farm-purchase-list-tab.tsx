@@ -155,8 +155,20 @@ export function FarmPurchaseListTab({
             : null,
       };
     }
+    for (const it of list?.items ?? []) {
+      if (!it.local_product_id) continue;
+      const existing = map[it.local_product_id];
+      map[it.local_product_id] = {
+        quantity: Number(it.current_stock ?? 0),
+        price_brl:
+          existing?.price_brl ??
+          (it.price_brl_fixed != null && Number.isFinite(Number(it.price_brl_fixed))
+            ? Number(it.price_brl_fixed)
+            : null),
+      };
+    }
     return map;
-  }, [producerStock]);
+  }, [producerStock, list?.items]);
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -337,7 +349,7 @@ export function FarmPurchaseListTab({
     }
   };
 
-  // Visualização: estoque da lista hidratado com o estoque real do produtor.
+  // Visualização: estoque = galpão − reserva de outras safras.
   const viewItems = useMemo(
     () => itemsFromList(list),
     [itemsFromList, list],
@@ -631,8 +643,9 @@ export function FarmPurchaseListTab({
         <div className="space-y-4">
           {editing ? (
             <p className="text-sm text-muted-foreground">
-              Adicione, edite ou remova produtos. As quantidades são calculadas por dose/ha ×{" "}
-              {fmtQty(totalHa)} ha × nº de aplicações.
+              Adicione, edite ou remova produtos. “Necessário” usa dose/ha ×{" "}
+              {fmtQty(totalHa)} ha × aplicações. “Estoque disponível” é o galpão menos o que
+              outras safras já reservaram — a baixa física só ocorre na aplicação.
             </p>
           ) : null}
           {/* Meta única (sc/ha): barra Real × Meta; a distribuição por categoria

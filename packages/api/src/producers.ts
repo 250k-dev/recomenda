@@ -71,15 +71,15 @@ export interface ProducerStock {
   product_name?: string;
   dose_unit?: string;
   category?: string | null;
-  /** Preço unitário deste produtor (R$) — não vem do catálogo global. */
+  /** Preço unitário deste produtor (R$). Cotação em US$ na lista entra convertido (US$ × câmbio). */
   price_brl?: number | null;
   /** Produto está referenciado em ao menos uma lista de compra ativa. */
   in_use?: boolean;
   /** Nomes das listas ativas que usam o produto (tooltip da flag). */
   list_names?: string[];
   /**
-   * Saldo físico ainda não reservado por listas ativas.
-   * Prefill da próxima safra: 0 se outra lista já tomou o estoque.
+   * Livre para uma safra nova (galpão − reservas das listas já existentes).
+   * A coluna da lista da safra aberta usa `current_stock` do GET da lista.
    */
   available?: number;
 }

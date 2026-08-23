@@ -16,9 +16,8 @@ import { toast } from "sonner";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
-import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
-import { MoneyInput } from "@recomenda/ui/forms/money-input";
+import { MoneyInput, brToCanonical } from "@recomenda/ui/forms/money-input";
 import { SearchableSelect } from "@recomenda/ui/forms/select";
 import { PageHero } from "@/components/domain/page-hero";
 import { StockExportDialog } from "@/components/domain/stock-export-dialog";
@@ -31,7 +30,10 @@ import type { StockExportData } from "@recomenda/domain/stock/stock-export";
 import { PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 
 const fmtQty = (n: number) =>
-  n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  n.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const fmtBrl = (n: number) =>
   n.toLocaleString("pt-BR", {
@@ -140,15 +142,15 @@ export function ProducerStockSection({
 
   const save = async () => {
     if (!productId) return toast.error("Selecione o produto.");
-    const n = Number(quantity.replace(",", "."));
-    if (Number.isNaN(n) || n < 0) {
+    const n = Number(brToCanonical(quantity) || quantity);
+    if (!Number.isFinite(n) || n < 0) {
       return toast.error("Informe uma quantidade válida.");
     }
 
     const priceRaw = priceBrl.trim();
     let price: number | null = null;
     if (priceRaw !== "") {
-      price = Number(priceRaw.replace(",", "."));
+      price = Number(priceRaw);
       if (!Number.isFinite(price) || price < 0) {
         return toast.error("Informe um preço válido.");
       }
@@ -212,14 +214,13 @@ export function ProducerStockSection({
             value: isLoading ? "…" : fmtQty(dashboard.totalQty),
           },
           {
-            label: "Valor estimado",
-            value: isLoading ? "…" : fmtBrl(dashboard.totalValue),
-            sub:
+            label:
               !isLoading &&
               dashboard.productCount > 0 &&
               dashboard.withPrice < dashboard.productCount
-                ? `${dashboard.withPrice}/${dashboard.productCount} com preço`
-                : undefined,
+                ? `Valor estimado · ${dashboard.withPrice}/${dashboard.productCount} com preço`
+                : "Valor estimado",
+            value: isLoading ? "…" : fmtBrl(dashboard.totalValue),
           },
         ]}
       >
@@ -305,12 +306,11 @@ export function ProducerStockSection({
               </div>
               <div className="space-y-1.5 sm:w-36">
                 <Label>Quantidade</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
+                <MoneyInput
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  onValueChange={setQuantity}
+                  decimals={2}
+                  grouping={false}
                   placeholder="0"
                 />
               </div>

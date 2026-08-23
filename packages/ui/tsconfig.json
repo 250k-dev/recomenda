@@ -14,7 +14,8 @@
     // proibido pelo ESLint, e `pnpm test:fronteiras` cobre isso — inclusive o
     // auto-import do barril. Este `paths` só ensina o resolver a achar o
     // diretório; não afrouxa fronteira nenhuma.
-    "baseUrl": ".",
+    // Sem `baseUrl`: no TypeScript 6 a opção foi depreciada; paths relativos
+    // ao tsconfig bastam (igual `apps/web`).
     "paths": { "@recomenda/ui/*": ["./src/*"] }
   },
   "include": ["src/**/*"]
