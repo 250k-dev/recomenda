@@ -17,11 +17,11 @@ import {
   useCreateTimingStage,
   useDeleteTimingStage,
   useLocalCatalog,
+  useMe,
   useReorderTimingStages,
   queryKeys,
 } from "@recomenda/api-hooks";
 import {
-  isStageProductPersistable,
   mapMixItemsToStageProducts,
   planStageProducts,
 } from "@recomenda/domain/timing/sync-stage-products";
@@ -33,18 +33,59 @@ import {
   useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
 import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
-import type { StageProductDraft } from "@recomenda/domain/timing/types";
 
 type TimingTemplateStagesPanelProps = {
   template: TimingTemplate & { stages: TimingStage[] };
   producerId?: string;
 };
 
+type StagesDraftV2 = {
+  stages: TimingStageField[];
+  fingerprint: string;
+};
+
+/** Assinatura do que está no servidor (etapas + produtos do mix). */
+function serverFingerprint(stages: TimingStage[]): string {
+  return stages
+    .map((stage) => {
+      const items = (stage.mix_items ?? [])
+        .map((item) => `${item.local_product_id}:${item.dose_per_hectare}:${item.dose_unit ?? ""}`)
+        .sort()
+        .join(",");
+      return [
+        stage.id,
+        stage.name,
+        stage.trigger_type,
+        stage.window_start_days,
+        stage.window_end_days,
+        stage.notes ?? "",
+        stage.default_mix_template_id ?? "",
+        items,
+      ].join(":");
+    })
+    .join("|");
+}
+
+function parseStagesDraft(raw: unknown): StagesDraftV2 | null {
+  if (!raw) return null;
+  if (Array.isArray(raw) && raw.length > 0) {
+    return { stages: raw as TimingStageField[], fingerprint: "" };
+  }
+  if (typeof raw === "object" && raw !== null && Array.isArray((raw as StagesDraftV2).stages)) {
+    const typed = raw as StagesDraftV2;
+    if (typed.stages.length === 0) return null;
+    return typed;
+  }
+  return null;
+}
+
 export function TimingTemplateStagesPanel({
   template,
   producerId,
 }: TimingTemplateStagesPanelProps) {
   const templateId = template.id;
+  const { data: me } = useMe();
+  const userId = me?.id ?? null;
   const createStage = useCreateTimingStage(templateId);
   const deleteStage = useDeleteTimingStage(templateId);
   const reorder = useReorderTimingStages(templateId);
@@ -57,6 +98,10 @@ export function TimingTemplateStagesPanel({
   const sortedStages = useMemo(
     () => [...(template.stages ?? [])].sort((a, b) => a.order_index - b.order_index),
     [template.stages],
+  );
+
+  const stagesHaveEmbeddedMix = sortedStages.every(
+    (stage) => !stage.default_mix_template_id || Array.isArray(stage.mix_items),
   );
 
   const mixIds = useMemo(
@@ -72,10 +117,13 @@ export function TimingTemplateStagesPanel({
   );
 
   const mixQueries = useQueries({
-    queries: mixIds.map((mixId) => ({
-      queryKey: queryKeys.mixTemplate(mixId),
-      queryFn: () => getMixTemplate(mixId),
-    })),
+    queries: stagesHaveEmbeddedMix
+      ? []
+      : mixIds.map((mixId) => ({
+          queryKey: queryKeys.mixTemplate(mixId),
+          queryFn: () => getMixTemplate(mixId),
+          staleTime: 0,
+        })),
   });
 
   const mixesById = useMemo(() => {
@@ -86,100 +134,88 @@ export function TimingTemplateStagesPanel({
     return map;
   }, [mixQueries]);
 
-  const mixesLoading = mixIds.length > 0 && mixQueries.some((query) => query.isLoading);
+  const mixesLoading =
+    !stagesHaveEmbeddedMix && mixIds.length > 0 && mixQueries.some((query) => query.isLoading);
 
-  const stageSignature = useMemo(
-    () =>
-      sortedStages
-        .map((stage) => `${stage.id}:${stage.default_mix_template_id ?? ""}`)
-        .join("|"),
-    [sortedStages],
-  );
+  const fingerprint = useMemo(() => serverFingerprint(sortedStages), [sortedStages]);
 
   const [editorStages, setEditorStages] = useState<TimingStageField[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const hydratedSignatureRef = useRef<string | null>(null);
+  const [draftCheckedFor, setDraftCheckedFor] = useState<string | null>(null);
 
-  // Rascunho local (localStorage): guarda o que está sendo editado no navegador,
-  // "por baixo dos panos", para nada se perder ao recarregar/fechar. NÃO é o
-  // salvamento no servidor — esse só acontece no botão Salvar (e antes de
-  // mudanças estruturais). Some quando o modelo é salvo de verdade.
-  const draftKey = `timing-tmpl-draft:${templateId}`;
-
-  // Restaura o rascunho local uma vez por modelo — ajuste de estado durante o
-  // render (padrão recomendado pelo React), não em efeito. Tem prioridade sobre
-  // o servidor: se havia edição não salva (reload/queda), ela volta silenciosa.
-  const [draftRestoredFor, setDraftRestoredFor] = useState<string | null>(null);
-  if (draftRestoredFor !== templateId) {
-    setDraftRestoredFor(templateId);
-    const draft = readLocalDraft<TimingStageField[]>(draftKey);
-    if (draft && draft.length > 0) {
-      // isDirty=true faz o efeito de hidratação retornar cedo — o servidor não
-      // sobrescreve o rascunho restaurado até o próximo Salvar.
-      setEditorStages(draft);
-      setIsDirty(true);
-    }
-  }
+  // Rascunho local por usuário. A chave antiga (sem userId) vazava entre
+  // agrônomo e consultor no mesmo navegador: o consultor via as etapas velhas
+  // e o nome novo (que não entra no rascunho).
+  const draftKey = userId ? `timing-tmpl-draft:${userId}:${templateId}` : "";
+  const legacyDraftKey = `timing-tmpl-draft:${templateId}`;
 
   useEffect(() => {
     if (mixesLoading) return;
-
-    // Enquanto edita (sujo), não re-hidrata do servidor — evita apagar/reordenar
-    // linhas no meio da digitação (era a causa do "some o produto/categoria").
+    if (!userId) return;
     if (isDirty) return;
 
-    // Hidrata uma única vez por assinatura de etapas. Não depender de
-    // `editorStages.length` evita loop quando deps instáveis (ex.: mixesById de
-    // useQueries) mudam a cada render e as etapas estão vazias.
-    if (hydratedSignatureRef.current === stageSignature) {
-      return;
+    if (hydratedSignatureRef.current === fingerprint) return;
+    hydratedSignatureRef.current = fingerprint;
+
+    const fromServer = sortedStages.map((stage) => {
+      const mixId = stage.default_mix_template_id;
+      const mix = mixId ? mixesById.get(mixId) : undefined;
+      const sourceItems = Array.isArray(stage.mix_items) ? stage.mix_items : mix?.items;
+      const hydratedProducts = sourceItems
+        ? mapMixItemsToStageProducts(sourceItems, catalogProducts)
+        : [];
+      return {
+        key: stage.id,
+        name: stage.name,
+        trigger_type: stage.trigger_type,
+        recommended_date: windowToRecommendedYmd(
+          stage.window_start_days,
+          stage.window_end_days,
+        ),
+        notes: stage.notes ?? "",
+        products: hydratedProducts,
+      };
+    });
+
+    const restoreKey = `${userId}:${templateId}`;
+    if (draftCheckedFor !== restoreKey) {
+      setDraftCheckedFor(restoreKey);
+      clearLocalDraft(legacyDraftKey);
+      const draft = parseStagesDraft(readLocalDraft(draftKey));
+      if (draft && draft.fingerprint === fingerprint) {
+        setEditorStages(draft.stages);
+        setIsDirty(true);
+        return;
+      }
+      if (draft) {
+        clearLocalDraft(draftKey);
+        toast.message("O modelo foi atualizado. Rascunho local descartado.");
+      }
     }
 
-    hydratedSignatureRef.current = stageSignature;
-    setEditorStages((prev) => {
-      const prevByKey = new Map(prev.map((s) => [s.key, s]));
-      return sortedStages.map((stage) => {
-        const mixId = stage.default_mix_template_id;
-        const mix = mixId ? mixesById.get(mixId) : undefined;
-        const hydratedProducts = mix?.items
-          ? mapMixItemsToStageProducts(mix.items, catalogProducts)
-          : [];
-        // Preserva linhas ainda EM ABERTO (sem produto ou sem dose) que o usuário
-        // está preenchendo — a re-hidratação não pode apagá-las ("some a linha").
-        // Mescla por `key`: as em aberto sobrescrevem a versão do servidor de
-        // mesma key (evita a CHAVE DUPLICADA quando a dose de um item salvo é
-        // limpa) e as novas (key própria) são anexadas ao fim.
-        const inProgress = (prevByKey.get(stage.id)?.products ?? []).filter(
-          (p) => !isStageProductPersistable(p),
-        );
-        const byKey = new Map<string, StageProductDraft>();
-        for (const p of hydratedProducts) byKey.set(p.key, p);
-        for (const p of inProgress) byKey.set(p.key, p);
-        return {
-          key: stage.id,
-          name: stage.name,
-          trigger_type: stage.trigger_type,
-          recommended_date: windowToRecommendedYmd(
-            stage.window_start_days,
-            stage.window_end_days,
-          ),
-          notes: stage.notes ?? "",
-          products: [...byKey.values()],
-        };
-      });
-    });
+    setEditorStages(fromServer);
   }, [
     catalogProducts,
+    draftCheckedFor,
+    draftKey,
+    fingerprint,
     isDirty,
+    legacyDraftKey,
     mixesById,
     mixesLoading,
     sortedStages,
-    stageSignature,
+    templateId,
+    userId,
   ]);
 
   // Escreve o rascunho local (debounce) enquanto há edição não salva.
-  useLocalDraft(draftKey, editorStages, isDirty);
+  useLocalDraft(
+    draftKey,
+    { stages: editorStages, fingerprint },
+    Boolean(isDirty && draftKey),
+  );
   // Rede de segurança: avisa antes de fechar/recarregar com edição não salva.
   useUnsavedChangesWarning(isDirty);
 
@@ -229,7 +265,8 @@ export function TimingTemplateStagesPanel({
       // apagava os itens recém-salvos da tela até dar F5. Mantemos o que está na
       // tela e só invalidamos os caches para as próximas leituras/mudança de
       // estrutura — que re-hidratam já com dado fresco (com gate de loading).
-      clearLocalDraft(draftKey);
+      clearLocalDraft(legacyDraftKey);
+      if (draftKey) clearLocalDraft(draftKey);
       setIsDirty(false);
       void queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplate(templateId) });
       for (const mixId of touchedMixIds) {
@@ -242,7 +279,7 @@ export function TimingTemplateStagesPanel({
     } finally {
       setIsSaving(false);
     }
-  }, [draftKey, editorStages, queryClient, sortedStages, templateId, template.crop, template.name]);
+  }, [draftKey, editorStages, fingerprint, legacyDraftKey, queryClient, sortedStages, templateId, template.crop, template.name]);
 
   // Persiste as edições pendentes antes de uma mudança estrutural (add/remover/
   // mover etapa), sem toast próprio — quem avisa é a ação estrutural.

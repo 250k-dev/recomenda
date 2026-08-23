@@ -1,5 +1,16 @@
 import { api } from "./http/axios";
 
+export interface MixTemplateItem {
+  id: string;
+  mix_template_id: string;
+  local_product_id: string;
+  dose_per_hectare: number;
+  product_name?: string;
+  dose_unit?: string;
+  /** Categoria do produto, derivada no servidor (não depende do catálogo local paginado). */
+  category?: string | null;
+}
+
 export interface TimingStage {
   id: string;
   timing_template_id: string;
@@ -10,6 +21,8 @@ export interface TimingStage {
   window_end_days: number;
   default_mix_template_id?: string | null;
   notes?: string | null;
+  /** Produtos do mix da etapa, já no GET do modelo (evita N+1 e cache separado). */
+  mix_items?: MixTemplateItem[];
 }
 
 export interface TimingTemplate {
@@ -19,17 +32,6 @@ export interface TimingTemplate {
   producer_id?: string | null;
   is_archived: boolean;
   stages?: TimingStage[];
-}
-
-export interface MixTemplateItem {
-  id: string;
-  mix_template_id: string;
-  local_product_id: string;
-  dose_per_hectare: number;
-  product_name?: string;
-  dose_unit?: string;
-  /** Categoria do produto, derivada no servidor (não depende do catálogo local paginado). */
-  category?: string | null;
 }
 
 export interface MixTemplate {

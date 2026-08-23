@@ -29,6 +29,8 @@ export function useTimingTemplate(id: string) {
     queryKey: queryKeys.timingTemplate(id),
     queryFn: () => getTimingTemplate(id),
     enabled: Boolean(id),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
