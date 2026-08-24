@@ -18,7 +18,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "Recomenda",
-  description: "Plataforma web para administradores e agrônomos.",
+  description: "Plataforma de recomendação agrícola para agrônomos, equipes e produtores.",
 };
 
 export default function RootLayout({
@@ -33,6 +33,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "document.documentElement.classList.add('js')",
+          }}
+        />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

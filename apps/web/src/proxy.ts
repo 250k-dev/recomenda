@@ -2,10 +2,43 @@ import { NextRequest, NextResponse } from "next/server";
 import { errors, jwtVerify } from "jose";
 import { serverEnv } from "@recomenda/config/server";
 
-const publicRoutes = ["/login", "/esqueci-senha", "/redefinir-senha", "/convite", "/cotacao"];
+const publicRoutes = [
+  "/login",
+  "/esqueci-senha",
+  "/redefinir-senha",
+  "/convite",
+  "/cotacao",
+  "/privacidade",
+  "/termos",
+];
+
+const protectedPrefixes = [
+  "/dashboard",
+  "/admin",
+  "/produtores",
+  "/fazendas",
+  "/safras",
+  "/produtos",
+  "/equipe",
+  "/relatorios",
+  "/cronograma",
+  "/perfil",
+  "/templates-de-compra",
+  "/minhas-gestoes",
+  "/acesso-produtor",
+];
+
+function matchesPrefix(pathname: string, prefixes: readonly string[]) {
+  return prefixes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
 
 function isPublicPath(pathname: string) {
-  return publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  if (pathname === "/") return true;
+  return matchesPrefix(pathname, publicRoutes);
+}
+
+function isProtectedPath(pathname: string) {
+  return matchesPrefix(pathname, protectedPrefixes);
 }
 
 /**
@@ -68,10 +101,17 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.searchParams.get("force") === "true";
 
   if (isPublicPath(pathname)) {
-    if (accessToken && role && (pathname === "/login" || pathname === "/") && !forceLogin) {
+    const sessaoAtiva =
+      sessao.estado === "valido" || (sessao.estado === "expirado" && Boolean(refreshToken));
+    if (sessaoAtiva && role && (pathname === "/login" || pathname === "/") && !forceLogin) {
       const redirectTo = role === "ADMIN" || role === "ORG_ADMIN" ? "/admin" : "/dashboard";
       return NextResponse.redirect(new URL(redirectTo, request.url));
     }
+    return NextResponse.next();
+  }
+
+  // URL fora da árvore autenticada: deixa o App Router renderizar `not-found`.
+  if (!isProtectedPath(pathname)) {
     return NextResponse.next();
   }
 

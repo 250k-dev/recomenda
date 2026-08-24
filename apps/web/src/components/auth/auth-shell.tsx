@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { routes } from "@recomenda/config";
 import { Logo } from "@recomenda/ui/assets/logo";
 import { Logo250K } from "@recomenda/ui/assets/logo-250K";
 import { cn } from "@recomenda/utils";
@@ -16,7 +17,7 @@ export function AuthShell({
   className?: string;
 }) {
   return (
-    <div className="relative flex min-h-[100dvh] flex-1 flex-col items-center justify-center px-4 py-12">
+    <div className="relative flex min-h-dvh flex-1 flex-col items-center justify-center px-4 py-12">
       <div className={cn("w-full max-w-md space-y-7", className)}>
         <div className="flex items-center justify-center gap-3.5">
           <span className="grid size-13 place-items-center rounded-2xl bg-primary shadow-(--brand-shadow)">
@@ -47,6 +48,18 @@ export function AuthShell({
             <Logo250K className="size-5" />
             250K
           </a>
+          <div className="flex items-center justify-center gap-3 pt-3 text-xs font-medium text-muted-foreground">
+            <a
+              href={routes.privacidade}
+              className="underline-offset-4 hover:underline"
+            >
+              Privacidade
+            </a>
+            <span aria-hidden>·</span>
+            <a href={routes.termos} className="underline-offset-4 hover:underline">
+              Termos
+            </a>
+          </div>
         </div>
       </div>
     </div>
