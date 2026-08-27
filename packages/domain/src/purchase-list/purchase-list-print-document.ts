@@ -177,11 +177,18 @@ function buildBody(list: PurchaseListDetail, ctx: PurchaseListPrintContext): str
   </div>`;
 }
 
+export function buildPurchaseListHtml(
+  list: PurchaseListDetail,
+  ctx: PurchaseListPrintContext = {},
+): string {
+  return htmlShell(`Lista de compra - ${list.name}`, buildBody(list, ctx), LIST_CSS);
+}
+
 export function printPurchaseList(
   list: PurchaseListDetail,
   ctx: PurchaseListPrintContext = {},
 ): void {
-  printHtml(htmlShell(`Lista de compra - ${list.name}`, buildBody(list, ctx), LIST_CSS));
+  printHtml(buildPurchaseListHtml(list, ctx));
 }
 
 export function buildPurchaseListWhatsappMessage(

@@ -92,6 +92,7 @@ export {
 export type { PurchaseListPrintContext } from "./purchase-list/purchase-list-print-document";
 export {
   printPurchaseList,
+  buildPurchaseListHtml,
   buildPurchaseListWhatsappMessage,
 } from "./purchase-list/purchase-list-print-document";
 
@@ -102,6 +103,7 @@ export type {
 } from "./quotes/quote-print-document";
 export {
   printQuoteComparison,
+  buildQuoteComparisonHtml,
   buildQuoteWhatsappMessage,
 } from "./quotes/quote-print-document";
 
@@ -153,6 +155,7 @@ export type {
 } from "./stock/stock-export";
 export {
   printStock,
+  buildStockHtml,
   buildStockWhatsappMessage,
   downloadStockCsv,
 } from "./stock/stock-export";

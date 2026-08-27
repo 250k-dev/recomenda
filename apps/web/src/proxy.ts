@@ -8,6 +8,7 @@ const publicRoutes = [
   "/redefinir-senha",
   "/convite",
   "/cotacao",
+  "/exportar",
   "/privacidade",
   "/termos",
 ];

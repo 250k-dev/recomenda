@@ -131,10 +131,14 @@ function buildBody(data: StockExportData): string {
 }
 
 export function printStock(data: StockExportData): void {
+  printHtml(buildStockHtml(data));
+}
+
+export function buildStockHtml(data: StockExportData): string {
   const title = data.producerName
     ? `Estoque - ${data.producerName}`
     : "Estoque do produtor";
-  printHtml(htmlShell(title, buildBody(data)));
+  return htmlShell(title, buildBody(data));
 }
 
 export function buildStockWhatsappMessage(data: StockExportData): string {

@@ -368,12 +368,12 @@ function buildStorePricesBody(
   </div>`;
 }
 
-export function printQuoteComparison(
+export function buildQuoteComparisonHtml(
   data: QuoteComparison,
   storeIds: Set<string> | null,
   ctx: QuotePrintContext = {},
   mode: QuoteExportMode = "best",
-): void {
+): string {
   const responses = selectResponses(data, storeIds);
   const title = `Cotações - ${ctx.listName || "lojas"}`;
   const body =
@@ -382,7 +382,16 @@ export function printQuoteComparison(
       : mode === "store"
         ? buildStorePricesBody(data, responses, ctx)
         : buildComparisonBody(data, responses, ctx);
-  printHtml(htmlShell(title, body, QUOTE_CSS));
+  return htmlShell(title, body, QUOTE_CSS);
+}
+
+export function printQuoteComparison(
+  data: QuoteComparison,
+  storeIds: Set<string> | null,
+  ctx: QuotePrintContext = {},
+  mode: QuoteExportMode = "best",
+): void {
+  printHtml(buildQuoteComparisonHtml(data, storeIds, ctx, mode));
 }
 
 /** Mensagem textual para WhatsApp: melhores preços por item (padrão) ou a
