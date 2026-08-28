@@ -9,6 +9,7 @@ const publicRoutes = [
   "/convite",
   "/cotacao",
   "/exportar",
+  "/zap",
   "/privacidade",
   "/termos",
 ];
