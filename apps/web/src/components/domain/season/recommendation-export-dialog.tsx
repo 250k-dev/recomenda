@@ -17,6 +17,10 @@ import {
 } from "@recomenda/domain/recommendations/share-message";
 import { printRecommendation } from "@recomenda/domain/recommendations/print-document";
 import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
+import {
+  readPricePreference,
+  writePricePreference,
+} from "@/components/domain/export/price-preference";
 import { cn } from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
@@ -33,6 +37,12 @@ export function RecommendationExportDialog({
   const [copied, setCopied] = useState(false);
   const [shareAll, setShareAll] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Escolha por documento: mesmo com PRICE_VIEW, o agrônomo decide se aquele
+  // PDF vai com custo (entrega ao produtor) ou sem (quem vai aplicar).
+  const [showPrices, setShowPrices] = useState(() => readPricePreference());
+  // O payload só traz preço para quem tem PRICE_VIEW — sem isso, nem a opção
+  // aparece e o documento sai sem valores de qualquer forma.
+  const canChoosePrices = Boolean(data.unitPriceByProduct);
 
   const allIds = useMemo(
     () => data.recommendations.map((r) => r.id),
@@ -89,7 +99,18 @@ export function RecommendationExportDialog({
 
   const handlePrint = () => {
     onOpenChange(false);
-    window.setTimeout(() => printRecommendation(filteredData), 250);
+    window.setTimeout(
+      () =>
+        printRecommendation(filteredData, {
+          showPrices: canChoosePrices && showPrices,
+        }),
+      250,
+    );
+  };
+
+  const togglePrices = (value: boolean) => {
+    setShowPrices(value);
+    writePricePreference(value);
   };
 
   return (
@@ -103,6 +124,29 @@ export function RecommendationExportDialog({
         </DialogHeader>
 
         <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto px-6 py-5">
+          {/* Primeiro item do modal: é a decisão que muda o que sai no documento. */}
+          {canChoosePrices ? (
+            <section className="rounded-xl border border-border bg-surface-2 p-4">
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-primary"
+                  checked={showPrices}
+                  onChange={(e) => togglePrices(e.target.checked)}
+                />
+                <span className="text-sm">
+                  <span className="font-semibold text-text-strong">
+                    Incluir preços e custos
+                  </span>
+                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                    Custo por hectare, total por etapa e total do talhão. Desmarque
+                    para entregar só a parte técnica.
+                  </span>
+                </span>
+              </label>
+            </section>
+          ) : null}
+
           <section className="rounded-xl border border-border bg-surface-2 p-4">
             <label className="flex cursor-pointer items-center gap-2.5">
               <input

@@ -36,6 +36,7 @@ import {
   useCyclePurchaseList,
   useApplyCycleBlock,
   usePublishCycle,
+  useSyncCycleListDoses,
   useTimingTemplate,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
@@ -602,6 +603,7 @@ function StepPlots({
   const { data: purchaseList } = useCyclePurchaseList(cycle.id);
   const applyBlock = useApplyCycleBlock(cycle.id);
   const publishCycle = usePublishCycle(cycle.id);
+  const syncListDoses = useSyncCycleListDoses(cycle.id);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [configs, setConfigs] = useState<Record<string, PlotConfig>>({});
   const [error, setError] = useState<string | null>(null);
@@ -774,6 +776,28 @@ function StepPlots({
                 result.applied.length === 1 ? "talhão" : "talhões"
               }.`,
             );
+          }
+          // Unidade divergente entre modelo e lista: a dose aplicada é a do
+          // modelo, mas o agrônomo precisa saber que a lista fala outra unidade.
+          if (result.unit_mismatches?.length) {
+            toast.warning(
+              `Unidade diferente da lista de compra em ${result.unit_mismatches
+                .map((m) => `${m.product_name} (modelo ${m.template_unit}, lista ${m.list_unit})`)
+                .slice(0, 3)
+                .join("; ")}. A dose aplicada foi a do modelo.`,
+            );
+          }
+          // Doses do modelo → lista de compra (a programação passou a mandar).
+          if (result.applied.length > 0) {
+            syncListDoses.mutate(undefined, {
+              onSuccess: (res) => {
+                if (res.updated > 0) {
+                  toast.info(
+                    `${res.updated} ${res.updated === 1 ? "item" : "itens"} da lista de compra ${res.updated === 1 ? "atualizado" : "atualizados"} com a dose do modelo.`,
+                  );
+                }
+              },
+            });
           }
           if (result.skipped.length > 0) {
             toast.info(

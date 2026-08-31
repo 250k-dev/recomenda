@@ -6,6 +6,33 @@ import {
 } from "./formulation-mix-order";
 import { sortRecommendationItemsByMixOrder } from "./mix-order";
 
+/** Uma variedade do talhão, com a área que ocupa e a população desejada. */
+export interface ShareVariety {
+  variety: string;
+  plantedAreaHa?: number | null;
+  thousandPlantsPerHa?: number | null;
+}
+
+/**
+ * Ficha técnica do talhão no documento. Todo campo é opcional porque o
+ * agrônomo preenche pouco: o que faltar sai como "—" no PDF, para deixar
+ * visível que ali deveria haver informação.
+ */
+export interface SharePlotSpec {
+  farmName?: string | null;
+  farmLocation?: string | null;
+  cycleName?: string | null;
+  cropLabel?: string | null;
+  /** Área cadastral do talhão. */
+  areaHa?: number | null;
+  plantedAreaHa?: number | null;
+  varieties?: ShareVariety[];
+  /** Espaçamento entre linhas (m) — vem da lista de compra da safra. */
+  spacingM?: number | null;
+  cycleDays?: number | null;
+  desiccationDate?: string | null;
+}
+
 export interface RecommendationShareData {
   title: string;
   plotName?: string | null;
@@ -16,6 +43,15 @@ export interface RecommendationShareData {
   done: number;
   total: number;
   recommendations: Recommendation[];
+  /** Ficha técnica; ausente = documento sem o bloco (compat com chamadas antigas). */
+  spec?: SharePlotSpec | null;
+  /**
+   * Preço unitário em R$ por `local_product_id`, vindo da lista de compra da
+   * safra (`unit_price_brl`). O custo do documento é sempre
+   * `preço unitário × dose DA RECOMENDAÇÃO` — nunca o custo já calculado na
+   * lista, que pode estar em outra dose.
+   */
+  unitPriceByProduct?: Record<string, number>;
 }
 
 const STATUS_EMOJI: Record<string, string> = {
@@ -90,7 +126,9 @@ export function buildWhatsappMessage(data: RecommendationShareData): string {
     `*${data.title}*`,
   ];
 
+  if (data.spec?.farmName) header.push(`🏡 Fazenda: ${data.spec.farmName}`);
   if (data.plotName) header.push(`📍 Talhão: ${data.plotName}`);
+  if (data.spec?.areaHa) header.push(`📐 Área: ${data.spec.areaHa} ha`);
   if (data.producerName) header.push(`👤 Produtor: ${data.producerName}`);
   if (data.plantingDate) header.push(`🌾 Plantio: ${fmtDate(data.plantingDate)}`);
   header.push(

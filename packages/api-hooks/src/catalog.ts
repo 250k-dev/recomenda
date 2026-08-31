@@ -88,6 +88,10 @@ export function useUpdateLocalProduct() {
       is_active?: boolean;
       global_product_id?: string | null;
       equivalence_group?: string | null;
+      /** Registro no MAPA (AGROFIT) — preenchido em massa pelo import, e
+       *  editável à mão nos produtos de nome livre. */
+      manufacturer?: string | null;
+      mapa_registration?: string | null;
     }) => updateLocalProduct(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.localCatalog });

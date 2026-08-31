@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { routes } from "@recomenda/config";
-import { useQueries } from "@tanstack/react-query";
-import { Check, ChevronRight, Leaf, Plus, Share2 } from "lucide-react";
+import { Check, ChevronRight, Leaf, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -22,25 +21,15 @@ import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import {
-  queryKeys,
   useCreateCycle,
-  useCycle,
   useFarmCycles,
-  useMe,
-  useProducer,
   useProducerFarms,
 } from "@recomenda/api-hooks";
 import type { CycleSummary } from "@recomenda/api/cycles";
-import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
-import {
-  FarmSeasonsExportDialog,
-  type FarmExportItem,
-} from "@/components/domain/farm-seasons-export-dialog";
 import {
   cn,
   CROP_LABELS,
   CYCLE_STATUS_LABELS,
-  STATUS_LABELS,
   labelStatus,
 } from "@recomenda/utils";
 
@@ -48,8 +37,6 @@ const CROP_CHOICES = [
   { value: "SOYBEAN", label: "Soja" },
   { value: "CORN", label: "Milho" },
 ];
-
-const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -304,8 +291,6 @@ export function FarmCyclesSection({
   const router = useRouter();
   const { data: cycles, isLoading } = useFarmCycles(farmId);
   const [newCycleOpen, setNewCycleOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [exportCycleId, setExportCycleId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const visibleCycles = (cycles ?? []).filter((c) => c.status !== "ARCHIVED");
@@ -316,67 +301,6 @@ export function FarmCyclesSection({
       cycle.name.toLocaleLowerCase("pt-BR").includes(query),
     );
   }, [visibleCycles, search]);
-  const exportableCycle = visibleCycles.find(
-    (cycle) => cycle.recommendations_total > 0,
-  );
-  const selectedCycleSummary =
-    visibleCycles.find((cycle) => cycle.id === exportCycleId) ?? null;
-  const { data: selectedCycle, isLoading: loadingCycleExport } = useCycle(
-    exportCycleId ?? "",
-  );
-  const { data: producer } = useProducer(producerId ?? "");
-  const { data: me } = useMe();
-  const exportSeasons = selectedCycle?.seasons ?? [];
-  const timelineQueries = useQueries({
-    queries: exportSeasons.map((season) => ({
-      queryKey: queryKeys.seasonTimeline(season.id),
-      queryFn: () => getTimeline(season.id),
-      enabled: Boolean(exportCycleId),
-    })),
-  });
-  const exportLoading =
-    loadingCycleExport || timelineQueries.some((query) => query.isLoading);
-
-  const exportItems = useMemo<FarmExportItem[]>(() => {
-    if (!selectedCycle) return [];
-
-    return selectedCycle.seasons.reduce<FarmExportItem[]>(
-      (acc, season, index) => {
-        const rows = timelineQueries[index]?.data;
-        const recommendations = (
-          Array.isArray(rows) ? rows : []
-        ) as Recommendation[];
-        if (recommendations.length === 0) return acc;
-
-        const cropLabel = CROP_LABELS[season.crop] ?? season.crop;
-        const title = season.variety
-          ? `${cropLabel} — ${season.variety}`
-          : cropLabel;
-        const done = recommendations.filter((rec) =>
-          APPLIED.has(rec.status),
-        ).length;
-
-        acc.push({
-          id: season.id,
-          label: `Talhão ${season.plot_name}`,
-          data: {
-            title,
-            plotName: season.plot_name,
-            plantingDate: season.planting_date,
-            statusLabel: labelStatus(STATUS_LABELS, season.status),
-            producerName: producer?.name ?? null,
-            agronomistName: me?.name ?? null,
-            done,
-            total: recommendations.length,
-            recommendations,
-          },
-        });
-
-        return acc;
-      },
-      [],
-    );
-  }, [me?.name, producer?.name, selectedCycle, timelineQueries]);
 
   /** Após criar safra: vai direto montar a lista (obrigatória antes da programação). */
   const openCycleListWizard = (cycleId: string) => {
@@ -392,11 +316,6 @@ export function FarmCyclesSection({
     router.push(cycleHref({ id: cycleId, farm_id: farmId }, producerId));
   };
 
-  const openExport = (cycleId: string) => {
-    setExportCycleId(cycleId);
-    setExportOpen(true);
-  };
-
   if (isLoading) return <ListCardsSkeleton count={3} />;
 
   return (
@@ -404,19 +323,6 @@ export function FarmCyclesSection({
       <div>
         <SectionToolbar
           title="Safras desta fazenda"
-          titleAction={
-            exportableCycle ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => openExport(exportableCycle.id)}
-              >
-                <Share2 className="w-4 h-4 text-muted-foreground" />
-                Exportar
-              </Button>
-            ) : null
-          }
           search={
             visibleCycles.length > 0
               ? {
@@ -586,15 +492,6 @@ export function FarmCyclesSection({
           onCreated={openCycleListWizard}
         />
       ) : null}
-
-      <FarmSeasonsExportDialog
-        open={exportOpen}
-        onOpenChange={setExportOpen}
-        farmName={selectedCycleSummary?.name ?? selectedCycle?.name ?? null}
-        contextLabel="SAFRA"
-        isLoading={exportLoading}
-        items={exportItems}
-      />
     </>
   );
 }

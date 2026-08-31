@@ -18,7 +18,7 @@ import { ProgressBar } from "@recomenda/ui/patterns/progress-bar";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Input } from "@recomenda/ui/primitives/input";
-import { Search } from "lucide-react";
+import { LayoutTemplate, Search } from "lucide-react";
 import {
   useCan,
   useCycleAvailablePlots,
@@ -37,6 +37,7 @@ import {
 import { routes } from "@recomenda/config";
 import { AddCycleFarmDialog } from "@/components/domain/cycle/cycle-farms-section";
 import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
+import { BulkApplyTemplateDialog } from "@/components/domain/cycle/bulk-apply-template-dialog";
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -129,6 +130,7 @@ export function CycleFarmDisclosures({
 
   const [plotFilter, setPlotFilter] = useState("");
   const [addFarmOpen, setAddFarmOpen] = useState(false);
+  const [bulkApplyOpen, setBulkApplyOpen] = useState(false);
   const [removeFarm, setRemoveFarm] = useState<{
     id: string;
     name: string;
@@ -203,6 +205,18 @@ export function CycleFarmDisclosures({
           Fazendas desta safra
         </h2>
         <div className="hidden min-w-4 flex-1 sm:block" />
+        {/* Fica junto da lista de talhões, não no topo da safra: é aqui que o
+            agrônomo está olhando quando pensa em aplicar o modelo. */}
+        {canManage && seasons.length > 0 ? (
+          <Button
+            variant="outline"
+            className="h-10 gap-1.5"
+            onClick={() => setBulkApplyOpen(true)}
+          >
+            <LayoutTemplate className="size-4 text-muted-foreground" />
+            Aplicar modelo
+          </Button>
+        ) : null}
         {seasons.length > 0 ? (
           <div className="relative w-full sm:w-60 lg:w-72">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -638,6 +652,13 @@ export function CycleFarmDisclosures({
         cycleId={cycle.id}
         producerId={producerId}
         cycleFarms={cycle.farms ?? []}
+      />
+
+      <BulkApplyTemplateDialog
+        open={bulkApplyOpen}
+        onOpenChange={setBulkApplyOpen}
+        cycle={cycle}
+        producerId={producerId}
       />
 
       <ConfirmDialog

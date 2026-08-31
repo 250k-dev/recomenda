@@ -13,6 +13,7 @@ import {
   getProducerCycles,
   publishCycle,
   removeCycleFarm,
+  syncCycleListDoses,
   updateCycle,
   type ApplyBlockPayload,
 } from "@recomenda/api/cycles";
@@ -64,6 +65,25 @@ export function useCyclePurchaseList(cycleId: string) {
     queryKey: queryKeys.cyclePurchaseList(cycleId),
     queryFn: () => getPurchaseListByCycle(cycleId),
     enabled: Boolean(cycleId),
+  });
+}
+
+/**
+ * Realinha as doses da lista de compra com a programação da safra.
+ * Chamado uma vez depois de aplicar modelo (inclusive no aplicar em massa, que
+ * dispara vários applies antes de sincronizar).
+ */
+export function useSyncCycleListDoses(cycleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => syncCycleListDoses(cycleId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["cycle-purchase-list"] });
+      void queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
+      void queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
+      void queryClient.invalidateQueries({ queryKey: ["cycle-cost-plan"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId) });
+    },
   });
 }
 

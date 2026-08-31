@@ -32,6 +32,7 @@ import { apiErrorMessage, publishBlockedMessage } from "@recomenda/api/api-error
 import type { CycleSeasonRow } from "@recomenda/api/cycles";
 import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
+import { CycleExportButton } from "@/components/domain/cycle/cycle-export";
 
 /**
  * Contexto comum das telas da safra da fazenda (`/fazendas/[id]/safras/[cycleId]`
@@ -202,6 +203,10 @@ export function CyclePageShell({
         }
         actions={
           <>
+            <CycleExportButton
+              cycleId={page.cycleId}
+              producerId={page.producerId}
+            />
             {draftSeasons.length > 0 ? (
               <Button
                 className="gap-1.5 border-0 bg-primary-soft text-primary-strong shadow-sm hover:bg-primary-soft/85 hover:text-primary-strong"

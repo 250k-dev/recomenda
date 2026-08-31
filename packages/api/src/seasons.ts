@@ -49,6 +49,11 @@ export interface RecommendationItem {
   mix_order?: number;
   /** Override por item (legado); null = usa formulacao da safra. */
   mix_order_override?: number | null;
+  /** Empresa titular do registro no MAPA (AGROFIT). Nulo em adjuvante,
+   *  fertilizante, foliar e semente — não têm registro de agrotóxico. */
+  manufacturer?: string | null;
+  /** Número do registro no MAPA. */
+  mapa_registration?: string | null;
   equivalence_group?: string | null;
   formulation_key?: string | null;
 }

@@ -116,11 +116,19 @@ export {
   displayRecStatus,
   recommendationStatusLabel,
 } from "./recommendations/format";
-export type { RecommendationShareData } from "./recommendations/share-message";
+export type {
+  RecommendationShareData,
+  SharePlotSpec,
+  ShareVariety,
+} from "./recommendations/share-message";
 export {
   buildWhatsappMessage,
   buildMultiWhatsappMessage,
 } from "./recommendations/share-message";
+export type {
+  DocumentCover,
+  PrintOptions,
+} from "./recommendations/print-document";
 export {
   buildRecommendationHtml,
   buildRecommendationsHtml,

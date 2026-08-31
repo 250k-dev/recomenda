@@ -30,6 +30,11 @@ export type PlatformCatalogEntry = {
   label_url?: string | null;
   price_brl?: string | null;
   owner_name?: string | null;
+  /** Empresa titular do registro no MAPA (AGROFIT). Nulo em adjuvante,
+   *  fertilizante, foliar e semente — não têm registro de agrotóxico. */
+  manufacturer?: string | null;
+  /** Número do registro no MAPA. */
+  mapa_registration?: string | null;
   can_edit: boolean;
   can_deactivate: boolean;
   can_clone_to_my_catalog: boolean;

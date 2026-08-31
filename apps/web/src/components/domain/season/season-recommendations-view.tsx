@@ -11,12 +11,15 @@ import { ProgressBar } from "@recomenda/ui/patterns/progress-bar";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
   useCreateRecommendation,
+  useCycle,
+  useCyclePurchaseList,
   useMe,
   useProducer,
   useReorderRecommendations,
   useSeason,
   useSeasonTimeline,
 } from "@recomenda/api-hooks";
+import { CROP_LABELS } from "@recomenda/utils";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { usePurchaseListCatalogProducts } from "@/components/domain/timing/timing-stages-editor";
 import type { Recommendation } from "@recomenda/api";
@@ -266,6 +269,60 @@ export function SeasonRecommendationsView({
   const canEditStructurePerm = useCan("RECOMMENDATION_EDIT_STRUCTURE");
   // PATCH /seasons exige SEASON_CRUD — botão de plantio usa essa permissão.
   const canSeasonCrud = useCan("SEASON_CRUD");
+  // Sem PRICE_VIEW o documento nunca sai com valores (nem a opção aparece).
+  const canViewPrices = useCan("PRICE_VIEW");
+
+  // Ficha técnica do PDF: fazenda, áreas, variedades e ciclo vêm da safra
+  // (`CycleDetail.seasons` já traz tudo agregado); o espaçamento, da lista.
+  const cycleId = seasonLive?.cycle_id ?? "";
+  const { data: cycle } = useCycle(cycleId);
+  const { data: cyclePurchaseList } = useCyclePurchaseList(cycleId);
+
+  const exportSpec = useMemo(() => {
+    const row = cycle?.seasons.find((s) => s.id === seasonId);
+    const farm = cycle?.farms.find((f) => f.id === row?.farm_id);
+    const varieties =
+      row?.varieties?.length
+        ? row.varieties.map((v) => ({
+            variety: v.variety,
+            plantedAreaHa: v.planted_area_ha,
+            thousandPlantsPerHa: v.thousand_plants_per_ha ?? null,
+          }))
+        : seasonLive?.varieties?.map((v) => ({
+            variety: v.variety,
+            plantedAreaHa: v.planted_area_ha,
+            thousandPlantsPerHa: v.thousand_plants_per_ha ?? null,
+          })) ?? [];
+    return {
+      farmName: row?.farm_name ?? farm?.name ?? null,
+      farmLocation: farm?.location ?? null,
+      cycleName: cycle?.name ?? null,
+      cropLabel: CROP_LABELS[crop ?? row?.crop ?? ""] ?? null,
+      areaHa: row?.plot_area_ha ?? null,
+      plantedAreaHa:
+        row?.planted_area_ha ??
+        (seasonLive?.planted_area_ha != null
+          ? Number(seasonLive.planted_area_ha)
+          : null),
+      varieties,
+      spacingM: cyclePurchaseList?.spacing_m ?? null,
+      cycleDays: row?.cycle_days ?? null,
+      desiccationDate: row?.desiccation_date ?? seasonLive?.desiccation_date ?? null,
+    };
+  }, [crop, cycle, cyclePurchaseList, seasonId, seasonLive]);
+
+  // Preço unitário por produto (R$) — base do custo/ha do documento.
+  const unitPriceByProduct = useMemo(() => {
+    if (!canViewPrices) return undefined;
+    const map: Record<string, number> = {};
+    for (const item of cyclePurchaseList?.items ?? []) {
+      const price = Number(item.unit_price_brl);
+      if (price > 0 && map[item.local_product_id] == null) {
+        map[item.local_product_id] = price;
+      }
+    }
+    return Object.keys(map).length > 0 ? map : undefined;
+  }, [canViewPrices, cyclePurchaseList]);
 
   const recommendations = useMemo(() => {
     return (
@@ -274,6 +331,17 @@ export function SeasonRecommendationsView({
         : ((data as { data?: unknown[] } | undefined)?.data ?? [])
     ) as Recommendation[];
   }, [data]);
+
+  // Aplicação registrada trava a troca de modelo: não se passa produto por cima
+  // do que já foi para o campo. Mesma regra do aplicar em massa, que esconde
+  // esses talhões da seleção. Definido antes dos returns condicionais porque os
+  // dois botões "Aplicar modelo" vivem em ramos diferentes do render.
+  const hasAppliedStage = recommendations.some(
+    (r) => r.status === "APPLIED_ON_TIME" || r.status === "APPLIED_LATE",
+  );
+  const applyTemplateTitle = hasAppliedStage
+    ? "Este talhão já tem aplicação registrada — o modelo não pode ser trocado."
+    : undefined;
 
   // Deep-link: rola até a etapa alvo após o timeline carregar.
   useEffect(() => {
@@ -351,6 +419,8 @@ export function SeasonRecommendationsView({
                   size="sm"
                   className="gap-1.5"
                   onClick={() => setTemplateOpen(true)}
+                  disabled={hasAppliedStage}
+                  title={applyTemplateTitle}
                 >
                   <LayoutTemplate className="w-4 h-4" />
                   Aplicar modelo
@@ -460,6 +530,8 @@ export function SeasonRecommendationsView({
     done,
     total,
     recommendations,
+    spec: exportSpec,
+    unitPriceByProduct,
   };
 
   return (
@@ -546,6 +618,8 @@ export function SeasonRecommendationsView({
                 size="sm"
                 className="gap-1.5 print:hidden"
                 onClick={() => setTemplateOpen(true)}
+                disabled={hasAppliedStage}
+                title={applyTemplateTitle}
               >
                 <LayoutTemplate className="w-4 h-4" />
                 Aplicar modelo

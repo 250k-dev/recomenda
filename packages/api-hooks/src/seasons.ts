@@ -30,6 +30,7 @@ import {
   deleteRecommendationItem,
   reorderRecommendationItems,
 } from "@recomenda/api/seasons";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import { queryKeys } from "./queryKeys";
 import { useWalletScopeKey } from "./use-active-scope";
 
@@ -199,6 +200,62 @@ export function useApplySeasonTemplate(seasonId: string) {
       applySeasonTemplate(seasonId, timingTemplateId),
     onSuccess: () => {
       invalidateSeasonCropCaches(queryClient, seasonId);
+      invalidatePurchaseListsAfterRecommendationChange(queryClient);
+    },
+  });
+}
+
+export type BulkApplyTemplateResult = {
+  ok: number;
+  failed: number;
+  /** Talhões que falharam, com o motivo — o diálogo mostra em vez de engolir. */
+  errors: Array<{ seasonId: string; label: string; message: string }>;
+};
+
+/**
+ * Aplica um modelo de timing a vários talhões de uma vez.
+ *
+ * Não existe endpoint em lote no servidor: resolve talhão a talhão com
+ * `Promise.allSettled` (mesmo padrão do registro em massa do cronograma),
+ * tolerando falha parcial. Cada chamada **substitui as etapas pendentes** do
+ * talhão — as já aplicadas permanecem.
+ */
+export function useBulkApplySeasonTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      timingTemplateId,
+      seasons,
+    }: {
+      timingTemplateId: string;
+      seasons: Array<{ id: string; label: string }>;
+    }): Promise<BulkApplyTemplateResult> => {
+      const results = await Promise.allSettled(
+        seasons.map((season) => applySeasonTemplate(season.id, timingTemplateId)),
+      );
+      const errors: BulkApplyTemplateResult["errors"] = [];
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          errors.push({
+            seasonId: seasons[index].id,
+            label: seasons[index].label,
+            message: apiErrorMessage(
+              result.reason,
+              "Não foi possível aplicar o modelo.",
+            ),
+          });
+        }
+      });
+      return {
+        ok: results.length - errors.length,
+        failed: errors.length,
+        errors,
+      };
+    },
+    onSuccess: (_result, { seasons }) => {
+      for (const season of seasons) {
+        invalidateSeasonCropCaches(queryClient, season.id);
+      }
       invalidatePurchaseListsAfterRecommendationChange(queryClient);
     },
   });

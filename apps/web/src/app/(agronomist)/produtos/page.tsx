@@ -72,6 +72,10 @@ const editSchema = z.object({
   price_usd: z.string().optional(),
   label_url: z.string().optional(),
   formulation_key: z.string().optional(),
+  // Registro no MAPA: vem preenchido do AGROFIT (`npm run import:agrofit`);
+  // editável à mão para o que a base não cobre.
+  manufacturer: z.string().optional(),
+  mapa_registration: z.string().optional(),
 });
 
 type CreateFormValues = z.infer<typeof createSchema>;
@@ -99,6 +103,8 @@ export default function CatalogPage() {
 
   const [openCreate, setOpenCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** Busca do "usar registro de outro produto" (ver `registryOptions`). */
+  const [registryQuery, setRegistryQuery] = useState("");
   const [activeTab, setActiveTab] = useState<
     "global" | "customizados" | "inativos"
   >("global");
@@ -164,6 +170,10 @@ export default function CatalogPage() {
           equivalence_group: key
             ? formulationEquivalenceGroup(key)
             : null,
+          // String vazia vira null: campo em branco significa "sem registro"
+          // (adjuvante, fertilizante), não texto vazio.
+          manufacturer: values.manufacturer?.trim() || null,
+          mapa_registration: values.mapa_registration?.trim() || null,
         },
         {
           onSuccess: () => {
@@ -197,7 +207,38 @@ export default function CatalogPage() {
     );
   };
 
-  const platformRows = (platformRes?.data ?? []) as PlatformCatalogEntry[];
+  // Memoizado: `?? []` cria um array novo a cada render e faz todos os memos
+  // que dependem dele recalcularem sempre.
+  const platformRows = useMemo(
+    () => (platformRes?.data ?? []) as PlatformCatalogEntry[],
+    [platformRes],
+  );
+
+  /**
+   * Produtos do catálogo que já têm registro do MAPA — fonte para copiar num
+   * produto de nome livre que o import não achou (ex.: "Glufosinato 800 WG -
+   * Rainbow", que no AGROFIT existe sob a marca comercial).
+   */
+  const registryOptions = useMemo(() => {
+    const q = registryQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const seen = new Set<string>();
+    const out: Array<{ name: string; manufacturer: string; registration: string }> = [];
+    for (const row of platformRows) {
+      if (!row.manufacturer || !row.mapa_registration) continue;
+      if (!row.name.toLowerCase().includes(q)) continue;
+      const key = `${row.manufacturer}|${row.mapa_registration}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        name: row.name,
+        manufacturer: row.manufacturer,
+        registration: row.mapa_registration,
+      });
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [platformRows, registryQuery]);
   const inactiveProducts = (inactiveData?.data ?? []) as Array<{
     id: string;
     name: string;
@@ -321,6 +362,9 @@ export default function CatalogPage() {
         : "",
     );
     editForm.setValue("label_url", row.label_url ?? "");
+    editForm.setValue("manufacturer", row.manufacturer ?? "");
+    editForm.setValue("mapa_registration", row.mapa_registration ?? "");
+    setRegistryQuery("");
     const formKey = resolveFormulationKey(row.equivalence_group);
     editForm.setValue(
       "formulation_key",
@@ -878,6 +922,84 @@ export default function CatalogPage() {
                   <p className="text-[11px] text-muted-foreground">
                     Usado pelo Plano de Custo com a cotação do dólar.
                   </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-surface-2 p-3">
+                <p className="text-xs font-semibold text-text-strong">
+                  Registro no MAPA
+                </p>
+                <p className="mt-0.5 mb-2.5 text-[11px] leading-snug text-muted-foreground">
+                  Preenchido automaticamente pela base do AGROFIT. Adjuvante,
+                  fertilizante, foliar e semente não têm registro — deixe em branco.
+                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="catalog-edit-manufacturer">Empresa</Label>
+                  <Input
+                    id="catalog-edit-manufacturer"
+                    {...editForm.register("manufacturer")}
+                    placeholder="Ex.: Syngenta Proteção de Cultivos Ltda."
+                  />
+                </div>
+                <div className="mt-2.5 space-y-1.5">
+                  <Label htmlFor="catalog-edit-registration">Nº de registro</Label>
+                  <Input
+                    id="catalog-edit-registration"
+                    {...editForm.register("mapa_registration")}
+                    placeholder="Ex.: 8499"
+                  />
+                </div>
+
+                <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+                  <Label htmlFor="catalog-edit-registry-search">
+                    Copiar de outro produto
+                  </Label>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Para genérico cadastrado com nome próprio: busque a marca
+                    comercial e traga empresa e registro dela.
+                  </p>
+                  <Input
+                    id="catalog-edit-registry-search"
+                    value={registryQuery}
+                    onChange={(e) => setRegistryQuery(e.target.value)}
+                    placeholder="Buscar por nome do produto…"
+                  />
+                  {registryQuery.trim().length >= 2 ? (
+                    registryOptions.length > 0 ? (
+                      <ul className="mt-1 flex flex-col gap-1">
+                        {registryOptions.map((opt) => (
+                          <li key={`${opt.manufacturer}-${opt.registration}`}>
+                            <button
+                              type="button"
+                              className="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-left text-[12px] hover:border-primary/40 hover:bg-primary/5"
+                              onClick={() => {
+                                editForm.setValue("manufacturer", opt.manufacturer);
+                                editForm.setValue(
+                                  "mapa_registration",
+                                  opt.registration,
+                                );
+                                setRegistryQuery("");
+                                toast.success(
+                                  `Registro de ${opt.name} copiado. Confira e salve.`,
+                                );
+                              }}
+                            >
+                              <span className="block font-medium text-text-strong">
+                                {opt.name}
+                              </span>
+                              <span className="block text-muted-foreground">
+                                {opt.manufacturer} · reg. {opt.registration}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">
+                        Nenhum produto com registro para essa busca.
+                      </p>
+                    )
+                  ) : null}
                 </div>
               </div>
 

@@ -15,6 +15,7 @@ import type {
   ExportRecommendationBlock,
 } from "@recomenda/api/exports";
 import type { RecommendationShareData } from "@recomenda/domain/recommendations/share-message";
+import type { DocumentCover } from "@recomenda/domain/recommendations/print-document";
 import {
   buildPurchaseListHtml,
   buildQuoteComparisonHtml,
@@ -365,14 +366,17 @@ function buildPreviewHtml(
   if (data.typ === "recommendation" && data.recommendation) {
     const share = toShareData(data, data.recommendation, sel);
     if (!share || share.recommendations.length === 0) return "";
-    return buildRecommendationHtml(share);
+    return buildRecommendationHtml(share, { showPrices: data.showPrices });
   }
   if (data.typ === "season" && data.season) {
     const list = data.season.items
       .map((item) => toShareData(data, item, sel))
       .filter((item): item is RecommendationShareData => Boolean(item?.recommendations.length));
     if (list.length === 0) return "";
-    return buildRecommendationsHtml(list, data.season.cycleName);
+    return buildRecommendationsHtml(list, data.season.cycleName, {
+      showPrices: data.showPrices,
+      cover: coverForSeason(data),
+    });
   }
   if (data.typ === "stock" && data.stock) {
     return buildStockHtml({
@@ -408,14 +412,19 @@ function printFromData(data: ExportByTokenResponse, sel: SelectionState) {
   }
   if (data.typ === "recommendation" && data.recommendation) {
     const share = toShareData(data, data.recommendation, sel);
-    if (share) printRecommendation(share);
+    if (share) printRecommendation(share, { showPrices: data.showPrices });
     return;
   }
   if (data.typ === "season" && data.season) {
     const list = data.season.items
       .map((item) => toShareData(data, item, sel))
       .filter((item): item is RecommendationShareData => Boolean(item?.recommendations.length));
-    if (list.length > 0) printRecommendations(list, data.season.cycleName);
+    if (list.length > 0) {
+      printRecommendations(list, data.season.cycleName, {
+        showPrices: data.showPrices,
+        cover: coverForSeason(data),
+      });
+    }
     return;
   }
   if (data.typ === "stock" && data.stock) {
@@ -466,6 +475,37 @@ function toShareData(
     done,
     total: recommendations.length,
     recommendations,
+    spec: block.spec ?? null,
+    // O servidor só manda preço quando quem gerou o link tem PRICE_VIEW.
+    unitPriceByProduct: data.unitPriceByProduct,
+  };
+}
+
+/** Capa do documento da safra no link público (mesmo formato do app). */
+function coverForSeason(data: ExportByTokenResponse): DocumentCover | null {
+  if (!data.season) return null;
+  const items = data.season.items;
+  const areaHa = items.reduce((sum, item) => sum + (item.spec?.areaHa ?? 0), 0);
+  const farms = new Set(
+    items.map((item) => item.spec?.farmName).filter(Boolean) as string[],
+  );
+  const stats: DocumentCover["stats"] = [];
+  if (farms.size > 1) stats.push({ label: "Fazendas", value: String(farms.size) });
+  stats.push({ label: "Talhões", value: String(items.length) });
+  if (areaHa > 0) {
+    stats.push({
+      label: "Área",
+      value: `${areaHa.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ha`,
+    });
+  }
+  return {
+    kicker: "Programação da safra",
+    title: data.season.cycleName,
+    tags: [
+      ...(data.producerName ? [`Produtor: ${data.producerName}`] : []),
+      ...(farms.size === 1 ? [`Fazenda ${[...farms][0]}`] : []),
+    ],
+    stats,
   };
 }
 

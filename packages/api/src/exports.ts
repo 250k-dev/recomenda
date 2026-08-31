@@ -19,6 +19,24 @@ export interface ExportStockItem {
   value_brl: number | null;
 }
 
+/** Ficha técnica do talhão no documento exportado (campo ausente sai como "—"). */
+export interface ExportPlotSpec {
+  farmName: string | null;
+  farmLocation: string | null;
+  cycleName: string | null;
+  cropLabel: string | null;
+  areaHa: number | null;
+  plantedAreaHa: number | null;
+  varieties: Array<{
+    variety: string;
+    plantedAreaHa: number | null;
+    thousandPlantsPerHa: number | null;
+  }>;
+  spacingM: number | null;
+  cycleDays: number | null;
+  desiccationDate: string | null;
+}
+
 export interface ExportRecommendationBlock {
   seasonId?: string;
   id?: string;
@@ -28,6 +46,7 @@ export interface ExportRecommendationBlock {
   plantingDate: string | null;
   statusLabel: string | null;
   recommendations: Recommendation[];
+  spec?: ExportPlotSpec | null;
 }
 
 export interface ExportByTokenResponse {
@@ -43,6 +62,11 @@ export interface ExportByTokenResponse {
     cycleName: string;
     items: ExportRecommendationBlock[];
   };
+  /**
+   * Preço unitário em R$ por `local_product_id`, da lista de compra da safra.
+   * Só vem quando o solicitante tem PRICE_VIEW (`showPrices`).
+   */
+  unitPriceByProduct?: Record<string, number>;
   stock?: { items: ExportStockItem[] };
   quotes?: {
     listName: string | null;

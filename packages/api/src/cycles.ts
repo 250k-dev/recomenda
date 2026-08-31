@@ -6,6 +6,8 @@ import { api } from "./http/axios";
 export interface CycleFarmRow {
   id: string;
   name: string;
+  /** Localização livre da fazenda — vai para a ficha do talhão nos documentos. */
+  location?: string | null;
   area_hectares_sum: number;
 }
 
@@ -62,6 +64,8 @@ export interface CycleSeasonRow {
   cycle_days: number | null;
   recommendations_total: number;
   recommendations_done: number;
+  /** Etapas em PENDING — o que é descartado ao aplicar um modelo neste talhão. */
+  recommendations_pending?: number;
 }
 
 export interface CycleBlock {
@@ -166,6 +170,17 @@ export interface ApplyBlockPayload {
 export interface ApplyBlockResult {
   applied: string[];
   skipped: string[];
+  /**
+   * Produto cuja unidade no modelo difere da cadastrada na lista de compra
+   * (ex.: L no modelo, Kg na lista). A dose aplicada é a do modelo — isto é
+   * aviso, não correção.
+   */
+  unit_mismatches?: Array<{
+    local_product_id: string;
+    product_name: string;
+    template_unit: string;
+    list_unit: string;
+  }>;
   cycle: CycleDetail;
 }
 
@@ -215,6 +230,24 @@ export async function getCycleAvailablePlots(id: string) {
 
 export async function applyCycleBlock(id: string, payload: ApplyBlockPayload) {
   const { data } = await api.post<ApplyBlockResult>(`/cycles/${id}/blocks`, payload);
+  return data;
+}
+
+/** Resultado do realinhamento das doses da lista com a programação. */
+export interface SyncListDosesResult {
+  updated: number;
+  conflicts: Array<{
+    product_name: string;
+    stage: string;
+    reason: "purchase_confirmed";
+  }>;
+}
+
+/** Leva as doses da programação para a lista de compra da safra. */
+export async function syncCycleListDoses(cycleId: string) {
+  const { data } = await api.post<SyncListDosesResult>(
+    `/cycles/${cycleId}/sync-list-doses`,
+  );
   return data;
 }
 

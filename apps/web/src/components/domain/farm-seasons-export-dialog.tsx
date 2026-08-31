@@ -15,8 +15,15 @@ import {
   buildMultiWhatsappMessage,
   type RecommendationShareData,
 } from "@recomenda/domain/recommendations/share-message";
-import { printRecommendations } from "@recomenda/domain/recommendations/print-document";
+import {
+  printRecommendations,
+  type DocumentCover,
+} from "@recomenda/domain/recommendations/print-document";
 import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
+import {
+  readPricePreference,
+  writePricePreference,
+} from "@/components/domain/export/price-preference";
 import { cn } from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
@@ -34,6 +41,7 @@ export function FarmSeasonsExportDialog({
   contextLabel = "FAZENDA",
   isLoading = false,
   items,
+  cover,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,10 +49,16 @@ export function FarmSeasonsExportDialog({
   contextLabel?: string;
   isLoading?: boolean;
   items: FarmExportItem[];
+  /** Capa do documento (números da safra/fazenda + consolidado). */
+  cover?: DocumentCover | null;
 }) {
   const [copied, setCopied] = useState(false);
   const [shareAll, setShareAll] = useState(true);
   const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set());
+  const [showPrices, setShowPrices] = useState(() => readPricePreference());
+  // Só oferece a escolha quando há preço no payload (isto é, quem exporta tem
+  // PRICE_VIEW). Sem isso o documento sai sem valores de qualquer forma.
+  const canChoosePrices = items.some((item) => item.data.unitPriceByProduct);
 
   const allStageIds = useMemo(
     () => items.flatMap((i) => i.data.recommendations.map((rec) => rec.id)),
@@ -115,6 +129,35 @@ export function FarmSeasonsExportDialog({
     });
   };
 
+  /** Talhões agrupados pela fazenda a que pertencem (safra multi-fazenda). */
+  const farmGroups = useMemo(() => {
+    const map = new Map<string, { farmName: string; items: FarmExportItem[] }>();
+    for (const item of items) {
+      const farmName = item.data.spec?.farmName ?? "Sem fazenda";
+      const group = map.get(farmName);
+      if (group) group.items.push(item);
+      else map.set(farmName, { farmName, items: [item] });
+    }
+    return [...map.values()].sort((a, b) =>
+      a.farmName.localeCompare(b.farmName, "pt-BR"),
+    );
+  }, [items]);
+
+  /** Marca/desmarca todas as etapas de todos os talhões de uma fazenda. */
+  const setFarmSelected = (groupItems: FarmExportItem[], on: boolean) => {
+    setShareAll(false);
+    setSelectedStageIds((prev) => {
+      const next = new Set(prev);
+      for (const item of groupItems) {
+        for (const rec of item.data.recommendations) {
+          if (on) next.add(rec.id);
+          else next.delete(rec.id);
+        }
+      }
+      return next;
+    });
+  };
+
   const setSeasonSelected = (item: FarmExportItem, on: boolean) => {
     setShareAll(false);
     setSelectedStageIds((prev) => {
@@ -161,9 +204,19 @@ export function FarmSeasonsExportDialog({
   const handlePrint = () => {
     onOpenChange(false);
     window.setTimeout(
-      () => printRecommendations(selectedItems.map((i) => i.data), `Recomendações - ${farmName ?? ""}`),
+      () =>
+        printRecommendations(
+          selectedItems.map((i) => i.data),
+          `Recomendações - ${farmName ?? ""}`,
+          { showPrices: canChoosePrices && showPrices, cover },
+        ),
       250,
     );
+  };
+
+  const togglePrices = (value: boolean) => {
+    setShowPrices(value);
+    writePricePreference(value);
   };
 
   return (
@@ -177,6 +230,29 @@ export function FarmSeasonsExportDialog({
         </DialogHeader>
 
         <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto px-6 py-5">
+          {/* Primeiro item do modal: é a decisão que muda o que sai no documento. */}
+          {canChoosePrices ? (
+            <section className="rounded-xl border border-border bg-surface-2 p-4">
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-primary"
+                  checked={showPrices}
+                  onChange={(e) => togglePrices(e.target.checked)}
+                />
+                <span className="text-sm">
+                  <span className="font-semibold text-text-strong">
+                    Incluir preços e custos
+                  </span>
+                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                    Custo por talhão e total da safra. Desmarque para entregar só a
+                    parte técnica.
+                  </span>
+                </span>
+              </label>
+            </section>
+          ) : null}
+
           <section className="rounded-xl border border-border bg-surface-2 p-4">
             <label className="flex cursor-pointer items-center gap-2.5">
               <input
@@ -242,8 +318,51 @@ export function FarmSeasonsExportDialog({
                     Nenhuma safra com cronograma para exportar.
                   </p>
                 ) : (
+                  <div className="flex flex-col gap-4">
+                    {farmGroups.map((group) => {
+                      const groupStageIds = group.items.flatMap((it) =>
+                        it.data.recommendations.map((rec) => rec.id),
+                      );
+                      const groupSelected = groupStageIds.filter((id) =>
+                        selectedStageIds.has(id),
+                      ).length;
+                      const groupAll =
+                        groupStageIds.length > 0 &&
+                        groupSelected === groupStageIds.length;
+
+                      return (
+                        <div key={group.farmName} className="flex flex-col gap-2">
+                          {/* Cabeçalho da fazenda: marca todos os talhões dela de
+                              uma vez — com 2 fazendas × 20 talhões, marcar um a um
+                              é o que consome o tempo. */}
+                          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+                            <label className="flex min-w-0 cursor-pointer items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                className="size-4 accent-primary"
+                                checked={groupAll}
+                                ref={(node) => {
+                                  if (node) {
+                                    node.indeterminate =
+                                      groupSelected > 0 && !groupAll;
+                                  }
+                                }}
+                                onChange={(e) =>
+                                  setFarmSelected(group.items, e.target.checked)
+                                }
+                              />
+                              <span className="truncate text-sm font-semibold text-text-strong">
+                                {group.farmName}
+                              </span>
+                            </label>
+                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                              {group.items.length}{" "}
+                              {group.items.length === 1 ? "talhão" : "talhões"}
+                            </span>
+                          </div>
+
                   <ul className="flex flex-col gap-3">
-                    {items.map((item) => {
+                    {group.items.map((item) => {
                       const seasonStageIds = item.data.recommendations.map((rec) => rec.id);
                       const selectedCount = seasonStageIds.filter((id) =>
                         selectedStageIds.has(id),
@@ -311,6 +430,10 @@ export function FarmSeasonsExportDialog({
                       );
                     })}
                   </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             ) : (
@@ -332,8 +455,15 @@ export function FarmSeasonsExportDialog({
                         key={it.id}
                         className="flex items-center gap-2.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
                       >
-                        <span className="font-medium text-text-strong">{it.label}</span>
-                        <span className="ml-auto text-xs text-muted-foreground">
+                        <span className="min-w-0 truncate font-medium text-text-strong">
+                          {it.label}
+                          {it.data.spec?.farmName ? (
+                            <span className="font-normal text-muted-foreground">
+                              {" "}· {it.data.spec.farmName}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                           {it.data.done}/{it.data.total}
                         </span>
                       </li>
