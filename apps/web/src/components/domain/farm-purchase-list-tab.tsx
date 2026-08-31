@@ -22,6 +22,8 @@ import {
 import {
   computePurchaseListMetrics,
   detailItemToListItem,
+  applyManualTotalSpent,
+  usesManualListTotal,
 } from "@recomenda/domain/purchase-list/breakdown";
 import {
   readLocalDraft,
@@ -51,6 +53,7 @@ import { Card, CardContent } from "@recomenda/ui/primitives/card";
 import { DataTable } from "@recomenda/ui/patterns/data-table";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
+import { FulfillWithoutQuoteButton } from "@/components/domain/fulfill-without-quote-dialog";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { PurchaseListTargetsDialog } from "@/components/domain/purchase-list-targets-dialog";
@@ -397,13 +400,26 @@ export function FarmPurchaseListTab({
   const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
 
   const kpis = useMemo(() => {
-    return computePurchaseListMetrics(
+    const base = computePurchaseListMetrics(
       editing ? draftItems : viewItems,
       totalHa,
       fx,
       saca,
     );
-  }, [editing, draftItems, viewItems, totalHa, fx, saca]);
+    return applyManualTotalSpent(
+      base,
+      list?.manual_total_spent_brl,
+      saca,
+      totalHa,
+    );
+  }, [editing, draftItems, viewItems, totalHa, fx, saca, list?.manual_total_spent_brl]);
+  const manualTotalLabel = usesManualListTotal(
+    kpis,
+    list?.manual_total_spent_brl,
+  );
+  const hasPendingBuy = (list?.items ?? []).some(
+    (it) => (it.quantity_to_buy ?? 0) > 1e-9,
+  );
 
   if (!producerId) {
     return (
@@ -557,6 +573,12 @@ export function FarmPurchaseListTab({
                 Cotações das lojas
               </Button>
               ) : null}
+              {canQuoteCrud && !editing && list.status !== "draft" ? (
+                <FulfillWithoutQuoteButton
+                  listId={list.id}
+                  pending={hasPendingBuy}
+                />
+              ) : null}
               {/* Plano de custo é só preço — Gerente/Operador não têm PRICE_VIEW. */}
               {canViewPrices && onOpenCostPlan ? (
                 <Button
@@ -591,7 +613,9 @@ export function FarmPurchaseListTab({
           ...(canViewPrices
             ? [
                 {
-                  label: "Valor total",
+                  label: manualTotalLabel
+                    ? "Total gasto (informado)"
+                    : "Valor total",
                   value: kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—",
                 },
                 {

@@ -44,6 +44,7 @@ import {
   type MultiStoreProductGroup,
 } from "@/components/domain/quote-confirm-qty-dialog";
 import { QuotePurchaseSummary } from "@/components/domain/quote-purchase-summary";
+import { FulfillWithoutQuoteButton } from "@/components/domain/fulfill-without-quote-dialog";
 import {
   createQuoteRequest,
   createQuoteResponse,
@@ -180,6 +181,20 @@ export function QuoteComparisonSection({
     </Button>
   );
 
+  const fulfillButton = (
+    <FulfillWithoutQuoteButton
+      listId={listId}
+      pending={Boolean(progress && !progress.is_complete)}
+    />
+  );
+
+  const quoteAltActions = (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {manualQuoteButton}
+      {fulfillButton}
+    </div>
+  );
+
   const manualQuoteDialog = (
     <Dialog open={manualOpen} onOpenChange={setManualOpen}>
       <DialogContent className="max-w-lg">
@@ -306,7 +321,7 @@ export function QuoteComparisonSection({
           variant="inline"
           title="Gere o link de cotação para começar a receber preços das lojas."
           description="Recebeu preços por telefone ou WhatsApp? Você também pode preencher uma cotação manualmente."
-          action={manualQuoteButton}
+          action={quoteAltActions}
         />
         {manualQuoteDialog}
       </>
@@ -431,7 +446,7 @@ export function QuoteComparisonSection({
           variant="inline"
           title="Nenhuma loja respondeu ainda."
           description="Assim que uma loja preencher a cotação pelo link, os preços aparecem aqui. Recebeu preços por telefone? Preencha uma cotação manual."
-          action={manualQuoteButton}
+          action={quoteAltActions}
         />
         {manualQuoteDialog}
         {confirmDialog}
@@ -655,6 +670,7 @@ export function QuoteComparisonSection({
             Selecionar todos disponíveis
           </Button>
           {manualQuoteButton}
+          {fulfillButton}
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
             <FileDown className="size-3.5" />
             Exportar

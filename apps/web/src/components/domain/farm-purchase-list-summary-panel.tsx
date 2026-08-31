@@ -7,12 +7,15 @@ import { Card } from "@recomenda/ui/primitives/card";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
+import { FulfillWithoutQuoteButton } from "@/components/domain/fulfill-without-quote-dialog";
 import type { PurchaseListDetail } from "@recomenda/api";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import {
+  applyManualTotalSpent,
   computePurchaseListMetrics,
   detailItemToListItem,
+  usesManualListTotal,
 } from "@recomenda/domain/purchase-list/breakdown";
 import { cn } from "@recomenda/utils";
 
@@ -32,16 +35,27 @@ function computeMetrics(
 ) {
   if (!list) {
     return {
+      totalProductsValue: 0,
+      totalSeedsValue: 0,
       totalValue: 0,
       seedVolume: 0,
+      seedSacksPerHa: 0,
       totalSacks: 0,
       costSacksPerHa: 0,
       productsCount: 0,
+      categoriesCount: 0,
       pricedCount: 0,
+      categoryBreakdown: [],
     };
   }
   const items = (list.items ?? []).map(detailItemToListItem);
-  return computePurchaseListMetrics(items, list.total_hectares ?? 0, fx, saca);
+  const base = computePurchaseListMetrics(items, list.total_hectares ?? 0, fx, saca);
+  return applyManualTotalSpent(
+    base,
+    list.manual_total_spent_brl,
+    saca,
+    list.total_hectares ?? 0,
+  );
 }
 
 function SummaryRow({
@@ -87,6 +101,7 @@ export function FarmPurchaseListSummaryPanel({
   costPlanHref?: Route | null;
 }) {
   const canViewPrices = useCan("PRICE_VIEW");
+  const canQuoteCrud = useCan("QUOTE_CRUD");
   const fxRate = useCurrencyStore((state) => state.fxRate);
   const grainPrice = useCurrencyStore((state) => state.grainPrice);
   if (isLoading) {
@@ -111,6 +126,14 @@ export function FarmPurchaseListSummaryPanel({
   const metrics = computeMetrics(list, fx, saca);
   const listLabel = list?.name ?? "—";
   const productsTotal = metrics.productsCount || 0;
+  const manualTotalLabel = usesManualListTotal(
+    metrics,
+    list?.manual_total_spent_brl,
+  );
+  const hasPendingBuy = (list?.items ?? []).some(
+    (it) => (it.quantity_to_buy ?? 0) > 1e-9,
+  );
+  const showPriceHint = canViewPrices && metrics.totalValue <= 0;
 
   return (
     <Card className="gap-0 overflow-hidden py-0 shadow-sm">
@@ -123,7 +146,7 @@ export function FarmPurchaseListSummaryPanel({
       <div className="px-[18px] pb-4 pt-1.5">
         {canViewPrices ? (
           <SummaryRow
-            label="Valor total"
+            label={manualTotalLabel ? "Total gasto (informado)" : "Valor total"}
             value={metrics.totalValue > 0 ? fmtBrl(metrics.totalValue) : "—"}
             largeValue
           />
@@ -146,9 +169,12 @@ export function FarmPurchaseListSummaryPanel({
         ) : null}
         <SummaryRow label="Produtos" value={String(productsTotal)} />
 
-        <div className="my-3 rounded-[10px] border border-warning-border bg-warning-soft px-[13px] py-[11px] text-[13px] font-medium leading-snug text-warning-strong">
-          Informe preços ou gere uma cotação para calcular o custo por hectare.
-        </div>
+        {showPriceHint ? (
+          <div className="my-3 rounded-[10px] border border-warning-border bg-warning-soft px-[13px] py-[11px] text-[13px] font-medium leading-snug text-warning-strong">
+            Informe preços, gere uma cotação ou registre sem cotação. Sem valor, o
+            custo por hectare não é calculado.
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <Button
@@ -160,6 +186,15 @@ export function FarmPurchaseListSummaryPanel({
             <Store className="size-4" />
             Cotações das lojas
           </Button>
+
+          {canQuoteCrud && list ? (
+            <FulfillWithoutQuoteButton
+              listId={list.id}
+              pending={hasPendingBuy}
+              size="default"
+              className={actionBtnClass}
+            />
+          ) : null}
 
           {list ? (
             <ShareQuoteSheet

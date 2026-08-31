@@ -12,7 +12,7 @@ import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Select } from "@recomenda/ui/forms/select";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
-import { useConsultants, useWalletActivity } from "@recomenda/api-hooks";
+import { useConsultants, useFarmTeamAll, useWalletActivity } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import type { WalletActivityQuery } from "@recomenda/api/consultants";
 import { cn } from "@recomenda/utils";
@@ -69,8 +69,33 @@ function csvEscape(value: string) {
   return value;
 }
 
+function actorRoleLabel(role?: string | null) {
+  switch (role) {
+    case "AGRONOMIST":
+      return "Agrônomo";
+    case "MANAGER":
+      return "Gestor";
+    case "CONSULTANT":
+      return "Consultor";
+    case "FARM_MANAGER":
+      return "Gerente";
+    case "FARM_OPERATOR":
+      return "Operador";
+    case "STAFF":
+      return "Equipe";
+    default:
+      return role ?? "";
+  }
+}
+
+function isCarteiraActor(role?: string | null) {
+  return role === "AGRONOMIST" || role === "MANAGER" || role === "CONSULTANT" || role === "STAFF";
+}
+
 export function TeamAuditTrail() {
   const canManage = useCan("TEAM_MANAGE");
+  const canFarmAudit = useCan("FARM_TEAM_MANAGE");
+  const canViewAudit = canManage || canFarmAudit;
   const searchParams = useSearchParams();
   const actorFromUrl = searchParams.get("actor") ?? "";
 
@@ -86,23 +111,31 @@ export function TeamAuditTrail() {
     setOffset(0);
   }, [actorFromUrl]);
 
-  const { data: team } = useConsultants();
+  const { data: team } = useConsultants(canManage);
+  const { data: farmTeam } = useFarmTeamAll(canViewAudit);
 
   const peopleOptions = useMemo(() => {
-    const rows = [
-      ...(team?.managers ?? []),
-      ...(team?.assistants ?? []),
-    ];
+    const carteira = [...(team?.managers ?? []), ...(team?.assistants ?? [])].map(
+      (m) => ({
+        value: m.user_id,
+        label: m.name ?? m.email ?? m.user_id,
+      }),
+    );
+    const farm = (Array.isArray(farmTeam) ? farmTeam : []).map((m) => ({
+      value: m.user_id,
+      label: `${m.name}${m.access_level === "FARM_MANAGER" ? " · Gerente" : " · Operador"}`,
+    }));
+    const seen = new Set<string>();
+    const rows = [...carteira, ...farm].filter((r) => {
+      if (seen.has(r.value)) return false;
+      seen.add(r.value);
+      return true;
+    });
     return [
       { value: "all", label: "Todas as pessoas" },
-      ...rows
-        .map((m) => ({
-          value: m.user_id,
-          label: m.name ?? m.email ?? m.user_id,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
+      ...rows.sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
     ];
-  }, [team]);
+  }, [team, farmTeam]);
 
   const query: WalletActivityQuery = useMemo(() => {
     const entityOpt = CATEGORY_OPTIONS.find((c) => c.value === category);
@@ -120,7 +153,7 @@ export function TeamAuditTrail() {
     };
   }, [period, actor, category, qApplied, offset]);
 
-  const { data, isLoading, isFetching } = useWalletActivity(query, canManage);
+  const { data, isLoading, isFetching } = useWalletActivity(query, canViewAudit);
 
   const items = useMemo(() => {
     const rows = data?.items ?? [];
@@ -154,7 +187,7 @@ export function TeamAuditTrail() {
         [
           fmtDateTime(r.created_at),
           r.actor_name ?? "",
-          r.actor_role ?? "",
+          actorRoleLabel(r.actor_role),
           r.summary,
           r.producer_name ?? "",
           r.farm_name ?? "",
@@ -176,13 +209,13 @@ export function TeamAuditTrail() {
     URL.revokeObjectURL(url);
   };
 
-  if (!canManage) {
+  if (!canViewAudit) {
     return (
       <div className="mx-auto max-w-[1240px]">
         <BreadcrumbBack items={[{ label: "Equipe", href: routes.equipe.lista }]} />
         <EmptyState
           title="Sem permissão para a trilha."
-          description="Apenas quem gerencia a equipe pode auditar as ações da carteira."
+          description="Agrônomo, gestor e consultor veem a auditoria da carteira e da equipe da fazenda."
         />
       </div>
     );
@@ -325,7 +358,7 @@ export function TeamAuditTrail() {
                       {fmtDateTime(r.created_at)}
                     </td>
                     <td className="px-4 py-3">
-                      {r.actor_user_id ? (
+                      {r.actor_user_id && isCarteiraActor(r.actor_role) ? (
                         <Link
                           href={routes.equipe.membro(r.actor_user_id)}
                           className="font-medium text-text-strong hover:underline"
@@ -337,7 +370,7 @@ export function TeamAuditTrail() {
                       )}
                       {r.actor_role ? (
                         <span className="mt-0.5 block text-xs text-muted-foreground">
-                          {r.actor_role}
+                          {actorRoleLabel(r.actor_role)}
                         </span>
                       ) : null}
                     </td>

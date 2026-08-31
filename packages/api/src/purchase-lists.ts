@@ -99,6 +99,10 @@ export interface PurchaseListDetail {
   spacing_m?: number | null;
   created_at: string;
   updated_at?: string;
+  /** Total gasto informado na mão (sem rateio nos itens). */
+  manual_total_spent_brl?: number | null;
+  /** Quando a lista foi registrada como comprada sem cotação. */
+  fulfilled_without_quote_at?: string | null;
   total_hectares: number;
   plots: Array<{
     id: string;
@@ -156,6 +160,16 @@ export async function getProducerPurchaseLists(producerId: string) {
   const { data } = await api.get<PurchaseListDetail[]>(`/purchase-lists`, {
     params: { producer_id: producerId },
   });
+  return data;
+}
+
+export async function getPurchaseListsCoverage() {
+  const { data } = await api.get<{
+    totalLists: number;
+    completeLists: number;
+    pendingLists: number;
+    pct: number;
+  }>("/purchase-lists/coverage");
   return data;
 }
 

@@ -1,4 +1,5 @@
 import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
+import { permissionsFromGrantKeys } from "./farm-staff-grants";
 
 /**
  * Espelho no cliente da camada de permissões do backend (`src/common/access`).
@@ -50,11 +51,12 @@ const CARTEIRA_BASE: Permission[] = [
   "EXPORT",
   "REPORTS_VIEW",
   "PRICE_VIEW",
+  "FARM_TEAM_MANAGE",
 ];
 
 const ACCESS_LEVEL_PERMISSIONS: Record<AccessLevel, ReadonlySet<Permission>> = {
   MANAGER: new Set<Permission>([...CARTEIRA_BASE, "TEAM_MANAGE"]),
-  CONSULTANT: new Set<Permission>([...CARTEIRA_BASE, "FARM_TEAM_MANAGE"]),
+  CONSULTANT: new Set<Permission>([...CARTEIRA_BASE]),
   FARM_MANAGER: new Set<Permission>([
     "RECOMMENDATION_REGISTER",
     "RECOMMENDATION_EDIT_ITEM",
@@ -83,7 +85,12 @@ const PRODUCER_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   "FARM_EDIT",
 ]);
 
-export type Principal = { role?: UserRole | null; access_level?: AccessLevel | null };
+export type Principal = {
+  role?: UserRole | null;
+  access_level?: AccessLevel | null;
+  price_view?: boolean | null;
+  grants?: string[] | null;
+};
 
 /**
  * A camada de níveis só se aplica a STAFF e PRODUCER. Admin/OrgAdmin/Agrônomo
@@ -93,6 +100,12 @@ export function can(user: Principal | null | undefined, permission: Permission):
   if (!user) return false;
   if (user.role === "STAFF") {
     const level = user.access_level ?? "CONSULTANT";
+    const isFarmStaff = level === "FARM_MANAGER" || level === "FARM_OPERATOR";
+    if (isFarmStaff && user.grants != null) {
+      if (permission === "PRICE_VIEW" && user.price_view) return true;
+      return permissionsFromGrantKeys(user.grants).includes(permission);
+    }
+    if (permission === "PRICE_VIEW" && user.price_view) return true;
     return ACCESS_LEVEL_PERMISSIONS[level].has(permission);
   }
   if (user.role === "PRODUCER") {

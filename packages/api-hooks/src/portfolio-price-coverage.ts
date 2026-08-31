@@ -1,23 +1,28 @@
 "use client";
 
-import { useQueries } from "@tanstack/react-query";
-import { getProducerPurchaseLists } from "@recomenda/api/purchase-lists";
-import { computePortfolioPriceCoverage } from "@recomenda/domain/purchase-list/metrics";
+import { useQuery } from "@tanstack/react-query";
+import { getPurchaseListsCoverage } from "@recomenda/api/purchase-lists";
 import { queryKeys } from "./queryKeys";
+import { useWalletScopeKey } from "./use-active-scope";
 
-export function usePortfolioPriceCoverage(producerIds: string[]) {
-  const queries = useQueries({
-    queries: producerIds.map((producerId) => ({
-      queryKey: queryKeys.producerPurchaseLists(producerId),
-      queryFn: () => getProducerPurchaseLists(producerId),
-      enabled: Boolean(producerId),
-    })),
+export function usePortfolioPriceCoverage(enabled = true) {
+  const scopeKey = useWalletScopeKey();
+  const query = useQuery({
+    queryKey: queryKeys.purchaseListsCoverage(scopeKey),
+    queryFn: getPurchaseListsCoverage,
+    enabled,
   });
 
-  const isLoading = queries.some((query) => query.isLoading);
-  const isFetching = queries.some((query) => query.isFetching);
-  const lists = queries.flatMap((query) => query.data ?? []);
-  const coverage = computePortfolioPriceCoverage(lists);
+  const coverage = query.data ?? {
+    totalLists: 0,
+    completeLists: 0,
+    pendingLists: 0,
+    pct: 0,
+  };
 
-  return { ...coverage, isLoading, isFetching };
+  return {
+    ...coverage,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+  };
 }

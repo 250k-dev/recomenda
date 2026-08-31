@@ -214,6 +214,9 @@ export async function createInvitation(payload: {
   manager_user_id?: string | null;
   /** Produtores liberados assim que o convite de equipe for aceito. */
   producer_ids?: string[];
+  /** FARM_TEAM + Gerente: libera visualização de preços. */
+  can_view_prices?: boolean;
+  grant_keys?: string[];
 }) {
   const { data } = await api.post<Invitation>("/invitations", payload);
   return data;

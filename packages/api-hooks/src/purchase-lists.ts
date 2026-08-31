@@ -37,6 +37,7 @@ export function useUpdatePurchaseList(id: string, options?: { farmId?: string })
         queryClient.invalidateQueries({
           queryKey: queryKeys.producerStock(data.producer_id),
         });
+        queryClient.invalidateQueries({ queryKey: ["purchase-lists-coverage"] });
       }
       if (options?.farmId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.farmPurchaseLists(options.farmId) });

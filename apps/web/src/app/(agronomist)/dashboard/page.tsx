@@ -221,12 +221,7 @@ export default function DashboardPage() {
     [activeProducers],
   );
 
-  const producerIds = useMemo(
-    () => activeProducers.map((producer) => producer.producer_id),
-    [activeProducers],
-  );
-
-  const priceCoverage = usePortfolioPriceCoverage(producerIds);
+  const priceCoverage = usePortfolioPriceCoverage(canViewPrices);
 
   // Safras ativas = cycles (a safra de verdade), já vem pronto por produtor no
   // endpoint de carteira — soma aqui em vez de buscar todas as `seasons`

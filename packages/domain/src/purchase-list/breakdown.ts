@@ -144,3 +144,38 @@ export function computePurchaseListMetrics(
     categoryBreakdown,
   };
 }
+
+/**
+ * Quando a lista não tem preço por item, o total informado na mão vira
+ * valor/sacas/sc-ha do resumo — sem ratear nas categorias.
+ */
+export function applyManualTotalSpent(
+  metrics: PurchaseListMetrics,
+  manualTotal: number | null | undefined,
+  grainPrice: number,
+  totalHa: number,
+): PurchaseListMetrics {
+  if (metrics.pricedCount > 0) return metrics;
+  if (manualTotal == null || !Number.isFinite(manualTotal) || manualTotal <= 0) {
+    return metrics;
+  }
+  const gp = grainPrice > 0 ? grainPrice : 0;
+  return {
+    ...metrics,
+    totalValue: manualTotal,
+    totalSacks: gp > 0 ? manualTotal / gp : 0,
+    costSacksPerHa: gp > 0 && totalHa > 0 ? manualTotal / gp / totalHa : 0,
+  };
+}
+
+export function usesManualListTotal(
+  metrics: PurchaseListMetrics,
+  manualTotal: number | null | undefined,
+): boolean {
+  return (
+    metrics.pricedCount === 0 &&
+    manualTotal != null &&
+    Number.isFinite(manualTotal) &&
+    manualTotal > 0
+  );
+}

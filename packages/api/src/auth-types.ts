@@ -23,6 +23,9 @@ export interface AuthUser {
   role: UserRole;
   /** Presente para role STAFF: MANAGER = Gestor, CONSULTANT = Consultor. */
   access_level?: AccessLevel;
+  /** Equipe da fazenda: convite/cadastro liberou visualização de preços. */
+  price_view?: boolean;
+  grants?: string[];
   impersonator?: Omit<AuthUser, "impersonator">;
   /** Presente quando o usuário entrou na carteira de outro agrônomo (escopo ativo). */
   active_scope?: MembershipDto;

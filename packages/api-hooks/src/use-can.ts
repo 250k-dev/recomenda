@@ -10,6 +10,8 @@ export function usePrincipal() {
   return {
     role: (me?.role ?? null) as UserRole | null,
     access_level: (me?.access_level ?? null) as AccessLevel | null,
+    price_view: Boolean(me?.price_view),
+    grants: Array.isArray(me?.grants) ? me.grants : undefined,
     id: (me?.id ?? null) as string | null,
     me,
   };

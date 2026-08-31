@@ -19,10 +19,12 @@ import { Button } from "@recomenda/ui/primitives/button";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
+import { FarmStaffMemberView } from "@/components/domain/farm-staff-member-view";
 import {
   useConsultantActivity,
   useConsultantSummary,
   useConsultants,
+  useFarmTeamAll,
   useRemoveConsultant,
 } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
@@ -67,10 +69,16 @@ function severityTone(severity?: string) {
 export function ConsultantDetailView({ userId }: { userId: string }) {
   const router = useRouter();
   const canManage = useCan("TEAM_MANAGE");
+  const canFarmTeam = useCan("FARM_TEAM_MANAGE");
+  const { data: farmTeam, isLoading: farmTeamLoading } = useFarmTeamAll(canFarmTeam);
+  const farmMemberships = (Array.isArray(farmTeam) ? farmTeam : []).filter(
+    (m) => m.user_id === userId,
+  );
+  const isFarmStaff = farmMemberships.length > 0;
   const { data: summary, isLoading: summaryLoading, isError } =
-    useConsultantSummary(userId);
+    useConsultantSummary(userId, !canFarmTeam || (!farmTeamLoading && !isFarmStaff));
   const { data: activity, isLoading: activityLoading } =
-    useConsultantActivity(userId);
+    useConsultantActivity(userId, !isFarmStaff);
   const { data: team } = useConsultants();
   const removeMutation = useRemoveConsultant();
 
@@ -96,6 +104,20 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
       );
     }
   };
+
+  if (canFarmTeam && farmTeamLoading) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (isFarmStaff) {
+    return <FarmStaffMemberView userId={userId} memberships={farmMemberships} />;
+  }
 
   if (summaryLoading) {
     return (

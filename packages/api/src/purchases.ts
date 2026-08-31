@@ -67,6 +67,20 @@ export async function confirmPurchaseListPurchases(
   return data;
 }
 
+export async function fulfillPurchaseListWithoutQuote(
+  listId: string,
+  payload: {
+    idempotency_key: string;
+    manual_total_spent_brl?: number | null;
+  },
+) {
+  const { data } = await api.post<PurchaseProgress>(
+    `/purchase-lists/${listId}/fulfill-without-quote`,
+    payload,
+  );
+  return data;
+}
+
 export async function getStockOrigins(producerId: string, localProductId: string) {
   const { data } = await api.get<StockOrigin[]>(
     `/producers/${producerId}/stock/${localProductId}/origins`,

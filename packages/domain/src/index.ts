@@ -16,6 +16,13 @@
 // dela — deixá-la no app faria um pacote importar de `apps/`.
 export type { Permission, Principal } from "./auth/permissions";
 export { can, isManager, isConsultant } from "./auth/permissions";
+export type { FarmStaffGrantKey } from "./auth/farm-staff-grants";
+export {
+  FARM_STAFF_GRANT_DEFS,
+  FARM_STAFF_GRANT_KEYS,
+  defaultFarmStaffGrantKeys,
+  permissionsFromGrantKeys,
+} from "./auth/farm-staff-grants";
 
 // ---- catálogo ----------------------------------------------------------
 export type {
@@ -84,6 +91,8 @@ export type { PurchaseListMetrics } from "./purchase-list/breakdown";
 export {
   detailItemToListItem,
   computePurchaseListMetrics,
+  applyManualTotalSpent,
+  usesManualListTotal,
 } from "./purchase-list/breakdown";
 export {
   isPurchaseListFullyPriced,

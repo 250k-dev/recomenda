@@ -24,6 +24,11 @@ import {
   useDeleteFarmTeamMember,
   useFarmTeam,
 } from "@recomenda/api-hooks";
+import { FarmStaffGrantsPalette } from "@/components/domain/farm-staff-grants-palette";
+import {
+  defaultFarmStaffGrantKeys,
+  type FarmStaffGrantKey,
+} from "@recomenda/domain";
 
 const schema = z.object({
   name: z.string().min(2),
@@ -44,6 +49,9 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
   const createMutation = useCreateFarmTeamMember();
   const deleteMutation = useDeleteFarmTeamMember(producerId);
   const [open, setOpen] = useState(false);
+  const [grantKeys, setGrantKeys] = useState<FarmStaffGrantKey[]>(
+    defaultFarmStaffGrantKeys("FARM_OPERATOR"),
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -62,9 +70,17 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
       await createMutation.mutateAsync({
         producer_id: producerId,
         ...values,
+        grant_keys: grantKeys,
+        can_view_prices: grantKeys.includes("prices"),
       });
       toast.success("Membro adicionado");
-      form.reset({ name: "", email: "", password: "", access_level: "FARM_OPERATOR" });
+      form.reset({
+        name: "",
+        email: "",
+        password: "",
+        access_level: "FARM_OPERATOR",
+      });
+      setGrantKeys(defaultFarmStaffGrantKeys("FARM_OPERATOR"));
       setOpen(false);
     } catch (err) {
       toast.error(apiErrorMessage(err, "Não foi possível adicionar o membro."));
@@ -99,11 +115,18 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
                     { value: "FARM_MANAGER", label: "Gerente" },
                     { value: "FARM_OPERATOR", label: "Operador" },
                   ]}
-                  onValueChange={(v) =>
-                    form.setValue("access_level", v as FormValues["access_level"])
-                  }
+                  onValueChange={(v) => {
+                    const level = v as FormValues["access_level"];
+                    form.setValue("access_level", level);
+                    setGrantKeys(defaultFarmStaffGrantKeys(level));
+                  }}
                 />
               </div>
+              <FarmStaffGrantsPalette
+                level={form.watch("access_level")}
+                selected={grantKeys}
+                onChange={setGrantKeys}
+              />
               <div className="space-y-2">
                 <Label>Nome</Label>
                 <Input {...form.register("name")} />
@@ -140,7 +163,11 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
               <div>
                 <div className="font-medium">{m.name}</div>
                 <div className="text-muted-foreground">
-                  {levelLabel(m.access_level)} · {m.email}
+                  {levelLabel(m.access_level)}
+                  {(m.permission_grants ?? []).includes("prices") || m.can_view_prices
+                    ? " · vê preços"
+                    : ""}{" "}
+                  · {m.email}
                 </div>
               </div>
               <Button

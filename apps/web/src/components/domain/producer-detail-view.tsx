@@ -11,6 +11,7 @@ import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcr
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
 import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
+import { ProducerFarmTeamSection } from "@/components/domain/producer-farm-team-section";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { ProducerCyclesSection } from "@/components/domain/producer-cycles-section";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
@@ -357,6 +358,10 @@ export function ProducerDetailView({
           toolbarLeading={portfolioTabs}
         />
       )}
+
+      <div className="mt-8">
+        <ProducerFarmTeamSection producerId={producerId} />
+      </div>
 
       {showSeasonActions ? (
         <>

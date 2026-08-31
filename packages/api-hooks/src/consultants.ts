@@ -28,9 +28,13 @@ const consultantActivityKey = (userId: string, scope: string) =>
 const walletActivityKey = (scope: string, params: WalletActivityQuery) =>
   ["consultants-wallet-activity", scope, params] as const;
 
-export function useConsultants() {
+export function useConsultants(enabled = true) {
   const scopeKey = useWalletScopeKey();
-  return useQuery({ queryKey: teamKey(scopeKey), queryFn: getTeam });
+  return useQuery({
+    queryKey: teamKey(scopeKey),
+    queryFn: getTeam,
+    enabled,
+  });
 }
 
 export function useTeamOverview(enabled = true) {

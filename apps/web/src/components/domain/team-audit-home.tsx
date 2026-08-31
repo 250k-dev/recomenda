@@ -50,19 +50,31 @@ function riskLabel(tags: string[], _lastAt: string | null): {
 }
 
 function RoleBadge({ level }: { level: string }) {
-  const isManager = level === "MANAGER";
+  const label =
+    level === "MANAGER"
+      ? "Gestor"
+      : level === "FARM_MANAGER"
+        ? "Gerente"
+        : level === "FARM_OPERATOR"
+          ? "Operador"
+          : "Consultor";
+  const strong = level === "MANAGER" || level === "FARM_MANAGER";
   return (
     <span
       className={cn(
         "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-        isManager
-          ? "bg-primary-soft text-primary-strong"
-          : "bg-muted text-muted-foreground",
+        strong ? "bg-primary-soft text-primary-strong" : "bg-muted text-muted-foreground",
       )}
     >
-      {isManager ? "Gestor" : "Consultor"}
+      {label}
     </span>
   );
+}
+
+type RoleFilter = "all" | "MANAGER" | "CONSULTANT" | "FARM_MANAGER" | "FARM_OPERATOR";
+
+function isFarmStaffLevel(level: string) {
+  return level === "FARM_MANAGER" || level === "FARM_OPERATOR";
 }
 
 type Props = {
@@ -74,7 +86,7 @@ type Props = {
 export function TeamAuditHome({ canManage, onInvite, pendingInvitesSlot }: Props) {
   const { data, isLoading } = useTeamOverview(canManage);
   const [filter, setFilter] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | "MANAGER" | "CONSULTANT">("all");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
 
   const members = data?.members ?? [];
   const filtered = useMemo(() => {
@@ -131,7 +143,12 @@ export function TeamAuditHome({ canManage, onInvite, pendingInvitesSlot }: Props
             value: isLoading ? "…" : fmt(data?.people_count ?? 0),
             sub: isLoading
               ? undefined
-              : `${data?.managers_count ?? 0} gestor · ${data?.consultants_count ?? 0} consult.`,
+              : [
+                  `${data?.managers_count ?? 0} gestor`,
+                  `${data?.consultants_count ?? 0} consult.`,
+                  `${members.filter((m) => m.access_level === "FARM_MANAGER").length} ger.`,
+                  `${members.filter((m) => m.access_level === "FARM_OPERATOR").length} op.`,
+                ].join(" · "),
           },
           {
             label: "Ações · 30 dias",
@@ -224,15 +241,15 @@ export function TeamAuditHome({ canManage, onInvite, pendingInvitesSlot }: Props
             </div>
             <Select
               value={roleFilter}
-              onValueChange={(v) =>
-                setRoleFilter(v as "all" | "MANAGER" | "CONSULTANT")
-              }
+              onValueChange={(v) => setRoleFilter(v as RoleFilter)}
               options={[
                 { value: "all", label: "Todos os papéis" },
                 { value: "MANAGER", label: "Gestores" },
                 { value: "CONSULTANT", label: "Consultores" },
+                { value: "FARM_MANAGER", label: "Gerentes" },
+                { value: "FARM_OPERATOR", label: "Operadores" },
               ]}
-              className="h-9 w-full sm:w-44"
+              className="h-9 w-full sm:w-52"
             />
           </div>
         </div>
@@ -320,8 +337,13 @@ export function TeamAuditHome({ canManage, onInvite, pendingInvitesSlot }: Props
 
 function MemberRow({ member }: { member: TeamOverviewMember }) {
   const risk = riskLabel(member.risk_tags, member.last_activity_at);
-  const linkLabel =
-    member.access_level === "MANAGER"
+  const farmStaff = isFarmStaffLevel(member.access_level);
+  const href = routes.equipe.membro(member.user_id);
+  const linkLabel = farmStaff
+    ? member.manager_name
+      ? `Fazenda · ${member.manager_name}`
+      : "Equipe da fazenda"
+    : member.access_level === "MANAGER"
       ? "Administra a equipe"
       : member.manager_name
         ? `Via ${member.manager_name}`
@@ -330,10 +352,7 @@ function MemberRow({ member }: { member: TeamOverviewMember }) {
   return (
     <tr className="border-b border-border last:border-0 hover:bg-accent/40">
       <td className="px-4 py-3">
-        <Link
-          href={routes.equipe.membro(member.user_id)}
-          className="flex items-center gap-3 min-w-0"
-        >
+        <Link href={href} className="flex min-w-0 items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary-strong">
             {initials(member.name)}
           </span>

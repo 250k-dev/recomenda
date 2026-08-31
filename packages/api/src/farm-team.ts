@@ -7,6 +7,8 @@ export interface FarmTeamMember {
   name: string;
   email: string;
   access_level: AccessLevel;
+  can_view_prices: boolean;
+  permission_grants?: string[];
   farm_id: string | null;
   producer_id: string;
   producer_name: string;
@@ -40,6 +42,8 @@ export async function createFarmTeamMember(payload: {
   password?: string;
   access_level: AccessLevel;
   farm_id?: string | null;
+  can_view_prices?: boolean;
+  grant_keys?: string[];
 }) {
   const { data } = await api.post<{
     user_id: string;
@@ -48,6 +52,16 @@ export async function createFarmTeamMember(payload: {
     memberships: Array<{ id: string; producer_id: string }>;
     temporary_password: string | null;
   }>("/farm-team", payload);
+  return data;
+}
+
+export async function updateFarmTeamGrants(userId: string, grant_keys: string[]) {
+  const { data } = await api.patch<{
+    user_id: string;
+    permission_grants: string[];
+    can_view_prices: boolean;
+    memberships: number;
+  }>(`/farm-team/by-user/${userId}`, { grant_keys });
   return data;
 }
 

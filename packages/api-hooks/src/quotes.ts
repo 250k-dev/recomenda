@@ -22,6 +22,7 @@ import {
 import {
   type ConfirmPurchaseLine,
   confirmPurchaseListPurchases,
+  fulfillPurchaseListWithoutQuote,
   getPurchaseListProgress,
 } from "@recomenda/api/purchases";
 import { queryKeys } from "./queryKeys";
@@ -157,6 +158,27 @@ export function useConfirmPurchaseListPurchases(listId: string) {
       queryClient.invalidateQueries({ queryKey: ["producer-stock"] });
       queryClient.invalidateQueries({ queryKey: ["cycle-purchase-list"] });
       queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
+    },
+  });
+}
+
+export function useFulfillPurchaseListWithoutQuote(listId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      idempotency_key: string;
+      manual_total_spent_brl?: number | null;
+    }) => fulfillPurchaseListWithoutQuote(listId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListProgress(listId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListQuotes(listId) });
+      queryClient.invalidateQueries({ queryKey: ["producer-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["cycle-purchase-list"] });
+      queryClient.invalidateQueries({ queryKey: ["producer-purchase-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["farm-purchase-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["farm-cycles"] });
+      queryClient.invalidateQueries({ queryKey: ["producer-cycles"] });
+      queryClient.invalidateQueries({ queryKey: ["cycle"] });
     },
   });
 }

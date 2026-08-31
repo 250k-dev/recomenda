@@ -52,6 +52,7 @@ export const queryKeys = {
   invitations: (kind?: string) => ["invitations", kind ?? "all"] as const,
   comparativeReport: ["comparative-report"],
   producerPurchaseLists: (producerId: string) => ["producer-purchase-lists", producerId] as const,
+  purchaseListsCoverage: (scope: string) => ["purchase-lists-coverage", scope] as const,
   farmPurchaseLists: (farmId: string) => ["farm-purchase-lists", farmId] as const,
   purchaseListTemplates: () => ["purchase-list-templates"] as const,
   seasonCostPlan: (seasonId: string) => ["season-cost-plan", seasonId] as const,
