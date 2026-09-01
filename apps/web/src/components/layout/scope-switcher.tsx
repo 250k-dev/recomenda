@@ -1,6 +1,7 @@
 "use client";
 
 import { Briefcase, Check, ChevronDown, Home } from "lucide-react";
+import { cn } from "@recomenda/utils";
 import {
   useActiveScope,
   useExitContext,
@@ -21,7 +22,7 @@ import {
  * Dentro de um escopo ativo: deixa explícito que a sessão está naquela carteira
  * e oferece sair / trocar para outra gestão.
  */
-export function ScopeSwitcher() {
+export function ScopeSwitcher({ compact = false }: { compact?: boolean }) {
   const { data: memberships } = useMemberships();
   const activeScope = useActiveScope();
   const switchMutation = useSwitchContext();
@@ -47,11 +48,20 @@ export function ScopeSwitcher() {
       <DropdownMenuTrigger
         aria-label="Trocar carteira"
         disabled={isPending}
-        className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 h-11 text-sm font-medium outline-none transition-shadow hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60"
+        className={cn(
+          "flex items-center rounded-lg border border-border bg-card text-sm font-medium outline-none transition-shadow hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
+          compact ? "size-11 justify-center" : "h-11 gap-2 px-3",
+        )}
       >
         <Briefcase className="size-4 shrink-0 text-muted-foreground" />
-        <span className="max-w-40 truncate">{currentLabel}</span>
-        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        {compact ? (
+          <span className="sr-only">{currentLabel}</span>
+        ) : (
+          <>
+            <span className="max-w-40 truncate">{currentLabel}</span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+          </>
+        )}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-xl">

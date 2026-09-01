@@ -11,6 +11,8 @@ export type PageHeroStat = {
   onClick?: () => void;
   /** Esconde a célula no mobile (ex.: quando o dado vira banner de alerta). */
   hideOnMobile?: boolean;
+  /** No mobile, ocupa as duas colunas (valores longos como moeda). */
+  wide?: boolean;
 };
 
 function PageHeroStatCell({
@@ -31,6 +33,7 @@ function PageHeroStatCell({
       ? "border-white/15 bg-white/10 sm:border-white/25 sm:bg-transparent"
       : "border-border bg-surface-2 sm:bg-transparent",
     stat.hideOnMobile && "hidden sm:block",
+    stat.wide && "col-span-2",
     interactive &&
       "cursor-pointer transition-colors sm:hover:bg-transparent " +
         (inverted ? "hover:bg-white/15" : "hover:bg-hover"),
@@ -49,7 +52,8 @@ function PageHeroStatCell({
       </div>
       <div
         className={cn(
-          "mt-1 font-display text-xl font-semibold tracking-[-0.01em] tabular-nums",
+          "mt-1 min-w-0 break-words font-display font-semibold tracking-[-0.01em] tabular-nums",
+          stat.wide ? "text-lg leading-tight sm:text-xl" : "text-xl",
           stat.tone === "danger"
             ? dangerClass
             : inverted
@@ -96,7 +100,8 @@ function PageHeroStatCell({
  * de métricas embutida (divisores verticais). Serve tanto telas de lista
  * (Produtores, Equipe, Templates) quanto de detalhe (Produtor, Fazenda, Safra).
  * É cartão em todas as larguras; no mobile só o arranjo muda — métricas em grade
- * de 2 colunas e ações em linha própria (scroll horizontal quando densas).
+ * de 2 colunas (métricas largas como valor total ocupam a linha toda) e ações em
+ * azulejos 2×2 (3 colunas a partir de ~420px).
  *
  * `variant="inverted"` usa o verde primário como fundo (herói em destaque, ex.:
  * abertura de dashboard).
@@ -155,7 +160,7 @@ export function PageHero({
           ? "bg-primary text-primary-foreground"
           : "border border-border bg-card",
         sticky &&
-          "sticky top-0 z-30 shadow-md " +
+          "max-md:static md:sticky md:top-0 md:z-20 shadow-md " +
             (inverted ? "bg-primary" : "bg-card"),
         className,
       )}
@@ -216,10 +221,17 @@ export function PageHero({
         ) : null}
       </div>
 
-      {/* Mobile: faixa rolável horizontal logo abaixo do título (antes dos KPIs),
-          alinhada ao desktop e acessível no herói sticky sem empilhar 4 linhas. */}
+      {/* Mobile: grade 2×2 (3 colunas em telas um pouco mais largas), azulejos
+          quadrados — sem scroll horizontal. */}
       {actions ? (
-        <div className="mt-3.5 -mx-1 flex gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 sm:hidden *:shrink-0">
+        <div
+          className={cn(
+            "mt-3.5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:hidden",
+            "[&>a]:flex [&>button]:flex [&>a]:h-full [&>button]:h-full",
+            "[&_a]:flex [&_a]:h-auto [&_a]:min-h-20 [&_a]:w-full [&_a]:flex-col [&_a]:items-center [&_a]:justify-center [&_a]:gap-1 [&_a]:whitespace-normal [&_a]:px-2 [&_a]:py-2.5 [&_a]:text-center [&_a]:text-xs [&_a]:leading-tight",
+            "[&_button]:flex [&_button]:h-auto [&_button]:min-h-20 [&_button]:w-full [&_button]:flex-col [&_button]:items-center [&_button]:justify-center [&_button]:gap-1 [&_button]:whitespace-normal [&_button]:px-2 [&_button]:py-2.5 [&_button]:text-center [&_button]:text-xs [&_button]:leading-tight",
+          )}
+        >
           {actions}
         </div>
       ) : null}

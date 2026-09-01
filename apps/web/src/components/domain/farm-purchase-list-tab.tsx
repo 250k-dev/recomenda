@@ -617,6 +617,7 @@ export function FarmPurchaseListTab({
                     ? "Total gasto (informado)"
                     : "Valor total",
                   value: kpis.totalValue > 0 ? fmtBrl(kpis.totalValue) : "—",
+                  wide: true,
                 },
                 {
                   label: "Volume de sacas",

@@ -18,7 +18,7 @@ const getGreeting = () => {
 };
 
 /** Saudação do Dashboard, exibida na linha do header ao lado da busca e do menu. */
-export function DashboardGreeting() {
+export function DashboardGreeting({ compact = false }: { compact?: boolean }) {
   const { data: me } = useMe();
   const activeScope = useActiveScope();
   const salute = useSyncExternalStore(subscribeNoop, getGreeting, () => "Olá");
@@ -35,7 +35,7 @@ export function DashboardGreeting() {
 
   return (
     <div className="min-w-0">
-      {activeScope ? (
+      {compact ? null : activeScope ? (
         <div className="mb-0.5 flex min-w-0 items-center gap-2">
           <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-primary px-2 text-[10px] font-bold uppercase tracking-[0.08em] text-primary-foreground">
             <Sparkles className="size-2.5" aria-hidden />
@@ -50,7 +50,13 @@ export function DashboardGreeting() {
           {dateLabel}
         </p>
       )}
-      <h1 className="truncate font-display text-xl font-semibold tracking-[-0.02em] text-text-strong md:text-2xl">
+      <h1
+        className={
+          compact
+            ? "truncate font-display text-base font-semibold tracking-[-0.02em] text-text-strong"
+            : "truncate font-display text-xl font-semibold tracking-[-0.02em] text-text-strong md:text-2xl"
+        }
+      >
         {salute}
         {displayName ? `, ${displayName}` : ""}
       </h1>

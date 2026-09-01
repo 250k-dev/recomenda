@@ -277,6 +277,8 @@ export function SeasonRecommendationsView({
   const cycleId = seasonLive?.cycle_id ?? "";
   const { data: cycle } = useCycle(cycleId);
   const { data: cyclePurchaseList } = useCyclePurchaseList(cycleId);
+  const plotAreaHa =
+    cycle?.seasons.find((s) => s.id === seasonId)?.plot_area_ha ?? null;
 
   const exportSpec = useMemo(() => {
     const row = cycle?.seasons.find((s) => s.id === seasonId);
@@ -494,6 +496,7 @@ export function SeasonRecommendationsView({
           cycleId={seasonLive?.cycle_id}
           crop={crop ?? seasonLive?.crop}
           fallbackVariety={seasonLive?.variety}
+          plotAreaHa={plotAreaHa}
           initialVarieties={seasonLive?.varieties?.map((v) => ({
             variety: v.variety,
             planted_area_ha: v.planted_area_ha,
@@ -714,6 +717,7 @@ export function SeasonRecommendationsView({
         cycleId={seasonLive?.cycle_id}
         crop={crop ?? seasonLive?.crop}
         fallbackVariety={seasonLive?.variety}
+        plotAreaHa={plotAreaHa}
         initialVarieties={seasonLive?.varieties?.map((v) => ({
           variety: v.variety,
           planted_area_ha: v.planted_area_ha,

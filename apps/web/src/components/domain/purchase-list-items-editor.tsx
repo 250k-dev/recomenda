@@ -333,6 +333,20 @@ export function PurchaseListItemsEditor({
     const product = rowProducts.find((entry) => entry.optionValue === optionValue);
     if (!product) return;
 
+    const current = items.find((i) => i.key === itemKey);
+    const stage = current?.stage || DEFAULT_ITEM_STAGE;
+    const alreadyOnStage = items.some(
+      (i) =>
+        i.key !== itemKey &&
+        Boolean(i.productId) &&
+        i.productId === product.optionValue &&
+        (i.stage || DEFAULT_ITEM_STAGE) === stage,
+    );
+    if (alreadyOnStage) {
+      toast.error("Este produto já está nesta etapa. Não é possível duplicar a linha.");
+      return;
+    }
+
     const category = items.find((i) => i.key === itemKey)?.category;
     // A variedade selecionada puxa a unidade: soja→bag, milho→sacos; fertilizante→t/ha.
     const unitForSelection = (productUnit: string): string => {
@@ -368,6 +382,16 @@ export function PurchaseListItemsEditor({
     setResolvingProductKey(itemKey);
     try {
       const cloned = await cloneGlobal.mutateAsync(product.globalId);
+      const clonedDup = items.some(
+        (i) =>
+          i.key !== itemKey &&
+          i.productId === cloned.id &&
+          (i.stage || DEFAULT_ITEM_STAGE) === stage,
+      );
+      if (clonedDup) {
+        toast.error("Este produto já está nesta etapa. Não é possível duplicar a linha.");
+        return;
+      }
       updateItem(itemKey, {
         productId: cloned.id,
         productName: cloned.name ?? product.name,
@@ -1288,13 +1312,13 @@ export function PurchaseListItemsEditor({
                     </div>
                   ) : null}
                   {canViewPrices ? (
-                    <div>
+                    <div className="col-span-2 min-w-0">
                       <span className="text-xs font-medium text-muted-foreground">Valor total</span>
-                      <p className="mt-0.5 font-semibold tabular-nums">
+                      <p className="mt-0.5 break-words font-semibold tabular-nums">
                         {hasPrice ? fmtBrl(totalValue) : "—"}
                         {hasPrice && rowUnitUsd > 0 ? (
-                          <span className="ml-1 text-xs font-normal text-muted-foreground">
-                            · {fmtUsd(totalValueUsd)}
+                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                            {fmtUsd(totalValueUsd)}
                           </span>
                         ) : null}
                       </p>

@@ -28,7 +28,7 @@ export function ActiveScopeBanner() {
   }
 
   return (
-    <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-primary/25 bg-primary px-4 py-2.5 text-sm text-primary-foreground md:px-8">
+    <div className="flex items-center justify-between gap-3 border-b border-primary/25 bg-primary px-4 py-2.5 text-sm text-primary-foreground md:sticky md:top-0 md:z-30 md:px-8">
       <span className="flex items-center gap-2 min-w-0">
         <Briefcase className="size-4 shrink-0 opacity-90" />
         <span className="truncate font-semibold">
@@ -42,7 +42,8 @@ export function ActiveScopeBanner() {
         disabled={exitMutation.isPending}
         onClick={() => exitMutation.mutate()}
       >
-        Sair desta carteira
+        Sair
+        <span className="hidden sm:inline"> desta carteira</span>
       </Button>
     </div>
   );

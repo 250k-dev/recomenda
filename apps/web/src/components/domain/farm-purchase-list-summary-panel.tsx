@@ -68,14 +68,20 @@ function SummaryRow({
   largeValue?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between border-b border-dashed border-border py-[9px]">
+    <div
+      className={
+        largeValue
+          ? "flex flex-col gap-1.5 border-b border-dashed border-border py-3"
+          : "flex items-baseline justify-between gap-3 border-b border-dashed border-border py-[9px]"
+      }
+    >
       <span className="text-[13.5px] text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "font-semibold tabular-nums text-text-strong",
+          "min-w-0 font-semibold tabular-nums text-text-strong",
           largeValue
-            ? "font-display text-[22px] leading-none tracking-[-0.02em]"
-            : "text-[15px]",
+            ? "w-full break-words font-display text-[22px] leading-tight tracking-[-0.02em]"
+            : "shrink-0 text-right text-[15px]",
         )}
       >
         {value}

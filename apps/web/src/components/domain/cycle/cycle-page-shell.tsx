@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, Leaf, Pencil, Rocket } from "lucide-react";
+import { ChevronLeft, Leaf, Pencil, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import type { Route } from "next";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
@@ -227,15 +227,9 @@ export function CyclePageShell({
 
       {backHref ? (
         <div className="mb-6">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-muted-foreground"
-          >
-            <Link href={backHref}>
-              <ArrowLeft className="size-4" />
-              Voltar à safra
+          <Button asChild variant="ghost" size="icon-lg" className="-ml-2">
+            <Link href={backHref} aria-label="Voltar">
+              <ChevronLeft className="size-7" />
             </Link>
           </Button>
         </div>

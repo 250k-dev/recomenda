@@ -40,7 +40,12 @@ const normalize = (value: string) =>
  * sobra largura (≥14rem) mostra o input; quando o breadcrumb ou a tela
  * apertam, recolhe para o botão de ícone. Medido por container query.
  */
-export function ProducerSearchButton() {
+export function ProducerSearchButton({
+  iconOnly = false,
+}: {
+  /** Mobile: só o botão de ícone, sem ocupar a linha inteira. */
+  iconOnly?: boolean;
+}) {
   const router = useRouter();
   const { data: me } = useMe();
   const { data } = useProducers();
@@ -161,7 +166,13 @@ export function ProducerSearchButton() {
     <>
       {/* flex-1 absorve a sobra da linha; a container query decide o formato.
           min-w-11 garante o ícone mesmo com o breadcrumb espremendo tudo. */}
-      <div className="flex h-11 min-w-11 flex-1 items-center justify-end @container">
+      <div
+        className={
+          iconOnly
+            ? "flex items-center"
+            : "flex h-11 min-w-11 flex-1 items-center justify-end @container"
+        }
+      >
         <Button
           type="button"
           size="icon-lg"
@@ -170,10 +181,11 @@ export function ProducerSearchButton() {
             isMac ? "Buscar produtor (⌘K)" : "Buscar produtor (Ctrl+K)"
           }
           onClick={() => setOpen(true)}
-          className="@min-[14rem]:hidden"
+          className={iconOnly ? undefined : "@min-[14rem]:hidden"}
         >
           <Search />
         </Button>
+        {iconOnly ? null : (
         <button
           type="button"
           aria-label={
@@ -190,6 +202,7 @@ export function ProducerSearchButton() {
             {isMac ? "⌘K" : "Ctrl K"}
           </kbd>
         </button>
+        )}
       </div>
 
       <Dialog open={open} onOpenChange={setDialogOpen}>

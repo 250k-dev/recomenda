@@ -75,7 +75,10 @@ export function FulfillWithoutQuoteButton({
         type="button"
         variant={variant}
         size={size}
-        className={cn("gap-1.5", className)}
+        className={cn(
+          "gap-1.5 border-warning-border bg-warning-soft text-warning-strong hover:bg-warning-soft/80 hover:text-warning-strong",
+          className,
+        )}
         onClick={() => setStep("warn")}
       >
         <PackageCheck className="size-4" />

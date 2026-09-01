@@ -639,6 +639,7 @@ export function CycleFarmDisclosures({
         cycleId={cycle.id}
         crop={editingCrop?.crop}
         fallbackVariety={editingCrop?.variety}
+        plotAreaHa={editingCrop?.plot_area_ha}
         initialVarieties={editingCrop?.varieties?.map((v) => ({
           variety: v.variety,
           planted_area_ha: v.planted_area_ha,

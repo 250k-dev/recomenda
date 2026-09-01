@@ -8,8 +8,10 @@ export function AgronomistShell({ children }: { children: ReactNode }) {
   return (
     <BreadcrumbsProvider>
       <div className="flex min-h-svh flex-col bg-canvas">
-        <ActiveScopeBanner />
-        <AppHeader />
+        <div className="sticky top-0 z-30 bg-canvas md:static md:bg-transparent">
+          <ActiveScopeBanner />
+          <AppHeader />
+        </div>
         <ImpersonationBanner />
         <main className="flex-1 px-4 py-6 md:px-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>

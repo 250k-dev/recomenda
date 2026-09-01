@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
+import { CascadeBackButton } from "@/components/layout/cascade-back-button";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { usePublishSeason } from "@recomenda/api-hooks";
@@ -70,9 +71,11 @@ export default function SeasonDetailLayout({
       <BreadcrumbBack items={breadcrumbs} />
 
       {/* Navegação entre as telas da safra */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-2 p-0.5">
-          {tabs.map(({ value, label, href }) => (
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1">
+          <CascadeBackButton className="-ml-2" />
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-2 p-0.5">
+            {tabs.map(({ value, label, href }) => (
             <Link
               key={value}
               href={href}
@@ -86,6 +89,7 @@ export default function SeasonDetailLayout({
               {label}
             </Link>
           ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
