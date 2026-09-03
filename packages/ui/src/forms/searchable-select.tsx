@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, createContext } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Plus, Search } from "lucide-react";
+
+/**
+ * Quando o select está dentro de um modal (Dialog/Sheet), o Radix aplica
+ * pointer-events:none no body e focus-trap no conteúdo do dialog. Portais
+ * montados no body ficam inacessíveis. Este contexto permite injetar um
+ * container alternativo para o portal (ex.: o próprio DialogContent).
+ */
+const SelectPortalContainerContext = createContext<HTMLElement | null>(null);
+export const SelectPortalContainer = SelectPortalContainerContext.Provider;
 import { Input } from "../primitives/input";
 import { cn } from "@recomenda/utils";
 
@@ -123,6 +132,7 @@ export function BaseSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const portalContainer = useContext(SelectPortalContainerContext);
 
   const selected = options.find((option) => option.value === value);
 
@@ -145,19 +155,7 @@ export function BaseSelect({
     if (!open) return;
 
     const frame = requestAnimationFrame(updatePanelPosition);
-
     const onScrollOrResize = () => updatePanelPosition();
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
-    };
-  }, [open, updatePanelPosition]);
-
-  useEffect(() => {
-    if (!open) return;
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
@@ -168,9 +166,17 @@ export function BaseSelect({
         setQuery("");
       }
     };
+
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
     document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [open]);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [open, updatePanelPosition]);
 
   useEffect(() => {
     if (!open || !searchable) return;
@@ -386,7 +392,7 @@ export function BaseSelect({
       </button>
 
       {typeof document !== "undefined" && panel
-        ? createPortal(panel, document.body)
+        ? createPortal(panel, portalContainer ?? document.body)
         : null}
     </div>
   );
