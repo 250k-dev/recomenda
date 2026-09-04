@@ -6,6 +6,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { cn } from "@recomenda/utils";
 import { Button } from "./button";
+import { isSelectPanelEventTarget } from "./select-panel-events";
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -49,6 +50,9 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onPointerDownOutside,
+  onFocusOutside,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
@@ -62,6 +66,18 @@ function DialogContent({
           "fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-200 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className,
         )}
+        onPointerDownOutside={(event) => {
+          if (isSelectPanelEventTarget(event.target)) event.preventDefault();
+          onPointerDownOutside?.(event);
+        }}
+        onFocusOutside={(event) => {
+          if (isSelectPanelEventTarget(event.target)) event.preventDefault();
+          onFocusOutside?.(event);
+        }}
+        onInteractOutside={(event) => {
+          if (isSelectPanelEventTarget(event.target)) event.preventDefault();
+          onInteractOutside?.(event);
+        }}
         {...props}
       >
         {children}

@@ -91,6 +91,5 @@ const Select = React.forwardRef<HTMLInputElement, SelectProps>(function Select(
 export { Select };
 export {
   SearchableSelect,
-  SelectPortalContainer,
   type SearchableSelectOption,
 } from "./searchable-select";

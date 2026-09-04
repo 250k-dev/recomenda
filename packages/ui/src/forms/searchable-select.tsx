@@ -1,18 +1,10 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState, createContext } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Plus, Search } from "lucide-react";
-
-/**
- * Quando o select está dentro de um modal (Dialog/Sheet), o Radix aplica
- * pointer-events:none no body e focus-trap no conteúdo do dialog. Portais
- * montados no body ficam inacessíveis. Este contexto permite injetar um
- * container alternativo para o portal (ex.: o próprio DialogContent).
- */
-const SelectPortalContainerContext = createContext<HTMLElement | null>(null);
-export const SelectPortalContainer = SelectPortalContainerContext.Provider;
 import { Input } from "../primitives/input";
+import { SELECT_PANEL_SLOT } from "../primitives/select-panel-events";
 import { cn } from "@recomenda/utils";
 
 export type SearchableSelectOption = {
@@ -132,7 +124,6 @@ export function BaseSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const portalContainer = useContext(SelectPortalContainerContext);
 
   const selected = options.find((option) => option.value === value);
 
@@ -224,15 +215,14 @@ export function BaseSelect({
     open && panelPosition ? (
       <div
         ref={panelRef}
+        data-slot={SELECT_PANEL_SLOT}
         style={{
           position: "fixed",
           top: panelPosition.top,
           bottom: panelPosition.bottom,
           left: panelPosition.left,
           width: panelPosition.width,
-          zIndex: 100,
-          // Garante cliques no painel mesmo dentro de modais (Radix Dialog/Sheet
-          // aplica pointer-events:none no body).
+          zIndex: 60,
           pointerEvents: "auto",
         }}
         className="flex max-h-[280px] flex-col overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md"
@@ -392,7 +382,7 @@ export function BaseSelect({
       </button>
 
       {typeof document !== "undefined" && panel
-        ? createPortal(panel, portalContainer ?? document.body)
+        ? createPortal(panel, document.body)
         : null}
     </div>
   );

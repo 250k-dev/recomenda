@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { FarmLocationFields } from "@/components/domain/farm-location-fields";
-import { SelectPortalContainer } from "@recomenda/ui/forms/select";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import {
@@ -48,7 +47,6 @@ export default function FarmDetailPage() {
   const { data: cycles } = useFarmCycles(farmId);
 
   const [editOpen, setEditOpen] = useState(false);
-  const [dialogContainerRef, setDialogContainerRef] = useState<HTMLDivElement | null>(null);
   const [editName, setEditName] = useState("");
   const [editStateUf, setEditStateUf] = useState("");
   const [editCity, setEditCity] = useState("");
@@ -170,50 +168,48 @@ export default function FarmDetailPage() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-lg overflow-visible">
-          <SelectPortalContainer value={dialogContainerRef}>
-            <DialogHeader>
-              <DialogTitle>Editar fazenda</DialogTitle>
-            </DialogHeader>
-            <div ref={setDialogContainerRef} className="relative space-y-4 overflow-y-auto px-6 py-5">
-              <div className="space-y-1.5">
-                <label className="mb-1.5 block text-xs font-medium text-foreground">
-                  Nome
-                </label>
-                <Input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="Nome da fazenda"
-                />
-                {nameError ? (
-                  <p className="mt-1 text-xs text-destructive">{nameError}</p>
-                ) : null}
-              </div>
-              <FarmLocationFields
-                idPrefix="edit-farm"
-                stateUf={editStateUf}
-                city={editCity}
-                onStateChange={setEditStateUf}
-                onCityChange={setEditCity}
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar fazenda</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-1.5">
+              <label className="mb-1.5 block text-xs font-medium text-foreground">
+                Nome
+              </label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Nome da fazenda"
               />
+              {nameError ? (
+                <p className="mt-1 text-xs text-destructive">{nameError}</p>
+              ) : null}
             </div>
-            <DialogFooter className="sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setEditOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                disabled={updateFarm.isPending}
-                onClick={onUpdateFarm}
-              >
-                {updateFarm.isPending ? "Salvando..." : "Salvar"}
-              </Button>
-            </DialogFooter>
-          </SelectPortalContainer>
+            <FarmLocationFields
+              idPrefix="edit-farm"
+              stateUf={editStateUf}
+              city={editCity}
+              onStateChange={setEditStateUf}
+              onCityChange={setEditCity}
+            />
+          </div>
+          <DialogFooter className="sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setEditOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={updateFarm.isPending}
+              onClick={onUpdateFarm}
+            >
+              {updateFarm.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
