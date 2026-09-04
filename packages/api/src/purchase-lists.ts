@@ -83,6 +83,7 @@ export interface CostPlanSummary {
 
 export interface PurchaseListDetail {
   id: string;
+  agronomist_id?: string;
   producer_id: string | null;
   is_template?: boolean;
   /** Rascunho (em montagem) × finalizada. Ausente em dados antigos = 'active'. */

@@ -479,7 +479,9 @@ export function FarmPurchaseListTab({
             disabled={editing}
             options={purchaseLists.map((l) => ({
               value: l.id,
-              label: `${l.name}${l.variety ? ` — ${l.variety}` : ""}`,
+              label: `${l.name}${l.variety ? ` — ${l.variety}` : ""}${
+                l.status === "draft" ? " (rascunho)" : ""
+              }`,
             }))}
           />
         </div>
@@ -489,7 +491,9 @@ export function FarmPurchaseListTab({
         sticky
         className="mb-7"
         icon={<Leaf className="size-6" />}
-        eyebrow={`Lista de compra · ${list.name}`}
+        eyebrow={`Lista de compra · ${list.name}${
+          list.status === "draft" ? " · rascunho" : ""
+        }`}
         title={`${CROP_LABELS[list.crop ?? "ANY"] ?? list.crop ?? "Multi-cultura"}${
           list.variety ? ` · ${list.variety}` : ""
         }`}

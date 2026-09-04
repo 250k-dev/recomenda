@@ -21,9 +21,12 @@ export default function CyclePurchaseListPage() {
   const page = useCyclePage();
   const { farmId, producerId } = page;
 
-  const { data: purchaseList, isLoading: loadingList } = useCyclePurchaseList(
-    page.cycleId,
-  );
+  const {
+    data: purchaseList,
+    isLoading: loadingList,
+    isError: listError,
+    refetch: refetchList,
+  } = useCyclePurchaseList(page.cycleId);
 
   // Lista em rascunho: abrir esta tela retoma o wizard direto (continua o
   // fluxo de onde parou), sem tela intermediária. Ao finalizar vira `active` e
@@ -38,7 +41,24 @@ export default function CyclePurchaseListPage() {
 
   return (
     <CyclePageShell page={page} backHref={page.hrefs.base}>
-      {!purchaseList && !loadingList ? (
+      {loadingList ? (
+        <EmptyState
+          icon={ShoppingCart}
+          title="Carregando a lista de compra…"
+          description="Buscando se esta safra já tem lista ou rascunho."
+        />
+      ) : listError ? (
+        <EmptyState
+          icon={ShoppingCart}
+          title="Não foi possível abrir a lista de compra."
+          description="Tente de novo. Se o rascunho já estiver salvo, ele continua no servidor."
+          action={
+            <Button size="sm" variant="outline" onClick={() => void refetchList()}>
+              Tentar de novo
+            </Button>
+          }
+        />
+      ) : purchaseList == null ? (
         <EmptyState
           icon={ShoppingCart}
           title="Esta safra ainda não tem lista de compra."

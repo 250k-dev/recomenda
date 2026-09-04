@@ -36,9 +36,11 @@ export default function FarmPurchaseListNewPage() {
   // Uma safra tem apenas UMA lista de compra. Se já existe FINALIZADA, não deixa
   // criar outra — redireciona para a lista. Se for RASCUNHO, reabre o wizard
   // preenchido para continuar (o rascunho ocupa a vaga da safra).
-  const { data: existingList, isLoading: listLoading } = useCyclePurchaseList(
-    cycleId ?? "",
-  );
+  const {
+    data: existingList,
+    isLoading: listLoading,
+    isError: listError,
+  } = useCyclePurchaseList(cycleId ?? "");
   const isDraft = existingList?.status === "draft";
   const hasActiveList = Boolean(existingList) && !isDraft;
   const cycleHref = cycleId
@@ -177,6 +179,22 @@ export default function FarmPurchaseListNewPage() {
           </p>
           <Button asChild className="mt-4" variant="outline">
             <Link href={farmHref}>Voltar à fazenda</Link>
+          </Button>
+        </div>
+      </>
+    );
+  }
+
+  if (cycleId && listError) {
+    return (
+      <>
+        <BreadcrumbBack items={breadcrumbs} />
+        <div className="rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            Não foi possível verificar a lista desta safra. O rascunho, se existir, continua salvo.
+          </p>
+          <Button asChild className="mt-4" variant="outline">
+            <Link href={cycleHrefNav ?? farmHref}>Voltar à safra</Link>
           </Button>
         </div>
       </>

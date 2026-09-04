@@ -37,11 +37,19 @@ export default function CycleDetailPage() {
   const page = useCyclePage();
   const { cycleId, producerId, cycle, seasons } = page;
 
-  const { data: purchaseList } = useCyclePurchaseList(cycleId);
+  const {
+    data: purchaseList,
+    isLoading: listLoading,
+    isError: listError,
+  } = useCyclePurchaseList(cycleId);
   const { data: availablePlots = [] } = useCycleAvailablePlots(cycleId);
   const archiveSeason = useArchiveSeason();
+  const listIsDraft = purchaseList?.status === "draft";
   const hasActivePurchaseList = purchaseList?.status === "active";
   const hasAvailablePlots = availablePlots.length > 0;
+  const listCtaHref = listIsDraft
+    ? page.hrefs.listaDeCompra
+    : page.hrefs.novaListaDeCompra;
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [archiveConfirm, setArchiveConfirm] = useState<{
@@ -54,11 +62,7 @@ export default function CycleDetailPage() {
       toast.error(
         "Finalize a lista de compra da safra antes de programar talhões.",
       );
-      router.push(
-        purchaseList?.status === "draft"
-          ? page.hrefs.listaDeCompra
-          : page.hrefs.novaListaDeCompra,
-      );
+      router.push(listCtaHref);
       return;
     }
     setWizardOpen(true);
@@ -118,8 +122,14 @@ export default function CycleDetailPage() {
     },
     {
       label: purchaseList?.name ?? "Lista de compra",
-      value: purchaseList ? (purchaseList.items ?? []).length : 0,
-      sub: "produtos",
+      value: listLoading
+        ? "…"
+        : listIsDraft
+          ? "Rascunho"
+          : purchaseList
+            ? (purchaseList.items ?? []).length
+            : 0,
+      sub: listIsDraft ? "continuar" : "produtos",
       onClick: () => router.push(page.hrefs.listaDeCompra),
     },
   ];
@@ -156,27 +166,34 @@ export default function CycleDetailPage() {
             archivePending={archiveSeason.isPending}
           />
 
-          {!hasActivePurchaseList && canListCrud ? (
+          {listError ? (
+            <div className="mt-6">
+              <EmptyState
+                icon={ShoppingCart}
+                title="Não foi possível carregar a lista de compra."
+                description="O rascunho, se existir, continua salvo. Tente abrir de novo."
+                action={
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={page.hrefs.listaDeCompra}>Abrir lista de compra</Link>
+                  </Button>
+                }
+              />
+            </div>
+          ) : !listLoading && !hasActivePurchaseList && canListCrud ? (
             <div className="mt-6">
               <EmptyState
                 icon={ShoppingCart}
                 title={
-                  purchaseList?.status === "draft"
+                  listIsDraft
                     ? "Finalize a lista de compra da safra."
                     : "Primeiro passo: lista de compra."
                 }
                 description="A programação dos talhões só libera depois que a lista de compra estiver finalizada. Assim dose, unidade e hectares ficam alinhados."
                 action={
                   <Button asChild size="sm" className="gap-1.5">
-                    <Link
-                      href={
-                        purchaseList?.status === "draft"
-                          ? page.hrefs.listaDeCompra
-                          : page.hrefs.novaListaDeCompra
-                      }
-                    >
+                    <Link href={listCtaHref}>
                       <ShoppingCart className="size-4" />
-                      {purchaseList?.status === "draft"
+                      {listIsDraft
                         ? "Continuar lista de compra"
                         : "Montar lista de compra"}
                     </Link>
@@ -192,17 +209,11 @@ export default function CycleDetailPage() {
                 <Plus className="size-4" />
                 Adicionar talhão
               </Button>
-            ) : !hasActivePurchaseList && canListCrud ? (
+            ) : !listLoading && !listError && !hasActivePurchaseList && canListCrud ? (
               <Button asChild size="lg" className="gap-2">
-                <Link
-                  href={
-                    purchaseList?.status === "draft"
-                      ? page.hrefs.listaDeCompra
-                      : page.hrefs.novaListaDeCompra
-                  }
-                >
+                <Link href={listCtaHref}>
                   <ShoppingCart className="size-4" />
-                  {purchaseList?.status === "draft"
+                  {listIsDraft
                     ? "Continuar lista de compra"
                     : "Montar lista de compra"}
                 </Link>

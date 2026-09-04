@@ -16,6 +16,7 @@ import {
   usePurchaseListTemplates,
   useUpdatePurchaseListTemplate,
 } from "@recomenda/api-hooks";
+import { useMe } from "@recomenda/api-hooks/auth";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
@@ -52,6 +53,7 @@ function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem
 }
 
 export function CompraTemplatesView() {
+  const { data: currentUser } = useMe();
   const canTemplateCrud = useCan("TEMPLATE_CRUD");
   const { data: templates, isLoading } = usePurchaseListTemplates();
   const [editing, setEditing] = useState<PurchaseListDetail | "new" | null>(null);
@@ -59,10 +61,15 @@ export function CompraTemplatesView() {
   const deleteMutation = useDeletePurchaseListTemplate();
 
   if (editing) {
+    const isOwn =
+      editing === "new" ||
+      !editing.agronomist_id ||
+      editing.agronomist_id === currentUser?.id;
     return (
       <TemplateEditor
         template={editing === "new" ? null : editing}
         onDone={() => setEditing(null)}
+        readOnly={!isOwn}
       />
     );
   }
@@ -103,11 +110,13 @@ export function CompraTemplatesView() {
       ) : !templates || templates.length === 0 ? (
         <EmptyState
           title="Nenhum template ainda."
-          description="Crie um template para reaproveitar em vários produtores."
+          description="Crie um template para reaproveitar em vários produtores, ou use os modelos da carteira."
         />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {templates.map((t) => (
+          {templates.map((t) => {
+            const isOwn = !t.agronomist_id || t.agronomist_id === currentUser?.id;
+            return (
             <li
               key={t.id}
               className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
@@ -124,9 +133,10 @@ export function CompraTemplatesView() {
                 <span className="text-xs text-muted-foreground">
                   {CROP_LABELS[t.crop as keyof typeof CROP_LABELS] ?? t.crop} · {t.items.length}{" "}
                   {t.items.length === 1 ? "produto" : "produtos"}
+                  {isOwn ? "" : " · carteira"}
                 </span>
               </button>
-              {canTemplateCrud ? (
+              {canTemplateCrud && isOwn ? (
               <div className="flex justify-end gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => setEditing(t)}>
                   Editar
@@ -143,7 +153,8 @@ export function CompraTemplatesView() {
               </div>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
@@ -168,9 +179,11 @@ export function CompraTemplatesView() {
 function TemplateEditor({
   template,
   onDone,
+  readOnly = false,
 }: {
   template: PurchaseListDetail | null;
   onDone: () => void;
+  readOnly?: boolean;
 }) {
   const isNew = template == null;
   const [name, setName] = useState(template?.name ?? "");
@@ -221,11 +234,12 @@ function TemplateEditor({
           </Button>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {isNew ? "Novo template de compra" : "Editar template"}
+              {isNew ? "Novo template de compra" : readOnly ? "Template da carteira" : "Editar template"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Defina nome, cultura e os produtos. As quantidades são calculadas depois, quando o
-              template é importado para um produtor com seus talhões.
+              {readOnly
+                ? "Somente leitura. Importe este modelo na lista de um produtor; não dá para alterar o catálogo da carteira."
+                : "Defina nome, cultura e os produtos. As quantidades são calculadas depois, quando o template é importado para um produtor com seus talhões."}
             </p>
           </div>
         </div>
@@ -239,7 +253,8 @@ function TemplateEditor({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex: Soja padrão alta tecnologia"
-            autoFocus
+            autoFocus={!readOnly}
+            disabled={readOnly}
           />
         </div>
         <div className="space-y-2">
@@ -253,6 +268,7 @@ function TemplateEditor({
                   type="button"
                   variant={on ? "default" : "outline"}
                   size="sm"
+                  disabled={readOnly}
                   onClick={() => {
                     const sojaOn = crop === "SOYBEAN" || crop === "ANY";
                     const milhoOn = crop === "CORN" || crop === "ANY";
@@ -271,11 +287,24 @@ function TemplateEditor({
       </section>
 
       <section className="overflow-hidden rounded-xl border bg-card p-5 shadow-sm">
-        <PurchaseListItemsEditor items={items} setItems={setItems} totalHa={0} crop={crop} />
+        <PurchaseListItemsEditor
+          items={items}
+          setItems={setItems}
+          totalHa={0}
+          crop={crop}
+          readOnly={readOnly}
+        />
       </section>
 
       {error ? <p className="text-sm text-danger-strong">{error}</p> : null}
 
+      {readOnly ? (
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onDone}>
+            Fechar
+          </Button>
+        </div>
+      ) : (
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onDone} disabled={saving}>
           Cancelar
@@ -285,6 +314,7 @@ function TemplateEditor({
           {saving ? "Salvando…" : "Salvar template"}
         </Button>
       </div>
+      )}
     </div>
   );
 }

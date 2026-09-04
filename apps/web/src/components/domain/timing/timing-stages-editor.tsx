@@ -77,8 +77,12 @@ export function usePurchaseListCatalogProducts(
         ? (farmLists ?? [])
         : (producerLists ?? []);
     return crop
-      ? source.filter((list) => list.crop === crop || list.crop === "ANY")
-      : source;
+      ? source.filter(
+          (list) =>
+            list.status !== "draft" &&
+            (list.crop === crop || list.crop === "ANY"),
+        )
+      : source.filter((list) => list.status !== "draft");
   }, [crop, farmId, farmLists, producerLists]);
 
   // Catálogo completo: global (admin) + local (agrônomo). Sementes ficam de fora (item 12).
