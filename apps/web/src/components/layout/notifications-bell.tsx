@@ -12,6 +12,7 @@ import {
   ArrowLeftRight,
   Bell,
   Check,
+  MessageCircle,
   Sprout,
   TriangleAlert,
   UserPlus,
@@ -291,6 +292,11 @@ const NOTIFICATION_STYLES: Record<
     tile: "bg-tb-soft",
     iconColor: "text-tb",
   },
+  WHATSAPP_HANDOFF: {
+    icon: MessageCircle,
+    tile: "bg-primary-soft",
+    iconColor: "text-primary",
+  },
 };
 
 const DEFAULT_STYLE = {
@@ -337,16 +343,27 @@ function getNotificationTitle(notification: Notification): string {
     SEASON_PUBLISHED: "Safra publicada",
     HARVEST_REGISTERED: "Colheita registrada",
     TEAM_ACTIVITY: "Atividade da equipe",
+    WHATSAPP_HANDOFF: "Pedido pelo WhatsApp",
   };
   return typeMap[notification.type] || "Nova notificação";
 }
 
-/** Linha descritiva ("quem fez o quê") — hoje só a atividade da equipe usa. */
+/** Linha descritiva ("quem fez o quê", "quem pediu o quê"). */
 function getNotificationBody(notification: Notification): string | null {
-  if (notification.type !== "TEAM_ACTIVITY") return null;
   const p = notification.payload ?? {};
   const actor = typeof p.actor_name === "string" ? p.actor_name : "Alguém";
   const summary = typeof p.summary === "string" ? p.summary : "fez uma alteração";
+
+  // O Lico passou o bastão: o produtor pediu para falar com o agrônomo pelo WhatsApp.
+  if (notification.type === "WHATSAPP_HANDOFF") {
+    const produtor =
+      typeof p.producer_name === "string" && p.producer_name && p.producer_name !== actor
+        ? `${actor} (${p.producer_name})`
+        : actor;
+    return `${produtor} quer falar com você: "${summary}"`;
+  }
+
+  if (notification.type !== "TEAM_ACTIVITY") return null;
   const farm = typeof p.farm_name === "string" && p.farm_name ? ` · ${p.farm_name}` : "";
   return `${actor} ${summary}${farm}`;
 }
