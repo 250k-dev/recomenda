@@ -39,6 +39,7 @@ export const queryKeys = {
   mixTemplates: ["mix-templates"],
   mixTemplate: (id: string) => ["mix-template", id],
   plans: ["plans"],
+  planCatalog: ["plan-catalog"],
   adminAgronomists: (status: "active" | "inactive") => ["admin-agronomists", status] as const,
   adminAgronomistDetail: (id: string) => ["admin-agronomist-detail", id] as const,
   adminProducers: ["admin-producers"],

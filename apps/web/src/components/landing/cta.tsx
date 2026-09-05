@@ -3,10 +3,6 @@ import { links } from "./content";
 import { Button, Container, Eyebrow, Section } from "./primitives";
 import { Reveal } from "./reveal";
 
-const subscribeHref = `mailto:${links.contactEmail}?subject=${encodeURIComponent(
-  "Quero assinar a Recomenda",
-)}`;
-
 export function Cta() {
   return (
     <Section id="assinar" className="bg-cream">
@@ -41,8 +37,8 @@ export function Cta() {
               </p>
 
               <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-                <Button href={subscribeHref} variant="clay" size="lg" withArrow>
-                  Assinar a Recomenda
+                <Button href={links.subscribe} variant="clay" size="lg" withArrow>
+                  Ver os planos
                 </Button>
                 <Button href={links.appUrl} variant="light" size="lg">
                   Acessar a plataforma
@@ -50,7 +46,7 @@ export function Cta() {
               </div>
 
               <p className="mt-7 text-sm text-brand-100/70">
-                Planos por cota de talhões ativos · Apoio na configuração inicial
+                Cota por talhões · 12 meses (duas safras) · PIX com 10% de desconto
               </p>
             </div>
           </div>

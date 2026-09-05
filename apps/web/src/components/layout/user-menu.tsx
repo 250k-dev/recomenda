@@ -40,9 +40,9 @@ export function UserMenu() {
   const planName = showOwnPlan ? planData?.plan.name : undefined;
 
   const current = planData?.quota_usage.current ?? 0;
-  const limit = planData?.quota_usage.limit ?? planData?.plan.plot_quota ?? 0;
+  const limit = planData?.quota_usage.limit ?? planData?.plan.plot_quota ?? null;
   const pct =
-    limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+    limit != null && limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
 
   const handleLogout = async () => {
     try {
@@ -108,7 +108,7 @@ export function UserMenu() {
                 <span className="text-xs font-semibold tabular-nums">
                   {current}{" "}
                   <span className="font-normal text-primary-foreground/60">
-                    / {limit}
+                    / {limit ?? "∞"}
                   </span>
                 </span>
               </div>

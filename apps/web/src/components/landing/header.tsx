@@ -80,7 +80,7 @@ export function Header() {
         id="menu-principal"
         className={cn(
           "overflow-hidden border-t border-line bg-cream/95 backdrop-blur-md transition-[max-height,opacity] duration-300 md:hidden",
-          open ? "max-h-[26rem] opacity-100" : "max-h-0 opacity-0",
+          open ? "max-h-[32rem] opacity-100" : "max-h-0 opacity-0",
         )}
       >
         <Container className="flex flex-col gap-1 py-4">

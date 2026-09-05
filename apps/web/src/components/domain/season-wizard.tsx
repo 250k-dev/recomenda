@@ -106,9 +106,9 @@ export function SeasonWizard({
   const { data: planData } = usePlanQuota();
   const [quotaAck, setQuotaAck] = useState(false);
   const quotaCurrent = planData?.quota_usage?.current ?? 0;
-  const quotaLimit = planData?.quota_usage?.limit ?? planData?.plan?.plot_quota ?? 0;
+  const quotaLimit = planData?.quota_usage?.limit ?? planData?.plan?.plot_quota ?? null;
   // Sem espaço para nem um talhão novo: já está no (ou acima do) limite do plano.
-  const noQuota = quotaLimit > 0 && quotaCurrent >= quotaLimit;
+  const noQuota = quotaLimit != null && quotaLimit > 0 && quotaCurrent >= quotaLimit;
   const [crop, setCrop] = useState<Crop>(savedDraft?.crop ?? "SOYBEAN");
   const [cronogramMode, setCronogramMode] = useState<CronogramMode>(
     savedDraft?.cronogramMode ?? "template",
@@ -1057,9 +1057,10 @@ function StepFinalize({
 
   const quotaCurrent = planData?.quota_usage?.current ?? 0;
   const quotaLimit =
-    planData?.quota_usage?.limit ?? planData?.plan?.plot_quota ?? 0;
+    planData?.quota_usage?.limit ?? planData?.plan?.plot_quota ?? null;
   const quotaWouldExceed =
     publishNow &&
+    quotaLimit != null &&
     quotaLimit > 0 &&
     quotaCurrent + plots.length > quotaLimit;
 

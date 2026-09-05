@@ -38,11 +38,11 @@ export const siteHost = new URL(siteUrl).host;
 
 /**
  * Links de acesso. `appUrl` é a rota de login no mesmo origin;
- * `subscribe` é uma âncora interna.
+ * `subscribe` é a página pública de planos.
  */
 export const links = {
   appUrl: routes.login(),
-  subscribe: "#assinar",
+  subscribe: routes.planos,
   privacy: routes.privacidade,
   terms: routes.termos,
   contactEmail:
@@ -54,6 +54,7 @@ export const nav = [
   { label: "Para quem é", href: "#para-quem" },
   { label: "Como funciona", href: "#como-funciona" },
   { label: "Onde usa", href: "#canais" },
+  { label: "Planos", href: routes.planos },
   { label: "Perguntas", href: "#perguntas" },
 ] as const;
 
@@ -216,6 +217,6 @@ export const faqs: Faq[] = [
   {
     question: "Como faço para assinar?",
     answer:
-      "É só falar com o nosso time pela seção de contato. A gente ajuda na escolha do plano — que funciona por cota de talhões ativos — e na configuração inicial dos seus modelos.",
+      "Abra a página de planos, escolha a faixa de talhões e fale com o time 250k. Os planos pagos cobrem 12 meses (duas safras), com compartilhamento ilimitado. O WhatsApp (Lico) entra no Plus ou na Conta Master. Pagamento no PIX tem 10% de desconto no ciclo anual.",
   },
 ];

@@ -14,13 +14,13 @@ export interface AgronomistMePlanResponse {
   plan: {
     id: string;
     name: string;
-    plot_quota: number;
+    plot_quota: number | null;
     timing_template_quota: number;
     price_brl_monthly: string;
     is_active?: boolean;
   };
   quota_usage: {
     current: number;
-    limit: number;
+    limit: number | null;
   };
 }

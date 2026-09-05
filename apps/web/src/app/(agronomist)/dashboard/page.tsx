@@ -559,7 +559,7 @@ export default function DashboardPage() {
                 <b className="text-[0.95rem] text-text-strong">
                   Plano {planData.plan.name} ·{" "}
                   {planData.quota_usage?.current ?? 0}/
-                  {planData.quota_usage?.limit ?? planData.plan.plot_quota}{" "}
+                  {planData.quota_usage?.limit ?? planData.plan.plot_quota ?? "∞"}{" "}
                   talhões
                 </b>
               </div>

@@ -4,9 +4,16 @@ import type { AdminProducerAccountStatus } from "./producers";
 export interface Plan {
   id: string;
   name: string;
-  plot_quota: number;
+  slug: string;
+  plot_quota: number | null;
   timing_template_quota: number;
   price_brl_monthly: string;
+  billing_kind: "free" | "monthly" | "harvest";
+  includes_whatsapp: boolean;
+  plot_range: string | null;
+  description: string | null;
+  features: string[];
+  sort_order: number;
   is_active: boolean;
 }
 
@@ -112,9 +119,16 @@ export async function getPlans() {
 
 export async function createAdminPlan(payload: {
   name: string;
-  plot_quota: number;
+  slug: string;
+  plot_quota: number | null;
   timing_template_quota?: number;
   price_brl_monthly: number | string;
+  billing_kind?: Plan["billing_kind"];
+  includes_whatsapp?: boolean;
+  plot_range?: string | null;
+  description?: string | null;
+  features?: string[];
+  sort_order?: number;
   is_active?: boolean;
 }) {
   const { data } = await api.post<Plan>("/admin/plans", payload);
@@ -125,9 +139,16 @@ export async function updateAdminPlan(
   id: string,
   payload: Partial<{
     name: string;
-    plot_quota: number;
+    slug: string;
+    plot_quota: number | null;
     timing_template_quota: number;
     price_brl_monthly: number | string;
+    billing_kind: Plan["billing_kind"];
+    includes_whatsapp: boolean;
+    plot_range: string | null;
+    description: string | null;
+    features: string[];
+    sort_order: number;
     is_active: boolean;
   }>,
 ) {

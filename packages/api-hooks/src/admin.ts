@@ -47,6 +47,7 @@ export function useCreateAdminPlan() {
     mutationFn: createAdminPlan,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.plans });
+      queryClient.invalidateQueries({ queryKey: queryKeys.planCatalog });
     },
   });
 }
@@ -58,14 +59,22 @@ export function useUpdateAdminPlan() {
       id: string;
       payload: Partial<{
         name: string;
-        plot_quota: number;
+        slug: string;
+        plot_quota: number | null;
         timing_template_quota: number;
         price_brl_monthly: number | string;
+        billing_kind: "free" | "monthly" | "harvest";
+        includes_whatsapp: boolean;
+        plot_range: string | null;
+        description: string | null;
+        features: string[];
+        sort_order: number;
         is_active: boolean;
       }>;
     }) => updateAdminPlan(vars.id, vars.payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.plans });
+      queryClient.invalidateQueries({ queryKey: queryKeys.planCatalog });
     },
   });
 }
@@ -76,6 +85,7 @@ export function useDeleteAdminPlan() {
     mutationFn: deleteAdminPlan,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.plans });
+      queryClient.invalidateQueries({ queryKey: queryKeys.planCatalog });
     },
   });
 }

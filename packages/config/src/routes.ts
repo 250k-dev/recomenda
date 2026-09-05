@@ -59,6 +59,8 @@ export function withQuery<T extends string>(
 
 export const routes = {
   home: "/" satisfies Route,
+  planos: "/planos" satisfies Route,
+  planosObrigado: "/planos/obrigado" satisfies Route,
   privacidade: "/privacidade" satisfies Route,
   termos: "/termos" satisfies Route,
   login: (opts?: { force?: boolean }) =>

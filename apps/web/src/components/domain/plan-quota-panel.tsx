@@ -24,9 +24,10 @@ export function PlanQuotaPanel() {
   const plan = data?.plan;
   const usage = data?.quota_usage;
   const current = usage?.current ?? 0;
-  const limit = usage?.limit ?? plan?.plot_quota ?? 0;
-  const pct = limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
-  const atLimit = limit > 0 && current >= limit;
+  const limit = usage?.limit ?? plan?.plot_quota ?? null;
+  const unlimited = limit == null;
+  const pct = !unlimited && limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+  const atLimit = !unlimited && limit > 0 && current >= limit;
   const isActive = plan?.is_active !== false;
 
   return (
@@ -83,8 +84,9 @@ export function PlanQuotaPanel() {
                   Uso da quota de talhões
                 </p>
                 <p className="mt-1 text-[13px] text-muted-foreground">
-                  Cada safra publicada ou em andamento conta no limite do plano
-                  ({limit} talhão{limit === 1 ? "" : "ões"}).
+                  {unlimited
+                    ? "Plano com talhões ilimitados."
+                    : `Cada safra publicada ou em andamento conta no limite do plano (${limit} talhão${limit === 1 ? "" : "ões"}).`}
                 </p>
               </div>
               <span
@@ -93,7 +95,7 @@ export function PlanQuotaPanel() {
                   atLimit ? "text-warning-strong" : "text-text-strong",
                 )}
               >
-                {current} / {limit}
+                {current} / {unlimited ? "∞" : limit}
               </span>
             </div>
             <ProgressBar

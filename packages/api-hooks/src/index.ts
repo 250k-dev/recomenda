@@ -26,6 +26,7 @@ export * from "./catalog";
 export * from "./templates";
 export * from "./producers";
 export * from "./admin";
+export * from "./billing";
 export * from "./notifications";
 export * from "./purchase-lists";
 export * from "./portfolio-price-coverage";
