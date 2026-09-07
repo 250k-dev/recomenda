@@ -9,6 +9,8 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@recomenda/ui/primitives/native-select";
+import { formatFarmLocation } from "@recomenda/utils";
+import { FarmLocationFields } from "@/components/domain/farm-location-fields";
 import { ZapLinkError } from "./zap-link-error";
 import type { ZapFarmDto, ZapLoadResult } from "./zap-types";
 
@@ -38,7 +40,8 @@ type PlotRow = { name: string; area: string };
 function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto }) {
   const [producerId, setProducerId] = useState(initial.producerId);
   const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
+  const [stateUf, setStateUf] = useState("");
+  const [city, setCity] = useState("");
   const [plots, setPlots] = useState<PlotRow[]>([{ name: "", area: "" }]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,7 +69,7 @@ function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto })
           token,
           producerId,
           name: name.trim(),
-          location: location.trim() || undefined,
+          location: city && stateUf ? formatFarmLocation(city, stateUf) : undefined,
           plots: preenchidos.map((p) => ({
             name: p.name.trim(),
             areaHectares: Number(p.area.replace(",", ".")),
@@ -163,15 +166,16 @@ function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto })
           />
         </div>
 
-        <div className="grid gap-1.5">
-          <Label htmlFor="zap-farm-location">Cidade e estado</Label>
-          <Input
-            id="zap-farm-location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Sorriso, MT"
-          />
-        </div>
+        <FarmLocationFields
+          idPrefix="zap-farm"
+          stateUf={stateUf}
+          city={city}
+          onStateChange={(uf) => {
+            setStateUf(uf);
+            setCity("");
+          }}
+          onCityChange={setCity}
+        />
 
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
