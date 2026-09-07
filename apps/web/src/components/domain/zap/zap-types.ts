@@ -59,3 +59,13 @@ export type ZapSeasonDto =
       farmId: string;
       plots: Array<{ id: string; name: string; areaHectares: number }>;
     };
+
+/** Cadastro de fazenda pelo Zap: nome, cidade/UF e os talhões, tudo numa tela só. */
+export type ZapFarmDto = {
+  typ: "farm_create";
+  step: "farm";
+  expiresAt: number;
+  producers: Array<{ id: string; name: string }>;
+  producerId: string;
+  producerName: string;
+};
