@@ -107,8 +107,8 @@ function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto })
         </span>
         <h1 className="font-display text-xl font-bold text-text-strong">Fazenda cadastrada</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
-          <strong className="text-text-strong">{done}</strong>. Pode voltar para o WhatsApp
-          e pedir a safra.
+          <strong className="text-text-strong">{done}</strong> já está na carteira. Volte no
+          WhatsApp e peça a safra — o Lico manda o link.
         </p>
       </div>
     );
@@ -183,7 +183,7 @@ function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto })
             <span className="text-xs text-muted-foreground">Pode deixar para depois</span>
           </div>
           {plots.map((plot, index) => (
-            <div key={index} className="grid grid-cols-[1fr_7rem] gap-2">
+            <div key={index} className="grid grid-cols-[1fr_7rem_auto] gap-2">
               <Input
                 value={plot.name}
                 onChange={(e) => updatePlot(index, { name: e.target.value })}
@@ -197,6 +197,17 @@ function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto })
                 placeholder="ha"
                 aria-label={`Área do talhão ${index + 1} em hectares`}
               />
+              {plots.length > 1 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="px-2 text-destructive"
+                  onClick={() => setPlots((rows) => rows.filter((_, i) => i !== index))}
+                  aria-label={`Remover talhão ${index + 1}`}
+                >
+                  Tirar
+                </Button>
+              ) : null}
             </div>
           ))}
           <Button

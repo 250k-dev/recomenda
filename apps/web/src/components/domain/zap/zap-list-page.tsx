@@ -10,10 +10,13 @@ import {
   NativeSelectOption,
 } from "@recomenda/ui/primitives/native-select";
 import { ZapLinkError } from "./zap-link-error";
-import type {
-  ZapCatalogItem,
-  ZapListDto,
-  ZapLoadResult,
+import {
+  formatZapExpiry,
+  isSeedCategory,
+  type ZapCatalogItem,
+  type ZapListDto,
+  type ZapListItem,
+  type ZapLoadResult,
 } from "./zap-types";
 
 const money = new Intl.NumberFormat("pt-BR", {
@@ -42,6 +45,26 @@ export function ZapListPage({
   return <ZapListReady token={token} initial={result.data} />;
 }
 
+type ItemDraft = {
+  dose: string;
+  nApplications: string;
+  stage: string;
+  areaPercent: string;
+  seedsPerMeter: string;
+  bagsOverride: string;
+};
+
+function draftOf(item: ZapListItem): ItemDraft {
+  return {
+    dose: String(item.dosePerHectare),
+    nApplications: String(item.nApplications),
+    stage: item.stage ?? "",
+    areaPercent: String(item.areaPercent || 100),
+    seedsPerMeter: item.seedsPerMeter != null ? String(item.seedsPerMeter) : "",
+    bagsOverride: item.bagsOverride != null ? String(item.bagsOverride) : "",
+  };
+}
+
 function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }) {
   const [data, setData] = useState(initial);
   const [query, setQuery] = useState("");
@@ -51,8 +74,12 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
   const [addQuery, setAddQuery] = useState("");
   const [hits, setHits] = useState<ZapCatalogItem[]>([]);
   const [picked, setPicked] = useState<ZapCatalogItem | null>(null);
-  const [dose, setDose] = useState("");
-  const [editing, setEditing] = useState<Record<string, string>>({});
+  const [addDose, setAddDose] = useState("");
+  const [addStage, setAddStage] = useState("Avulso");
+  const [addNApps, setAddNApps] = useState("1");
+  const [addArea, setAddArea] = useState("100");
+  const [editing, setEditing] = useState<Record<string, ItemDraft>>({});
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const categories = useMemo(() => {
     const map = new Map<string, string>();
@@ -68,6 +95,10 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
     if (category !== "ALL" && item.category !== category) return false;
     return true;
   });
+
+  function draftFor(item: ZapListItem): ItemDraft {
+    return editing[item.id] ?? draftOf(item);
+  }
 
   async function mutate(
     path: string,
@@ -95,9 +126,14 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
       }
       setData(json as ZapListDto);
       setPicked(null);
-      setDose("");
+      setAddDose("");
+      setAddStage("Avulso");
+      setAddNApps("1");
+      setAddArea("100");
       setHits([]);
       setAddQuery("");
+      setConfirmRemove(null);
+      setEditing({});
     } catch {
       setError("Não deu para gravar agora. Tente de novo.");
     } finally {
@@ -132,10 +168,12 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
             </p>
             <p className="text-xs text-muted-foreground">
               {data.list.cropLabel ?? data.list.crop}
-              {data.list.totalHectares
-                ? ` · ${data.list.totalHectares} ha`
+              {data.list.totalHectares ? ` · ${data.list.totalHectares} ha` : ""}
+              {data.showPrices && data.list.costPerHaBrl
+                ? ` · ${money.format(data.list.costPerHaBrl)}/ha`
                 : ""}
               {data.canWrite ? " · pode editar" : " · só leitura"}
+              {` · ${formatZapExpiry(data.expiresAt)}`}
             </p>
           </div>
         </div>
@@ -145,6 +183,14 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
         {error ? (
           <p className="rounded-lg border border-destructive/40 bg-danger-soft px-3 py-2 text-sm text-danger-strong">
             {error}
+          </p>
+        ) : null}
+
+        {data.showPrices && (data.list.totalBrl > 0 || data.list.sacksPerHa > 0) ? (
+          <p className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-text-strong">
+            Total {money.format(data.list.totalBrl)}
+            {data.list.sacksPerHa ? ` · ${data.list.sacksPerHa} sc/ha` : ""}
+            {data.list.totalSacks ? ` · ${data.list.totalSacks} sc` : ""}
           </p>
         ) : null}
 
@@ -182,76 +228,181 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
               Nenhum item com esse filtro.
             </li>
           ) : (
-            visible.map((item) => (
-              <li
-                key={item.id}
-                className="rounded-xl border border-border bg-card p-4 shadow-sm"
-              >
-                <p className="font-semibold text-text-strong">{item.productName}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {item.categoryLabel}
-                  {item.quantity
-                    ? ` · ${item.quantity} ${item.doseUnit}`
-                    : ""}
-                  {data.showPrices && item.totalBrl
-                    ? ` · ${money.format(item.totalBrl)}`
-                    : ""}
-                </p>
-                {data.canWrite ? (
-                  <div className="mt-3 flex flex-wrap items-end gap-2">
-                    <div className="grid min-w-28 flex-1 gap-1">
-                      <Label htmlFor={`dose-${item.id}`}>Dose/ha</Label>
-                      <Input
-                        id={`dose-${item.id}`}
-                        inputMode="decimal"
-                        value={editing[item.id] ?? String(item.dosePerHectare)}
-                        onChange={(e) =>
-                          setEditing((prev) => ({ ...prev, [item.id]: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() =>
-                        mutate(
-                          `/api/v1/zap/lists/${data.list.id}/items/${item.id}`,
-                          "PATCH",
-                          {
-                            token,
-                            dosePerHectare: Number(
-                              (editing[item.id] ?? item.dosePerHectare)
-                                .toString()
-                                .replace(",", "."),
-                            ),
-                          },
-                        )
-                      }
-                    >
-                      Salvar
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={busy}
-                      onClick={() =>
-                        mutate(
-                          `/api/v1/zap/lists/${data.list.id}/items/${item.id}?token=${encodeURIComponent(token)}`,
-                          "DELETE",
-                        )
-                      }
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-text-strong">
-                    {item.dosePerHectare} {item.doseUnit}/ha
+            visible.map((item) => {
+              const draft = draftFor(item);
+              const seed = isSeedCategory(item.category);
+              return (
+                <li
+                  key={item.id}
+                  className="rounded-xl border border-border bg-card p-4 shadow-sm"
+                >
+                  <p className="font-semibold text-text-strong">{item.productName}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {item.categoryLabel}
+                    {item.stage ? ` · ${item.stage}` : ""}
+                    {item.quantity ? ` · ${item.quantity} ${item.doseUnit}` : ""}
+                    {data.showPrices && item.totalBrl ? ` · ${money.format(item.totalBrl)}` : ""}
+                    {item.outOfProgram ? " · fora da programação" : ""}
                   </p>
-                )}
-              </li>
-            ))
+                  {data.canWrite ? (
+                    <div className="mt-3 grid gap-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="grid gap-1">
+                          <Label htmlFor={`stage-${item.id}`}>Estágio</Label>
+                          <Input
+                            id={`stage-${item.id}`}
+                            value={draft.stage}
+                            onChange={(e) =>
+                              setEditing((prev) => ({
+                                ...prev,
+                                [item.id]: { ...draft, stage: e.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="grid gap-1">
+                          <Label htmlFor={`napps-${item.id}`}>Aplicações</Label>
+                          <Input
+                            id={`napps-${item.id}`}
+                            inputMode="numeric"
+                            value={draft.nApplications}
+                            onChange={(e) =>
+                              setEditing((prev) => ({
+                                ...prev,
+                                [item.id]: { ...draft, nApplications: e.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      {seed ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="grid gap-1">
+                            <Label htmlFor={`seed-${item.id}`}>Semente/m</Label>
+                            <Input
+                              id={`seed-${item.id}`}
+                              inputMode="decimal"
+                              value={draft.seedsPerMeter}
+                              onChange={(e) =>
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [item.id]: { ...draft, seedsPerMeter: e.target.value },
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="grid gap-1">
+                            <Label htmlFor={`bags-${item.id}`}>Bags</Label>
+                            <Input
+                              id={`bags-${item.id}`}
+                              inputMode="decimal"
+                              value={draft.bagsOverride}
+                              onChange={(e) =>
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [item.id]: { ...draft, bagsOverride: e.target.value },
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="grid gap-1">
+                            <Label htmlFor={`dose-${item.id}`}>Dose/ha ({item.doseUnit})</Label>
+                            <Input
+                              id={`dose-${item.id}`}
+                              inputMode="decimal"
+                              value={draft.dose}
+                              onChange={(e) =>
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [item.id]: { ...draft, dose: e.target.value },
+                                }))
+                              }
+                            />
+                          </div>
+                          <div className="grid gap-1">
+                            <Label htmlFor={`area-${item.id}`}>% da área</Label>
+                            <Input
+                              id={`area-${item.id}`}
+                              inputMode="decimal"
+                              value={draft.areaPercent}
+                              onChange={(e) =>
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [item.id]: { ...draft, areaPercent: e.target.value },
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() =>
+                            mutate(
+                              `/api/v1/zap/lists/${data.list.id}/items/${item.id}`,
+                              "PATCH",
+                              {
+                                token,
+                                dosePerHectare: Number(draft.dose.replace(",", ".")),
+                                nApplications: Number(draft.nApplications),
+                                stage: draft.stage,
+                                areaPercent: Number(draft.areaPercent.replace(",", ".")),
+                                seedsPerMeter: seed
+                                  ? Number(draft.seedsPerMeter.replace(",", ".")) || null
+                                  : undefined,
+                                bagsOverride: seed
+                                  ? Number(draft.bagsOverride.replace(",", ".")) || null
+                                  : undefined,
+                              },
+                            )
+                          }
+                        >
+                          Salvar
+                        </Button>
+                        {confirmRemove === item.id ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={busy}
+                            onClick={() =>
+                              mutate(
+                                `/api/v1/zap/lists/${data.list.id}/items/${item.id}?token=${encodeURIComponent(token)}`,
+                                "DELETE",
+                              )
+                            }
+                          >
+                            Confirmar remoção
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-destructive"
+                            disabled={busy}
+                            onClick={() => setConfirmRemove(item.id)}
+                          >
+                            Remover
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-text-strong">
+                      {item.dosePerHectare} {item.doseUnit}/ha · {item.nApplications}×
+                      {item.areaPercent && item.areaPercent !== 100
+                        ? ` · ${item.areaPercent}% da área`
+                        : ""}
+                    </p>
+                  )}
+                </li>
+              );
+            })
           )}
         </ul>
 
@@ -296,25 +447,58 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                 <p className="text-sm text-text-strong">
                   Selecionado: <strong>{picked.name}</strong>
                 </p>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="zap-add-dose">Dose por hectare</Label>
-                  <Input
-                    id="zap-add-dose"
-                    inputMode="decimal"
-                    value={dose}
-                    onChange={(e) => setDose(e.target.value)}
-                    placeholder={`Em ${picked.doseUnit}`}
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="zap-add-stage">Estágio</Label>
+                    <Input
+                      id="zap-add-stage"
+                      value={addStage}
+                      onChange={(e) => setAddStage(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="zap-add-napps">Aplicações</Label>
+                    <Input
+                      id="zap-add-napps"
+                      inputMode="numeric"
+                      value={addNApps}
+                      onChange={(e) => setAddNApps(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="zap-add-dose">Dose por hectare</Label>
+                    <Input
+                      id="zap-add-dose"
+                      inputMode="decimal"
+                      value={addDose}
+                      onChange={(e) => setAddDose(e.target.value)}
+                      placeholder={`Em ${picked.doseUnit}`}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="zap-add-area">% da área</Label>
+                    <Input
+                      id="zap-add-area"
+                      inputMode="decimal"
+                      value={addArea}
+                      onChange={(e) => setAddArea(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <Button
                   type="button"
-                  disabled={busy || !dose}
+                  disabled={busy || !addDose}
                   onClick={() =>
                     mutate(`/api/v1/zap/lists/${data.list.id}/items`, "POST", {
                       token,
                       localProductId: picked.id,
-                      dosePerHectare: Number(dose.replace(",", ".")),
+                      dosePerHectare: Number(addDose.replace(",", ".")),
                       doseUnit: picked.doseUnit,
+                      stage: addStage.trim() || "Avulso",
+                      nApplications: Number(addNApps) || 1,
+                      areaPercent: Number(addArea.replace(",", ".")) || 100,
                     })
                   }
                 >
