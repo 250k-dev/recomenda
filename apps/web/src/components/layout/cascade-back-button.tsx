@@ -57,7 +57,7 @@ export function useCascadeNav() {
   };
 }
 
-/** Seta para o nível anterior da trilha (igual ao breadcrumb da web). */
+/** Seta para o nível anterior da trilha — só no mobile; no desktop a trilha é o breadcrumb. */
 export function CascadeBackButton({
   className,
 }: {
@@ -67,7 +67,12 @@ export function CascadeBackButton({
   if (isHome) return null;
 
   return (
-    <Button asChild variant="ghost" size="icon-lg" className={cn("shrink-0", className)}>
+    <Button
+      asChild
+      variant="ghost"
+      size="icon-lg"
+      className={cn("shrink-0 md:hidden", className)}
+    >
       <Link href={(parent.href ?? HOME_CRUMB.href) as Route} aria-label="Voltar">
         <ChevronLeft className="size-7" />
       </Link>

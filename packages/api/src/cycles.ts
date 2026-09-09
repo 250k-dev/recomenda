@@ -64,8 +64,11 @@ export interface CycleSeasonRow {
   cycle_days: number | null;
   recommendations_total: number;
   recommendations_done: number;
-  /** Etapas em PENDING — o que é descartado ao aplicar um modelo neste talhão. */
+  /** Etapas em PENDING — o que `applyTemplate` apaga ao aplicar um modelo neste talhão. */
   recommendations_pending?: number;
+  harvest_total_bags?: number | null;
+  harvest_bags_per_hectare?: number | null;
+  harvest_date?: string | null;
 }
 
 export interface CycleBlock {

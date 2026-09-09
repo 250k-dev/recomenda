@@ -321,3 +321,29 @@ export async function getPlotHistory(seasonId: string): Promise<PlotHistorySeaso
   const { data } = await api.get<PlotHistorySeason[]>(`/seasons/${seasonId}/plot-history`);
   return data;
 }
+
+export interface SeasonHarvest {
+  id: string;
+  season_id: string;
+  harvest_date: string;
+  bags_per_hectare: string;
+  total_bags: string | null;
+  sale_price_per_bag_brl: string | null;
+  notes: string | null;
+}
+
+export async function getSeasonHarvest(seasonId: string) {
+  const { data } = await api.get<SeasonHarvest | null>(`/seasons/${seasonId}/harvest`);
+  return data;
+}
+
+export async function registerSeasonHarvest(
+  seasonId: string,
+  payload: {
+    harvest_date: string;
+    total_bags: number;
+  },
+) {
+  const { data } = await api.post<SeasonHarvest>(`/seasons/${seasonId}/harvest`, payload);
+  return data;
+}

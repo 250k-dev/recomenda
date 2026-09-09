@@ -3,6 +3,7 @@
 import { Download, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 
 export function ReportsExportPanel() {
   const handleExport = () => {
@@ -20,8 +21,7 @@ export function ReportsExportPanel() {
       </p>
       <Button
         type="button"
-        variant="outline"
-        className="h-[42px] w-full rounded-[11px] text-sm font-semibold"
+        className={`h-[42px] w-full rounded-[11px] text-sm font-semibold ${EXPORT_ACTION_CLASS}`}
         onClick={handleExport}
       >
         <FileDown className="size-4" />

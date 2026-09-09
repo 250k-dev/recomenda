@@ -1,5 +1,6 @@
 "use client";
 
+import { BreadcrumbTrail } from "@/components/domain/breadcrumb-back";
 import { DashboardGreeting } from "@/components/domain/dashboard-greeting";
 import { ProducerSearchButton } from "@/components/domain/producer-search";
 import {
@@ -28,7 +29,7 @@ function HeaderActions({ compact }: { compact?: boolean }) {
 }
 
 export function AppHeader() {
-  const { isHome, current } = useCascadeNav();
+  const { isHome, current, items } = useCascadeNav();
 
   return (
     <header className="border-b border-border/70 bg-canvas/95 px-2 py-1.5 backdrop-blur-md md:border-0 md:bg-transparent md:px-8 md:pt-6 md:pb-2 md:backdrop-blur-none">
@@ -44,10 +45,15 @@ export function AppHeader() {
           </div>
         ) : (
           <>
-            <CascadeBackButton />
-            <p className="min-w-0 flex-1 truncate font-display text-[17px] font-semibold leading-tight tracking-[-0.02em] text-text-strong md:text-xl">
-              {current?.label ?? "Recomenda"}
-            </p>
+            <div className="flex min-w-0 flex-1 items-center gap-1 md:hidden">
+              <CascadeBackButton />
+              <p className="min-w-0 flex-1 truncate font-display text-[17px] font-semibold leading-tight tracking-[-0.02em] text-text-strong">
+                {current?.label ?? "Recomenda"}
+              </p>
+            </div>
+            <div className="hidden min-w-0 shrink-0 md:block">
+              <BreadcrumbTrail items={items} />
+            </div>
           </>
         )}
 

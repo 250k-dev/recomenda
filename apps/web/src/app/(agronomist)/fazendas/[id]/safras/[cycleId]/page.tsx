@@ -27,6 +27,11 @@ import {
   useCyclePurchaseList,
 } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
+import {
+  cycleHarvestFromSeasons,
+  fmtBags,
+  fmtScHa,
+} from "@/components/domain/season/register-harvest-dialog";
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -92,6 +97,10 @@ export default function CycleDetailPage() {
       ? programmedArea
       : (cycle?.total_cadastral_hectares ?? 0);
   const plotCount = areaByPlot.size;
+  const harvestSummary = useMemo(
+    () => cycleHarvestFromSeasons(seasons),
+    [seasons],
+  );
 
   if (wizardOpen && cycle && hasActivePurchaseList) {
     return (
@@ -132,6 +141,21 @@ export default function CycleDetailPage() {
       sub: listIsDraft ? "continuar" : "produtos",
       onClick: () => router.push(page.hrefs.listaDeCompra),
     },
+    ...(harvestSummary.totalBags != null
+      ? [
+          {
+            label: "Sacas colhidas",
+            value: fmtBags(harvestSummary.totalBags),
+          },
+          {
+            label: "Sacas / ha",
+            value:
+              harvestSummary.bagsPerHectare != null
+                ? fmtScHa(harvestSummary.bagsPerHectare)
+                : "—",
+          },
+        ]
+      : []),
   ];
 
   return (

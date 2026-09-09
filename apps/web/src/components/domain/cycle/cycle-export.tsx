@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Share2 } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
+import { cn } from "@recomenda/utils";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import {
   queryKeys,
   useCycle,
@@ -162,11 +164,10 @@ export function CycleExportButton({
   return (
     <>
       <Button
-        variant="outline"
-        className="gap-1.5"
+        className={cn("gap-1.5", EXPORT_ACTION_CLASS)}
         onClick={() => setOpen(true)}
       >
-        <Share2 className="size-4 text-muted-foreground" />
+        <Share2 className="size-4" />
         Exportar
       </Button>
       <FarmSeasonsExportDialog

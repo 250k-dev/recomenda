@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { Label } from "@recomenda/ui/primitives/label";
 import { MoneyInput, brToCanonical } from "@recomenda/ui/forms/money-input";
@@ -251,9 +252,8 @@ export function ProducerStockSection({
             </Button>
             <Button
               type="button"
-              variant="outline"
               size="sm"
-              className="gap-1.5"
+              className={`gap-1.5 ${EXPORT_ACTION_CLASS}`}
               onClick={() => setExportOpen(true)}
               disabled={enrichedRows.length === 0}
             >

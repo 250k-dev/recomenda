@@ -11,6 +11,7 @@ import { PageHero } from "@/components/domain/page-hero";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Button } from "@recomenda/ui/primitives/button";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { FieldError } from "@/components/domain/season/_shared";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
@@ -555,9 +556,8 @@ export function FarmPurchaseListTab({
                 />
               ) : null}
               <Button
-                variant="outline"
                 size="sm"
-                className="gap-1.5"
+                className={`gap-1.5 ${EXPORT_ACTION_CLASS}`}
                 onClick={() => setExportOpen(true)}
               >
                 <FileDown className="h-4 w-4" />

@@ -226,7 +226,7 @@ export function CyclePageShell({
       />
 
       {backHref ? (
-        <div className="mb-6">
+        <div className="mb-6 md:hidden">
           <Button asChild variant="ghost" size="icon-lg" className="-ml-2">
             <Link href={backHref} aria-label="Voltar">
               <ChevronLeft className="size-7" />

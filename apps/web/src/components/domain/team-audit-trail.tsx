@@ -9,6 +9,7 @@ import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Button } from "@recomenda/ui/primitives/button";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Select } from "@recomenda/ui/forms/select";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
@@ -237,8 +238,7 @@ export function TeamAuditTrail() {
         }
         actions={
           <Button
-            variant="outline"
-            className="gap-2"
+            className={`gap-2 ${EXPORT_ACTION_CLASS}`}
             onClick={exportCsv}
             disabled={items.length === 0}
           >

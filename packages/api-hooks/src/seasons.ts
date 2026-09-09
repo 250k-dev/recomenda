@@ -18,6 +18,7 @@ import {
   getArchivedSeasons,
   getTimeline,
   getPlotHistory,
+  registerSeasonHarvest,
   createRecommendation,
   reorderRecommendations,
   patchRecommendation,
@@ -411,5 +412,27 @@ export function usePlotHistory(seasonId: string) {
     queryKey: queryKeys.plotHistory(seasonId),
     queryFn: () => getPlotHistory(seasonId),
     enabled: Boolean(seasonId),
+  });
+}
+
+export function useRegisterHarvest(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { harvest_date: string; total_bags: number }) =>
+      registerSeasonHarvest(seasonId, payload),
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.season(seasonId) });
+      invalidateAfterRecommendationExecution(queryClient, seasonId);
+      const cycleId = (data as { cycle_id?: string }).cycle_id;
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId ?? "") });
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          (query.queryKey[0] === "cycle" ||
+            query.queryKey[0] === "farm-cycles" ||
+            query.queryKey[0] === "producer-cycles"),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seasonHarvest(seasonId) });
+    },
   });
 }

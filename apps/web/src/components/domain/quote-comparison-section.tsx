@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@recomenda/ui/primitives/button";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import {
   Dialog,
@@ -671,7 +672,11 @@ export function QuoteComparisonSection({
           </Button>
           {manualQuoteButton}
           {fulfillButton}
-          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
+          <Button
+            size="sm"
+            className={EXPORT_ACTION_CLASS}
+            onClick={() => setExportOpen(true)}
+          >
             <FileDown className="size-3.5" />
             Exportar
           </Button>

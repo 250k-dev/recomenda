@@ -12,6 +12,7 @@ import { Card, CardContent } from "@recomenda/ui/primitives/card";
 import { Input } from "@recomenda/ui/primitives/input";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
 import { Button } from "@recomenda/ui/primitives/button";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { Select } from "@recomenda/ui/forms/select";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { PageHero } from "@/components/domain/page-hero";
@@ -643,7 +644,7 @@ function PlanHeader({
         <>
           <CropToggle crop={crop} />
           <DuplicateButton purchaseListId={purchaseListId} />
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={onExport}>
+          <Button size="sm" className={`gap-1.5 ${EXPORT_ACTION_CLASS}`} onClick={onExport}>
             <Download className="h-4 w-4" />
             Exportar
           </Button>

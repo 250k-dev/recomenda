@@ -10,6 +10,7 @@ import {
   Plus,
   SquareCheckBig,
   Trash2,
+  Wheat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@recomenda/ui/primitives/badge";
@@ -38,6 +39,18 @@ import { routes } from "@recomenda/config";
 import { AddCycleFarmDialog } from "@/components/domain/cycle/cycle-farms-section";
 import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
 import { BulkApplyTemplateDialog } from "@/components/domain/cycle/bulk-apply-template-dialog";
+import {
+  fmtBags,
+  RegisterHarvestDialog,
+} from "@/components/domain/season/register-harvest-dialog";
+import { HARVEST_ROW_ACTION_CLASS } from "@/components/domain/export-action-class";
+
+const PLOT_GRID =
+  "grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_17rem] items-center gap-4";
+
+function canRegisterHarvest(status: string) {
+  return status === "PUBLISHED" || status === "IN_PROGRESS";
+}
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -124,6 +137,7 @@ export function CycleFarmDisclosures({
 }) {
   const canManage = useCan("CYCLE_CRUD");
   const canEditCrop = useCan("SEASON_CRUD");
+  const canHarvest = useCan("HARVEST_REGISTER");
   const { data: producerFarms } = useProducerFarms(producerId);
   const { data: availablePlots = [] } = useCycleAvailablePlots(cycle.id);
   const removeCycleFarm = useRemoveCycleFarm(cycle.id);
@@ -138,6 +152,7 @@ export function CycleFarmDisclosures({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [openFarms, setOpenFarms] = useState<Set<string>>(new Set());
   const [editingCrop, setEditingCrop] = useState<CycleSeasonRow | null>(null);
+  const [harvesting, setHarvesting] = useState<CycleSeasonRow | null>(null);
 
   const locationByFarm = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -410,11 +425,12 @@ export function CycleFarmDisclosures({
                       <>
                         {/* Desktop: padrão atual da linha de talhão */}
                         <div className="hidden md:block">
-                          <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_minmax(0,1fr)_14.5rem] items-center gap-4 bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+                          <div className={`${PLOT_GRID} bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase`}>
                             <span>Talhão</span>
                             <span>Cultura / variedade</span>
                             <span>Área</span>
                             <span>Progresso</span>
+                            <span>Sacas colhidas</span>
                             <span>Status</span>
                             <span className="text-right">Ações</span>
                           </div>
@@ -427,7 +443,7 @@ export function CycleFarmDisclosures({
                             return (
                               <div
                                 key={season.id}
-                                className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,0.8fr)_minmax(0,1.3fr)_minmax(0,1fr)_14.5rem] items-center gap-4 border-t border-border px-5 py-3.5 text-sm"
+                                className={`${PLOT_GRID} border-t border-border px-5 py-3.5 text-sm`}
                               >
                                 <span className="truncate font-semibold text-text-strong">
                                   Talhão {season.plot_name}
@@ -483,6 +499,11 @@ export function CycleFarmDisclosures({
                                     </span>
                                   )}
                                 </span>
+                                <span className="tabular-nums text-text-strong">
+                                  {season.harvest_total_bags != null
+                                    ? fmtBags(season.harvest_total_bags)
+                                    : "—"}
+                                </span>
                                 <span>
                                   <Badge
                                     variant={
@@ -493,7 +514,18 @@ export function CycleFarmDisclosures({
                                     {labelStatus(STATUS_LABELS, season.status)}
                                   </Badge>
                                 </span>
-                                <span className="flex justify-end gap-4">
+                                <span className="flex justify-end gap-2">
+                                  {canHarvest && canRegisterHarvest(season.status) ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className={`gap-1.5 ${HARVEST_ROW_ACTION_CLASS}`}
+                                      onClick={() => setHarvesting(season)}
+                                    >
+                                      <Wheat className="size-3.5" />
+                                      Colheita
+                                    </Button>
+                                  ) : null}
                                   <Button asChild variant="secondary" size="sm">
                                     <Link href={row.recommendationHref}>
                                       Recomendações
@@ -545,6 +577,9 @@ export function CycleFarmDisclosures({
                                         ? ` de ${fmtHa(season.plot_area_ha)}`
                                         : ""}{" "}
                                       ha
+                                      {season.harvest_total_bags != null
+                                        ? ` · ${fmtBags(season.harvest_total_bags)} sc`
+                                        : ""}
                                     </p>
                                     {canEditCrop &&
                                     season.status !== "ARCHIVED" &&
@@ -586,7 +621,19 @@ export function CycleFarmDisclosures({
                                     />
                                   </div>
                                 ) : null}
-                                <div className="mt-3 flex gap-2">
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {canHarvest &&
+                                  canRegisterHarvest(season.status) ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className={`gap-1.5 ${HARVEST_ROW_ACTION_CLASS}`}
+                                      onClick={() => setHarvesting(season)}
+                                    >
+                                      <Wheat />
+                                      Colheita
+                                    </Button>
+                                  ) : null}
                                   <Button
                                     asChild
                                     variant="secondary"
@@ -660,6 +707,25 @@ export function CycleFarmDisclosures({
         onOpenChange={setBulkApplyOpen}
         cycle={cycle}
         producerId={producerId}
+      />
+
+      <RegisterHarvestDialog
+        open={!!harvesting}
+        onOpenChange={(open) => {
+          if (!open) setHarvesting(null);
+        }}
+        seasonId={harvesting?.id ?? ""}
+        plotLabel={
+          harvesting
+            ? `Talhão ${harvesting.plot_name}`
+            : "Talhão"
+        }
+        pendingCount={harvesting?.recommendations_pending ?? 0}
+        plantedAreaHa={
+          harvesting
+            ? (harvesting.planted_area_ha ?? harvesting.plot_area_ha)
+            : 0
+        }
       />
 
       <ConfirmDialog

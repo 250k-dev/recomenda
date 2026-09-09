@@ -69,4 +69,5 @@ export const queryKeys = {
   agronomistAgenda: (producerId?: string) =>
     ["agronomist-agenda", producerId ?? "all"] as const,
   plotHistory: (seasonId: string) => ["plot-history", seasonId] as const,
+  seasonHarvest: (seasonId: string) => ["season-harvest", seasonId] as const,
 };

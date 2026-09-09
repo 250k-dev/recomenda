@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, LayoutTemplate, Leaf, ListOrdered, Pencil, Plus, Send, Share2 } from "lucide-react";
+import { CalendarDays, LayoutTemplate, Leaf, ListOrdered, Pencil, Plus, Send, Share2, Wheat } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
 import { TimelineCardsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
@@ -19,7 +19,7 @@ import {
   useSeason,
   useSeasonTimeline,
 } from "@recomenda/api-hooks";
-import { CROP_LABELS } from "@recomenda/utils";
+import { CROP_LABELS, cn } from "@recomenda/utils";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { usePurchaseListCatalogProducts } from "@/components/domain/timing/timing-stages-editor";
 import type { Recommendation } from "@recomenda/api";
@@ -35,9 +35,15 @@ import { PlantingDateRegisterPopover } from "@/components/domain/season/planting
 import { SeasonMixOrderDialog } from "@/components/domain/season/season-mix-order-dialog";
 import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
 import { ApplySeasonTemplateDialog } from "@/components/domain/season/apply-season-template-dialog";
+import {
+  fmtBags,
+  fmtScHa,
+  RegisterHarvestDialog,
+} from "@/components/domain/season/register-harvest-dialog";
 import { fmtDate } from "@recomenda/domain/recommendations/format";
 import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { routes } from "@recomenda/config";
+import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 
 /**
  * Card da âncora de plantio — primeiro item visual do cronograma (não é uma
@@ -261,6 +267,7 @@ export function SeasonRecommendationsView({
   const [mixOrderOpen, setMixOrderOpen] = useState(false);
   const [cropEditOpen, setCropEditOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [harvestOpen, setHarvestOpen] = useState(false);
   const reorderMut = useReorderRecommendations(seasonId);
   const meData = useMe().data as { name?: string } | undefined;
   const producerQuery = useProducer(producerId ?? "");
@@ -271,6 +278,7 @@ export function SeasonRecommendationsView({
   const canSeasonCrud = useCan("SEASON_CRUD");
   // Sem PRICE_VIEW o documento nunca sai com valores (nem a opção aparece).
   const canViewPrices = useCan("PRICE_VIEW");
+  const canHarvest = useCan("HARVEST_REGISTER");
 
   // Ficha técnica do PDF: fazenda, áreas, variedades e ciclo vêm da safra
   // (`CycleDetail.seasons` já traz tudo agregado); o espaçamento, da lista.
@@ -345,6 +353,35 @@ export function SeasonRecommendationsView({
     ? "Este talhão já tem aplicação registrada — o modelo não pode ser trocado."
     : undefined;
 
+  const plotRow = cycle?.seasons.find((s) => s.id === seasonId);
+  const harvestable =
+    canHarvest &&
+    (seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS");
+  const pendingCount = recommendations.filter((r) => r.status === "PENDING")
+    .length;
+  const harvestStats =
+    plotRow?.harvest_total_bags != null
+      ? [
+          {
+            label: "Sacas colhidas",
+            value: fmtBags(plotRow.harvest_total_bags),
+          },
+          {
+            label: "Sacas / ha",
+            value:
+              plotRow.harvest_bags_per_hectare != null
+                ? fmtScHa(plotRow.harvest_bags_per_hectare)
+                : "—",
+          },
+        ]
+      : [];
+  const plantedAreaHa =
+    plotRow?.planted_area_ha ??
+    plotRow?.plot_area_ha ??
+    (seasonLive?.planted_area_ha != null
+      ? Number(seasonLive.planted_area_ha)
+      : 0);
+
   // Deep-link: rola até a etapa alvo após o timeline carregar.
   useEffect(() => {
     if (!openRecommendationId || isLoading) return;
@@ -399,6 +436,16 @@ export function SeasonRecommendationsView({
               >
                 <Pencil className="w-4 h-4 text-muted-foreground" />
                 Editar cultivo
+              </Button>
+            ) : null}
+            {harvestable ? (
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setHarvestOpen(true)}
+              >
+                <Wheat className="w-4 h-4" />
+                Registrar colheita
               </Button>
             ) : null}
             {canManageStages ? (
@@ -513,6 +560,14 @@ export function SeasonRecommendationsView({
             hasPendingStages={false}
           />
         ) : null}
+        <RegisterHarvestDialog
+          open={harvestOpen}
+          onOpenChange={setHarvestOpen}
+          seasonId={seasonId}
+          plotLabel={plotName ? `Talhão ${plotName}` : title}
+          pendingCount={pendingCount}
+          plantedAreaHa={plantedAreaHa}
+        />
       </div>
     );
   }
@@ -558,6 +613,7 @@ export function SeasonRecommendationsView({
             sub: total > 0 ? `${progressPct}%` : undefined,
             subClassName: "font-semibold text-primary-strong",
           },
+          ...harvestStats,
         ]}
       >
         <div className="mt-4 rounded-xl border border-border bg-rail px-4 py-3.5 sm:mt-5">
@@ -582,12 +638,14 @@ export function SeasonRecommendationsView({
             Etapas do cronograma
           </h2>
           <Button
-            variant="outline"
             size="sm"
-            className="gap-1.5 print:hidden"
+            className={cn(
+              "gap-1.5 print:hidden",
+              EXPORT_ACTION_CLASS,
+            )}
             onClick={() => setExportOpen(true)}
           >
-            <Share2 className="w-4 h-4 text-muted-foreground" />
+            <Share2 className="w-4 h-4" />
             Exportar
           </Button>
           {canManageStages ? (
@@ -610,6 +668,16 @@ export function SeasonRecommendationsView({
             >
               <Pencil className="w-4 h-4 text-muted-foreground" />
               Editar cultivo
+            </Button>
+          ) : null}
+          {harvestable ? (
+            <Button
+              size="sm"
+              className="gap-1.5 print:hidden"
+              onClick={() => setHarvestOpen(true)}
+            >
+              <Wheat className="w-4 h-4" />
+              Registrar colheita
             </Button>
           ) : null}
         </div>
@@ -734,6 +802,14 @@ export function SeasonRecommendationsView({
           hasPendingStages={recommendations.some((r) => r.status === "PENDING")}
         />
       ) : null}
+      <RegisterHarvestDialog
+        open={harvestOpen}
+        onOpenChange={setHarvestOpen}
+        seasonId={seasonId}
+        plotLabel={plotName ? `Talhão ${plotName}` : title}
+        pendingCount={pendingCount}
+        plantedAreaHa={plantedAreaHa}
+      />
     </div>
   );
 }
