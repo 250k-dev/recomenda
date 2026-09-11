@@ -29,6 +29,7 @@ import {
   createFarmTeamMember,
   deleteFarmTeamMember,
   updateFarmTeamGrants,
+  resendFarmTeamAccessEmail,
 } from "@recomenda/api/farm-team";
 import type { AccessLevel } from "@recomenda/api/auth-types";
 import { queryKeys } from "./queryKeys";
@@ -284,6 +285,17 @@ export function useUpdateFarmTeamGrants() {
       queryClient.invalidateQueries({ queryKey: queryKeys.farmTeamAll });
       queryClient.invalidateQueries({ queryKey: ["farm-team"] });
       queryClient.invalidateQueries({ queryKey: ["consultants-overview"] });
+    },
+  });
+}
+
+export function useResendFarmTeamAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: resendFarmTeamAccessEmail,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.farmTeamAll });
+      queryClient.invalidateQueries({ queryKey: ["farm-team"] });
     },
   });
 }

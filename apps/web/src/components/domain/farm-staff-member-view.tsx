@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { routes } from "@recomenda/config";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { FarmStaffGrantsPalette } from "@/components/domain/farm-staff-grants-palette";
+import { FarmTeamAccessEmail } from "@/components/domain/farm-team-access-email";
 import { PageHero } from "@/components/domain/page-hero";
 import { Button } from "@recomenda/ui/primitives/button";
 import { apiErrorMessage } from "@recomenda/api/api-error";
@@ -89,6 +90,11 @@ export function FarmStaffMemberView({
           </span>
           <p className="text-sm text-muted-foreground">{email}</p>
         </div>
+        {first ? (
+          <div className="mt-3">
+            <FarmTeamAccessEmail member={first} />
+          </div>
+        ) : null}
       </PageHero>
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">

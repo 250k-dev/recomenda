@@ -34,6 +34,7 @@ import {
   useFarmTeam,
 } from "@recomenda/api-hooks";
 import { FarmStaffGrantsPalette } from "@/components/domain/farm-staff-grants-palette";
+import { FarmTeamAccessEmail } from "@/components/domain/farm-team-access-email";
 import {
   defaultFarmStaffGrantKeys,
   type FarmStaffGrantKey,
@@ -42,7 +43,6 @@ import {
 const schema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(6),
   access_level: z.enum(["FARM_MANAGER", "FARM_OPERATOR"]),
 });
 
@@ -67,7 +67,6 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
     defaultValues: {
       name: "",
       email: "",
-      password: "",
       access_level: "FARM_OPERATOR",
     },
   });
@@ -78,7 +77,6 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
     form.reset({
       name: "",
       email: "",
-      password: "",
       access_level: "FARM_OPERATOR",
     });
     setGrantKeys(defaultFarmStaffGrantKeys("FARM_OPERATOR"));
@@ -86,13 +84,17 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
 
   async function onSubmit(values: FormValues) {
     try {
-      await createMutation.mutateAsync({
+      const created = await createMutation.mutateAsync({
         producer_id: producerId,
         ...values,
         grant_keys: grantKeys,
         can_view_prices: grantKeys.includes("prices"),
       });
-      toast.success("Membro adicionado");
+      toast.success(
+        created.email_sent
+          ? `E-mail de acesso enviado para ${created.email}.`
+          : "Membro adicionado. O e-mail não saiu — use Enviar e-mail na lista.",
+      );
       resetForm();
       setOpen(false);
     } catch (err) {
@@ -147,6 +149,9 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
                       : ""}{" "}
                     · {m.email}
                   </div>
+                  <div className="mt-2">
+                    <FarmTeamAccessEmail member={m} />
+                  </div>
                 </div>
                 <Button
                   size="sm"
@@ -181,7 +186,7 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
           <DialogHeader className="shrink-0">
             <DialogTitle>Novo membro</DialogTitle>
             <DialogDescription>
-              Cadastre gerente ou operador com senha temporária e as permissões deste produtor.
+              A pessoa recebe um e-mail para criar a senha e entrar. Sem o e-mail, o acesso não chega.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -223,22 +228,13 @@ export function ProducerFarmTeamSection({ producerId }: { producerId: string }) 
                   {...form.register("email")}
                 />
               </div>
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor="farm-team-password">Senha temporária</Label>
-                <Input
-                  id="farm-team-password"
-                  type="password"
-                  autoComplete="new-password"
-                  {...form.register("password")}
-                />
-              </div>
             </div>
             <DialogFooter className="shrink-0 flex-row justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Salvando…" : "Salvar"}
+                {createMutation.isPending ? "Enviando…" : "Adicionar e enviar e-mail"}
               </Button>
             </DialogFooter>
           </form>

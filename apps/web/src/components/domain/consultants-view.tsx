@@ -46,6 +46,7 @@ import type { FarmTeamMember } from "@recomenda/api/farm-team";
 import type { InvitationRow } from "@recomenda/api/producers";
 import type { AccessLevel } from "@recomenda/api/auth-types";
 import { FarmStaffGrantsPalette } from "@/components/domain/farm-staff-grants-palette";
+import { FarmTeamAccessEmail } from "@/components/domain/farm-team-access-email";
 import { defaultFarmStaffGrantKeys, type FarmStaffGrantKey } from "@recomenda/domain";
 
 type TeamInviteLevel = Extract<AccessLevel, "MANAGER" | "CONSULTANT">;
@@ -235,6 +236,9 @@ function FarmMemberCard({
           </div>
             <p className="truncate text-[13px] text-[#8A857D]">{member.email || "—"}</p>
           </Link>
+          <div className="mt-2">
+            <FarmTeamAccessEmail member={member} />
+          </div>
         </div>
         <Button
           variant="ghost"

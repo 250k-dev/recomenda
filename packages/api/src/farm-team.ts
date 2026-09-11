@@ -1,6 +1,13 @@
 import { api } from "./http/axios";
 import type { AccessLevel } from "./auth-types";
 
+export type FarmTeamAccessEmailStatus = "never" | "sent" | "skipped" | "failed";
+
+export interface FarmTeamAccessEmail {
+  status: FarmTeamAccessEmailStatus;
+  sent_at: string | null;
+}
+
 export interface FarmTeamMember {
   id: string;
   user_id: string;
@@ -13,6 +20,8 @@ export interface FarmTeamMember {
   producer_id: string;
   producer_name: string;
   created_at: string;
+  is_temporary?: boolean;
+  access_email?: FarmTeamAccessEmail;
 }
 
 export async function getFarmTeamAll() {
@@ -51,7 +60,15 @@ export async function createFarmTeamMember(payload: {
     access_level: AccessLevel;
     memberships: Array<{ id: string; producer_id: string }>;
     temporary_password: string | null;
+    email_sent?: boolean;
   }>("/farm-team", payload);
+  return data;
+}
+
+export async function resendFarmTeamAccessEmail(memberId: string) {
+  const { data } = await api.post<{ email_sent: boolean }>(
+    `/farm-team/${memberId}/access-email`,
+  );
   return data;
 }
 
