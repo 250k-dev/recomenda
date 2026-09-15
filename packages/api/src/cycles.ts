@@ -252,6 +252,11 @@ export interface SyncListDosesResult {
     stage: string;
     reason: "purchase_confirmed";
   }>;
+  shortages?: Array<{
+    product_name: string;
+    stage: string;
+    confirmed_qty: number;
+  }>;
 }
 
 /** Leva as doses da programação para a lista de compra da safra. */

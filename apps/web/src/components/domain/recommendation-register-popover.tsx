@@ -16,6 +16,7 @@ import {
   useSkipRecommendation,
 } from "@recomenda/api-hooks";
 import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 
 /**
  * Atalho "Registrar aplicação": abre um popover ancorado com o mesmo mini-form do
@@ -67,7 +68,8 @@ export function RecommendationRegisterPopover({
           toast.success("Etapa registrada como aplicada.");
           setOpen(false);
         },
-        onError: () => toast.error("Não foi possível registrar."),
+        onError: (e: unknown) =>
+          toast.error(apiErrorMessage(e, "Não foi possível registrar.")),
       },
     );
   };

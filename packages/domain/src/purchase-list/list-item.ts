@@ -42,6 +42,8 @@ export type ListItem = {
   outOfProgram?: boolean;
   /** Semente: quantidade de bags/sacos digitada à mão (sobrepõe o cálculo). */
   bagsOverride?: string;
+  /** Defensivo: volume comercial digitado (bombona). Sobrepõe dose × ha × nApps. */
+  volumeOverride?: string;
   /** % da área total em que o produto é aplicado (ex.: "20"). Vazio/ausente = 100. */
   areaPercent?: string;
   /** Observação de onde é aplicado (ex.: "áreas sujas"). Não entra em cálculo. */
@@ -50,9 +52,14 @@ export type ListItem = {
 
 /** Fração (0..1) da área em que o item é aplicado. Default: área toda. */
 export function areaFactorOf(it: ListItem): number {
-  const pct = Number((it.areaPercent ?? "").replace(",", "."));
+  const pct = Number(
+    String(it.areaPercent ?? "")
+      .replace("%", "")
+      .replace(",", ".")
+      .trim(),
+  );
   if (!Number.isFinite(pct) || pct <= 0) return 1;
-  return pct / 100;
+  return Math.min(pct, 100) / 100;
 }
 
 /** Espaçamento padrão entre linhas (m) quando a lista não informa outro valor. */
@@ -115,14 +122,17 @@ export function seedPlanOutputs(it: ListItem, totalHa: number) {
 
 /**
  * Quantidade necessária: para semente, (população/ha × área) convertida em
- * bags/sacos conforme a categoria; senão, dose×área×aplicações.
+ * bags/sacos conforme a categoria; senão, dose × ha tratados × aplicações
+ * (ou o volume comercial, se digitado).
  */
 export function listItemRequired(it: ListItem, totalHa: number): number {
   if (isSeedItem(it)) {
     const populationBase = Number(it.thousandPlants || 0) * Number(it.seedingArea || 0);
     return seedQuantityFromPopulation(populationBase, it.category);
   }
-  return Number(it.dose || 0) * totalHa * Number(it.nApps || 1);
+  if (hasVolumeOverride(it)) return Number(it.volumeOverride) || 0;
+  const nApps = parseNApplications(it.nApps);
+  return Number(it.dose || 0) * treatedHectaresOf(it, totalHa) * nApps;
 }
 
 /** Indica se a semente teve a quantidade de bags/sacos ajustada manualmente. */
@@ -130,9 +140,29 @@ export function hasBagsOverride(it: ListItem): boolean {
   return isSeedItem(it) && it.bagsOverride !== undefined && it.bagsOverride !== "";
 }
 
+/** Defensivo: volume comercial digitado (não vende picado). */
+export function hasVolumeOverride(it: ListItem): boolean {
+  return !isSeedItem(it) && it.volumeOverride !== undefined && it.volumeOverride !== "";
+}
+
+/** Hectares da linha: % área × área da lista. Volume não muda o hectare. */
+export function treatedHectaresOf(it: ListItem, totalHa: number): number {
+  return areaFactorOf(it) * Math.max(0, totalHa);
+}
+
+/** Dose de bula implícita: volume ÷ (ha tratados × aplicações). */
+export function doseFromCommercialVolume(
+  volume: number,
+  treatedHa: number,
+  nApps: number,
+): string {
+  if (!(volume > 0) || !(treatedHa > 0) || !(nApps > 0)) return "";
+  return String(Number((volume / (treatedHa * nApps)).toFixed(6)));
+}
+
 /**
  * Quantidade efetiva: respeita o override manual de bags/sacos (semente) quando
- * houver; senão usa o cálculo por população (ou dose, para defensivos).
+ * houver; senão usa o cálculo por população (ou dose × ha, para defensivos).
  */
 export function listItemQuantity(it: ListItem, totalHa: number): number {
   if (hasBagsOverride(it)) return Number(it.bagsOverride) || 0;
@@ -140,15 +170,14 @@ export function listItemQuantity(it: ListItem, totalHa: number): number {
 }
 
 /**
- * Quanto comprar. Espelha a planilha: `(necessário − estoque) × % da área`.
- * O `%` é aplicado DEPOIS de descontar o estoque (ex.: Triclopir em áreas
- * sujas: (1,5 × 870 − 0) × 50% = 652,5).
+ * Quanto comprar: volume da linha − aplicado − estoque.
+ * O % área já entrou no volume (ha tratados); não multiplica de novo.
  */
 export function listItemToBuy(it: ListItem, totalHa: number): number {
   const required = listItemQuantity(it, totalHa);
   const stock = Math.max(0, Number(it.stock || 0));
   const applied = Math.max(0, Number(it.applied || 0));
-  return Math.max(0, (required - applied - stock) * areaFactorOf(it));
+  return Math.max(0, required - applied - stock);
 }
 
 /**
@@ -173,7 +202,7 @@ export function listItemsToBuyByKey(
     const left = remaining.get(pid) ?? 0;
     const used = Math.min(left, stillNeed);
     remaining.set(pid, left - used);
-    result.set(it.key, Math.max(0, (stillNeed - used) * areaFactorOf(it)));
+    result.set(it.key, Math.max(0, stillNeed - used));
   }
   return result;
 }
@@ -215,8 +244,9 @@ export function listItemToPayload(it: ListItem, listCrop?: string): PurchaseList
     cycle_days: seed && it.cycleDays ? Number(it.cycleDays) || null : null,
     seeding_area_ha: seed ? Number(it.seedingArea) || 0 : null,
     bags_override: hasBagsOverride(it) ? Number(it.bagsOverride) : null,
+    volume_override: hasVolumeOverride(it) ? Number(it.volumeOverride) : null,
     out_of_program: it.outOfProgram ?? false,
-    area_factor: areaFactorOf(it),
+    area_factor: Math.min(1, areaFactorOf(it)),
     area_note: it.areaNote?.trim() || null,
   };
 }

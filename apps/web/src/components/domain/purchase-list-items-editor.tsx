@@ -28,12 +28,15 @@ import {
 import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
 import {
   areaFromBags,
-  areaFactorOf,
+  doseFromCommercialVolume,
+  hasVolumeOverride,
   isSeedItem,
   listItemQuantity,
   listItemsToBuyByKey,
+  parseNApplications,
   populationFromSeeds,
   seedQuantityUnitLabel,
+  treatedHectaresOf,
   DEFAULT_SPACING_M,
   SEED_CATEGORIES,
   type ListItem,
@@ -197,6 +200,46 @@ export function PurchaseListItemsEditor({
     });
   };
 
+  const setDose = (key: string, dose: string) => {
+    updateItem(key, { dose, volumeOverride: "" });
+  };
+
+  const setVolumeOverride = (key: string, raw: string) => {
+    const item = items.find((i) => i.key === key);
+    if (!item) return;
+    const vol = Number(String(raw).replace(",", "."));
+    const ha = treatedHectaresOf(item, totalHa);
+    const nApps = parseNApplications(item.nApps);
+    updateItem(key, {
+      volumeOverride: raw,
+      dose: doseFromCommercialVolume(vol, ha, nApps) || item.dose,
+    });
+  };
+
+  const setAreaPercent = (key: string, raw: string) => {
+    // % só muda os hectares da linha. A dose de bula fica; o volume recalcula.
+    // Se o volume comercial ficasse travado, 10% inflava a dose (ex.: 1,5 → 15).
+    updateItem(key, { areaPercent: raw, volumeOverride: "" });
+  };
+
+  const setNApps = (key: string, nApps: string) => {
+    const item = items.find((i) => i.key === key);
+    if (!item) {
+      updateItem(key, { nApps });
+      return;
+    }
+    if (hasVolumeOverride(item)) {
+      const vol = Number(String(item.volumeOverride).replace(",", "."));
+      const ha = treatedHectaresOf(item, totalHa);
+      updateItem(key, {
+        nApps,
+        dose: doseFromCommercialVolume(vol, ha, parseNApplications(nApps)) || item.dose,
+      });
+      return;
+    }
+    updateItem(key, { nApps, volumeOverride: "" });
+  };
+
   // Área derivada (ha), formatada com 2 casas ("" quando não há bags/população).
   const areaString = (bags: number, pop: number, category: string): string => {
     const area = areaFromBags(bags, pop, category);
@@ -308,7 +351,7 @@ export function PurchaseListItemsEditor({
       if (SEED_CATEGORIES.includes(category)) {
         patch.dose = "";
         patch.nApps = "1";
-        // Ciclo (dias) já nasce com o padrão da soja quando vira semente.
+        patch.volumeOverride = "";
         const current = items.find((i) => i.key === key);
         if (!current?.cycleDays) patch.cycleDays = DEFAULT_CYCLE_DAYS;
       } else {
@@ -654,7 +697,7 @@ export function PurchaseListItemsEditor({
                   type="number"
                   step="0.01"
                   value={it.dose}
-                  onChange={(e) => updateItem(it.key, { dose: e.target.value })}
+                  onChange={(e) => setDose(it.key, e.target.value)}
                   className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
                 />
               )}
@@ -684,28 +727,50 @@ export function PurchaseListItemsEditor({
                   value={it.nApps}
                   onChange={(e) => {
                     const whole = e.target.value.replace(/[.,].*$/, "").replace(/\D/g, "");
-                    updateItem(it.key, { nApps: whole === "" ? "" : whole });
+                    setNApps(it.key, whole === "" ? "" : whole);
                   }}
                   className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
                 />
               )}
             </td>
-            {/* % da área — aplica só a essa fração (ex.: 20% da fazenda). */}
+            {/* Volume — editável; se mexer, recalcula a dose (ha/% ficam) */}
             <td className="px-1.5 py-1.5 text-right">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">
-                  {fmt(areaFactorOf(it) * 100)}%
+                  {fmt(required)}
                 </span>
               ) : (
                 <Input
                   type="number"
-                  min={0}
-                  max={100}
                   step="0.01"
-                  value={it.areaPercent ?? ""}
+                  min="0"
+                  value={
+                    it.volumeOverride !== undefined && it.volumeOverride !== ""
+                      ? it.volumeOverride
+                      : required > 0
+                        ? String(Number(required.toFixed(4)))
+                        : ""
+                  }
+                  onChange={(e) => setVolumeOverride(it.key, e.target.value)}
+                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                />
+              )}
+            </td>
+            {/* % da área — hectares da linha = % × área da lista */}
+            <td className="px-1.5 py-1.5 text-right">
+              {readOnly ? (
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {it.areaPercent || "100"}
+                </span>
+              ) : (
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
                   placeholder="100"
-                  title="Percentual da área total em que o produto é aplicado"
-                  onChange={(e) => updateItem(it.key, { areaPercent: e.target.value })}
+                  value={it.areaPercent ?? ""}
+                  onChange={(e) => setAreaPercent(it.key, e.target.value)}
                   className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
                 />
               )}
@@ -786,9 +851,6 @@ export function PurchaseListItemsEditor({
             )}
           </td>
         ) : null}
-        <td className={cn(summaryCellClass, "text-muted-foreground")}>
-          {fmt(required)}
-        </td>
         <td
           className={cn(
             summaryCellClass,
@@ -838,7 +900,6 @@ export function PurchaseListItemsEditor({
       {canViewPrices ? (
         <td className="px-1.5 py-2 text-right">Valor</td>
       ) : null}
-      <td className={summaryHeaderClass}>Necessário</td>
       <td className={summaryHeaderClass}>Qtde final</td>
       {canViewPrices ? (
         <td className={summaryHeaderClass}>Total</td>
@@ -863,7 +924,7 @@ export function PurchaseListItemsEditor({
     // Defensivos: Form. + Dose/Un/Nº + % área + obs. Sem PRICE_VIEW, −4 cols de preço.
     const priceCols = canViewPrices ? 4 : 0;
     const colCount = seedBand
-      ? (readOnly ? 14 : 15) - (4 - priceCols)
+      ? (readOnly ? 13 : 14) - (4 - priceCols)
       : (readOnly ? 15 : 16) - (4 - priceCols);
     const tableWidth = seedBand
       ? readOnly
@@ -900,7 +961,6 @@ export function PurchaseListItemsEditor({
                 {canViewPrices ? <col className="w-[120px]" /> : null}
                 {canViewPrices ? <col className="w-[128px]" /> : null}
                 <col className="w-[104px]" />
-                <col className="w-[104px]" />
                 {canViewPrices ? <col className="w-[128px]" /> : null}
                 {canViewPrices ? <col className="w-[128px]" /> : null}
                 {!readOnly ? <col className="w-[44px]" /> : null}
@@ -913,13 +973,13 @@ export function PurchaseListItemsEditor({
                 <col className="w-[120px]" />
                 <col className="w-[120px]" />
                 <col className="w-[120px]" />
-                {/* % área + obs. área */}
+                {/* volume + % área + obs. área */}
                 <col className="w-[104px]" />
+                <col className="w-[80px]" />
                 <col className="w-[160px]" />
                 <col className="w-[104px]" />
                 {canViewPrices ? <col className="w-[120px]" /> : null}
                 {canViewPrices ? <col className="w-[128px]" /> : null}
-                <col className="w-[104px]" />
                 <col className="w-[104px]" />
                 {canViewPrices ? <col className="w-[128px]" /> : null}
                 {canViewPrices ? <col className="w-[128px]" /> : null}
@@ -981,6 +1041,7 @@ export function PurchaseListItemsEditor({
                   <td className="px-1.5 py-2 text-right leading-tight">Dose</td>
                   <td className="px-1.5 py-2 text-right leading-tight">Un.</td>
                   <td className="px-1.5 py-2 text-right leading-tight">Nº apl.</td>
+                  <td className="px-1.5 py-2 text-right leading-tight">Volume</td>
                   <td className="px-1.5 py-2 text-right leading-tight">% área</td>
                   <td className="px-1.5 py-2 text-left leading-tight">Obs. área</td>
                 </>
@@ -1432,7 +1493,7 @@ export function PurchaseListItemsEditor({
                           type="number"
                           step="0.01"
                           value={it.dose}
-                          onChange={(e) => updateItem(it.key, { dose: e.target.value })}
+                          onChange={(e) => setDose(it.key, e.target.value)}
                         />
                       </Field>
                       <Field label="Unidade">
@@ -1452,24 +1513,34 @@ export function PurchaseListItemsEditor({
                             const whole = e.target.value
                               .replace(/[.,].*$/, "")
                               .replace(/\D/g, "");
-                            updateItem(it.key, { nApps: whole === "" ? "" : whole });
+                            setNApps(it.key, whole === "" ? "" : whole);
                           }}
                         />
                       </Field>
-                      <Field
-                        label="% da área"
-                        hint="Fração da área onde aplica. Vazio = área toda."
-                      >
+                      <Field label="Volume" hint="Digite o volume comercial; a dose recalcula. Digite a dose e o volume sai sozinho.">
                         <Input
                           type="number"
-                          min={0}
-                          max={100}
                           step="0.01"
+                          min="0"
+                          value={
+                            it.volumeOverride !== undefined && it.volumeOverride !== ""
+                              ? it.volumeOverride
+                              : required > 0
+                                ? String(Number(required.toFixed(4)))
+                                : ""
+                          }
+                          onChange={(e) => setVolumeOverride(it.key, e.target.value)}
+                        />
+                      </Field>
+                      <Field label="% da área" hint="Vazio = 100% da safra. 20 = só 20% dos hectares.">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
                           placeholder="100"
                           value={it.areaPercent ?? ""}
-                          onChange={(e) =>
-                            updateItem(it.key, { areaPercent: e.target.value })
-                          }
+                          onChange={(e) => setAreaPercent(it.key, e.target.value)}
                         />
                       </Field>
                       <Field label="Observação da área" hint="Só aparece no PDF.">

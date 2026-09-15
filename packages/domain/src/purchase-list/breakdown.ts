@@ -7,7 +7,6 @@
  * é reutilizável tanto na aba da lista quanto no wizard de criação.
  */
 import {
-  areaFactorOf,
   isSeedItem,
   listItemQuantity,
   listItemsToBuyByKey,
@@ -40,6 +39,7 @@ export function detailItemToListItem(
       it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
     seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
     bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
+    volumeOverride: it.volume_override != null ? String(it.volume_override) : undefined,
     outOfProgram: it.out_of_program || undefined,
     // `area_factor` vem como fração (0..1); no formulário editamos em %.
     areaPercent:
@@ -98,7 +98,7 @@ export function computePurchaseListMetrics(
     const seed = isSeedItem(it);
     // Custo da lavoura: volume programado (dose × ha × % área). Galpão e
     // aplicação não entram — senão sc/ha cai só porque já tem produto no pátio.
-    const programQty = listItemQuantity(it, totalHa) * areaFactorOf(it);
+    const programQty = listItemQuantity(it, totalHa);
     const lineTotal = programQty * unitPrice;
 
     if (seed) seedVolume += toBuy;

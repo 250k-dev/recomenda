@@ -69,9 +69,7 @@ function fmtQty(value: number, unit: string): string {
   return `${fmtNum(value)} ${escapeHtml(unit)}`;
 }
 
-/** Área de referência do talhão. Espelha o servidor, que calcula
- *  `total_quantity = dose × área CADASTRAL` — usar a plantada aqui faria o
- *  custo divergir da quantidade impressa ao lado. */
+/** Quantidade da etapa já inclui o recorte de área (`area_factor`). */
 function plotAreaHa(data: RecommendationShareData): number {
   const area = data.spec?.areaHa;
   return typeof area === "number" && area > 0 ? area : 0;

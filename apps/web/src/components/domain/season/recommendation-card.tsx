@@ -309,6 +309,9 @@ function ProductRow({
                 maximumFractionDigits: 1,
               })}{" "}
               {item.dose_unit} total
+              {item.area_factor != null && item.area_factor < 0.999 ? (
+                <> · {Math.round(item.area_factor * 100)}% da área</>
+              ) : null}
             </span>
           )}
           <Button
@@ -1046,7 +1049,8 @@ export function RecommendationCard({
           toast.success("Etapa registrada como aplicada.");
           setRegistering(false);
         },
-        onError: () => toast.error("Não foi possível registrar."),
+        onError: (e: unknown) =>
+          toast.error(apiErrorMessage(e, "Não foi possível registrar.")),
       },
     );
   };

@@ -321,8 +321,17 @@ export function useDeleteRecommendation(seasonId: string) {
 export function useApplyRecommendation(seasonId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, executed_date, notes }: { id: string; executed_date: string; notes?: string }) =>
-      applyRecommendation(id, { executed_date, notes }),
+    mutationFn: ({
+      id,
+      executed_date,
+      notes,
+      allow_stock_shortfall,
+    }: {
+      id: string;
+      executed_date: string;
+      notes?: string;
+      allow_stock_shortfall?: boolean;
+    }) => applyRecommendation(id, { executed_date, notes, allow_stock_shortfall }),
     onSuccess: () => {
       invalidateAfterRecommendationExecution(queryClient, seasonId);
     },

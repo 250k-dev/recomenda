@@ -189,10 +189,7 @@ export function BulkApplyTemplateDialog({
               }
               if (res.conflicts.length > 0) {
                 toast.warning(
-                  `${res.conflicts.length} ${res.conflicts.length === 1 ? "item da lista não foi alterado" : "itens da lista não foram alterados"} porque já têm compra confirmada: ${res.conflicts
-                    .slice(0, 3)
-                    .map((c) => c.product_name)
-                    .join(", ")}.`,
+                  `${res.conflicts.length} ${res.conflicts.length === 1 ? "item já tinha compra confirmada" : "itens já tinham compra confirmada"}. O alvo da lista sobe — compre o complemento.`,
                 );
               }
             } catch {

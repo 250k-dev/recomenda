@@ -796,6 +796,11 @@ function StepPlots({
                     `${res.updated} ${res.updated === 1 ? "item" : "itens"} da lista de compra ${res.updated === 1 ? "atualizado" : "atualizados"} com a dose do modelo.`,
                   );
                 }
+                if (res.conflicts.length > 0) {
+                  toast.warning(
+                    `${res.conflicts.length} ${res.conflicts.length === 1 ? "item já comprado" : "itens já comprados"}: o modelo pede mais. Compre o complemento na lista.`,
+                  );
+                }
               },
             });
           }

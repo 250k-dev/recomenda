@@ -42,6 +42,9 @@ export interface RecommendationItem {
   local_product_id: string;
   product_name: string;
   dose_per_hectare: number;
+  /** Fração 0–1 da área do talhão (10% = 0.1). Default 1. */
+  area_factor?: number;
+  area_note?: string | null;
   total_quantity: number;
   dose_unit: string;
   is_substitution: boolean;
@@ -237,7 +240,11 @@ export async function deleteRecommendation(id: string) {
 
 export async function applyRecommendation(
   id: string,
-  payload: { executed_date: string; notes?: string },
+  payload: {
+    executed_date: string;
+    notes?: string;
+    allow_stock_shortfall?: boolean;
+  },
 ) {
   const { data } = await api.post(`/recommendations/${id}/apply`, payload);
   return data;

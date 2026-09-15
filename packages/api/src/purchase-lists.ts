@@ -29,6 +29,8 @@ export interface PurchaseListItemInput {
   seeding_area_ha?: number | null;
   /** Semente: bags/sacos ajustados à mão (sobrepõe o cálculo). */
   bags_override?: number | null;
+  /** Defensivo: volume comercial (bombona). */
+  volume_override?: number | null;
   /** Produto fora da lista/programação (destaque vermelho). */
   out_of_program?: boolean;
 }
@@ -143,6 +145,7 @@ export interface PurchaseListDetail {
     cycle_days: number | null;
     seeding_area_ha: number | null;
     bags_override: number | null;
+    volume_override: number | null;
     out_of_program: boolean;
     quantity_final: number;
     unit_price_brl: number;

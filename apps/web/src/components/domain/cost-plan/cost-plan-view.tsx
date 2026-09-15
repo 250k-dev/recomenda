@@ -83,6 +83,7 @@ interface EditableItem {
   cycle_days: number | null;
   seeding_area_ha: number | null;
   bags_override: number | null;
+  volume_override: number | null;
   out_of_program: boolean;
 }
 
@@ -154,6 +155,7 @@ export function CostPlanView({
         cycle_days: it.cycle_days ?? null,
         seeding_area_ha: it.seeding_area_ha ?? null,
         bags_override: it.bags_override ?? null,
+        volume_override: it.volume_override ?? null,
         out_of_program: it.out_of_program ?? false,
       })),
     );
@@ -180,6 +182,8 @@ export function CostPlanView({
       cost_per_ha_mode: it.cost_per_ha_mode,
       deduct_stock: it.deduct_stock,
       calc_rule: it.calc_rule,
+      bags_override: it.bags_override,
+      volume_override: it.volume_override,
     }));
     return calculateSummary(inputs, {
       area_hectares: area,
@@ -217,6 +221,7 @@ export function CostPlanView({
         cycle_days: it.cycle_days,
         seeding_area_ha: it.seeding_area_ha,
         bags_override: it.bags_override,
+        volume_override: it.volume_override,
         out_of_program: it.out_of_program,
       })),
     });
@@ -298,6 +303,7 @@ export function CostPlanView({
         cycle_days: null,
         seeding_area_ha: null,
         bags_override: null,
+        volume_override: null,
         out_of_program: false,
       },
     ]);

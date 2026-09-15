@@ -27,6 +27,7 @@ export interface CostItemInput {
   population_base?: number | null;
   /** Semente: bags/sacos ajustados à mão (sobrepõe o cálculo por população). */
   bags_override?: number | null;
+  volume_override?: number | null;
 }
 
 export interface CostParams {
@@ -113,13 +114,13 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
   } else if (item.calc_rule === "SEED_BAGS") {
     G = (item.population_base ?? 0) * 25;
   } else {
-    // Espelha a planilha: `(dose × área × aplicações − estoque) × %`. O fator de
-    // área vale sempre — inclusive quando o estoque não é descontado.
-    const base = dose * area * nApps;
-    const afterStock = item.deduct_stock ? base - stock : base;
     const factor =
       Number.isFinite(item.area_factor) && item.area_factor > 0 ? item.area_factor : 1;
-    G = afterStock * factor;
+    const volume =
+      item.volume_override != null && Number.isFinite(item.volume_override)
+        ? item.volume_override
+        : dose * area * factor * nApps;
+    G = item.deduct_stock ? volume - stock : volume;
   }
 
   // I — Preço unitário R$

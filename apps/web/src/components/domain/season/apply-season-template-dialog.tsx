@@ -82,7 +82,12 @@ export function ApplySeasonTemplateDialog({
             }
             if (res.conflicts.length > 0) {
               toast.warning(
-                `${res.conflicts.length} ${res.conflicts.length === 1 ? "item não foi alterado" : "itens não foram alterados"} por já ter compra confirmada.`,
+                `${res.conflicts.length} ${res.conflicts.length === 1 ? "item já tinha compra confirmada" : "itens já tinham compra confirmada"}. O alvo da lista sobe para o que o modelo novo pede — compre o complemento.`,
+              );
+            }
+            if (res.shortages && res.shortages.length > 0) {
+              toast.warning(
+                `Falta comprar: ${res.shortages.map((s) => s.product_name).join(", ")}.`,
               );
             }
           } catch {
@@ -140,7 +145,7 @@ export function ApplySeasonTemplateDialog({
                   Atualizar a lista de compra com as doses do modelo
                 </span>
                 <span className="mt-0.5 block text-muted-foreground">
-                  Estoque, preços e itens com compra confirmada não são alterados.
+                  Estoque e preços não mudam. Item já comprado: a dose do modelo entra e o alvo da lista sobe — falta comprar o complemento.
                 </span>
               </span>
             </label>
