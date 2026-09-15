@@ -67,7 +67,7 @@ export default function FarmPlotsPage() {
   // Detalhe de cada safra ativa para mapear talhão → nome da safra
   // (a coluna "Safras vinculadas" do design mostra "Safra 2026", não a cultura).
   const activeCycles = useMemo(
-    () => (cycles ?? []).filter((c) => c.status !== "ARCHIVED"),
+    () => (cycles ?? []).filter((c) => c.status === "ACTIVE" && !c.backfill),
     [cycles],
   );
   const cycleDetailQueries = useQueries({

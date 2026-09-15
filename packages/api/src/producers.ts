@@ -164,6 +164,34 @@ export async function getProducerStock(producerId: string) {
   return data;
 }
 
+export type StockMovementType =
+  | "INITIAL_LOAD"
+  | "PURCHASE"
+  | "APPLICATION_DEBIT"
+  | "MANUAL_ADJUSTMENT"
+  | "SUBSTITUTION_REVERSAL";
+
+export interface ProducerStockMovement {
+  id: string;
+  created_at: string;
+  movement_type: StockMovementType;
+  source_type: "RECOMMENDATION" | "PURCHASE" | "MANUAL";
+  source_id: string | null;
+  quantity_delta: number;
+  quantity_after: number;
+  notes: string | null;
+  local_product_id: string | null;
+  product_name: string;
+  dose_unit: string | null;
+}
+
+export async function getProducerStockMovements(producerId: string) {
+  const { data } = await api.get<ProducerStockMovement[]>(
+    `/producers/${producerId}/stock/movements`,
+  );
+  return data;
+}
+
 export async function adjustProducerStock(
   producerId: string,
   payload: {

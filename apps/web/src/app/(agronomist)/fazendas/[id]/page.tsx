@@ -94,7 +94,8 @@ export default function FarmDetailPage() {
   );
 
   const activeSeasonsCount = useMemo(
-    () => (cycles ?? []).filter((c) => c.status === "ACTIVE").length,
+    () =>
+      (cycles ?? []).filter((c) => c.status === "ACTIVE" && !c.backfill).length,
     [cycles],
   );
 

@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addCycleFarm,
   applyCycleBlock,
+  concludeHistoryCycle,
   createCycle,
+  createProducerHistoricalCycle,
   deleteCycle,
   getCycle,
   getCycleAvailablePlots,
@@ -95,6 +97,8 @@ export function useCreateCycle(farmId: string) {
       name: string;
       crops: string[];
       farm_ids?: string[];
+      backfill?: boolean;
+      closed_at?: string;
     }) => createCycle(farmId, payload),
     onSuccess: (cycle) => {
       // Invalida a fazenda da URL e todas as fazendas participantes da safra —
@@ -104,6 +108,54 @@ export function useCreateCycle(farmId: string) {
         queryKey: queryKeys.producerCycles(cycle.producer_id),
       });
       for (const farm of cycle.farms) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
+      }
+    },
+  });
+}
+
+export function useConcludeHistoryCycle(cycleId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => concludeHistoryCycle(cycleId),
+    onSuccess: (cycle) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerCycles(cycle.producer_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerCycleHistory(cycle.producer_id, cycleId),
+      });
+      for (const farm of cycle.farms ?? []) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
+      }
+    },
+  });
+}
+
+export function useCreateHistoricalCycle(producerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      name: string;
+      crops: string[];
+      farm_ids: string[];
+      closed_at: string;
+      status: "HARVESTED" | "ARCHIVED";
+      stock_items?: Array<{
+        local_product_id: string;
+        quantity: number;
+        price_brl?: number | null;
+      }>;
+    }) => createProducerHistoricalCycle(producerId, payload),
+    onSuccess: (cycle) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerCycles(producerId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.producerCycleHistory(producerId, cycle.id),
+      });
+      for (const farm of cycle.farms ?? []) {
         queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farm.id) });
       }
     },

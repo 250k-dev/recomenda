@@ -1,4 +1,5 @@
 import { api } from "./http/axios";
+import type { PlotHistoryRec } from "./seasons";
 
 /** Safra da fazenda (`crop_cycles`): agrupa as programações por talhão. */
 
@@ -19,6 +20,9 @@ export interface CycleSummary {
   crops: string[];
   status: "ACTIVE" | "HARVESTED" | "ARCHIVED";
   created_at: string;
+  closed_at?: string | null;
+  /** Arquivo de safra antiga em preenchimento — some da lista operacional. */
+  backfill?: boolean;
   plots_count: number;
   area_ha: number;
   recommendations_total: number;
@@ -87,6 +91,8 @@ export interface CycleDetail {
   crops: string[];
   status: "ACTIVE" | "HARVESTED" | "ARCHIVED";
   created_at: string;
+  closed_at?: string | null;
+  backfill?: boolean;
   seasons: CycleSeasonRow[];
   blocks: CycleBlock[];
   purchase_list_id: string | null;
@@ -207,6 +213,8 @@ export async function createCycle(
     crops: string[];
     /** Fazendas participantes da safra. Vazio/ausente = só a fazenda da URL. */
     farm_ids?: string[];
+    backfill?: boolean;
+    closed_at?: string;
   },
 ) {
   const { data } = await api.post<CycleDetail>(`/farms/${farmId}/cycles`, payload);
@@ -288,5 +296,111 @@ export async function addCycleFarm(cycleId: string, farmId: string) {
  *  ou `FARM_LOCKED_BY_PURCHASES` — ver `apiErrorMessage`. */
 export async function removeCycleFarm(cycleId: string, farmId: string) {
   const { data } = await api.delete<CycleDetail>(`/cycles/${cycleId}/farms/${farmId}`);
+  return data;
+}
+
+export interface CycleHistoryPlot {
+  season_id: string;
+  plot_id: string;
+  plot_name: string;
+  farm_id: string;
+  farm_name: string;
+  area_ha: number;
+  crop: string;
+  variety: string | null;
+  status: string;
+  planting_date: string | null;
+  harvest_date: string | null;
+  harvest_bags_per_hectare: number | null;
+  harvest_total_bags: number | null;
+  recommendations: PlotHistoryRec[];
+}
+
+export interface CycleHistoryConsumption {
+  local_product_id: string;
+  product_name: string;
+  dose_unit: string | null;
+  quantity: number;
+  total_brl?: number | null;
+}
+
+export interface CycleStockSnapshotItem {
+  local_product_id: string;
+  product_name: string;
+  dose_unit: string | null;
+  category: string | null;
+  quantity: number;
+  price_brl: number | null;
+  total_brl: number | null;
+}
+
+export interface CycleStockSnapshot {
+  captured_at: string;
+  reason: "HARVEST" | "ARCHIVE";
+  total_brl: number | null;
+  items: CycleStockSnapshotItem[];
+}
+
+export interface CycleHistoryDetail {
+  id: string;
+  farm_id: string;
+  farms: CycleFarmRow[];
+  total_cadastral_hectares: number;
+  producer_id: string;
+  name: string;
+  crops: string[];
+  status: "ACTIVE" | "HARVESTED" | "ARCHIVED";
+  created_at: string;
+  closed_at?: string | null;
+  backfill?: boolean;
+  area_ha: number;
+  plots_count: number;
+  recommendations_total: number;
+  recommendations_done: number;
+  harvests_count: number;
+  plots: CycleHistoryPlot[];
+  consumption: CycleHistoryConsumption[];
+  total_brl?: number | null;
+  stock_snapshot: CycleStockSnapshot | null;
+}
+
+export async function getProducerCycleHistory(
+  producerId: string,
+  cycleId: string,
+) {
+  const { data } = await api.get<CycleHistoryDetail>(
+    `/producers/${producerId}/history/cycles/${cycleId}`,
+  );
+  return data;
+}
+
+export type CreateHistoricalCyclePayload = {
+  name: string;
+  crops: string[];
+  farm_ids: string[];
+  closed_at: string;
+  status: "HARVESTED" | "ARCHIVED";
+  stock_items?: Array<{
+    local_product_id: string;
+    quantity: number;
+    price_brl?: number | null;
+  }>;
+};
+
+export async function createProducerHistoricalCycle(
+  producerId: string,
+  payload: CreateHistoricalCyclePayload,
+) {
+  const { data } = await api.post<CycleDetail>(
+    `/producers/${producerId}/history/cycles`,
+    payload,
+  );
+  return data;
+}
+
+export async function concludeHistoryCycle(cycleId: string) {
+  const { data } = await api.post<CycleHistoryDetail>(
+    `/cycles/${cycleId}/conclude-history`,
+  );
   return data;
 }

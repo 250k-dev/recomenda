@@ -99,6 +99,16 @@ export const routes = {
       withQuery(`/produtores/${produtorId}/modelos-de-timing/${templateId}`, ctx),
     safrasArquivadas: (produtorId: string, ctx?: RouteContext) =>
       withQuery(`/produtores/${produtorId}/safras-arquivadas`, ctx),
+    historico: (
+      produtorId: string,
+      ctx?: RouteContext & { tab?: string | null },
+    ) => {
+      const { tab, ...rest } = ctx ?? {};
+      return withQuery(
+        `/produtores/${produtorId}/historico` as Route,
+        { ...rest, tab },
+      );
+    },
   },
 
   equipe: {

@@ -54,7 +54,7 @@ export function StockExportDialog({
   };
 
   const handleCsv = () => {
-    downloadStockCsv(data.items);
+    downloadStockCsv(data.items, data.csvBasename);
     toast.success("CSV do estoque baixado.");
   };
 

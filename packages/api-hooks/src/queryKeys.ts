@@ -21,6 +21,10 @@ export const queryKeys = {
   producer: (id: string) => ["producer", id],
   producerFarms: (producerId: string) => ["producer-farms", producerId],
   producerStock: (producerId: string) => ["producer-stock", producerId],
+  producerStockMovements: (producerId: string) =>
+    ["producer-stock-movements", producerId] as const,
+  producerCycleHistory: (producerId: string, cycleId: string) =>
+    ["producer-cycle-history", producerId, cycleId] as const,
   localCatalog: ["local-catalog"],
   inactiveLocalCatalog: ["inactiveLocalCatalog"],
   allLocalProducts: ["allLocalProducts"],

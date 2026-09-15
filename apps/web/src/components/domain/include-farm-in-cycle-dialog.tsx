@@ -52,7 +52,7 @@ export function IncludeFarmInCycleDialog({
 
   const eligibleCycles = useMemo(() => {
     return (producerCycles ?? []).filter((cycle) => {
-      if (cycle.status !== "ACTIVE") return false;
+      if (cycle.status !== "ACTIVE" || cycle.backfill) return false;
       // Lista finalizada ou programação publicada — hectares já fechados.
       if (cycle.can_add_farms === false) return false;
       const alreadyIn = (cycle.farms ?? []).some((f) => f.id === farmId);

@@ -56,7 +56,7 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
   const { data: cycles } = useFarmCycles(farmId);
 
   const activeCycles = useMemo(
-    () => (cycles ?? []).filter((c) => c.status !== "ARCHIVED"),
+    () => (cycles ?? []).filter((c) => c.status === "ACTIVE" && !c.backfill),
     [cycles],
   );
   const cycleDetailQueries = useQueries({

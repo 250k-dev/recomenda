@@ -26,6 +26,11 @@ export interface StockExportData {
   producerName?: string | null;
   agronomistName?: string | null;
   items: StockExportItem[];
+  /** PDF kicker / WhatsApp heading. Default: estoque vivo do produtor. */
+  heading?: string;
+  /** Linha extra no PDF (ex.: data do retrato histórico). */
+  note?: string | null;
+  csvBasename?: string;
 }
 
 const fmtQty = (n: number) =>
@@ -105,19 +110,25 @@ function itemsTableHtml(items: StockExportItem[]): string {
 
 function buildBody(data: StockExportData): string {
   const emittedAt = new Date().toLocaleDateString("pt-BR");
+  const heading = data.heading?.trim() || "Estoque";
   const title = data.producerName
-    ? `Estoque · ${data.producerName}`
-    : "Estoque do produtor";
+    ? `${heading} · ${data.producerName}`
+    : heading === "Estoque"
+      ? "Estoque do produtor"
+      : heading;
   const tags: string[] = [];
   if (data.producerName) {
     tags.push(`<span>Produtor: ${escapeHtml(data.producerName)}</span>`);
+  }
+  if (data.note) {
+    tags.push(`<span>${escapeHtml(data.note)}</span>`);
   }
 
   return `
   <div class="doc">
     ${headerHtml(emittedAt)}
     <div class="title-block">
-      <p class="kicker">Estoque</p>
+      <p class="kicker">${escapeHtml(heading)}</p>
       <h1 class="title">${escapeHtml(title)}</h1>
       ${tags.length ? `<div class="tags">${tags.join("")}</div>` : ""}
     </div>
@@ -135,9 +146,12 @@ export function printStock(data: StockExportData): void {
 }
 
 export function buildStockHtml(data: StockExportData): string {
+  const heading = data.heading?.trim() || "Estoque";
   const title = data.producerName
-    ? `Estoque - ${data.producerName}`
-    : "Estoque do produtor";
+    ? `${heading} - ${data.producerName}`
+    : heading === "Estoque"
+      ? "Estoque do produtor"
+      : heading;
   return htmlShell(title, buildBody(data));
 }
 
@@ -146,8 +160,10 @@ export function buildStockWhatsappMessage(data: StockExportData): string {
   const productCount = data.items.length;
   const totalValue = data.items.reduce((s, r) => s + (r.value_brl ?? 0), 0);
 
-  const header: string[] = ["📦 *ESTOQUE DO PRODUTOR*", ""];
+  const heading = data.heading?.trim() || "ESTOQUE DO PRODUTOR";
+  const header: string[] = [`📦 *${heading.toUpperCase()}*`, ""];
   if (data.producerName) header.push(`👤 Produtor: ${data.producerName}`);
+  if (data.note) header.push(data.note);
   header.push(`📊 ${productCount} ${productCount === 1 ? "produto" : "produtos"}`);
   if (totalValue > 0) {
     header.push(`💰 Valor estimado: ${fmtBrl(totalValue)}`);
@@ -178,7 +194,10 @@ export function buildStockWhatsappMessage(data: StockExportData): string {
 }
 
 /** CSV com BOM UTF-8 (Excel BR) — mesma estrutura do export anterior. */
-export function downloadStockCsv(items: StockExportItem[]): void {
+export function downloadStockCsv(
+  items: StockExportItem[],
+  basename = `estoque-${new Date().toISOString().slice(0, 10)}`,
+): void {
   if (typeof window === "undefined") return;
 
   const header = ["Produto", "Categoria", "Quantidade", "Unidade", "Preço R$", "Valor R$"];
@@ -205,7 +224,7 @@ export function downloadStockCsv(items: StockExportItem[]): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `estoque-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `${basename}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

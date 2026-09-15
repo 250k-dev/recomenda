@@ -59,6 +59,7 @@ import {
   TriangleAlert,
   Mail,
   Boxes,
+  History,
 } from "lucide-react";
 
 type ProducerPortfolioTab = "fazendas" | "safras";
@@ -147,11 +148,8 @@ export function ProducerDetailView({
 
   const farmsList = useMemo(() => farms ?? [], [farms]);
   const activeCyclesCount = useMemo(
-    () => producerCycles.filter((c) => c.status === "ACTIVE").length,
-    [producerCycles],
-  );
-  const visibleCyclesCount = useMemo(
-    () => producerCycles.filter((c) => c.status !== "ARCHIVED").length,
+    () =>
+      producerCycles.filter((c) => c.status === "ACTIVE" && !c.backfill).length,
     [producerCycles],
   );
 
@@ -219,7 +217,7 @@ export function ProducerDetailView({
         {
           value: "safras",
           label: "Safras",
-          badgeCount: visibleCyclesCount,
+          badgeCount: activeCyclesCount,
         },
         {
           value: "fazendas",
@@ -306,6 +304,12 @@ export function ProducerDetailView({
                     </Link>
                   </Button>
                 ) : null}
+                <Button asChild variant="outline" className="gap-2">
+                  <Link href={routes.produtores.historico(producerId)}>
+                    <History className="size-4" />
+                    Histórico
+                  </Link>
+                </Button>
                 <Button
                   variant="outline"
                   className="gap-2"

@@ -809,7 +809,7 @@ function StepPlots({
           // Publica os rascunhos da safra na sequência (como o "Publicar agora"
           // do fluxo antigo). Se falhar (ex.: quota do plano), o trabalho aplicado
           // não se perde — dá para publicar depois pelo botão do hub.
-          if (publishNow && result.applied.length > 0) {
+          if (publishNow && !cycle.backfill && result.applied.length > 0) {
             publishCycle.mutate(undefined, {
               onSuccess: () => {
                 toast.success(
@@ -1112,6 +1112,13 @@ function StepPlots({
 
       <FieldError message={error ?? undefined} />
 
+      {cycle.backfill ? (
+        <p className="mt-6 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-[13px] leading-relaxed text-warning-strong">
+          Arquivo histórico: aplicar o modelo não publica no cronograma de hoje
+          nem avisa o produtor. Use <strong>Registrar programação</strong> na
+          safra só para fechar o rascunho deste arquivo.
+        </p>
+      ) : (
       <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <input
           type="checkbox"
@@ -1129,6 +1136,7 @@ function StepPlots({
           </span>
         </span>
       </label>
+      )}
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack} className="gap-1.5">

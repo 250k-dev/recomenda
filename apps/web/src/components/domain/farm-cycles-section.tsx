@@ -20,6 +20,7 @@ import { ProgressBar } from "@recomenda/ui/patterns/progress-bar";
 import { SectionToolbar } from "@/components/domain/section-toolbar";
 import { StickyMobileCta } from "@/components/domain/sticky-mobile-cta";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
+import { HistoricalCycleFlag } from "@/components/domain/historical-cycle-flag";
 import {
   useCreateCycle,
   useFarmCycles,
@@ -58,31 +59,43 @@ export function NewCycleDialog({
   farmId,
   producerId,
   onCreated,
+  defaultDestination = "current",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   farmId: string;
   producerId: string;
   onCreated?: (cycleId: string) => void;
+  /** Histórico pré-seleciona arquivo de safra antiga. */
+  defaultDestination?: "current" | "historical";
 }) {
+  const router = useRouter();
   const currentYear = new Date().getFullYear();
   const [name, setName] = useState(
     `Safra ${currentYear}/${String(currentYear + 1).slice(-2)}`,
   );
   const [crops, setCrops] = useState<Set<string>>(new Set(["SOYBEAN"]));
+  const [destination, setDestination] = useState<"current" | "historical">(
+    defaultDestination,
+  );
+  const [closedAt, setClosedAt] = useState("");
   const [selectedFarms, setSelectedFarms] = useState<Set<string>>(
-    new Set([farmId]),
+    new Set(farmId ? [farmId] : []),
   );
   const createCycle = useCreateCycle(farmId);
   const { data: producerFarms } = useProducerFarms(producerId);
   const farms = producerFarms ?? [];
 
   // Onboarding / reabertura: realinha a seleção quando o dialog abre (ou muda a fazenda).
-  const openSeed = open ? farmId : null;
+  const openSeed = open ? `${farmId}:${defaultDestination}` : null;
   const [prevOpenSeed, setPrevOpenSeed] = useState<string | null>(null);
   if (openSeed !== prevOpenSeed) {
     setPrevOpenSeed(openSeed);
-    if (openSeed) setSelectedFarms(new Set([farmId]));
+    if (openSeed) {
+      setSelectedFarms(new Set(farmId ? [farmId] : []));
+      setDestination(defaultDestination);
+      setClosedAt("");
+    }
   }
 
   const toggleCrop = (value: string) => {
@@ -128,19 +141,38 @@ export function NewCycleDialog({
       toast.error("Selecione pelo menos uma fazenda.");
       return;
     }
+    const isHistorical = destination === "historical";
+    if (isHistorical && !closedAt) {
+      toast.error("Informe a data de encerramento da safra antiga.");
+      return;
+    }
     createCycle.mutate(
       {
         producer_id: producerId,
         name: name.trim(),
         crops: [...crops],
         farm_ids: [...selectedFarms],
+        ...(isHistorical
+          ? { backfill: true, closed_at: closedAt }
+          : {}),
       },
       {
         onSuccess: (cycle) => {
+          onOpenChange(false);
+          if (cycle.backfill) {
+            toast.success(
+              "Arquivo criado. Preencha a safra — o galpão de hoje não muda.",
+            );
+            router.push(
+              routes.fazendas.safra(cycle.farm_id, cycle.id, {
+                producer_id: producerId,
+              }),
+            );
+            return;
+          }
           toast.success(
             "Safra criada! Monte a lista de compra para liberar a programação.",
           );
-          onOpenChange(false);
           onCreated?.(cycle.id);
         },
         onError: () => toast.error("Não foi possível criar a safra."),
@@ -152,9 +184,72 @@ export function NewCycleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nova safra</DialogTitle>
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            Nova safra
+            {destination === "historical" ? <HistoricalCycleFlag /> : null}
+          </DialogTitle>
         </DialogHeader>
         <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-foreground">
+              Destino
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    id: "current" as const,
+                    title: "Safra atual",
+                    hint: "Entra na operação e no galpão de hoje.",
+                  },
+                  {
+                    id: "historical" as const,
+                    title: "Já encerrada",
+                    hint: "Arquivo no histórico. Não altera o estoque vivo.",
+                  },
+                ] as const
+              ).map((opt) => {
+                const checked = destination === opt.id;
+                return (
+                  <label
+                    key={opt.id}
+                    className={cn(
+                      "cursor-pointer rounded-lg border px-3 py-2.5",
+                      checked
+                        ? "border-primary bg-primary-soft/40"
+                        : "border-border hover:bg-hover/40",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="cycle-destination"
+                      checked={checked}
+                      onChange={() => setDestination(opt.id)}
+                      className="sr-only"
+                    />
+                    <span className="block text-sm font-semibold">
+                      {opt.title}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {opt.hint}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          {destination === "historical" ? (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-foreground">
+                Encerrada em
+              </label>
+              <Input
+                type="date"
+                value={closedAt}
+                onChange={(e) => setClosedAt(e.target.value)}
+              />
+            </div>
+          ) : null}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-foreground">
               Nome da safra
@@ -293,7 +388,9 @@ export function FarmCyclesSection({
   const [newCycleOpen, setNewCycleOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const visibleCycles = (cycles ?? []).filter((c) => c.status !== "ARCHIVED");
+  const visibleCycles = (cycles ?? []).filter(
+    (c) => c.status === "ACTIVE" && !c.backfill,
+  );
   const filteredCycles = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     if (!query) return visibleCycles;
@@ -322,7 +419,7 @@ export function FarmCyclesSection({
     <>
       <div>
         <SectionToolbar
-          title="Safras desta fazenda"
+          title="Safras ativas desta fazenda"
           search={
             visibleCycles.length > 0
               ? {
@@ -347,7 +444,7 @@ export function FarmCyclesSection({
 
         {visibleCycles.length === 0 ? (
           <EmptyState
-            title="Nenhuma safra nesta fazenda."
+            title="Nenhuma safra ativa nesta fazenda."
             description="Crie a safra pelo produtor (aba Safras) ou inclua esta fazenda em uma safra existente."
             action={
               showCreateCycle && producerId ? (

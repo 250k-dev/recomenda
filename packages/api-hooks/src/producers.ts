@@ -11,6 +11,7 @@ import {
   setProducerActive,
   getProducerFarms,
   getProducerStock,
+  getProducerStockMovements,
   adjustProducerStock,
   deleteProducerStock,
   createInvitation,
@@ -21,6 +22,7 @@ import {
   getInvitationByToken,
   acceptInvitation,
 } from "@recomenda/api/producers";
+import { getProducerCycleHistory } from "@recomenda/api/cycles";
 import { getStockHistory, getStockOrigins } from "@recomenda/api/purchases";
 import { getSeasonShoppingList } from "@recomenda/api/seasons";
 import { queryKeys } from "./queryKeys";
@@ -109,6 +111,26 @@ export function useProducerStock(producerId: string) {
     queryKey: queryKeys.producerStock(producerId),
     queryFn: () => getProducerStock(producerId),
     enabled: Boolean(producerId),
+  });
+}
+
+export function useProducerStockMovements(producerId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.producerStockMovements(producerId),
+    queryFn: () => getProducerStockMovements(producerId),
+    enabled: Boolean(producerId) && enabled,
+  });
+}
+
+export function useProducerCycleHistory(
+  producerId: string,
+  cycleId: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.producerCycleHistory(producerId, cycleId),
+    queryFn: () => getProducerCycleHistory(producerId, cycleId),
+    enabled: Boolean(producerId && cycleId) && enabled,
   });
 }
 

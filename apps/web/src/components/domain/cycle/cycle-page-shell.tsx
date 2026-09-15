@@ -33,6 +33,8 @@ import type { CycleSeasonRow } from "@recomenda/api/cycles";
 import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { CycleExportButton } from "@/components/domain/cycle/cycle-export";
+import { HistoricalCycleFlag } from "@/components/domain/historical-cycle-flag";
+import { INVERTED_HERO_CTA_CLASS } from "@/components/domain/export-action-class";
 
 /**
  * Contexto comum das telas da safra da fazenda (`/fazendas/[id]/safras/[cycleId]`
@@ -173,7 +175,7 @@ export function CyclePageShell({
       <PageHero
         variant="inverted"
         icon={<Leaf className="size-6" />}
-        eyebrow="Safra"
+        eyebrow={cycle.backfill ? "Arquivo de safra · histórico" : "Safra"}
         title={cycle.name}
         titleAction={
           canEdit ? (
@@ -189,9 +191,10 @@ export function CyclePageShell({
         }
         titleBadge={
           <span className="inline-flex flex-wrap items-center gap-1.5">
+            {cycle.backfill ? <HistoricalCycleFlag /> : null}
             {isPlanning ? (
               <Badge variant="neutral">Em planejamento</Badge>
-            ) : (
+            ) : cycle.backfill ? null : (
               <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"}>
                 {labelStatus(CYCLE_STATUS_LABELS, cycle.status)}
               </Badge>
@@ -209,14 +212,18 @@ export function CyclePageShell({
             />
             {draftSeasons.length > 0 ? (
               <Button
-                className="gap-1.5 border-0 bg-primary-soft text-primary-strong shadow-sm hover:bg-primary-soft/85 hover:text-primary-strong"
+                className={`gap-1.5 ${INVERTED_HERO_CTA_CLASS}`}
                 onClick={() => setPublishConfirm(true)}
                 disabled={publishCycle.isPending}
               >
                 <Rocket className="size-4" />
                 {publishCycle.isPending
-                  ? "Publicando..."
-                  : "Revisar e publicar"}
+                  ? cycle.backfill
+                    ? "Registrando..."
+                    : "Publicando..."
+                  : cycle.backfill
+                    ? "Registrar programação"
+                    : "Revisar e publicar"}
               </Button>
             ) : null}
             {actions}
@@ -224,6 +231,16 @@ export function CyclePageShell({
         }
         stats={heroStats}
       />
+
+      {cycle.backfill ? (
+        <div
+          role="status"
+          className="mb-6 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong"
+        >
+          Arquivo de safra — não altera o galpão de hoje. Lista e estoque desta
+          safra ficam só no retrato histórico.
+        </div>
+      ) : null}
 
       {backHref ? (
         <div className="mb-6 md:hidden">
@@ -291,20 +308,36 @@ export function CyclePageShell({
       <ConfirmDialog
         open={publishConfirm}
         onOpenChange={setPublishConfirm}
-        title="Publicar programação da safra"
-        description={`${draftSeasons.length} ${
-          draftSeasons.length === 1
-            ? "talhão em rascunho será publicado"
-            : "talhões em rascunho serão publicados"
-        } e o produtor passa a ver o cronograma. Continuar?`}
-        confirmLabel="Publicar"
+        title={
+          cycle.backfill
+            ? "Registrar programação do arquivo"
+            : "Publicar programação da safra"
+        }
+        description={
+          cycle.backfill
+            ? `${draftSeasons.length} ${
+                draftSeasons.length === 1
+                  ? "talhão em rascunho será registrado neste arquivo"
+                  : "talhões em rascunho serão registrados neste arquivo"
+              }. Não entra no cronograma atual, no WhatsApp nem no galpão de hoje.`
+            : `${draftSeasons.length} ${
+                draftSeasons.length === 1
+                  ? "talhão em rascunho será publicado"
+                  : "talhões em rascunho serão publicados"
+              } e o produtor passa a ver o cronograma. Continuar?`
+        }
+        confirmLabel={cycle.backfill ? "Registrar" : "Publicar"}
         loading={publishCycle.isPending}
         onConfirm={async () => {
           await new Promise<void>((resolve, reject) =>
             publishCycle.mutate(undefined, {
               onSuccess: () => {
                 setPublishConfirm(false);
-                toast.success("Programação da safra publicada!");
+                toast.success(
+                  cycle.backfill
+                    ? "Programação registrada neste arquivo."
+                    : "Programação da safra publicada!",
+                );
                 resolve();
               },
               onError: (err) => {

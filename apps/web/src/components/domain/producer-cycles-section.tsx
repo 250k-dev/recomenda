@@ -55,7 +55,7 @@ export function ProducerCyclesSection({
   const [pendingDelete, setPendingDelete] = useState<CycleSummary | null>(null);
 
   const visible = useMemo(
-    () => cycles.filter((c) => c.status !== "ARCHIVED"),
+    () => cycles.filter((c) => c.status === "ACTIVE" && !c.backfill),
     [cycles],
   );
 
@@ -129,8 +129,8 @@ export function ProducerCyclesSection({
 
       {visible.length === 0 ? (
         <EmptyState
-          title="Nenhuma safra neste produtor."
-          description="Crie a safra escolhendo as fazendas, monte a lista de compra e programe os talhões."
+          title="Nenhuma safra ativa neste produtor."
+          description="Crie a safra escolhendo as fazendas, monte a lista de compra e programe os talhões. Safras colhidas ficam no Histórico."
           action={
             anchorFarmId ? (
               <Button size="sm" onClick={() => setNewCycleOpen(true)}>

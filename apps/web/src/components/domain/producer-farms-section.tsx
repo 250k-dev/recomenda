@@ -117,7 +117,7 @@ export function ProducerFarmsSection({
     const map = new Map<string, CycleSummary[]>();
     farms.forEach((farm, index) => {
       const cycles = (cycleQueries[index]?.data ?? []).filter(
-        (c) => c.status === "ACTIVE",
+        (c) => c.status === "ACTIVE" && !c.backfill,
       );
       map.set(farm.id, cycles);
     });
