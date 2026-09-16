@@ -49,3 +49,5 @@ __fronteira_probe*
 
 /docs/design-refactor
 /docs/monorepo
+# Ignorar arquivos de mídia do ReportaDesk no git local
+.reportadesk/attachments/
