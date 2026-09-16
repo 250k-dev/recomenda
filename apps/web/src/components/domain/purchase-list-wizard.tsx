@@ -2,7 +2,7 @@
 
 import { routes } from "@recomenda/config";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -180,6 +180,7 @@ function buildListPayload(opts: {
   targets: Record<string, number>;
   plots: WizardPlot[];
   status: "draft" | "active";
+  cascadeRecommendationItems?: boolean;
 }): PurchaseListInput {
   const {
     fxRate: fxRaw,
@@ -207,6 +208,7 @@ function buildListPayload(opts: {
       cycle_days: null,
     })),
     items: opts.items.map((it) => listItemToPayload(it, opts.crop)),
+    cascade_recommendation_items: opts.cascadeRecommendationItems || undefined,
   };
 }
 
@@ -249,6 +251,12 @@ export function PurchaseListWizard({
   // Id da lista no servidor: já existe se estamos retomando um rascunho; passa a
   // existir na primeira vez que "Salvar rascunho" é clicado.
   const [listId, setListId] = useState<string | null>(draftList?.id ?? null);
+  const cascadeRecommendationItemsRef = useRef(false);
+  const consumeCascadeRecommendationItems = () => {
+    const armed = cascadeRecommendationItemsRef.current;
+    cascadeRecommendationItemsRef.current = false;
+    return armed;
+  };
   const [savingDraft, setSavingDraft] = useState(false);
 
   const queryClient = useQueryClient();
@@ -342,6 +350,7 @@ export function PurchaseListWizard({
         targets,
         plots,
         status: "draft",
+        cascadeRecommendationItems: consumeCascadeRecommendationItems(),
       });
       let saved;
       if (listId) {
@@ -410,6 +419,10 @@ export function PurchaseListWizard({
           onNext={() => setStep(3)}
           onSaveDraft={saveDraft}
           savingDraft={savingDraft}
+          listId={listId}
+          onRemovalCascadeArmed={() => {
+            cascadeRecommendationItemsRef.current = true;
+          }}
         />
       )}
       {step === 3 && (
@@ -430,6 +443,7 @@ export function PurchaseListWizard({
           onSaved={onSaved}
           onSaveDraft={saveDraft}
           savingDraft={savingDraft}
+          consumeCascadeRecommendationItems={consumeCascadeRecommendationItems}
         />
       )}
     </div>
@@ -452,6 +466,8 @@ function StepList({
   onNext,
   onSaveDraft,
   savingDraft,
+  listId,
+  onRemovalCascadeArmed,
 }: {
   crop: string;
   setCrop: (v: string) => void;
@@ -468,6 +484,8 @@ function StepList({
   onNext: () => void;
   onSaveDraft: () => void;
   savingDraft: boolean;
+  listId: string | null;
+  onRemovalCascadeArmed: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [importedTemplateId, setImportedTemplateId] = useState<string | null>(
@@ -696,6 +714,8 @@ function StepList({
             totalHa={totalHa}
             crop={crop as "SOYBEAN" | "CORN" | "ANY"}
             stockByProductId={stockByProductId}
+            listId={listId}
+            onRemovalCascadeArmed={onRemovalCascadeArmed}
           />
         </div>
       </section>
@@ -874,6 +894,7 @@ function StepReview({
   onSaved,
   onSaveDraft,
   savingDraft,
+  consumeCascadeRecommendationItems,
 }: {
   producerId: string;
   producerName: string;
@@ -893,6 +914,7 @@ function StepReview({
   onSaved: () => void;
   onSaveDraft: () => void;
   savingDraft: boolean;
+  consumeCascadeRecommendationItems: () => boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -931,6 +953,7 @@ function StepReview({
         targets,
         plots,
         status: "active",
+        cascadeRecommendationItems: consumeCascadeRecommendationItems(),
       });
       // Veio de um rascunho: finaliza o MESMO registro (draft → active).
       if (listId) return updatePurchaseList(listId, payload);

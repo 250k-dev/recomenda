@@ -13,7 +13,7 @@ import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Button } from "@recomenda/ui/primitives/button";
 import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { FieldError } from "@/components/domain/season/_shared";
-import { apiErrorMessage } from "@recomenda/api/api-error";
+import { apiErrorCode, apiErrorMessage } from "@recomenda/api/api-error";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import {
   useCurrencyStore,
@@ -206,6 +206,7 @@ export function FarmPurchaseListTab({
   }, []);
 
   const updateMutation = useUpdatePurchaseList(list?.id ?? "", { farmId });
+  const cascadeRecommendationItemsRef = useRef(false);
 
   const itemsFromList = useCallback(
     (source: PurchaseListDetail | null | undefined) =>
@@ -318,7 +319,9 @@ export function FarmPurchaseListTab({
         fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
         grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
         spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
+        cascade_recommendation_items: cascadeRecommendationItemsRef.current || undefined,
       });
+      cascadeRecommendationItemsRef.current = false;
       // Salvou de verdade no servidor: pode descartar o backup local.
       setSaveState("saved");
       setSavedAt(new Date());
@@ -331,6 +334,16 @@ export function FarmPurchaseListTab({
     } catch (e) {
       // NÃO engole o erro: marca "não salvo" (o backup local continua guardado).
       setSaveState("error");
+      const code = apiErrorCode(e);
+      if (
+        code === "LIST_ITEM_REMOVAL_BLOCKED" ||
+        code === "LIST_ITEM_REMOVAL_NEEDS_CONFIRM"
+      ) {
+        toast.error(apiErrorMessage(e, "Não foi possível remover o produto da lista."));
+        resetDraft();
+        cascadeRecommendationItemsRef.current = false;
+        return;
+      }
       if (!opts?.silent) {
         setError(apiErrorMessage(e, "Não foi possível salvar a lista."));
       }
@@ -709,6 +722,10 @@ export function FarmPurchaseListTab({
             totalHa={totalHa}
             crop={list.crop as "SOYBEAN" | "CORN" | "ANY"}
             stockByProductId={stockByProductId}
+            listId={list.id}
+            onRemovalCascadeArmed={() => {
+              cascadeRecommendationItemsRef.current = true;
+            }}
           />
           {error ? (
             <div className="max-w-xl">

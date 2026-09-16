@@ -51,6 +51,8 @@ export function useUpdatePurchaseList(id: string, options?: { farmId?: string })
           queryKey: queryKeys.cyclePurchaseList(data.cycle_id),
         });
         queryClient.invalidateQueries({ queryKey: queryKeys.cycleCostPlan(data.cycle_id) });
+        queryClient.invalidateQueries({ queryKey: ["season-timeline"] });
+        queryClient.invalidateQueries({ queryKey: ["season"] });
       }
     },
   });

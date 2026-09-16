@@ -66,6 +66,8 @@ export interface PurchaseListInput {
   status?: "draft" | "active";
   plots: PurchaseListPlotInput[];
   items: PurchaseListItemInput[];
+  /** Confirma exclusão em cascata das recomendações pendentes dos itens removidos. */
+  cascade_recommendation_items?: boolean;
 }
 
 export interface CostPlanCategoryBreakdown {
@@ -199,6 +201,39 @@ export async function getPurchaseListByCycle(cycleId: string) {
 
 export async function updatePurchaseList(id: string, payload: Partial<PurchaseListInput>) {
   const { data } = await api.put<PurchaseListDetail>(`/purchase-lists/${id}`, payload);
+  return data;
+}
+
+export type ListItemRemovalPreview = {
+  local_product_id: string;
+  product_name: string;
+  stage: string;
+  blocked: boolean;
+  reason: "purchase_confirmed" | "already_applied" | null;
+  pending_recommendations: Array<{
+    recommendation_id: string;
+    stage_name: string;
+    farm_name: string;
+    plot_name: string;
+  }>;
+};
+
+export async function getPurchaseListItemRemovalPreview(
+  listId: string,
+  localProductId: string,
+  stage: string,
+  outOfProgram = false,
+) {
+  const { data } = await api.get<ListItemRemovalPreview>(
+    `/purchase-lists/${listId}/item-removal-preview`,
+    {
+      params: {
+        local_product_id: localProductId,
+        stage,
+        out_of_program: outOfProgram ? "1" : "0",
+      },
+    },
+  );
   return data;
 }
 

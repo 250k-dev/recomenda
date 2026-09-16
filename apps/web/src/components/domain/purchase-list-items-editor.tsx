@@ -26,6 +26,9 @@ import {
   type PurchaseListCrop,
 } from "@recomenda/domain/catalog/purchase-list-catalog";
 import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
+import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
+import { getPurchaseListItemRemovalPreview } from "@recomenda/api/purchase-lists";
+import type { ListItemRemovalPreview } from "@recomenda/api/purchase-lists";
 import {
   areaFromBags,
   doseFromCommercialVolume,
@@ -63,6 +66,10 @@ type PurchaseListItemsEditorProps = {
   >;
   className?: string;
   readOnly?: boolean;
+  /** Lista persistida: ao remover um produto, consulta recomendações da safra. */
+  listId?: string | null;
+  /** Marca o próximo PUT para cascatear exclusão nas recomendações pendentes. */
+  onRemovalCascadeArmed?: () => void;
 };
 
 /** Chave estável e única de item. A antiga (`Date.now()`+índice) colidia ao
@@ -90,6 +97,8 @@ export function PurchaseListItemsEditor({
   stockByProductId,
   className,
   readOnly = false,
+  listId,
+  onRemovalCascadeArmed,
 }: PurchaseListItemsEditorProps) {
   const canViewPrices = useCan("PRICE_VIEW");
   const platformCatalog = usePlatformCatalog();
@@ -97,6 +106,9 @@ export function PurchaseListItemsEditor({
   const cloneGlobal = useCloneGlobalProduct();
   const createLocal = useCreateLocalProduct();
   const [resolvingProductKey, setResolvingProductKey] = useState<string | null>(null);
+  const [removalPreview, setRemovalPreview] = useState<ListItemRemovalPreview | null>(null);
+  const [pendingRemovalKey, setPendingRemovalKey] = useState<string | null>(null);
+  const [removalBusy, setRemovalBusy] = useState(false);
 
   const defaultUnitForCategory = (category: string): string => {
     if (category === "CULTIVAR_SOJA") return "BAG";
@@ -272,8 +284,54 @@ export function PurchaseListItemsEditor({
     });
   };
 
-  const removeItem = (key: string) => {
+  const dropItem = (key: string) => {
     setItems((prev) => prev.filter((it) => it.key !== key));
+  };
+
+  const removeItem = (key: string) => {
+    void (async () => {
+      const item = items.find((it) => it.key === key);
+      if (!item) return;
+      if (!listId || !item.productId) {
+        dropItem(key);
+        return;
+      }
+      setRemovalBusy(true);
+      try {
+        const preview = await getPurchaseListItemRemovalPreview(
+          listId,
+          item.productId,
+          item.stage || DEFAULT_ITEM_STAGE,
+          Boolean(item.outOfProgram),
+        );
+        if (preview.blocked) {
+          toast.error(
+            preview.reason === "already_applied"
+              ? `${preview.product_name} já foi aplicado em uma etapa e não pode sair da lista.`
+              : `${preview.product_name} já tem compra confirmada e não pode sair da lista.`,
+          );
+          return;
+        }
+        if (preview.pending_recommendations.length > 0) {
+          setRemovalPreview(preview);
+          setPendingRemovalKey(key);
+          return;
+        }
+        dropItem(key);
+      } catch {
+        toast.error("Não foi possível verificar as recomendações deste produto.");
+      } finally {
+        setRemovalBusy(false);
+      }
+    })();
+  };
+
+  const confirmRemovalWithRecommendations = () => {
+    if (!pendingRemovalKey) return;
+    onRemovalCascadeArmed?.();
+    dropItem(pendingRemovalKey);
+    setPendingRemovalKey(null);
+    setRemovalPreview(null);
   };
 
   // Cotação do dólar (US$ → R$) — global, preenchida manualmente. Converte
@@ -878,7 +936,8 @@ export function PurchaseListItemsEditor({
             <button
               type="button"
               onClick={() => removeItem(it.key)}
-              className="text-muted-foreground hover:text-destructive"
+              disabled={removalBusy}
+              className="text-muted-foreground hover:text-destructive disabled:opacity-50"
               aria-label="Remover"
             >
               <Trash2 className="h-4 w-4" />
@@ -1415,7 +1474,8 @@ export function PurchaseListItemsEditor({
                   <button
                     type="button"
                     onClick={() => removeItem(it.key)}
-                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    disabled={removalBusy}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                     aria-label="Remover"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -1644,6 +1704,41 @@ export function PurchaseListItemsEditor({
           </div>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={removalPreview != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemovalPreview(null);
+            setPendingRemovalKey(null);
+          }
+        }}
+        title="Remover da lista e das recomendações?"
+        description={
+          removalPreview ? (
+            <span className="block space-y-2 text-left">
+              <span className="block">
+                {removalPreview.product_name} está em{" "}
+                {removalPreview.pending_recommendations.length}{" "}
+                {removalPreview.pending_recommendations.length === 1
+                  ? "recomendação pendente"
+                  : "recomendações pendentes"}
+                . Ao confirmar, o produto sai da lista e dessas etapas:
+              </span>
+              <span className="block space-y-1">
+                {removalPreview.pending_recommendations.map((hit) => (
+                  <span key={hit.recommendation_id} className="block">
+                    • {hit.stage_name} — {hit.farm_name} / {hit.plot_name}
+                  </span>
+                ))}
+              </span>
+            </span>
+          ) : null
+        }
+        tone="destructive"
+        confirmLabel="Remover"
+        cancelLabel="Cancelar"
+        onConfirm={confirmRemovalWithRecommendations}
+      />
     </div>
   );
 }
