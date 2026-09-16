@@ -66,7 +66,6 @@ import {
   SkipForward,
   Sprout,
   Trash2,
-  X,
 } from "lucide-react";
 import {
   RecommendationStageFields,
@@ -261,7 +260,8 @@ function ProductRow({
       onDragOver={canReorder ? onDragOver : undefined}
       onDragEnd={canReorder ? onDragEnd : undefined}
       className={cn(
-        "flex min-w-0 flex-col gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm sm:flex-row sm:items-center",
+        "flex min-w-0 flex-col gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm",
+        !editing && "sm:flex-row sm:items-center",
         outOfProgram && "border-destructive/40 bg-destructive/5",
         canReorder && "cursor-grab active:cursor-grabbing",
         isDragging && "opacity-60 ring-1 ring-primary/40",
@@ -307,58 +307,83 @@ function ProductRow({
       </div>
 
       {editing ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 pl-8 sm:pl-0">
-          <Input
-            value={dose}
-            onChange={(e) => setDose(e.target.value)}
-            inputMode="decimal"
-            className="h-8 min-w-0 flex-1 text-right text-xs tabular-nums sm:w-20 sm:flex-none"
-          />
-          <DoseUnitSelect
-            value={unit}
-            onChange={setUnit}
-            className="h-8 text-xs"
-          />
-          <span className="shrink-0 text-xs text-muted-foreground">/ha</span>
-          <Input
-            value={areaPercent}
-            onChange={(e) => setAreaPercent(e.target.value)}
-            inputMode="decimal"
-            placeholder="100"
-            className="h-8 w-16 text-right text-xs tabular-nums"
-            aria-label="% da área"
-          />
-          <span className="shrink-0 text-xs text-muted-foreground">%</span>
-          <Input
-            value={areaNote}
-            onChange={(e) => setAreaNote(e.target.value)}
-            placeholder="Obs. área"
-            className="h-8 min-w-0 flex-1 text-xs sm:w-36 sm:flex-none"
-            aria-label="Observação de área"
-          />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-primary"
-            onClick={handleSave}
-            disabled={updateMut.isPending}
-          >
-            <Save className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-muted-foreground"
-            onClick={() => {
-              setEditing(false);
-              setDose(String(item.dose_per_hectare));
-              setUnit(item.dose_unit ?? "L");
-              setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
-              setAreaNote(item.area_note ?? "");
-            }}
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
+        <div className="grid w-full min-w-0 gap-2">
+          <div className="grid min-w-0 grid-cols-2 gap-1.5">
+            <label className="grid min-w-0 gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Dose / ha
+              </span>
+              <Input
+                value={dose}
+                onChange={(e) => setDose(e.target.value)}
+                inputMode="decimal"
+                className="h-9 min-w-0 w-full text-right text-sm tabular-nums"
+              />
+            </label>
+            <label className="grid min-w-0 gap-1">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Unidade
+              </span>
+              <DoseUnitSelect
+                value={unit}
+                onChange={setUnit}
+                className="h-9 w-full min-w-0 max-w-none shrink"
+              />
+            </label>
+          </div>
+          <label className="grid gap-1">
+            <span className="text-[11px] font-medium text-muted-foreground">
+              % da área
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={areaPercent}
+                onChange={(e) => setAreaPercent(e.target.value)}
+                inputMode="decimal"
+                placeholder="100"
+                className="h-9 min-w-0 w-full text-right text-sm tabular-nums"
+                aria-label="% da área"
+              />
+              <span className="shrink-0 text-xs text-muted-foreground">%</span>
+            </div>
+          </label>
+          <label className="grid gap-1">
+            <span className="text-[11px] font-medium text-muted-foreground">
+              Obs. área
+            </span>
+            <Input
+              value={areaNote}
+              onChange={(e) => setAreaNote(e.target.value)}
+              placeholder="Ex.: só cabeceira"
+              className="h-9 min-w-0 w-full text-sm"
+              aria-label="Observação de área"
+            />
+          </label>
+          <div className="flex gap-2 pt-0.5">
+            <Button
+              size="sm"
+              className="h-9 flex-1 gap-1.5 sm:flex-none"
+              onClick={handleSave}
+              disabled={updateMut.isPending}
+            >
+              <Save className="h-3.5 w-3.5" />
+              Salvar
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-9 flex-1 sm:flex-none"
+              onClick={() => {
+                setEditing(false);
+                setDose(String(item.dose_per_hectare));
+                setUnit(item.dose_unit ?? "L");
+                setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
+                setAreaNote(item.area_note ?? "");
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="flex min-w-0 items-center justify-between gap-2 pl-8 sm:justify-end sm:pl-0">
@@ -619,24 +644,29 @@ function AddProductRow({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Dose/ha</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0"
-              value={dose}
-              onChange={(e) => setDose(e.target.value)}
-              className="h-8 text-sm w-28"
-            />
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:col-span-2">
+            <div className="min-w-0 space-y-1">
+              <Label className="text-xs text-muted-foreground">Dose / ha</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0"
+                value={dose}
+                onChange={(e) => setDose(e.target.value)}
+                className="h-9 min-w-0 w-full text-sm"
+              />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <Label className="text-xs text-muted-foreground">Unidade</Label>
+              <DoseUnitSelect
+                value={unit}
+                onChange={setUnit}
+                className="h-9 w-full min-w-0 max-w-none shrink"
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Un.</Label>
-            <DoseUnitSelect value={unit} onChange={setUnit} className="h-8" />
-          </div>
-          <span className="pb-1 text-xs text-muted-foreground">/ha</span>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">% área</Label>
             <Input
@@ -644,19 +674,19 @@ function AddProductRow({
               placeholder="100"
               value={areaPercent}
               onChange={(e) => setAreaPercent(e.target.value)}
-              className="h-8 w-20 text-sm text-right tabular-nums"
+              className="h-9 w-full text-sm text-right tabular-nums"
             />
           </div>
-          <div className="min-w-40 flex-1 space-y-1">
+          <div className="min-w-0 space-y-1 sm:col-span-2">
             <Label className="text-xs text-muted-foreground">Obs. área</Label>
             <Input
               placeholder="Ex: áreas sujas"
               value={areaNote}
               onChange={(e) => setAreaNote(e.target.value)}
-              className="h-8 text-sm"
+              className="h-9 w-full text-sm"
             />
           </div>
-          <div className="flex gap-1 ml-auto">
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
             <Button
               size="sm"
               onClick={handleAdd}

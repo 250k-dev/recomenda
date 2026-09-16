@@ -20,7 +20,7 @@ export function DoseUnitSelect({ value, onChange, className, disabled }: DoseUni
         value: unit,
         label: DOSE_UNIT_SHORT_LABELS[unit],
       }))}
-      className={cn("min-w-[96px] w-[96px] shrink-0", className)}
+      className={cn("min-w-[5.5rem] w-[5.5rem] shrink-0", className)}
     />
   );
 }
