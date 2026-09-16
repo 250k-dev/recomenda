@@ -51,7 +51,7 @@ export type ListItem = {
 };
 
 /** Fração (0..1) da área em que o item é aplicado. Default: área toda. */
-export function areaFactorOf(it: ListItem): number {
+export function areaFactorOf(it: Pick<ListItem, "areaPercent">): number {
   const pct = Number(
     String(it.areaPercent ?? "")
       .replace("%", "")
@@ -60,6 +60,13 @@ export function areaFactorOf(it: ListItem): number {
   );
   if (!Number.isFinite(pct) || pct <= 0) return 1;
   return Math.min(pct, 100) / 100;
+}
+
+/** Campo de % área (vazio = 100%) a partir da fração 0..1 da recomendação/lista. */
+export function areaPercentFieldFromFactor(factor?: number | string | null): string {
+  const n = Number(factor);
+  if (!Number.isFinite(n) || n <= 0 || n >= 0.999) return "";
+  return String(Number((n * 100).toFixed(4)));
 }
 
 /** Espaçamento padrão entre linhas (m) quando a lista não informa outro valor. */

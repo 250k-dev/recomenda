@@ -69,6 +69,7 @@ export {
 export type { ListItem } from "./purchase-list/list-item";
 export {
   areaFactorOf,
+  areaPercentFieldFromFactor,
   DEFAULT_SPACING_M,
   populationFromSeeds,
   SEED_CATEGORIES,

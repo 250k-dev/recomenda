@@ -382,6 +382,8 @@ export function useUpdateRecommendationItem(seasonId: string) {
       dose_unit?: string;
       local_product_id?: string;
       mix_order_override?: number | null;
+      area_factor?: number;
+      area_note?: string | null;
     }) => updateRecommendationItem(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });

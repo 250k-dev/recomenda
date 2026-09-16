@@ -29,7 +29,7 @@ import {
 } from "@/components/domain/recommendation-stage-fields";
 import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 import { extractError } from "@/components/domain/season/_shared";
-import { RecommendationCard } from "@/components/domain/season/recommendation-card";
+import { RecommendationCard, type ListProductPlan } from "@/components/domain/season/recommendation-card";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
 import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
 import { SeasonMixOrderDialog } from "@/components/domain/season/season-mix-order-dialog";
@@ -114,6 +114,139 @@ function PlantingDateBlock({
         ) : null}
       </div>
     </li>
+  );
+}
+
+const TOOLBAR_BTN =
+  "h-auto min-h-9 min-w-0 max-w-full shrink justify-center whitespace-normal px-2 py-2 text-center leading-tight print:hidden sm:h-8 sm:min-h-8 sm:w-auto sm:justify-start sm:whitespace-nowrap sm:py-0 sm:text-left";
+
+function ScheduleToolbar({
+  showExport,
+  onExport,
+  canManageStages,
+  canEditCrop,
+  harvestable,
+  onMixOrder,
+  onEditCrop,
+  onHarvest,
+  onApplyTemplate,
+  applyTemplateDisabled,
+  applyTemplateTitle,
+  onAddStage,
+  producerId,
+  showPublish,
+  onPublish,
+  isPublishing,
+}: {
+  showExport?: boolean;
+  onExport?: () => void;
+  canManageStages: boolean;
+  canEditCrop: boolean;
+  harvestable: boolean;
+  onMixOrder: () => void;
+  onEditCrop: () => void;
+  onHarvest: () => void;
+  onApplyTemplate: () => void;
+  applyTemplateDisabled?: boolean;
+  applyTemplateTitle?: string;
+  onAddStage: () => void;
+  producerId?: string | null;
+  showPublish?: boolean;
+  onPublish?: () => void;
+  isPublishing?: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <h2 className="text-base font-semibold font-display text-text-strong">
+        Etapas do cronograma
+      </h2>
+      <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        {showExport && onExport ? (
+          <Button
+            size="sm"
+            className={cn(TOOLBAR_BTN, EXPORT_ACTION_CLASS)}
+            onClick={onExport}
+          >
+            <Share2 className="h-4 w-4 shrink-0" />
+            Exportar
+          </Button>
+        ) : null}
+        {canManageStages ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className={TOOLBAR_BTN}
+            onClick={onMixOrder}
+          >
+            <ListOrdered className="h-4 w-4 shrink-0 text-muted-foreground" />
+            Ordem de mistura
+          </Button>
+        ) : null}
+        {canManageStages ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className={TOOLBAR_BTN}
+            onClick={onApplyTemplate}
+            disabled={applyTemplateDisabled}
+            title={applyTemplateTitle}
+          >
+            <LayoutTemplate className="h-4 w-4 shrink-0" />
+            Aplicar modelo
+          </Button>
+        ) : producerId ? (
+          <Button asChild size="sm" variant="outline" className={TOOLBAR_BTN}>
+            <Link
+              href={routes.produtores.detalhe(producerId, {
+                hash: "timing-templates",
+              })}
+            >
+              Configurar modelo de timing
+            </Link>
+          </Button>
+        ) : null}
+        {canManageStages ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className={TOOLBAR_BTN}
+            aria-label="Adicionar etapa"
+            onClick={onAddStage}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            Adicionar etapa
+          </Button>
+        ) : null}
+        {canEditCrop ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className={TOOLBAR_BTN}
+            onClick={onEditCrop}
+          >
+            <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
+            Editar cultivo
+          </Button>
+        ) : null}
+        {harvestable ? (
+          <Button size="sm" className={TOOLBAR_BTN} onClick={onHarvest}>
+            <Wheat className="h-4 w-4 shrink-0" />
+            Registrar colheita
+          </Button>
+        ) : null}
+        {showPublish && onPublish ? (
+          <Button
+            size="sm"
+            className={cn(TOOLBAR_BTN, "col-span-2 sm:col-span-1")}
+            onClick={onPublish}
+            disabled={isPublishing}
+          >
+            <Send className="h-4 w-4 shrink-0" />
+            {isPublishing ? "Publicando…" : "Publicar safra"}
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -241,20 +374,32 @@ export function SeasonRecommendationsView({
   } = usePurchaseListCatalogProducts(producerId, crop, farmId);
   // Dose planejada na lista de compra, por produto — pré-preenche a dose ao
   // adicionar o produto numa etapa (o agrônomo não digita de novo).
-  const listDoseByProductId = useMemo(() => {
-    const map = new Map<string, { dose: number; unit: string }>();
+  const { listPlanByProductId, listPlanByProductStage } = useMemo(() => {
+    const byProduct = new Map<string, ListProductPlan>();
+    const byProductStage = new Map<string, ListProductPlan>();
+    const keyOf = (name: string) =>
+      name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, " ")
+        .trim()
+        .toLowerCase();
     for (const list of purchaseLists) {
       for (const item of list.items) {
-        if (map.has(item.local_product_id)) continue;
-        if (Number(item.dose_per_hectare) > 0) {
-          map.set(item.local_product_id, {
-            dose: Number(item.dose_per_hectare),
-            unit: item.dose_unit,
-          });
+        const plan: ListProductPlan = {
+          dose: Number(item.dose_per_hectare) || 0,
+          unit: item.dose_unit,
+          areaFactor: Number(item.area_factor) > 0 ? Number(item.area_factor) : 1,
+          areaNote: item.area_note ?? null,
+        };
+        const stage = keyOf(item.stage || "");
+        if (stage) byProductStage.set(`${item.local_product_id}::${stage}`, plan);
+        if (!byProduct.has(item.local_product_id)) {
+          byProduct.set(item.local_product_id, plan);
         }
       }
     }
-    return map;
+    return { listPlanByProductId: byProduct, listPlanByProductStage: byProductStage };
   }, [purchaseLists]);
   // Só marca item como "fora da programação" depois que a lista carregou —
   // senão todos os itens piscariam em vermelho enquanto a lista não chega.
@@ -422,92 +567,26 @@ export function SeasonRecommendationsView({
   if (!recommendations.length) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold font-display text-text-strong">
-              Etapas do cronograma
-            </h2>
-            {canSeasonCrud && seasonStatus !== "ARCHIVED" && seasonStatus !== "HARVESTED" ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setCropEditOpen(true)}
-              >
-                <Pencil className="w-4 h-4 text-muted-foreground" />
-                Editar cultivo
-              </Button>
-            ) : null}
-            {harvestable ? (
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setHarvestOpen(true)}
-              >
-                <Wheat className="w-4 h-4" />
-                Registrar colheita
-              </Button>
-            ) : null}
-            {canManageStages ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setMixOrderOpen(true)}
-              >
-                <ListOrdered className="w-4 h-4 text-muted-foreground" />
-                Ordem de mistura
-              </Button>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {canManageStages ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setTemplateOpen(true)}
-                  disabled={hasAppliedStage}
-                  title={applyTemplateTitle}
-                >
-                  <LayoutTemplate className="w-4 h-4" />
-                  Aplicar modelo
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setAddingStage(true)}
-                >
-                  <Plus className="w-4 h-4" />
-                  Adicionar etapa
-                </Button>
-              </>
-            ) : producerId ? (
-              <Button asChild size="sm" variant="outline">
-                <Link
-                  href={routes.produtores.detalhe(producerId, {
-                    hash: "timing-templates",
-                  })}
-                >
-                  Configurar modelo de timing
-                </Link>
-              </Button>
-            ) : null}
-            {seasonStatus === "DRAFT" && onPublish ? (
-              <Button
-                size="sm"
-                className="gap-2"
-                onClick={onPublish}
-                disabled={isPublishing}
-              >
-                <Send className="w-4 h-4" />
-                {isPublishing ? "Publicando…" : "Publicar safra"}
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <ScheduleToolbar
+          canManageStages={canManageStages}
+          canEditCrop={
+            canSeasonCrud &&
+            seasonStatus !== "ARCHIVED" &&
+            seasonStatus !== "HARVESTED"
+          }
+          harvestable={harvestable}
+          onMixOrder={() => setMixOrderOpen(true)}
+          onEditCrop={() => setCropEditOpen(true)}
+          onHarvest={() => setHarvestOpen(true)}
+          onApplyTemplate={() => setTemplateOpen(true)}
+          applyTemplateDisabled={hasAppliedStage}
+          applyTemplateTitle={applyTemplateTitle}
+          onAddStage={() => setAddingStage(true)}
+          producerId={producerId}
+          showPublish={seasonStatus === "DRAFT" && Boolean(onPublish)}
+          onPublish={onPublish}
+          isPublishing={isPublishing}
+        />
         <ul className="flex flex-col gap-3">
           <PlantingDateBlock
             seasonId={seasonId}
@@ -632,82 +711,25 @@ export function SeasonRecommendationsView({
         </div>
       </PageHero>
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold font-display text-text-strong">
-            Etapas do cronograma
-          </h2>
-          <Button
-            size="sm"
-            className={cn(
-              "gap-1.5 print:hidden",
-              EXPORT_ACTION_CLASS,
-            )}
-            onClick={() => setExportOpen(true)}
-          >
-            <Share2 className="w-4 h-4" />
-            Exportar
-          </Button>
-          {canManageStages ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 print:hidden"
-              onClick={() => setMixOrderOpen(true)}
-            >
-              <ListOrdered className="w-4 h-4 text-muted-foreground" />
-              Ordem de mistura
-            </Button>
-          ) : null}
-          {canSeasonCrud && seasonStatus !== "ARCHIVED" && seasonStatus !== "HARVESTED" ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 print:hidden"
-              onClick={() => setCropEditOpen(true)}
-            >
-              <Pencil className="w-4 h-4 text-muted-foreground" />
-              Editar cultivo
-            </Button>
-          ) : null}
-          {harvestable ? (
-            <Button
-              size="sm"
-              className="gap-1.5 print:hidden"
-              onClick={() => setHarvestOpen(true)}
-            >
-              <Wheat className="w-4 h-4" />
-              Registrar colheita
-            </Button>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          {canManageStages ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 print:hidden"
-                onClick={() => setTemplateOpen(true)}
-                disabled={hasAppliedStage}
-                title={applyTemplateTitle}
-              >
-                <LayoutTemplate className="w-4 h-4" />
-                Aplicar modelo
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-label="Adicionar etapa"
-                onClick={() => setAddingStage((v) => !v)}
-              >
-                <Plus className="w-4 h-4" />
-                Adicionar etapa
-              </Button>
-            </>
-          ) : null}
-        </div>
-      </div>
+      <ScheduleToolbar
+        showExport
+        onExport={() => setExportOpen(true)}
+        canManageStages={canManageStages}
+        canEditCrop={
+          canSeasonCrud &&
+          seasonStatus !== "ARCHIVED" &&
+          seasonStatus !== "HARVESTED"
+        }
+        harvestable={harvestable}
+        onMixOrder={() => setMixOrderOpen(true)}
+        onEditCrop={() => setCropEditOpen(true)}
+        onHarvest={() => setHarvestOpen(true)}
+        onApplyTemplate={() => setTemplateOpen(true)}
+        applyTemplateDisabled={hasAppliedStage}
+        applyTemplateTitle={applyTemplateTitle}
+        onAddStage={() => setAddingStage((v) => !v)}
+        producerId={producerId}
+      />
 
       {addingStage ? (
         <AddStagePanel
@@ -738,7 +760,8 @@ export function SeasonRecommendationsView({
             canEditStructure={canManageStages}
             catalogProducts={catalogProducts}
             inProgramProductIds={inProgramProductIds}
-            listDoseByProductId={listDoseByProductId}
+            listPlanByProductId={listPlanByProductId}
+            listPlanByProductStage={listPlanByProductStage}
             listReady={listReady}
           />
         ))}

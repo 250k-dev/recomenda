@@ -41,7 +41,7 @@ import {
   recommendedYmdToWindow,
   todayLocalYmd,
 } from "@recomenda/domain/timing/window-days";
-import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
+import { SEED_CATEGORIES, areaFactorOf, areaPercentFieldFromFactor } from "@recomenda/domain/purchase-list/list-item";
 import { displayRecStatus, fmtDate } from "@recomenda/domain/recommendations/format";
 import {
   formulationShortLabel,
@@ -75,6 +75,36 @@ import {
 } from "@/components/domain/recommendation-stage-fields";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
+
+export type ListProductPlan = {
+  dose: number;
+  unit: string;
+  areaFactor: number;
+  areaNote: string | null;
+};
+
+function stageKey(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+export function pickListProductPlan(
+  byProductStage: Map<string, ListProductPlan>,
+  byProduct: Map<string, ListProductPlan>,
+  productId: string,
+  stageName: string,
+): ListProductPlan | undefined {
+  const staged = stageKey(stageName);
+  if (staged) {
+    const hit = byProductStage.get(`${productId}::${staged}`);
+    if (hit) return hit;
+  }
+  return byProduct.get(productId);
+}
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
@@ -185,11 +215,17 @@ function ProductRow({
   const [editing, setEditing] = useState(false);
   const [dose, setDose] = useState(String(item.dose_per_hectare));
   const [unit, setUnit] = useState<string>(item.dose_unit ?? "L");
+  const [areaPercent, setAreaPercent] = useState(
+    areaPercentFieldFromFactor(item.area_factor),
+  );
+  const [areaNote, setAreaNote] = useState(item.area_note ?? "");
   const updateMut = useUpdateRecommendationItem(seasonId);
 
   const startEditing = () => {
     setDose(String(item.dose_per_hectare));
     setUnit(item.dose_unit ?? "L");
+    setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
+    setAreaNote(item.area_note ?? "");
     setEditing(true);
   };
 
@@ -197,13 +233,19 @@ function ProductRow({
     const parsed = parseFloat(dose.replace(",", "."));
     if (!parsed || parsed <= 0) return;
     updateMut.mutate(
-      { id: item.id, dose_per_hectare: parsed, dose_unit: unit },
+      {
+        id: item.id,
+        dose_per_hectare: parsed,
+        dose_unit: unit,
+        area_factor: areaFactorOf({ areaPercent }),
+        area_note: areaNote.trim() || null,
+      },
       {
         onSuccess: () => {
-          toast.success("Dose atualizada.");
+          toast.success("Produto atualizado.");
           setEditing(false);
         },
-        onError: () => toast.error("Não foi possível atualizar a dose."),
+        onError: () => toast.error("Não foi possível atualizar o produto."),
       },
     );
   };
@@ -219,66 +261,85 @@ function ProductRow({
       onDragOver={canReorder ? onDragOver : undefined}
       onDragEnd={canReorder ? onDragEnd : undefined}
       className={cn(
-        "flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm",
+        "flex min-w-0 flex-col gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm sm:flex-row sm:items-center",
         outOfProgram && "border-destructive/40 bg-destructive/5",
         canReorder && "cursor-grab active:cursor-grabbing",
         isDragging && "opacity-60 ring-1 ring-primary/40",
       )}
     >
-      {canReorder ? (
-        <GripVertical
-          className="h-4 w-4 shrink-0 text-muted-foreground"
-          aria-hidden
-        />
-      ) : null}
-      {mixPosition != null ? (
-        <span
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground"
-          title={`Ordem de mistura #${mixPosition}`}
-        >
-          {mixPosition}
-        </span>
-      ) : (
-        <FlaskConical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      )}
-      <span
-        className="inline-flex h-6 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 px-1 text-[10px] font-bold tracking-wide text-muted-foreground"
-        title={`Formulação: ${formShort}`}
-      >
-        {formShort}
-      </span>
-      <span className="flex-1 min-w-0 font-medium text-foreground">
-        {item.product_name}
-        {item.is_substitution && (
-          <span className="ml-1.5 text-[10px] text-warning-strong">
-            (substituído)
-          </span>
-        )}
-        {outOfProgram ? (
-          <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive align-middle">
-            <CircleAlert className="w-3 h-3" />
-            Fora da programação
-          </span>
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        {canReorder ? (
+          <GripVertical
+            className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
         ) : null}
-      </span>
+        {mixPosition != null ? (
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground"
+            title={`Ordem de mistura #${mixPosition}`}
+          >
+            {mixPosition}
+          </span>
+        ) : (
+          <FlaskConical className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        )}
+        <span
+          className="inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 px-1 text-[10px] font-bold tracking-wide text-muted-foreground"
+          title={`Formulação: ${formShort}`}
+        >
+          {formShort}
+        </span>
+        <span className="min-w-0 flex-1 break-words font-medium leading-snug text-foreground">
+          {item.product_name}
+          {item.is_substitution && (
+            <span className="ml-1.5 text-[10px] text-warning-strong">
+              (substituído)
+            </span>
+          )}
+          {outOfProgram ? (
+            <span className="ml-1.5 mt-0.5 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive align-middle">
+              <CircleAlert className="w-3 h-3" />
+              Fora da programação
+            </span>
+          ) : null}
+        </span>
+      </div>
 
       {editing ? (
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 pl-8 sm:pl-0">
           <Input
             value={dose}
             onChange={(e) => setDose(e.target.value)}
-            className="w-20 text-xs text-right h-7 tabular-nums"
+            inputMode="decimal"
+            className="h-8 min-w-0 flex-1 text-right text-xs tabular-nums sm:w-20 sm:flex-none"
           />
           <DoseUnitSelect
             value={unit}
             onChange={setUnit}
-            className="text-xs h-7"
+            className="h-8 text-xs"
           />
-          <span className="text-xs shrink-0 text-muted-foreground">/ha</span>
+          <span className="shrink-0 text-xs text-muted-foreground">/ha</span>
+          <Input
+            value={areaPercent}
+            onChange={(e) => setAreaPercent(e.target.value)}
+            inputMode="decimal"
+            placeholder="100"
+            className="h-8 w-16 text-right text-xs tabular-nums"
+            aria-label="% da área"
+          />
+          <span className="shrink-0 text-xs text-muted-foreground">%</span>
+          <Input
+            value={areaNote}
+            onChange={(e) => setAreaNote(e.target.value)}
+            placeholder="Obs. área"
+            className="h-8 min-w-0 flex-1 text-xs sm:w-36 sm:flex-none"
+            aria-label="Observação de área"
+          />
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-primary"
+            className="h-8 w-8 text-primary"
             onClick={handleSave}
             disabled={updateMut.isPending}
           >
@@ -287,51 +348,57 @@ function ProductRow({
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-muted-foreground"
+            className="h-8 w-8 text-muted-foreground"
             onClick={() => {
               setEditing(false);
               setDose(String(item.dose_per_hectare));
               setUnit(item.dose_unit ?? "L");
+              setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
+              setAreaNote(item.area_note ?? "");
             }}
           >
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <span className="text-xs shrink-0 tabular-nums text-muted-foreground">
+        <div className="flex min-w-0 items-center justify-between gap-2 pl-8 sm:justify-end sm:pl-0">
+          <span className="min-w-0 text-xs tabular-nums text-muted-foreground">
             {item.dose_per_hectare} {item.dose_unit}/ha
+            {item.total_quantity > 0 ? (
+              <>
+                {" "}
+                ·{" "}
+                {item.total_quantity.toLocaleString("pt-BR", {
+                  maximumFractionDigits: 1,
+                })}{" "}
+                {item.dose_unit} total
+              </>
+            ) : null}
+            {item.area_factor != null && item.area_factor < 0.999 ? (
+              <> · {Math.round(item.area_factor * 100)}% da área</>
+            ) : null}
+            {item.area_note ? <> · {item.area_note}</> : null}
           </span>
-          {item.total_quantity > 0 && (
-            <span className="hidden text-xs shrink-0 tabular-nums text-muted-foreground sm:inline">
-              ·{" "}
-              {item.total_quantity.toLocaleString("pt-BR", {
-                maximumFractionDigits: 1,
-              })}{" "}
-              {item.dose_unit} total
-              {item.area_factor != null && item.area_factor < 0.999 ? (
-                <> · {Math.round(item.area_factor * 100)}% da área</>
-              ) : null}
-            </span>
-          )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            onClick={startEditing}
-          >
-            <Pencil className="w-3 h-3" />
-          </Button>
-          {canDelete ? (
+          <div className="flex shrink-0 items-center">
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              onClick={() => onDelete(item.id)}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={startEditing}
             >
-              <Trash2 className="w-3 h-3" />
+              <Pencil className="w-3 h-3" />
             </Button>
-          ) : null}
+            {canDelete ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={() => onDelete(item.id)}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            ) : null}
+          </div>
         </div>
       )}
     </div>
@@ -341,25 +408,30 @@ function ProductRow({
 function AddProductRow({
   recommendationId,
   seasonId,
+  stageName,
   onClose,
   catalogProducts,
   inProgramProductIds,
-  listDoseByProductId,
+  listPlanByProductId,
+  listPlanByProductStage,
 }: {
   recommendationId: string;
   seasonId: string;
+  stageName: string;
   onClose: () => void;
   catalogProducts: PurchaseListCatalogProduct[];
   /** Produtos "na programação": lista de compra ∪ estoque do produtor. */
   inProgramProductIds: Set<string>;
-  /** Dose planejada na lista de compra, por produto — pré-preenche a dose. */
-  listDoseByProductId: Map<string, { dose: number; unit: string }>;
+  listPlanByProductId: Map<string, ListProductPlan>;
+  listPlanByProductStage: Map<string, ListProductPlan>;
 }) {
   const [category, setCategory] = useState("");
   const [productId, setProductId] = useState("");
   const [productName, setProductName] = useState("");
   const [dose, setDose] = useState("");
   const [unit, setUnit] = useState("L");
+  const [areaPercent, setAreaPercent] = useState("");
+  const [areaNote, setAreaNote] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [resolving, setResolving] = useState(false);
   const createMut = useCreateRecommendationItem(seasonId);
@@ -397,13 +469,20 @@ function AddProductRow({
     );
     if (!product) return;
     const apply = (localId: string, name: string, doseUnit?: string) => {
-      // Produto da lista de compra: traz a dose planejada (sem sobrescrever uma
-      // dose já digitada nesta linha).
-      const planned = listDoseByProductId.get(localId);
+      const planned = pickListProductPlan(
+        listPlanByProductStage,
+        listPlanByProductId,
+        localId,
+        stageName,
+      );
       setProductId(localId);
       setProductName(name);
       setUnit(planned?.unit ?? doseUnit ?? "L");
-      if (!dose && planned) setDose(String(planned.dose));
+      if (!dose && planned?.dose) setDose(String(planned.dose));
+      if (planned) {
+        setAreaPercent(areaPercentFieldFromFactor(planned.areaFactor));
+        setAreaNote(planned.areaNote ?? "");
+      }
     };
     if (!product.globalId || !product.isGlobalOnly) {
       apply(product.optionValue, product.name, product.dose_unit);
@@ -445,6 +524,8 @@ function AddProductRow({
         local_product_id: localId,
         dose_per_hectare: doseVal,
         dose_unit: unit,
+        area_factor: areaFactorOf({ areaPercent }),
+        area_note: areaNote.trim() || null,
       },
       {
         onSuccess: () => {
@@ -556,6 +637,25 @@ function AddProductRow({
             <DoseUnitSelect value={unit} onChange={setUnit} className="h-8" />
           </div>
           <span className="pb-1 text-xs text-muted-foreground">/ha</span>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">% área</Label>
+            <Input
+              inputMode="decimal"
+              placeholder="100"
+              value={areaPercent}
+              onChange={(e) => setAreaPercent(e.target.value)}
+              className="h-8 w-20 text-sm text-right tabular-nums"
+            />
+          </div>
+          <div className="min-w-40 flex-1 space-y-1">
+            <Label className="text-xs text-muted-foreground">Obs. área</Label>
+            <Input
+              placeholder="Ex: áreas sujas"
+              value={areaNote}
+              onChange={(e) => setAreaNote(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
           <div className="flex gap-1 ml-auto">
             <Button
               size="sm"
@@ -744,38 +844,44 @@ function SeedRow({
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg bg-card">
-      <Sprout className="h-3.5 w-3.5 shrink-0 text-primary-strong" />
-      <span className="flex-1 min-w-0 font-medium text-foreground">
-        {item.product_name}
-      </span>
-      <span className="text-xs shrink-0 tabular-nums text-muted-foreground">
-        {currentPop.toLocaleString("pt-BR")} plantas/ha
-        {item.total_quantity
-          ? ` · ${item.total_quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unitLabel}`
-          : ""}
-      </span>
-      {canEdit ? (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7 text-muted-foreground"
-          onClick={startEditing}
-          aria-label="Editar semente"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-      ) : null}
-      {canDelete ? (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7 text-muted-foreground hover:text-danger-strong"
-          onClick={() => onDelete(item.id)}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      ) : null}
+    <div className="flex min-w-0 flex-col gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <Sprout className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-strong" />
+        <span className="min-w-0 flex-1 break-words font-medium leading-snug text-foreground">
+          {item.product_name}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center justify-between gap-2 pl-6 sm:pl-0">
+        <span className="min-w-0 text-xs tabular-nums text-muted-foreground">
+          {currentPop.toLocaleString("pt-BR")} plantas/ha
+          {item.total_quantity
+            ? ` · ${item.total_quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unitLabel}`
+            : ""}
+        </span>
+        <div className="flex shrink-0">
+          {canEdit ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground"
+              onClick={startEditing}
+              aria-label="Editar semente"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground hover:text-danger-strong"
+              onClick={() => onDelete(item.id)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -897,7 +1003,8 @@ export function RecommendationCard({
   canEditStructure = true,
   catalogProducts,
   inProgramProductIds,
-  listDoseByProductId,
+  listPlanByProductId,
+  listPlanByProductStage,
   listReady,
 }: {
   rec: Recommendation;
@@ -915,7 +1022,8 @@ export function RecommendationCard({
   catalogProducts: PurchaseListCatalogProduct[];
   /** Produtos "na programação": lista de compra ∪ estoque do produtor. */
   inProgramProductIds: Set<string>;
-  listDoseByProductId: Map<string, { dose: number; unit: string }>;
+  listPlanByProductId: Map<string, ListProductPlan>;
+  listPlanByProductStage: Map<string, ListProductPlan>;
   listReady: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -1096,7 +1204,7 @@ export function RecommendationCard({
         }}
         aria-expanded={open}
         className={cn(
-          "flex w-full cursor-pointer items-center gap-3 px-4 py-4 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+          "flex w-full min-w-0 cursor-pointer flex-wrap items-center gap-3 px-4 py-4 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
           isPending ? "hover:bg-primary/5" : "hover:bg-accent/40",
         )}
       >
@@ -1144,7 +1252,7 @@ export function RecommendationCard({
           </span>
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1 basis-40">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-base font-semibold text-foreground">
               {rec.name}
@@ -1172,7 +1280,7 @@ export function RecommendationCard({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2.5">
+        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2.5">
           {isDone && rec.executed_date ? (
             <StageDateBadge
               label="Aplicado"
@@ -1217,7 +1325,7 @@ export function RecommendationCard({
       </div>
 
       {open && (
-        <div className="flex flex-col gap-4 px-4 pt-3 pb-4 border-t">
+        <div className="flex min-w-0 flex-col gap-4 px-3 pt-3 pb-4 border-t sm:px-4">
           <div className="p-4 border shadow-sm rounded-xl border-border bg-card">
             <p className="mb-3 text-sm font-semibold text-foreground">
               Dados da etapa
@@ -1258,7 +1366,7 @@ export function RecommendationCard({
             )}
           </div>
 
-          <div className="p-4 border shadow-sm rounded-xl bg-card">
+          <div className="min-w-0 overflow-hidden rounded-xl border bg-card p-3 shadow-sm sm:p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1322,8 +1430,8 @@ export function RecommendationCard({
               ) : null}
             </div>
             {productItems.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                <div className="mb-0.5 flex items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="mb-0.5 hidden items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:flex">
                   {canEditStructure ? <span className="w-4" /> : null}
                   <span className="w-6 text-center">#</span>
                   <span className="w-10 text-center">Form.</span>
@@ -1411,10 +1519,12 @@ export function RecommendationCard({
                 <AddProductRow
                   recommendationId={rec.id}
                   seasonId={seasonId}
+                  stageName={rec.name}
                   onClose={() => setAddingProduct(false)}
                   catalogProducts={catalogProducts}
                   inProgramProductIds={inProgramProductIds}
-                  listDoseByProductId={listDoseByProductId}
+                  listPlanByProductId={listPlanByProductId}
+                  listPlanByProductStage={listPlanByProductStage}
                 />
               </div>
             ) : null}

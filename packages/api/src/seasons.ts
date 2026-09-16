@@ -265,6 +265,8 @@ export async function createRecommendationItem(payload: {
   local_product_id: string;
   dose_per_hectare: number;
   dose_unit?: string;
+  area_factor?: number;
+  area_note?: string | null;
 }) {
   const { data } = await api.post(`/recommendation_items`, payload);
   return data;
@@ -277,6 +279,8 @@ export async function updateRecommendationItem(
     dose_unit?: string;
     local_product_id?: string;
     mix_order_override?: number | null;
+    area_factor?: number;
+    area_note?: string | null;
   },
 ) {
   const { data } = await api.patch(`/recommendation_items/${id}`, payload);
