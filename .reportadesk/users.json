@@ -8,15 +8,5 @@
     "company": "250k-dev",
     "active": true,
     "createdAt": "2026-09-16T20:42:05.538Z"
-  },
-  {
-    "id": "usr_client_1",
-    "name": "Mariana Silveira",
-    "email": "mariana.silveira@acme-corp.com",
-    "passwordHash": "123456",
-    "role": "client",
-    "company": "Acme Corp",
-    "active": true,
-    "createdAt": "2026-09-16T20:42:05.538Z"
   }
 ]
