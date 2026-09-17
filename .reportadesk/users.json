@@ -58,5 +58,15 @@
     "company": "250K",
     "active": true,
     "createdAt": "2026-09-17T15:05:46.237Z"
+  },
+  {
+    "id": "usr_1789657570228",
+    "name": "José Eduardo de Freitas Candido",
+    "email": "jose.eduardo@250k.org",
+    "passwordHash": "admin123",
+    "role": "client",
+    "company": "250K",
+    "active": true,
+    "createdAt": "2026-09-17T15:06:10.228Z"
   }
 ]
