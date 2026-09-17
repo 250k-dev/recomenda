@@ -27,6 +27,7 @@ import {
   type PurchaseListCrop,
 } from "@recomenda/domain/catalog/purchase-list-catalog";
 import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { removePurchaseListItems } from "@recomenda/api/purchase-lists";
 import {
@@ -89,6 +90,18 @@ function seedQuantityUnitAbbrev(category: string): string {
   return seedQuantityUnitLabel(category).toLowerCase().startsWith("s") ? "S" : "B";
 }
 
+type BandId = "seed" | "dose" | "out";
+
+type Band = {
+  id: BandId;
+  title: string;
+  /** Rótulo curto da aba (o `title` vai na faixa dentro da tabela). */
+  tab: string;
+  seed: boolean;
+  out?: boolean;
+  items: ListItem[];
+};
+
 export function PurchaseListItemsEditor({
   items,
   setItems,
@@ -147,12 +160,18 @@ export function PurchaseListItemsEditor({
       ),
     [platformCatalog.data?.data, globalCatalog.data?.data],
   );
+  // Aba da tabela visível no desktop (uma banda por vez). Sem escolha — ou
+  // sumiu a banda escolhida, porque removeram os itens dela — cai na primeira
+  // da ordem: fora da programação, que pede ação, vem antes das outras.
+  const [bandTab, setBandTab] = useState<BandId | null>(null);
+
   const toBuyByKey = useMemo(
     () => listItemsToBuyByKey(items, totalHa),
     [items, totalHa],
   );
 
   const addItem = () => {
+    setBandTab("dose");
     setItems((prev) => [
       ...prev,
       {
@@ -176,6 +195,7 @@ export function PurchaseListItemsEditor({
   const addSeedItem = () => {
     const category = seedCategories[0];
     if (!category) return;
+    setBandTab("seed");
     setItems((prev) => [
       ...prev,
       {
@@ -1023,13 +1043,7 @@ export function PurchaseListItemsEditor({
 
   // Cada banda (sementes / defensivos) vira sua própria tabela com rolagem
   // horizontal simples, pois têm conjuntos de colunas diferentes.
-  const renderBandTable = (band: {
-    id: string;
-    title: string;
-    seed: boolean;
-    out?: boolean;
-    items: ListItem[];
-  }) => {
+  const renderBandTable = (band: Band) => {
     const seedBand = band.seed;
     // Defensivos: Form. + Dose/Un/Nº + % área + obs. Sem PRICE_VIEW, −4 cols de preço.
     const priceCols = canViewPrices ? 4 : 0;
@@ -1226,10 +1240,22 @@ export function PurchaseListItemsEditor({
     );
   };
 
-  const bands = [
+  // A ordem é a das abas, da esquerda para a direita.
+  const bandDefs: Band[] = [
+    // Produtos recomendados nas etapas sem estar na lista — entram aqui para o
+    // custo não virar fantasma. O agrônomo completa preço/estoque ou remove.
+    {
+      id: "out",
+      title: "Fora da programação · vindos da recomendação",
+      tab: "Fora da programação",
+      seed: false,
+      out: true,
+      items: items.filter((it) => !isSeedItem(it) && Boolean(it.outOfProgram)),
+    },
     {
       id: "seed",
       title: "Sementes · variedades e híbridos",
+      tab: "Sementes",
       seed: true,
       out: false,
       items: items.filter((it) => isSeedItem(it)),
@@ -1237,20 +1263,14 @@ export function PurchaseListItemsEditor({
     {
       id: "dose",
       title: "Defensivos e fertilizantes",
+      tab: "Defensivos e fertilizantes",
       seed: false,
       out: false,
       items: items.filter((it) => !isSeedItem(it) && !it.outOfProgram),
     },
-    // Produtos recomendados nas etapas sem estar na lista — entram aqui para o
-    // custo não virar fantasma. O agrônomo completa preço/estoque ou remove.
-    {
-      id: "out",
-      title: "Fora da programação · vindos da recomendação",
-      seed: false,
-      out: true,
-      items: items.filter((it) => !isSeedItem(it) && Boolean(it.outOfProgram)),
-    },
-  ].filter((b) => b.items.length > 0);
+  ];
+  const bands = bandDefs.filter((b) => b.items.length > 0);
+  const activeBand = bands.find((b) => b.id === bandTab) ?? bands[0];
 
   // Item 14: avisa quando o volume recomendado ultrapassa o estoque disponível.
   // O excedente é o que de fato se compra — já com o % da área aplicado.
@@ -1408,12 +1428,31 @@ export function PurchaseListItemsEditor({
         </div>
       ) : (
         <div className="hidden space-y-4 lg:block">
-          {bands.map((band) => (
-            <div key={band.id} className="space-y-2">
-              {renderBandTable(band)}
-              {band.seed ? renderSeedAreaSummary(band.items) : null}
-            </div>
-          ))}
+          {bands.length > 1 ? (
+            <SegmentedTabs
+              value={activeBand?.id ?? bands[0].id}
+              onValueChange={(id: BandId) => setBandTab(id)}
+              items={bands.map((band) => ({
+                value: band.id,
+                // Fora da programação em vermelho — menos quando é a aba ativa,
+                // que fica no verde primário como as outras.
+                label:
+                  band.out && activeBand?.id !== band.id ? (
+                    <span className="text-danger-strong">{band.tab}</span>
+                  ) : (
+                    band.tab
+                  ),
+                badgeCount: band.items.length,
+              }))}
+            />
+          ) : null}
+          {activeBand ? renderBandTable(activeBand) : null}
+          {/* O aviso de área plantada fica fora das abas: ele diz que as
+              sementes passaram dos hectares da safra, e sumir junto com a aba
+              seria fácil demais de não ver. */}
+          {items.some((it) => isSeedItem(it))
+            ? renderSeedAreaSummary(items.filter((it) => isSeedItem(it)))
+            : null}
         </div>
       )}
 
