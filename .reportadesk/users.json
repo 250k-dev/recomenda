@@ -18,5 +18,15 @@
     "company": "Suporte 250k",
     "active": true,
     "createdAt": "2026-09-17T01:10:05.480Z"
+  },
+  {
+    "id": "usr_1789607964159",
+    "name": "Vitor Cliente",
+    "email": "vfidelisdev3@gmail.com",
+    "passwordHash": "admin123",
+    "role": "client",
+    "company": "250K",
+    "active": true,
+    "createdAt": "2026-09-17T01:19:24.159Z"
   }
 ]
