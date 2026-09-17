@@ -26,6 +26,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   tone?: Tone;
   loading?: boolean;
+  className?: string;
   onConfirm: () => void | Promise<void>;
 }
 
@@ -38,6 +39,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancelar",
   tone = "default",
   loading = false,
+  className,
   onConfirm,
 }: ConfirmDialogProps) {
   const handleConfirm = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -47,12 +49,20 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
+      <AlertDialogContent
+        className={cn("max-w-lg overflow-hidden sm:max-w-lg", className)}
+      >
+        <AlertDialogHeader className="grid-rows-none">
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
         </AlertDialogHeader>
-        <AlertDialogFooter>
+        {description ? (
+          <AlertDialogDescription asChild>
+            <div className="max-h-[min(50vh,20rem)] overflow-y-auto overscroll-contain pr-1 text-left text-pretty">
+              {description}
+            </div>
+          </AlertDialogDescription>
+        ) : null}
+        <AlertDialogFooter className="relative z-10">
           <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             disabled={loading}

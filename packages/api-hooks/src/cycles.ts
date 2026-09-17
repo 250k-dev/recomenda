@@ -72,8 +72,7 @@ export function useCyclePurchaseList(cycleId: string) {
 
 /**
  * Realinha as doses da lista de compra com a programação da safra.
- * Chamado uma vez depois de aplicar modelo (inclusive no aplicar em massa, que
- * dispara vários applies antes de sincronizar).
+ * Não entra no apply de modelo — só quando o agrônomo pede o alinhamento.
  */
 export function useSyncCycleListDoses(cycleId: string) {
   const queryClient = useQueryClient();

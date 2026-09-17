@@ -16,6 +16,7 @@ import {
   useGlobalCatalog,
   usePlatformCatalog,
 } from "@recomenda/api-hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn, GLOBAL_PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import {
@@ -27,8 +28,7 @@ import {
 } from "@recomenda/domain/catalog/purchase-list-catalog";
 import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
-import { getPurchaseListItemRemovalPreview } from "@recomenda/api/purchase-lists";
-import type { ListItemRemovalPreview } from "@recomenda/api/purchase-lists";
+import { removePurchaseListItems } from "@recomenda/api/purchase-lists";
 import {
   areaFromBags,
   doseFromCommercialVolume,
@@ -101,13 +101,14 @@ export function PurchaseListItemsEditor({
   onRemovalCascadeArmed,
 }: PurchaseListItemsEditorProps) {
   const canViewPrices = useCan("PRICE_VIEW");
+  const queryClient = useQueryClient();
   const platformCatalog = usePlatformCatalog();
   const globalCatalog = useGlobalCatalog();
   const cloneGlobal = useCloneGlobalProduct();
   const createLocal = useCreateLocalProduct();
   const [resolvingProductKey, setResolvingProductKey] = useState<string | null>(null);
-  const [removalPreview, setRemovalPreview] = useState<ListItemRemovalPreview | null>(null);
-  const [pendingRemovalKey, setPendingRemovalKey] = useState<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [removalBusy, setRemovalBusy] = useState(false);
 
   const defaultUnitForCategory = (category: string): string => {
@@ -286,52 +287,91 @@ export function PurchaseListItemsEditor({
 
   const dropItem = (key: string) => {
     setItems((prev) => prev.filter((it) => it.key !== key));
+    setSelectedKeys((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  };
+
+  const toggleSelected = (key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   const removeItem = (key: string) => {
+    const item = items.find((it) => it.key === key);
+    if (!item) return;
+    if (!listId || !item.productId) {
+      dropItem(key);
+      return;
+    }
+    setSelectedKeys(new Set([key]));
+    setConfirmOpen(true);
+  };
+
+  const confirmRemoval = () => {
     void (async () => {
-      const item = items.find((it) => it.key === key);
-      if (!item) return;
-      if (!listId || !item.productId) {
-        dropItem(key);
+      const selected = items.filter((it) => selectedKeys.has(it.key));
+      if (selected.length === 0) {
+        setConfirmOpen(false);
+        return;
+      }
+      const unsaved = selected.filter((it) => !it.productId);
+      if (unsaved.length === selected.length || !listId) {
+        setItems((prev) => prev.filter((it) => !selectedKeys.has(it.key)));
+        setSelectedKeys(new Set());
+        setConfirmOpen(false);
         return;
       }
       setRemovalBusy(true);
       try {
-        const preview = await getPurchaseListItemRemovalPreview(
-          listId,
-          item.productId,
-          item.stage || DEFAULT_ITEM_STAGE,
-          Boolean(item.outOfProgram),
+        const payload = selected
+          .filter((it) => it.productId)
+          .map((it) => ({
+            local_product_id: it.productId,
+            stage: it.stage || DEFAULT_ITEM_STAGE,
+          }));
+        const res = await removePurchaseListItems(listId, payload);
+        const removedKeys = new Set(
+          selected
+            .filter((it) =>
+              res.removed.some(
+                (r) =>
+                  r.local_product_id === it.productId &&
+                  r.stage === (it.stage || DEFAULT_ITEM_STAGE),
+              ),
+            )
+            .map((it) => it.key),
         );
-        if (preview.blocked) {
-          toast.error(
-            preview.reason === "already_applied"
-              ? `${preview.product_name} já foi aplicado em uma etapa e não pode sair da lista.`
-              : `${preview.product_name} já tem compra confirmada e não pode sair da lista.`,
+        for (const it of unsaved) removedKeys.add(it.key);
+        setItems((prev) => prev.filter((it) => !removedKeys.has(it.key)));
+        setSelectedKeys(new Set());
+        onRemovalCascadeArmed?.();
+        if (res.removed.length > 0) {
+          toast.success(
+            `${res.removed.length} ${res.removed.length === 1 ? "item removido" : "itens removidos"} da lista.`,
           );
-          return;
+          void queryClient.invalidateQueries({ queryKey: ["cycle-purchase-list"] });
+          void queryClient.invalidateQueries({ queryKey: ["cycle-cost-plan"] });
         }
-        if (preview.pending_recommendations.length > 0) {
-          setRemovalPreview(preview);
-          setPendingRemovalKey(key);
-          return;
+        if (res.blocked.length > 0) {
+          toast.error(
+            `${res.blocked.map((b) => b.product_name).join(", ")} ${res.blocked.length === 1 ? "não saiu" : "não saíram"}: compra confirmada ou já aplicado.`,
+          );
         }
-        dropItem(key);
       } catch {
-        toast.error("Não foi possível verificar as recomendações deste produto.");
+        toast.error("Não foi possível remover os produtos.");
       } finally {
         setRemovalBusy(false);
+        setConfirmOpen(false);
       }
     })();
-  };
-
-  const confirmRemovalWithRecommendations = () => {
-    if (!pendingRemovalKey) return;
-    onRemovalCascadeArmed?.();
-    dropItem(pendingRemovalKey);
-    setPendingRemovalKey(null);
-    setRemovalPreview(null);
   };
 
   // Cotação do dólar (US$ → R$) — global, preenchida manualmente. Converte
@@ -624,6 +664,17 @@ export function PurchaseListItemsEditor({
 
     return (
       <tr key={it.key} className="align-middle">
+        {!readOnly ? (
+          <td className="px-1.5 py-1.5 text-center">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={selectedKeys.has(it.key)}
+              onChange={() => toggleSelected(it.key)}
+              aria-label="Selecionar para excluir"
+            />
+          </td>
+        ) : null}
         <td className="px-1.5 py-1.5">
           {readOnly ? (
             <span className="text-sm text-muted-foreground">{catLabel}</span>
@@ -983,8 +1034,8 @@ export function PurchaseListItemsEditor({
     // Defensivos: Form. + Dose/Un/Nº + % área + obs. Sem PRICE_VIEW, −4 cols de preço.
     const priceCols = canViewPrices ? 4 : 0;
     const colCount = seedBand
-      ? (readOnly ? 13 : 14) - (4 - priceCols)
-      : (readOnly ? 15 : 16) - (4 - priceCols);
+      ? (readOnly ? 13 : 15) - (4 - priceCols)
+      : (readOnly ? 15 : 17) - (4 - priceCols);
     const tableWidth = seedBand
       ? readOnly
         ? canViewPrices
@@ -1009,6 +1060,7 @@ export function PurchaseListItemsEditor({
           <colgroup>
             {seedBand ? (
               <>
+                {!readOnly ? <col className="w-[36px]" /> : null}
                 <col className="w-[144px]" />
                 <col className="w-[240px]" />
                 <col className="w-[112px]" />
@@ -1026,6 +1078,7 @@ export function PurchaseListItemsEditor({
               </>
             ) : (
               <>
+                {!readOnly ? <col className="w-[36px]" /> : null}
                 <col className="w-[144px]" />
                 <col className="w-[260px]" />
                 <col className="w-[80px]" />
@@ -1080,6 +1133,7 @@ export function PurchaseListItemsEditor({
               </td>
             </tr>
             <tr className="bg-muted/40 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {!readOnly ? <td className="px-1.5 py-2" /> : null}
               <td className="px-1.5 py-2 text-left">
                 {seedBand ? "Categoria" : "Classe"}
               </td>
@@ -1463,14 +1517,25 @@ export function PurchaseListItemsEditor({
             return (
               <div key={it.key} className="rounded-xl border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-start justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Insumo
-                    {it.outOfProgram ? (
-                      <span className="ml-2 inline-flex items-center rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-destructive">
-                        Fora da programação
-                      </span>
+                  <label className="flex items-center gap-2">
+                    {!readOnly ? (
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={selectedKeys.has(it.key)}
+                        onChange={() => toggleSelected(it.key)}
+                        aria-label="Selecionar para excluir"
+                      />
                     ) : null}
-                  </p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Insumo
+                      {it.outOfProgram ? (
+                        <span className="ml-2 inline-flex items-center rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-destructive">
+                          Fora da programação
+                        </span>
+                      ) : null}
+                    </p>
+                  </label>
                   <button
                     type="button"
                     onClick={() => removeItem(it.key)}
@@ -1679,6 +1744,23 @@ export function PurchaseListItemsEditor({
                 "lg:rounded-full lg:border lg:border-border lg:bg-card/95 lg:px-2 lg:py-1.5 lg:shadow-lg lg:backdrop-blur",
             )}
           >
+            {selectedKeys.size > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size={useStickyActions ? "sm" : "default"}
+                onClick={() => setConfirmOpen(true)}
+                disabled={removalBusy}
+                className={cn(
+                  "shrink-0 gap-2 text-destructive hover:bg-destructive/10",
+                  useStickyActions && "lg:rounded-full",
+                )}
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir {selectedKeys.size}{" "}
+                {selectedKeys.size === 1 ? "selecionado" : "selecionados"}
+              </Button>
+            ) : null}
             {seedCategories.length > 0 ? (
               <Button
                 type="button"
@@ -1705,39 +1787,33 @@ export function PurchaseListItemsEditor({
         </div>
       ) : null}
       <ConfirmDialog
-        open={removalPreview != null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRemovalPreview(null);
-            setPendingRemovalKey(null);
-          }
-        }}
-        title="Remover da lista e das recomendações?"
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Excluir da lista?"
+        loading={removalBusy}
         description={
-          removalPreview ? (
-            <span className="block space-y-2 text-left">
-              <span className="block">
-                {removalPreview.product_name} está em{" "}
-                {removalPreview.pending_recommendations.length}{" "}
-                {removalPreview.pending_recommendations.length === 1
-                  ? "recomendação pendente"
-                  : "recomendações pendentes"}
-                . Ao confirmar, o produto sai da lista e dessas etapas:
-              </span>
-              <span className="block space-y-1">
-                {removalPreview.pending_recommendations.map((hit) => (
-                  <span key={hit.recommendation_id} className="block">
-                    • {hit.stage_name} — {hit.farm_name} / {hit.plot_name}
-                  </span>
+          <div className="space-y-2">
+            <p>
+              {selectedKeys.size}{" "}
+              {selectedKeys.size === 1 ? "item sai" : "itens saem"} da lista. Se
+              estiverem em recomendações pendentes, também saem de lá. Compra
+              confirmada ou já aplicado não sai.
+            </p>
+            <ul className="space-y-1">
+              {items
+                .filter((it) => selectedKeys.has(it.key))
+                .map((it) => (
+                  <li key={it.key}>
+                    • {it.productName || "Produto"} — {it.stage || DEFAULT_ITEM_STAGE}
+                  </li>
                 ))}
-              </span>
-            </span>
-          ) : null
+            </ul>
+          </div>
         }
         tone="destructive"
-        confirmLabel="Remover"
+        confirmLabel="Excluir"
         cancelLabel="Cancelar"
-        onConfirm={confirmRemovalWithRecommendations}
+        onConfirm={confirmRemoval}
       />
     </div>
   );

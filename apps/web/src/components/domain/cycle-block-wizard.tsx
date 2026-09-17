@@ -36,7 +36,6 @@ import {
   useCyclePurchaseList,
   useApplyCycleBlock,
   usePublishCycle,
-  useSyncCycleListDoses,
   useTimingTemplate,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
@@ -603,7 +602,6 @@ function StepPlots({
   const { data: purchaseList } = useCyclePurchaseList(cycle.id);
   const applyBlock = useApplyCycleBlock(cycle.id);
   const publishCycle = usePublishCycle(cycle.id);
-  const syncListDoses = useSyncCycleListDoses(cycle.id);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [configs, setConfigs] = useState<Record<string, PlotConfig>>({});
   const [error, setError] = useState<string | null>(null);
@@ -787,22 +785,16 @@ function StepPlots({
                 .join("; ")}. A dose aplicada foi a do modelo.`,
             );
           }
-          // Doses do modelo → lista de compra (a programação passou a mandar).
-          if (result.applied.length > 0) {
-            syncListDoses.mutate(undefined, {
-              onSuccess: (res) => {
-                if (res.updated > 0) {
-                  toast.info(
-                    `${res.updated} ${res.updated === 1 ? "item" : "itens"} da lista de compra ${res.updated === 1 ? "atualizado" : "atualizados"} com a dose do modelo.`,
-                  );
-                }
-                if (res.conflicts.length > 0) {
-                  toast.warning(
-                    `${res.conflicts.length} ${res.conflicts.length === 1 ? "item já comprado" : "itens já comprados"}: o modelo pede mais. Compre o complemento na lista.`,
-                  );
-                }
-              },
-            });
+          const impact = result.list_impact;
+          if (impact?.conflicts.length) {
+            toast.warning(
+              `${impact.conflicts.length} ${impact.conflicts.length === 1 ? "item já tinha compra confirmada" : "itens já tinham compra confirmada"}. A lista não mudou dose nem unidade — compre o complemento se faltar.`,
+            );
+          }
+          if (impact?.shortages?.length) {
+            toast.warning(
+              `Falta comprar: ${impact.shortages.map((s) => s.product_name).join(", ")}.`,
+            );
           }
           if (result.skipped.length > 0) {
             toast.info(

@@ -190,6 +190,8 @@ export interface ApplyBlockResult {
     template_unit: string;
     list_unit: string;
   }>;
+  /** Só aviso: aplicar bloco não grava dose/unidade na lista. */
+  list_impact?: SyncListDosesResult;
   cycle: CycleDetail;
 }
 
@@ -257,6 +259,19 @@ export interface SyncListDosesResult {
     stage: string;
     confirmed_qty: number;
   }>;
+}
+
+export async function applyCycleTemplateBulk(
+  cycleId: string,
+  payload: { timing_template_id: string; season_ids: string[] },
+) {
+  const { data } = await api.post<{
+    ok: number;
+    failed: number;
+    errors: Array<{ seasonId: string; label: string; message: string }>;
+    list_impact?: SyncListDosesResult;
+  }>(`/cycles/${cycleId}/apply-template`, payload);
+  return data;
 }
 
 /** Leva as doses da programação para a lista de compra da safra. */

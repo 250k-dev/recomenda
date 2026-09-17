@@ -218,6 +218,31 @@ export type ListItemRemovalPreview = {
   }>;
 };
 
+export async function removePurchaseListItems(
+  listId: string,
+  items: Array<{ local_product_id: string; stage: string }>,
+) {
+  const { data } = await api.post<{
+    removed: Array<{
+      local_product_id: string;
+      product_name: string;
+      stage: string;
+    }>;
+    blocked: Array<{
+      local_product_id: string;
+      product_name: string;
+      stage: string;
+      reason: "purchase_confirmed" | "already_applied";
+    }>;
+    pending: Array<{
+      product_name: string;
+      stage_name: string;
+      plot_count: number;
+    }>;
+  }>(`/purchase-lists/${listId}/items/remove`, { items });
+  return data;
+}
+
 export async function getPurchaseListItemRemovalPreview(
   listId: string,
   localProductId: string,

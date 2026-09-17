@@ -16,7 +16,6 @@ import { Label } from "@recomenda/ui/primitives/label";
 import { Select } from "@recomenda/ui/forms/select";
 import {
   useBulkApplySeasonTemplate,
-  useSyncCycleListDoses,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
 import type { CycleDetail, CycleSeasonRow } from "@recomenda/api/cycles";
@@ -61,12 +60,8 @@ export function BulkApplyTemplateDialog({
   producerId: string;
 }) {
   const { data: templates, isLoading } = useTimingTemplates(producerId);
-  const bulkApply = useBulkApplySeasonTemplate();
-  const syncListDoses = useSyncCycleListDoses(cycle.id);
+  const bulkApply = useBulkApplySeasonTemplate(cycle.id);
   const [templateId, setTemplateId] = useState("");
-  // A dose que manda na programação passou a ser a do modelo; sem isto a lista
-  // de compra continuaria com a dose antiga e as duas telas divergiriam.
-  const [syncList, setSyncList] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const options = useMemo(
@@ -178,34 +173,24 @@ export function BulkApplyTemplateDialog({
         })),
       },
       {
-        onSuccess: async ({ ok, failed, errors }) => {
-          // Uma vez só no fim do lote — o sync é da safra inteira.
-          let listMsg = "";
-          if (syncList && ok > 0) {
-            try {
-              const res = await syncListDoses.mutateAsync();
-              if (res.updated > 0) {
-                listMsg = ` ${res.updated} ${res.updated === 1 ? "item" : "itens"} da lista de compra ${res.updated === 1 ? "atualizado" : "atualizados"}.`;
-              }
-              if (res.conflicts.length > 0) {
-                toast.warning(
-                  `${res.conflicts.length} ${res.conflicts.length === 1 ? "item já tinha compra confirmada" : "itens já tinham compra confirmada"}. O alvo da lista sobe — compre o complemento.`,
-                );
-              }
-            } catch {
-              toast.warning(
-                "Modelo aplicado, mas não deu para atualizar a lista de compra.",
-              );
-            }
+        onSuccess: ({ ok, failed, errors, list_impact }) => {
+          if (list_impact?.conflicts.length) {
+            toast.warning(
+              `${list_impact.conflicts.length} ${list_impact.conflicts.length === 1 ? "item já tinha compra confirmada" : "itens já tinham compra confirmada"}. A lista não mudou dose nem unidade — compre o complemento se faltar.`,
+            );
+          }
+          if (list_impact?.shortages?.length) {
+            toast.warning(
+              `Falta comprar: ${list_impact.shortages.map((s) => s.product_name).join(", ")}.`,
+            );
           }
           if (failed === 0) {
             toast.success(
-              `Modelo aplicado em ${ok} ${ok === 1 ? "talhão" : "talhões"}.${listMsg}`,
+              `Modelo aplicado em ${ok} ${ok === 1 ? "talhão" : "talhões"}.`,
             );
             onOpenChange(false);
             return;
           }
-          // Falha parcial: não fecha o diálogo, para o agrônomo ver quem falhou.
           toast.warning(
             `Aplicado em ${ok}; ${failed} falhou: ${errors
               .slice(0, 3)
@@ -246,23 +231,10 @@ export function BulkApplyTemplateDialog({
             ) : null}
           </div>
 
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5">
-            <input
-              type="checkbox"
-              className="mt-0.5 size-4 accent-primary"
-              checked={syncList}
-              onChange={(e) => setSyncList(e.target.checked)}
-            />
-            <span className="text-sm">
-              <span className="font-semibold text-text-strong">
-                Atualizar a lista de compra com as doses do modelo
-              </span>
-              <span className="mt-0.5 block text-[13px] text-muted-foreground">
-                Mantém a lista alinhada com o que foi programado. Estoque, preços
-                e itens com compra confirmada não são alterados.
-              </span>
-            </span>
-          </label>
+          <p className="text-[13px] text-muted-foreground">
+            A lista de compra não muda dose nem unidade. Produto que não estiver
+            nela entra como fora da programação.
+          </p>
 
           {pendingToReplace > 0 ? (
             <p className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2.5 text-[13px] font-medium leading-snug text-warning-strong">

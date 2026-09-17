@@ -160,7 +160,23 @@ export async function updateSeasonVarieties(
 }
 
 export async function applySeasonTemplate(id: string, timingTemplateId: string) {
-  const { data } = await api.post<SeasonDetail>(`/seasons/${id}/apply-template`, {
+  const { data } = await api.post<
+    SeasonDetail & {
+      list_impact?: {
+        updated: number;
+        conflicts: Array<{
+          product_name: string;
+          stage: string;
+          reason: "purchase_confirmed";
+        }>;
+        shortages?: Array<{
+          product_name: string;
+          stage: string;
+          confirmed_qty: number;
+        }>;
+      } | null;
+    }
+  >(`/seasons/${id}/apply-template`, {
     timing_template_id: timingTemplateId,
   });
   return data;
