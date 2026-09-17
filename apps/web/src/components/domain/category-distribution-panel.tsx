@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@recomenda/utils";
 import { CATEGORY_ORDER } from "@recomenda/domain/cost-plan/calculate";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@recomenda/domain/cost-plan/categories";
@@ -32,26 +32,33 @@ export function CategoryDistributionPanel({
   breakdown,
   targets,
   defaultMode = "brl",
+  action,
 }: {
   breakdown: CategoryBreakdown[];
   targets?: Record<string, number>;
   defaultMode?: "brl" | "sacks";
+  /** Ação no canto do header do card (ex.: "Editar metas" na lista de compra). */
+  action?: ReactNode;
 }) {
   // A lista de compra sempre passa `targets` (mesmo vazio) → tabela unificada.
   // O plano de custo não passa → distribuição de gastos com toggle.
   if (targets !== undefined) {
-    return <MetaView breakdown={breakdown} targets={targets} />;
+    return <MetaView breakdown={breakdown} targets={targets} action={action} />;
   }
-  return <SpendView breakdown={breakdown} defaultMode={defaultMode} />;
+  return (
+    <SpendView breakdown={breakdown} defaultMode={defaultMode} action={action} />
+  );
 }
 
 /** Realizado (R$ e sc/ha) × Meta por categoria, em tabela com barra de progresso. */
 function MetaView({
   breakdown,
   targets,
+  action,
 }: {
   breakdown: CategoryBreakdown[];
   targets: Record<string, number>;
+  action?: ReactNode;
 }) {
   const byCat = new Map(breakdown.map((b) => [b.category, b]));
   // Linhas = união das categorias com gasto (breakdown) e com meta definida.
@@ -76,13 +83,16 @@ function MetaView({
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="mb-3">
-        <h3 className="text-base font-semibold text-foreground">Gastos por categoria</h3>
-        <p className="text-xs text-muted-foreground">
-          {hasAnyTarget
-            ? "Realizado em R$ e sc/ha, comparado à meta do agrônomo"
-            : "Realizado em R$ e sc/ha — defina metas para acompanhar o progresso"}
-        </p>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Gastos por categoria</h3>
+          <p className="text-xs text-muted-foreground">
+            {hasAnyTarget
+              ? "Realizado em R$ e sc/ha, comparado à meta do agrônomo"
+              : "Realizado em R$ e sc/ha — defina metas para acompanhar o progresso"}
+          </p>
+        </div>
+        {action}
       </div>
 
       <div className="overflow-x-auto">
@@ -203,16 +213,19 @@ function MetaView({
 function SpendView({
   breakdown,
   defaultMode,
+  action,
 }: {
   breakdown: CategoryBreakdown[];
   defaultMode: "brl" | "sacks";
+  action?: ReactNode;
 }) {
   const [mode, setMode] = useState<"brl" | "sacks">(defaultMode);
   const rows = sortByCategory(breakdown);
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Gastos por categoria</h3>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h3 className="mr-auto text-sm font-semibold text-foreground">Gastos por categoria</h3>
+        {action}
         <div className="flex rounded-md border p-0.5 text-xs">
           <button
             type="button"

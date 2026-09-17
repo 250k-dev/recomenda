@@ -547,17 +547,6 @@ export function FarmPurchaseListTab({
                   Editar lista
                 </Button>
               ) : null}
-              {canViewPrices && !effectiveReadOnly ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setTargetsOpen(true)}
-                >
-                  <Target className="h-4 w-4" />
-                  Editar metas
-                </Button>
-              ) : null}
               {/* Sempre disponível: a lista muda com o tempo e o agrônomo precisa
                   poder salvar as alterações como template (antes só na criação). */}
               {!effectiveReadOnly && hasItems ? (
@@ -712,6 +701,19 @@ export function FarmPurchaseListTab({
                 hasSingleTotalTarget(list.category_targets ?? {})
                   ? undefined
                   : (list.category_targets ?? {})
+              }
+              action={
+                !editing && !effectiveReadOnly ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setTargetsOpen(true)}
+                  >
+                    <Target className="h-4 w-4" />
+                    Editar metas
+                  </Button>
+                ) : undefined
               }
             />
           ) : null}
