@@ -28,5 +28,15 @@
     "company": "250K",
     "active": true,
     "createdAt": "2026-09-17T01:19:24.159Z"
+  },
+  {
+    "id": "usr_1789610472251",
+    "name": "Jose Paschoal",
+    "email": "jose.paschoal@250k.org",
+    "passwordHash": "admin123",
+    "role": "client",
+    "company": "250K",
+    "active": true,
+    "createdAt": "2026-09-17T02:01:12.251Z"
   }
 ]
