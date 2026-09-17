@@ -26,6 +26,7 @@ export * from "./primitives/badge";
 export * from "./primitives/button";
 export * from "./primitives/calendar";
 export * from "./primitives/card";
+export * from "./primitives/collapsible";
 export * from "./primitives/dialog";
 export * from "./primitives/dropdown-menu";
 export * from "./primitives/input";

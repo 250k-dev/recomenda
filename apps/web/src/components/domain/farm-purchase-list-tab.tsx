@@ -687,6 +687,7 @@ export function FarmPurchaseListTab({
                   ? undefined
                   : (list.category_targets ?? {})
               }
+              collapsible
               action={
                 !editing && !effectiveReadOnly ? (
                   <Button
