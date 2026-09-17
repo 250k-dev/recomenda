@@ -8,5 +8,15 @@
     "company": "250k-dev",
     "active": true,
     "createdAt": "2026-09-16T20:42:05.538Z"
+  },
+  {
+    "id": "usr_1789607405480",
+    "name": "Vitor Fidelis",
+    "email": "vfidelisdev@gmail.com",
+    "passwordHash": "admin123",
+    "role": "admin",
+    "company": "Suporte 250k",
+    "active": true,
+    "createdAt": "2026-09-17T01:10:05.480Z"
   }
 ]
