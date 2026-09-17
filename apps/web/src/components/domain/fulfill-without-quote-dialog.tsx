@@ -26,10 +26,12 @@ export function FulfillWithoutQuoteButton({
   className,
   size = "sm",
   variant = "outline",
+  disabled = false,
 }: {
   listId: string;
   /** Só renderiza quando há quantidade a comprar. */
   pending: boolean;
+  disabled?: boolean;
   className?: string;
   size?: "default" | "sm" | "lg";
   variant?: "default" | "clay" | "outline" | "secondary" | "ghost";
@@ -76,9 +78,13 @@ export function FulfillWithoutQuoteButton({
         variant={variant}
         size={size}
         className={cn(
-          "gap-1.5 border-warning-border bg-warning-soft text-warning-strong hover:bg-warning-soft/80 hover:text-warning-strong",
+          "gap-1.5",
+          // O tom de alerta é do botão discreto; nos outros manda a variante.
+          variant === "outline" &&
+            "border-warning-border bg-warning-soft text-warning-strong hover:bg-warning-soft/80 hover:text-warning-strong",
           className,
         )}
+        disabled={disabled}
         onClick={() => setStep("warn")}
       >
         <PackageCheck className="size-4" />

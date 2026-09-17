@@ -33,6 +33,7 @@ export function SavePurchaseListTemplateButton({
   suggestedName,
   size = "default",
   iconOnly = false,
+  disabled = false,
   className,
 }: {
   items: ListItem[];
@@ -42,6 +43,7 @@ export function SavePurchaseListTemplateButton({
   size?: "sm" | "default" | "lg";
   /** Só o ícone, com o nome no tooltip (barra de ações do PageHero). */
   iconOnly?: boolean;
+  disabled?: boolean;
   className?: string;
 }) {
   const createTemplate = useCreatePurchaseListTemplate();
@@ -84,7 +86,7 @@ export function SavePurchaseListTemplateButton({
           label="Salvar como template"
           icon={<Bookmark className="h-4 w-4" />}
           onClick={openDialog}
-          disabled={items.length === 0}
+          disabled={disabled || items.length === 0}
           className={className}
         />
       ) : (
@@ -93,7 +95,7 @@ export function SavePurchaseListTemplateButton({
           variant="outline"
           size={size}
           onClick={openDialog}
-          disabled={items.length === 0}
+          disabled={disabled || items.length === 0}
           className={cn("gap-1.5", className)}
         >
           <Bookmark className="h-4 w-4" />

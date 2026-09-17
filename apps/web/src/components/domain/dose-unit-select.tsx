@@ -8,14 +8,22 @@ interface DoseUnitSelectProps {
   onChange: (value: GlobalDoseUnit) => void;
   className?: string;
   disabled?: boolean;
+  size?: "sm" | "default";
 }
 
-export function DoseUnitSelect({ value, onChange, className, disabled }: DoseUnitSelectProps) {
+export function DoseUnitSelect({
+  value,
+  onChange,
+  className,
+  disabled,
+  size,
+}: DoseUnitSelectProps) {
   return (
     <Select
       value={value}
       onValueChange={(next) => onChange(next as GlobalDoseUnit)}
       disabled={disabled}
+      size={size}
       options={GLOBAL_DOSE_UNITS.map((unit) => ({
         value: unit,
         label: DOSE_UNIT_SHORT_LABELS[unit],

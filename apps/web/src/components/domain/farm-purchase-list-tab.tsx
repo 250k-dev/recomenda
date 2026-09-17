@@ -3,7 +3,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Boxes, Leaf, Pencil, Plus, Share2, Store, Target, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@recomenda/ui/forms/select";
 import { PageHero } from "@/components/domain/page-hero";
@@ -14,6 +14,7 @@ import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { FieldError } from "@/components/domain/season/_shared";
 import { apiErrorCode, apiErrorMessage } from "@recomenda/api/api-error";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
+import { PurchaseListParamsRow } from "@/components/domain/purchase-list-params-row";
 import {
   useCurrencyStore,
   DEFAULT_GRAIN_PRICE_BRL,
@@ -473,6 +474,22 @@ export function FarmPurchaseListTab({
 
   const hasItems = (list.items ?? []).length > 0;
 
+  /** Link do herói: editando, vira botão desligado (âncora não desabilita). */
+  const linkAction = (href: Route, icon: ReactNode, label: string) =>
+    editing ? (
+      <Button variant="outline" size="sm" className="gap-1.5" disabled>
+        {icon}
+        {label}
+      </Button>
+    ) : (
+      <Button asChild variant="outline" size="sm" className="gap-1.5">
+        <Link href={href}>
+          {icon}
+          {label}
+        </Link>
+      </Button>
+    );
+
   return (
     <div className="flex flex-col gap-5">
       {purchaseLists.length > 1 ? (
@@ -504,40 +521,17 @@ export function FarmPurchaseListTab({
           list.variety ? ` · ${list.variety}` : ""
         }`}
         actions={
-          editing ? (
+          // Editando, os botões continuam à vista — desligados, para a barra do
+          // herói não mudar de tamanho a cada entrada e saída da edição.
+          (
             <>
-              <SaveStatus state={saveState} savedAt={savedAt} />
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={cancelEditing}
-                disabled={updateMutation.isPending}
-              >
-                <X className="h-4 w-4" />
-                Cancelar
-              </Button>
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => void saveItems()}
-                disabled={updateMutation.isPending}
-              >
-                {updateMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-                Salvar
-              </Button>
-            </>
-          ) : (
-            <>
-              {!effectiveReadOnly ? (
-                <Button size="sm" className="gap-1.5" onClick={startEditing}>
-                  <Pencil className="h-4 w-4" />
-                  Editar lista
-                </Button>
+              {canQuoteCrud && list.status !== "draft" ? (
+                <FulfillWithoutQuoteButton
+                  listId={list.id}
+                  pending={hasPendingBuy}
+                  variant="default"
+                  disabled={editing}
+                />
               ) : null}
               {/* Sempre disponível: a lista muda com o tempo e o agrônomo precisa
                   poder salvar as alterações como template (antes só na criação). */}
@@ -547,6 +541,7 @@ export function FarmPurchaseListTab({
                   crop={list.crop ?? "ANY"}
                   suggestedName={list.name}
                   iconOnly
+                  disabled={editing}
                 />
               ) : null}
               <IconActionButton
@@ -554,48 +549,32 @@ export function FarmPurchaseListTab({
                 icon={<Share2 className="h-4 w-4" />}
                 className={EXPORT_ACTION_CLASS}
                 onClick={() => setExportOpen(true)}
+                disabled={editing}
               />
             </>
           )
         }
         statsActions={
-          editing ? undefined : (
-            <>
-              {canViewPrices ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setMetasOpen(true)}
-                >
-                  <Target className="h-4 w-4" />
-                  Metas
-                </Button>
-              ) : null}
-              {canQuoteCrud && quotesHref ? (
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href={quotesHref}>
-                    <Store className="h-4 w-4" />
-                    Cotações
-                  </Link>
-                </Button>
-              ) : null}
-              {canQuoteCrud && list.status !== "draft" ? (
-                <FulfillWithoutQuoteButton
-                  listId={list.id}
-                  pending={hasPendingBuy}
-                />
-              ) : null}
-              {stockHref ? (
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href={stockHref}>
-                    <Boxes className="h-4 w-4" />
-                    Estoque
-                  </Link>
-                </Button>
-              ) : null}
-            </>
-          )
+          <>
+            {canViewPrices ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setMetasOpen(true)}
+                disabled={editing}
+              >
+                <Target className="h-4 w-4" />
+                Metas
+              </Button>
+            ) : null}
+            {canQuoteCrud && quotesHref
+              ? linkAction(quotesHref, <Store className="h-4 w-4" />, "Cotações")
+              : null}
+            {stockHref
+              ? linkAction(stockHref, <Boxes className="h-4 w-4" />, "Estoque")
+              : null}
+          </>
         }
         stats={[
           ...(canViewPrices
@@ -625,7 +604,16 @@ export function FarmPurchaseListTab({
           { label: "Hectares", value: `${fmtQty(totalHa)} ha` },
           { label: "Talhões", value: (list.plots ?? []).length },
         ]}
-      />
+      >
+        {/* Dólar, saca e espaçamento alimentam as contas da tabela — ficam no
+            herói, numa linha abaixo das métricas. */}
+        <PurchaseListParamsRow
+          items={editing ? draftItems : viewItems}
+          totalHa={totalHa}
+          readOnly={!editing}
+          variant="plain"
+        />
+      </PageHero>
 
       {restoreItems && !editing && !effectiveReadOnly ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
@@ -654,14 +642,48 @@ export function FarmPurchaseListTab({
 
       {hasItems || editing ? (
         <div className="space-y-4">
-          {editing ? (
-            <p className="text-sm text-muted-foreground">
-              Adicione, edite ou remova produtos. “Necessário” usa dose/ha ×{" "}
-              {fmtQty(totalHa)} ha × aplicações. “Estoque disponível” é o galpão menos o que
-              outras safras já reservaram — a baixa física só ocorre na aplicação.
-            </p>
-          ) : null}
           <PurchaseListItemsEditor
+            hideParams
+            tabsActions={
+              editing ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <SaveStatus state={saveState} savedAt={savedAt} />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={cancelEditing}
+                    disabled={updateMutation.isPending}
+                  >
+                    <X className="h-4 w-4" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => void saveItems()}
+                    disabled={updateMutation.isPending}
+                  >
+                    {updateMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}
+                    Salvar
+                  </Button>
+                </div>
+              ) : !effectiveReadOnly ? (
+                <Button
+                  variant="clay"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={startEditing}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar Lista de Compras
+                </Button>
+              ) : undefined
+            }
             items={editing ? draftItems : viewItems}
             setItems={setDraftItems}
             readOnly={!editing}
