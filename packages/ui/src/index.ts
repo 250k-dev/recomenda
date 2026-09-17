@@ -33,6 +33,7 @@ export * from "./primitives/dropdown-menu";
 export * from "./primitives/input";
 export * from "./primitives/label";
 export * from "./primitives/native-select";
+export * from "./primitives/pagination";
 export * from "./primitives/popover";
 export * from "./primitives/separator";
 export * from "./primitives/sheet";
