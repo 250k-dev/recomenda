@@ -1,11 +1,10 @@
 "use client";
 
-import { routes } from "@recomenda/config";
 
 import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, Eye, Leaf, Pencil, Plus, Share2, Store, Target, X, Check, Loader2 } from "lucide-react";
+import { Boxes, Leaf, Pencil, Plus, Share2, Store, Target, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@recomenda/ui/forms/select";
 import { PageHero } from "@/components/domain/page-hero";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -121,8 +120,6 @@ export type FarmPurchaseListTabProps = {
   fallbackSeasonIds: string[];
   /** Hide edit affordances (used by the standalone read-only list page). */
   readOnly?: boolean;
-  /** Quando embutido na safra (sem abas), abre o plano de custo agregado. */
-  onOpenCostPlan?: () => void;
   /** Quando informado, mostra o botão Estoque na mesma linha dos outros. */
   stockHref?: Route;
   /** Página de cotações das lojas (compartilhar link e comparar preços). */
@@ -140,7 +137,6 @@ export function FarmPurchaseListTab({
   newPurchaseListHref,
   fallbackSeasonIds,
   readOnly = false,
-  onOpenCostPlan,
   stockHref,
   quotesHref,
 }: FarmPurchaseListTabProps) {
@@ -569,25 +565,6 @@ export function FarmPurchaseListTab({
                   listId={list.id}
                   pending={hasPendingBuy}
                 />
-              ) : null}
-              {/* Plano de custo é só preço — Gerente/Operador não têm PRICE_VIEW. */}
-              {canViewPrices && onOpenCostPlan ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={onOpenCostPlan}
-                >
-                  <Eye className="h-4 w-4" />
-                  Ver plano de custo
-                </Button>
-              ) : canViewPrices && list.season_id ? (
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href={routes.safras.planoDeCusto(list.season_id)}>
-                    <Eye className="h-4 w-4" />
-                    Ver plano de custo
-                  </Link>
-                </Button>
               ) : null}
               {stockHref ? (
                 <Button asChild variant="outline" size="sm" className="gap-1.5">

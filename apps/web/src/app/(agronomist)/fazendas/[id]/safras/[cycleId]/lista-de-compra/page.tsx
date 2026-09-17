@@ -106,7 +106,6 @@ export default function CyclePurchaseListPage() {
           producerId={producerId || null}
           newPurchaseListHref={page.hrefs.novaListaDeCompra}
           fallbackSeasonIds={[]}
-          onOpenCostPlan={() => router.push(page.hrefs.planoDeCusto)}
           stockHref={page.hrefs.estoque}
           quotesHref={page.hrefs.cotacoes}
         />
