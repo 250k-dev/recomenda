@@ -38,5 +38,15 @@
     "company": "250K",
     "active": true,
     "createdAt": "2026-09-17T02:01:12.251Z"
+  },
+  {
+    "id": "usr_1789657519068",
+    "name": "João Gabriel",
+    "email": "estagio@250k.org",
+    "passwordHash": "admin123",
+    "role": "client",
+    "company": "250K",
+    "active": true,
+    "createdAt": "2026-09-17T15:05:19.068Z"
   }
 ]
