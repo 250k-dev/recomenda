@@ -1036,27 +1036,29 @@ export function PurchaseListItemsEditor({
     const colCount = seedBand
       ? (readOnly ? 13 : 15) - (4 - priceCols)
       : (readOnly ? 15 : 17) - (4 - priceCols);
-    const tableWidth = seedBand
+    // Soma das colunas: largura mínima (abaixo dela, rola na horizontal). Acima,
+    // a tabela ocupa o card inteiro e as colunas crescem na proporção.
+    const tableMinWidth = seedBand
       ? readOnly
         ? canViewPrices
-          ? "w-[1752px]"
-          : "w-[1248px]"
+          ? "min-w-[1752px]"
+          : "min-w-[1248px]"
         : canViewPrices
-          ? "w-[1796px]"
-          : "w-[1292px]"
+          ? "min-w-[1796px]"
+          : "min-w-[1292px]"
       : readOnly
         ? canViewPrices
-          ? "w-[1924px]"
-          : "w-[1420px]"
+          ? "min-w-[1924px]"
+          : "min-w-[1420px]"
         : canViewPrices
-          ? "w-[1968px]"
-          : "w-[1464px]";
+          ? "min-w-[1968px]"
+          : "min-w-[1464px]";
     return (
       <div
         key={band.id}
         className="overflow-x-auto rounded-xl border bg-card shadow-sm"
       >
-        <table className={cn("table-fixed text-sm", tableWidth)}>
+        <table className={cn("w-full table-fixed text-sm", tableMinWidth)}>
           <colgroup>
             {seedBand ? (
               <>
