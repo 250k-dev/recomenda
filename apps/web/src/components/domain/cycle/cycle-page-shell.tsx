@@ -61,6 +61,7 @@ export function useCyclePage() {
     farm: routes.fazendas.detalhe(farmId, ctx),
     base: routes.fazendas.safra(farmId, cycleId, ctx),
     listaDeCompra: routes.fazendas.safraListaDeCompra(farmId, cycleId, ctx),
+    cotacoes: routes.fazendas.safraCotacoes(farmId, cycleId, ctx),
     planoDeCusto: routes.fazendas.safraPlanoDeCusto(farmId, cycleId, ctx),
     estoque: routes.fazendas.estoque(farmId, ctx),
     novaListaDeCompra: routes.fazendas.novaListaDeCompra(farmId, {
@@ -121,7 +122,7 @@ export function CyclePageShell({
   actions,
   backHref,
   hideHero = false,
-  currentLabel,
+  trail,
   children,
 }: {
   page: CyclePage;
@@ -134,21 +135,21 @@ export function CyclePageShell({
   /** Omite o hero da safra — para telas que já têm hero próprio (lista de compra). */
   hideHero?: boolean;
   /**
-   * Nome da subrota (ex.: "Lista de compra"). Quando definido, a safra vira
-   * link na trilha e este rótulo entra depois dela como página atual.
+   * Níveis da subrota abaixo da safra (ex.: Lista de compra → Cotações).
+   * Quando definido, a safra vira link na trilha e estes itens entram depois dela.
    */
-  currentLabel?: string;
+  trail?: BreadcrumbItem[];
   children: ReactNode;
 }) {
   const { cycle, farm, isLoading, draftSeasons } = page;
-  const breadcrumbs: BreadcrumbItem[] = currentLabel
+  const breadcrumbs: BreadcrumbItem[] = trail?.length
     ? [
         ...page.breadcrumbs.map((item, idx) =>
           idx === page.breadcrumbs.length - 1
             ? { ...item, href: page.hrefs.base }
             : item,
         ),
-        { label: currentLabel },
+        ...trail,
       ]
     : page.breadcrumbs;
   const publishCycle = usePublishCycle(page.cycleId);

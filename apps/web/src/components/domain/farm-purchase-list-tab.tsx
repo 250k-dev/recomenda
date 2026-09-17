@@ -52,8 +52,6 @@ import { CROP_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 import { Card, CardContent } from "@recomenda/ui/primitives/card";
 import { DataTable } from "@recomenda/ui/patterns/data-table";
-import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
-import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
 import { FulfillWithoutQuoteButton } from "@/components/domain/fulfill-without-quote-dialog";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
 import { useCan } from "@recomenda/api-hooks/use-can";
@@ -126,6 +124,8 @@ export type FarmPurchaseListTabProps = {
   onOpenCostPlan?: () => void;
   /** Quando informado, mostra o botão Estoque na mesma linha dos outros. */
   stockHref?: Route;
+  /** Página de cotações das lojas (compartilhar link e comparar preços). */
+  quotesHref?: Route;
 };
 
 export function FarmPurchaseListTab({
@@ -141,6 +141,7 @@ export function FarmPurchaseListTab({
   readOnly = false,
   onOpenCostPlan,
   stockHref,
+  quotesHref,
 }: FarmPurchaseListTabProps) {
   const canListCrud = useCan("LIST_CRUD");
   const canQuoteCrud = useCan("QUOTE_CRUD");
@@ -176,11 +177,9 @@ export function FarmPurchaseListTab({
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [showComparison, setShowComparison] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [targetsOpen, setTargetsOpen] = useState(false);
   const [savingTargets, setSavingTargets] = useState(false);
-  const quotesSectionRef = useRef<HTMLDivElement>(null);
 
   // Rede de segurança do autosave: além de gravar no servidor, guarda os itens em
   // edição no navegador (localStorage). O servidor pode falhar calado (servidor
@@ -192,18 +191,6 @@ export function FarmPurchaseListTab({
   );
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [restoreItems, setRestoreItems] = useState<ListItem[] | null>(null);
-
-  const toggleQuotesComparison = useCallback(() => {
-    setShowComparison((prev) => {
-      const next = !prev;
-      if (next) {
-        requestAnimationFrame(() => {
-          quotesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      }
-      return next;
-    });
-  }, []);
 
   const updateMutation = useUpdatePurchaseList(list?.id ?? "", { farmId });
   const cascadeRecommendationItemsRef = useRef(false);
@@ -231,7 +218,6 @@ export function FarmPurchaseListTab({
   if (list?.id !== trackedListId) {
     setTrackedListId(list?.id);
     setError(null);
-    setShowComparison(false);
     setEditing(false);
     setDraftItems(list ? itemsFromList(list) : []);
     setSaveState("idle");
@@ -565,19 +551,13 @@ export function FarmPurchaseListTab({
                 <FileDown className="h-4 w-4" />
                 Exportar
               </Button>
-              {canQuoteCrud ? (
-                <ShareQuoteSheet listId={list.id} listName={list.name} />
-              ) : null}
-              {canQuoteCrud ? (
-              <Button
-                variant={showComparison ? "clay" : "outline"}
-                size="sm"
-                className="gap-1.5"
-                onClick={toggleQuotesComparison}
-              >
-                <Store className="h-4 w-4" />
-                Cotações das lojas
-              </Button>
+              {canQuoteCrud && quotesHref ? (
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link href={quotesHref}>
+                    <Store className="h-4 w-4" />
+                    Cotações
+                  </Link>
+                </Button>
               ) : null}
               {canQuoteCrud && !editing && list.status !== "draft" ? (
                 <FulfillWithoutQuoteButton
@@ -748,21 +728,6 @@ export function FarmPurchaseListTab({
           }
         />
       )}
-
-      {!editing && showComparison ? (
-        <div ref={quotesSectionRef} className="scroll-mt-24 space-y-3">
-          <div className="flex items-center gap-2">
-            <Store className="h-4 w-4 text-primary-strong" />
-            <h3 className="font-display text-base font-semibold text-text-strong">
-              Cotações das lojas
-            </h3>
-            <span className="text-xs text-muted-foreground">
-              · preços por loja (somente você vê esta comparação)
-            </span>
-          </div>
-          <QuoteComparisonSection listId={list.id} listName={list.name} />
-        </div>
-      ) : null}
 
       <PurchaseListExportDialog
         open={exportOpen}

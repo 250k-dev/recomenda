@@ -44,7 +44,7 @@ export default function CyclePurchaseListPage() {
       page={page}
       backHref={page.hrefs.base}
       hideHero
-      currentLabel="Lista de compra"
+      trail={[{ label: "Lista de compra" }]}
     >
       {loadingList ? (
         <EmptyState
@@ -108,6 +108,7 @@ export default function CyclePurchaseListPage() {
           fallbackSeasonIds={[]}
           onOpenCostPlan={() => router.push(page.hrefs.planoDeCusto)}
           stockHref={page.hrefs.estoque}
+          quotesHref={page.hrefs.cotacoes}
         />
       )}
     </CyclePageShell>

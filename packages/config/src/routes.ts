@@ -133,6 +133,9 @@ export const routes = {
       withQuery(`/fazendas/${id}/safras/${cycleId}`, ctx),
     safraListaDeCompra: (id: string, cycleId: string, ctx?: RouteContext) =>
       withQuery(`/fazendas/${id}/safras/${cycleId}/lista-de-compra`, ctx),
+    /** Cotações das lojas para a lista de compra da safra. */
+    safraCotacoes: (id: string, cycleId: string, ctx?: RouteContext) =>
+      withQuery(`/fazendas/${id}/safras/${cycleId}/lista-de-compra/cotacoes`, ctx),
     safraPlanoDeCusto: (id: string, cycleId: string, ctx?: RouteContext) =>
       withQuery(`/fazendas/${id}/safras/${cycleId}/plano-de-custo`, ctx),
     novaSafra: (id: string, ctx?: RouteContext) =>
