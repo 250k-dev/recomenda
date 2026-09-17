@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckSquare,
-  FileDown,
   Loader2,
   PencilLine,
   RotateCcw,
@@ -15,7 +14,6 @@ import {
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { Button } from "@recomenda/ui/primitives/button";
-import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import {
   Dialog,
@@ -39,7 +37,6 @@ import {
 } from "@recomenda/api-hooks";
 import { queryKeys } from "@recomenda/api-hooks/queryKeys";
 import { apiErrorMessage } from "@recomenda/api/api-error";
-import { QuoteExportDialog } from "@/components/domain/quote-export-dialog";
 import {
   QuoteConfirmQtyDialog,
   type MultiStoreProductGroup,
@@ -99,14 +96,8 @@ type PendingPermanent =
 
 export function QuoteComparisonSection({
   listId,
-  listName,
-  producerName,
-  agronomistName,
 }: {
   listId: string;
-  listName?: string | null;
-  producerName?: string | null;
-  agronomistName?: string | null;
 }) {
   const { data, isLoading } = usePurchaseListQuotes(listId);
   const { data: trash } = usePurchaseListQuoteTrash(listId);
@@ -116,7 +107,6 @@ export function QuoteComparisonSection({
   const queryClient = useQueryClient();
 
   const [showTrash, setShowTrash] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const [pendingPermanent, setPendingPermanent] = useState<PendingPermanent | null>(null);
   /** quote_response_item_id selecionados para compra. */
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -672,14 +662,6 @@ export function QuoteComparisonSection({
           </Button>
           {manualQuoteButton}
           {fulfillButton}
-          <Button
-            size="sm"
-            className={EXPORT_ACTION_CLASS}
-            onClick={() => setExportOpen(true)}
-          >
-            <FileDown className="size-3.5" />
-            Exportar
-          </Button>
           {trashCount > 0 ? (
             <Button variant="ghost" size="sm" onClick={() => setShowTrash((v) => !v)}>
               <Trash2 className="size-3.5" />
@@ -690,14 +672,6 @@ export function QuoteComparisonSection({
       </div>
       {manualQuoteDialog}
       {trashPanel}
-      {data ? (
-        <QuoteExportDialog
-          open={exportOpen}
-          onOpenChange={setExportOpen}
-          data={data}
-          context={{ listName, producerName, agronomistName }}
-        />
-      ) : null}
       <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full min-w-[920px] border-collapse text-sm">

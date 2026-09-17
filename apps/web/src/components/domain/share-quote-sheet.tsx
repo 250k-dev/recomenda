@@ -34,13 +34,23 @@ export function ShareQuoteSheet({
   listName,
   producerName,
   triggerClassName,
+  open: openProp,
+  onOpenChange,
 }: {
   listId: string;
   listName: string;
   producerName?: string | null;
   triggerClassName?: string;
+  /**
+   * Controlado por fora, sem botão próprio (ex.: aberto de dentro do diálogo
+   * Compartilhar da tela de Cotações).
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlled ? openProp : internalOpen;
   const [token, setToken] = useState<string | null>(null);
   const [paymentTerm, setPaymentTerm] = useState<"" | QuotePaymentTerm>("");
   const [copied, setCopied] = useState(false);
@@ -114,7 +124,8 @@ export function ShareQuoteSheet({
   };
 
   const handleOpenChange = (next: boolean) => {
-    setOpen(next);
+    if (!controlled) setInternalOpen(next);
+    onOpenChange?.(next);
     if (!next) {
       setToken(null);
       setPaymentTerm("");
@@ -126,16 +137,18 @@ export function ShareQuoteSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn("gap-1.5", triggerClassName)}
-        >
-          <Share2 className="h-4 w-4" />
-          Compartilhar cotação
-        </Button>
-      </SheetTrigger>
+      {controlled ? null : (
+        <SheetTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn("gap-1.5", triggerClassName)}
+          >
+            <Share2 className="h-4 w-4" />
+            Compartilhar cotação
+          </Button>
+        </SheetTrigger>
+      )}
       <SheetContent side="right" className="w-full gap-0 sm:max-w-md">
         <SheetHeader className="border-b">
           <SheetTitle className="flex items-center gap-2 text-lg">
@@ -248,7 +261,7 @@ export function ShareQuoteSheet({
 
               <p className="text-xs text-muted-foreground">
                 O mesmo link serve para todas as lojas. Você acompanha os preços
-                recebidos em <strong>Cotações das lojas</strong>.
+                recebidos em <strong>Cotações</strong>.
               </p>
             </>
           )}

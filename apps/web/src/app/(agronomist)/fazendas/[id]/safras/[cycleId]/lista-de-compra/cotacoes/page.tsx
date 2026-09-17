@@ -7,7 +7,7 @@ import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { PageHero } from "@/components/domain/page-hero";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { QuoteComparisonSection } from "@/components/domain/quote-comparison-section";
-import { ShareQuoteSheet } from "@/components/domain/share-quote-sheet";
+import { QuoteShareButton } from "@/components/domain/quote-share-button";
 import {
   CyclePageShell,
   useCyclePage,
@@ -74,7 +74,7 @@ export default function CyclePurchaseListQuotesPage() {
             eyebrow={`Lista de compra · ${purchaseList.name}`}
             title="Cotações"
             actions={
-              <ShareQuoteSheet
+              <QuoteShareButton
                 listId={purchaseList.id}
                 listName={purchaseList.name}
               />
@@ -85,10 +85,7 @@ export default function CyclePurchaseListQuotesPage() {
             </p>
           </PageHero>
 
-          <QuoteComparisonSection
-            listId={purchaseList.id}
-            listName={purchaseList.name}
-          />
+          <QuoteComparisonSection listId={purchaseList.id} />
         </>
       )}
     </CyclePageShell>
