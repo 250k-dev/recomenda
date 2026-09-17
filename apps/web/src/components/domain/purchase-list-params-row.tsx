@@ -42,15 +42,28 @@ export function PurchaseListParamsRow({
   totalHa,
   readOnly = false,
   variant = "card",
+  inverted = false,
   className,
 }: {
   items: ListItem[];
   totalHa: number;
   readOnly?: boolean;
   variant?: "card" | "plain";
+  /** Sobre o verde do herói: texto e ícones claros. */
+  inverted?: boolean;
   className?: string;
 }) {
   const canViewPrices = useCan("PRICE_VIEW");
+  const chipClass = inverted
+    ? "bg-white/15 text-white"
+    : "bg-primary-soft text-primary-strong";
+  const labelClass = inverted
+    ? "text-primary-foreground/80"
+    : "text-muted-foreground";
+  const hintClass = inverted
+    ? "text-primary-foreground/70"
+    : "text-muted-foreground";
+  const valueClass = inverted ? "text-primary-foreground" : "text-foreground";
   const {
     fxRate,
     setFxRate,
@@ -99,30 +112,33 @@ export function PurchaseListParamsRow({
         "flex flex-wrap items-center justify-between gap-3",
         variant === "card"
           ? "rounded-xl border bg-card px-4 py-3 shadow-sm"
-          : "mt-4 border-t pt-4",
+          : cn("mt-4 border-t pt-4", inverted && "border-white/20"),
         className,
       )}
     >
       {canViewPrices ? (
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+          <span className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-lg",
+              chipClass,
+            )}>
             <DollarSign className="h-4 w-4" />
           </span>
           <div className="flex flex-col">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className={cn("text-[11px] font-semibold uppercase tracking-wide", labelClass)}>
               Cotação do dólar
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className={cn("text-[11px]", hintClass)}>
               converte produtos cotados em US$ para R$
             </span>
           </div>
           {readOnly ? (
-            <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
+            <span className={cn("ml-2 self-end text-sm font-semibold tabular-nums", valueClass)}>
               {fx > 0 ? fmtBrl(fx) : "—"}
             </span>
           ) : (
             <div className="ml-2 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">US$ 1 =</span>
+              <span className={cn("text-sm", hintClass)}>US$ 1 =</span>
               <MoneyInput
                 placeholder="5,50"
                 value={fxRate}
@@ -138,24 +154,27 @@ export function PurchaseListParamsRow({
       ) : null}
       {canViewPrices ? (
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+          <span className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-lg",
+              chipClass,
+            )}>
             <PaperBag className="h-4 w-4" />
           </span>
           <div className="flex flex-col">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className={cn("text-[11px] font-semibold uppercase tracking-wide", labelClass)}>
               Preço da saca
             </span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className={cn("text-[11px]", hintClass)}>
               converte o custo em sacas
             </span>
           </div>
           {readOnly ? (
-            <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
+            <span className={cn("ml-2 self-end text-sm font-semibold tabular-nums", valueClass)}>
               {fmtBrl(saca)}
             </span>
           ) : (
             <div className="ml-2 flex items-center gap-1">
-              <span className="text-sm text-muted-foreground">R$</span>
+              <span className={cn("text-sm", hintClass)}>R$</span>
               <MoneyInput
                 placeholder="110,00"
                 value={grainPrice}
@@ -168,19 +187,22 @@ export function PurchaseListParamsRow({
       ) : null}
       {/* Espaçamento entre linhas (m) — parâmetro único; deriva a população da semente. */}
       <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft text-primary-strong">
+        <span className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-lg",
+              chipClass,
+            )}>
           <RulerDimensionLine className="h-4 w-4" />
         </span>
         <div className="flex flex-col">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className={cn("text-[11px] font-semibold uppercase tracking-wide", labelClass)}>
             Espaçamento
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className={cn("text-[11px]", hintClass)}>
             deriva a população da semente
           </span>
         </div>
         {readOnly ? (
-          <span className="ml-2 self-end text-sm font-semibold tabular-nums text-foreground">
+          <span className={cn("ml-2 self-end text-sm font-semibold tabular-nums", valueClass)}>
             {fmt(spacing)} m
           </span>
         ) : (
@@ -193,25 +215,25 @@ export function PurchaseListParamsRow({
               onChange={(e) => setSpacing(e.target.value)}
               className="h-8 w-20"
             />
-            <span className="text-sm text-muted-foreground">m</span>
+            <span className={cn("text-sm", hintClass)}>m</span>
           </div>
         )}
       </div>
       {canViewPrices ? (
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className={cn("text-[10px] uppercase tracking-wide", labelClass)}>
               Total R$
             </span>
-            <span className="text-sm font-semibold tabular-nums text-foreground">
+            <span className={cn("text-sm font-semibold tabular-nums", valueClass)}>
               {fmtBrl(totals.brl)}
             </span>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className={cn("text-[10px] uppercase tracking-wide", labelClass)}>
               Total US$
             </span>
-            <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+            <span className={cn("text-sm font-semibold tabular-nums", hintClass)}>
               {totals.usd > 0 ? fmtUsd(totals.usd) : "—"}
             </span>
           </div>

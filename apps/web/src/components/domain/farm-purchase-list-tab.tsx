@@ -511,7 +511,7 @@ export function FarmPurchaseListTab({
       ) : null}
 
       <PageHero
-        sticky
+        variant="inverted"
         className="mb-7"
         icon={<Leaf className="size-6" />}
         eyebrow={`Lista de compra · ${list.name}${
@@ -529,7 +529,7 @@ export function FarmPurchaseListTab({
                 <FulfillWithoutQuoteButton
                   listId={list.id}
                   pending={hasPendingBuy}
-                  variant="default"
+                  variant="clay"
                   disabled={editing}
                 />
               ) : null}
@@ -612,6 +612,7 @@ export function FarmPurchaseListTab({
           totalHa={totalHa}
           readOnly={!editing}
           variant="plain"
+          inverted
         />
       </PageHero>
 
@@ -673,12 +674,7 @@ export function FarmPurchaseListTab({
                   </Button>
                 </div>
               ) : !effectiveReadOnly ? (
-                <Button
-                  variant="clay"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={startEditing}
-                >
+                <Button size="sm" className="gap-1.5" onClick={startEditing}>
                   <Pencil className="h-4 w-4" />
                   Editar Lista de Compras
                 </Button>

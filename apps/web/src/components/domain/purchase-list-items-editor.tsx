@@ -62,6 +62,8 @@ import {
 
 const DEFAULT_ITEM_STAGE = "Outra";
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+/** Em quantos pixels de scroll o fundo da faixa fixa entra por completo. */
+const STICK_RAMP_PX = 40;
 /** Ciclo padrão da semente (dias) — soja gira em ~110 dias. */
 const DEFAULT_CYCLE_DAYS = "110";
 
@@ -218,6 +220,11 @@ export function PurchaseListItemsEditor({
   // Paginação da tabela aberta. A página é limitada na renderização, então
   // trocar de aba (ou remover itens) nunca deixa a tela vazia.
   const [page, setPage] = useState(1);
+  // O fundo branco da faixa entra conforme o scroll, não por transição de
+  // tempo: num scroll rápido de volta ao topo ela some junto com o movimento,
+  // em vez de ficar desbotando depois que o dedo já parou.
+  const tabsSentinelRef = useRef<HTMLDivElement | null>(null);
+  const [tabsStickProgress, setTabsStickProgress] = useState(0);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   /** Item novo entra no fim: a última página é onde ele aparece. */
   const goToLastPage = () => setPage(Number.MAX_SAFE_INTEGER);
@@ -1388,7 +1395,7 @@ export function PurchaseListItemsEditor({
                 <td className={summaryCellClass} />
               </tr>
               {seedBand ? renderSeedAreaTableRows(band.items, colCount) : null}
-          </tfoot>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -1537,6 +1544,40 @@ export function PurchaseListItemsEditor({
   ];
   const bands = bandDefs.filter((b) => b.items.length > 0);
   const activeBand = bands.find((b) => b.id === bandTab) ?? bands[0];
+  const showTabsRow = Boolean(tabsActions) || bands.length > 1;
+  useEffect(() => {
+    if (!showTabsRow) return;
+    // O sentinela fica na posição natural da faixa: o quanto ele já subiu além
+    // do topo é o quanto a faixa está grudada.
+    const desktop = window.matchMedia("(min-width: 768px)");
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const el = tabsSentinelRef.current;
+      if (!el || !desktop.matches) {
+        setTabsStickProgress(0);
+        return;
+      }
+      const offset = -el.getBoundingClientRect().top;
+      const next = Math.min(1, Math.max(0, offset / STICK_RAMP_PX));
+      setTabsStickProgress((prev) =>
+        Math.abs(prev - next) < 0.02 ? prev : next,
+      );
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    desktop.addEventListener("change", schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      desktop.removeEventListener("change", schedule);
+    };
+  }, [showTabsRow]);
   const totalPages = Math.max(
     1,
     Math.ceil((activeBand?.items.length ?? 0) / pageSize),
@@ -1563,54 +1604,79 @@ export function PurchaseListItemsEditor({
 
       {/* Abas (só no desktop, onde há tabela) e a ação da lista, que vale em
           qualquer largura — por isso a linha fica fora do bloco `lg:block`. */}
-      {tabsActions || bands.length > 1 ? (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          {bands.length > 1 ? (
-            <SegmentedTabs
-              className="hidden lg:inline-flex"
-              value={activeBand?.id ?? bands[0].id}
-              onValueChange={(id: BandId) => {
-                setBandTab(id);
-                setPage(1);
-              }}
-              items={bands.map((band) => ({
-                value: band.id,
-                // Fora da programação em vermelho — menos quando é a aba ativa,
-                // que fica no verde primário como as outras.
-                label: (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className={
-                        band.out && activeBand?.id !== band.id
-                          ? "text-danger-strong"
-                          : undefined
-                      }
-                    >
-                      {band.tab}
-                    </span>
-                    {/* Itens acima do estoque nesta tabela — o âmbar sai na aba
-                        ativa, onde o fundo é o verde primário. */}
-                    {band.items.some(exceedsStockOf) ? (
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-0.5",
-                          activeBand?.id !== band.id && "text-amber-700",
-                        )}
-                        title="Itens acima do estoque disponível"
-                      >
-                        <AlertTriangle className="size-3.5" />
-                        {band.items.filter(exceedsStockOf).length}
-                      </span>
-                    ) : null}
-                  </span>
-                ),
-              }))}
+      {showTabsRow ? (
+        // Fica no topo ao rolar: as abas e a ação da lista seguem à mão com a
+        // tabela longa. Só em md+ — no mobile o topo já é da barra do app.
+        // Grudada, ganha fundo branco e sombra; a transição faz a passagem.
+        <>
+          <div ref={tabsSentinelRef} aria-hidden className="h-0" />
+          <div
+            className={cn(
+              "relative mb-3",
+              "max-md:static md:sticky md:top-0 md:z-10",
+              // Sangra até as bordas da janela; o conteúdo segue alinhado com a
+              // página pelo contêiner de dentro.
+              "md:mx-[calc(50%-50vw)] md:w-screen",
+            )}
+          >
+            {/* Camada só do fundo: a opacidade acompanha o scroll sem levar
+              junto o texto das abas. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 bg-card shadow-[0_6px_20px_-8px_rgb(0_0_0/0.25)]"
+              style={{ opacity: tabsStickProgress }}
             />
-          ) : (
-            <span />
-          )}
-          {tabsActions}
-        </div>
+            {/* A largura máxima soma o px-8 do `main`: sem isso o recuo entra
+              duas vezes e as abas saem da prumada da tabela em tela larga. */}
+            <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 md:max-w-[calc(var(--container-app)+4rem)] md:px-8 md:py-2">
+              {bands.length > 1 ? (
+                <SegmentedTabs
+                  className="hidden lg:inline-flex"
+                  value={activeBand?.id ?? bands[0].id}
+                  onValueChange={(id: BandId) => {
+                    setBandTab(id);
+                    setPage(1);
+                  }}
+                  items={bands.map((band) => ({
+                    value: band.id,
+                    // Fora da programação em vermelho — menos quando é a aba ativa,
+                    // que fica no verde primário como as outras.
+                    label: (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className={
+                            band.out && activeBand?.id !== band.id
+                              ? "text-danger-strong"
+                              : undefined
+                          }
+                        >
+                          {band.tab}
+                        </span>
+                        {/* Itens acima do estoque nesta tabela — o âmbar sai na aba
+                          ativa, onde o fundo é o verde primário. */}
+                        {band.items.some(exceedsStockOf) ? (
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5",
+                              activeBand?.id !== band.id && "text-amber-700",
+                            )}
+                            title="Itens acima do estoque disponível"
+                          >
+                            <AlertTriangle className="size-3.5" />
+                            {band.items.filter(exceedsStockOf).length}
+                          </span>
+                        ) : null}
+                      </span>
+                    ),
+                  }))}
+                />
+              ) : (
+                <span />
+              )}
+              {tabsActions}
+            </div>
+          </div>
+        </>
       ) : null}
       {items.length === 0 ? (
         <div className="hidden rounded-xl border bg-card px-3 py-10 text-center text-sm text-muted-foreground shadow-sm lg:block">
@@ -2012,8 +2078,8 @@ export function PurchaseListItemsEditor({
         // Faixa fixa no rodapé da janela: adicionar produto fica à mão em lista
         // longa, sem rolar até o fim. O `pb` do container abre o espaço para o
         // fim da lista não terminar embaixo dela.
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-app flex-wrap items-center justify-end gap-2 px-4 py-3 md:px-8">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-[0_-6px_20px_-8px_rgb(0_0_0/0.25)] backdrop-blur">
+          <div className="mx-auto flex w-full max-w-[calc(var(--container-app)+2rem)] flex-wrap items-center justify-end gap-2 px-4 py-3 md:max-w-[calc(var(--container-app)+4rem)] md:px-8">
             {selectedKeys.size > 0 ? (
               <Button
                 type="button"
@@ -2030,7 +2096,11 @@ export function PurchaseListItemsEditor({
               </Button>
             ) : null}
             {seedCategories.length > 0 ? (
-              <Button type="button" onClick={addSeedItem} className="shrink-0 gap-2">
+              <Button
+                type="button"
+                onClick={addSeedItem}
+                className="shrink-0 gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Adicionar semente
               </Button>

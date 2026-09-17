@@ -13,7 +13,7 @@ export function AgronomistShell({ children }: { children: ReactNode }) {
           <AppHeader />
         </div>
         <ImpersonationBanner />
-        <main className="flex-1 px-4 py-6 md:px-8">
+        <main className="flex-1 overflow-x-clip px-4 py-6 md:px-8">
           <div className="mx-auto w-full max-w-app">{children}</div>
         </main>
       </div>
