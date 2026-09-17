@@ -78,5 +78,15 @@
     "company": "250K",
     "active": true,
     "createdAt": "2026-09-17T15:07:00.791Z"
+  },
+  {
+    "id": "usr_1789657639004",
+    "name": "Valdinei Vitor",
+    "email": "vitor.consultoria@250k.org",
+    "passwordHash": "admin123",
+    "role": "client",
+    "company": "250K",
+    "active": true,
+    "createdAt": "2026-09-17T15:07:19.004Z"
   }
 ]
