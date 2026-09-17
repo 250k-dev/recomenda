@@ -50,6 +50,14 @@ import type { PurchaseListDetail, PurchaseListItemInput } from "@recomenda/api";
 import { CROP_LABELS } from "@recomenda/utils";
 import { toast } from "sonner";
 import { Card, CardContent } from "@recomenda/ui/primitives/card";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@recomenda/ui/primitives/drawer";
 import { DataTable } from "@recomenda/ui/patterns/data-table";
 import { FulfillWithoutQuoteButton } from "@/components/domain/fulfill-without-quote-dialog";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
@@ -176,6 +184,7 @@ export function FarmPurchaseListTab({
   const [error, setError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [targetsOpen, setTargetsOpen] = useState(false);
+  const [metasOpen, setMetasOpen] = useState(false);
   const [savingTargets, setSavingTargets] = useState(false);
 
   // Rede de segurança do autosave: além de gravar no servidor, guarda os itens em
@@ -552,6 +561,17 @@ export function FarmPurchaseListTab({
         statsActions={
           editing ? undefined : (
             <>
+              {canViewPrices ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setMetasOpen(true)}
+                >
+                  <Target className="h-4 w-4" />
+                  Metas
+                </Button>
+              ) : null}
               {canQuoteCrud && quotesHref ? (
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={quotesHref}>
@@ -641,45 +661,6 @@ export function FarmPurchaseListTab({
               outras safras já reservaram — a baixa física só ocorre na aplicação.
             </p>
           ) : null}
-          {/* Meta única (sc/ha): barra Real × Meta; a distribuição por categoria
-              continua abaixo, sem coluna de meta. Metas antigas por categoria
-              seguem na tabela Realizado × Meta de sempre. */}
-          {canViewPrices &&
-          hasSingleTotalTarget(list.category_targets ?? {}) ? (
-            <CategoryMetaProgress
-              items={editing ? draftItems : viewItems}
-              totalHa={totalHa}
-              targets={list.category_targets ?? {}}
-            />
-          ) : null}
-          {canViewPrices &&
-          (kpis.categoryBreakdown.length > 0 ||
-            Object.values(list.category_targets ?? {}).some(
-              (v) => (v ?? 0) > 0,
-            )) ? (
-            <CategoryDistributionPanel
-              breakdown={kpis.categoryBreakdown}
-              targets={
-                hasSingleTotalTarget(list.category_targets ?? {})
-                  ? undefined
-                  : (list.category_targets ?? {})
-              }
-              collapsible
-              action={
-                !editing && !effectiveReadOnly ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => setTargetsOpen(true)}
-                  >
-                    <Target className="h-4 w-4" />
-                    Editar metas
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : null}
           <PurchaseListItemsEditor
             items={editing ? draftItems : viewItems}
             setItems={setDraftItems}
@@ -711,6 +692,70 @@ export function FarmPurchaseListTab({
           }
         />
       )}
+
+      {/* Metas e gastos por categoria: fora do fluxo da tela, num drawer que
+          sobe pelo rodapé — quem abre a lista quer a tabela de itens. */}
+      {canViewPrices ? (
+        <Drawer open={metasOpen} onOpenChange={setMetasOpen}>
+          <DrawerContent>
+            <DrawerHeader className="flex-row flex-wrap items-start justify-between gap-3 border-b">
+              {/* O DrawerHeader centraliza o texto no drawer de baixo (regra de
+                  `group-data`, que vence um `text-left` no próprio header). */}
+              <div className="text-left">
+                <DrawerTitle className="text-lg">Metas da safra</DrawerTitle>
+                <DrawerDescription>
+                  Realizado por categoria, em R$ e sc/ha, comparado às metas.
+                </DrawerDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {!effectiveReadOnly ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setTargetsOpen(true)}
+                  >
+                    <Target className="h-4 w-4" />
+                    Editar metas
+                  </Button>
+                ) : null}
+                <DrawerClose asChild>
+                  <Button variant="ghost" size="icon-sm" aria-label="Fechar">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DrawerClose>
+              </div>
+            </DrawerHeader>
+            <div className="flex flex-col gap-4 overflow-y-auto p-4 pb-10">
+              {hasSingleTotalTarget(list.category_targets ?? {}) ? (
+                <CategoryMetaProgress
+                  items={editing ? draftItems : viewItems}
+                  totalHa={totalHa}
+                  targets={list.category_targets ?? {}}
+                />
+              ) : null}
+              {kpis.categoryBreakdown.length > 0 ||
+              Object.values(list.category_targets ?? {}).some(
+                (v) => (v ?? 0) > 0,
+              ) ? (
+                <CategoryDistributionPanel
+                  breakdown={kpis.categoryBreakdown}
+                  targets={
+                    hasSingleTotalTarget(list.category_targets ?? {})
+                      ? undefined
+                      : (list.category_targets ?? {})
+                  }
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Ainda não há gastos por categoria. Informe os preços dos
+                  produtos da lista, ou defina as metas da safra.
+                </p>
+              )}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
 
       <PurchaseListExportDialog
         open={exportOpen}

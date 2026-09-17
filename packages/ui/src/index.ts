@@ -28,6 +28,7 @@ export * from "./primitives/calendar";
 export * from "./primitives/card";
 export * from "./primitives/collapsible";
 export * from "./primitives/dialog";
+export * from "./primitives/drawer";
 export * from "./primitives/dropdown-menu";
 export * from "./primitives/input";
 export * from "./primitives/label";
