@@ -120,6 +120,8 @@ export function CyclePageShell({
   stats = [],
   actions,
   backHref,
+  hideHero = false,
+  currentLabel,
   children,
 }: {
   page: CyclePage;
@@ -129,9 +131,26 @@ export function CyclePageShell({
   actions?: ReactNode;
   /** Quando definido, mostra "Voltar à safra" acima do conteúdo. */
   backHref?: Route;
+  /** Omite o hero da safra — para telas que já têm hero próprio (lista de compra). */
+  hideHero?: boolean;
+  /**
+   * Nome da subrota (ex.: "Lista de compra"). Quando definido, a safra vira
+   * link na trilha e este rótulo entra depois dela como página atual.
+   */
+  currentLabel?: string;
   children: ReactNode;
 }) {
-  const { cycle, farm, isLoading, breadcrumbs, draftSeasons } = page;
+  const { cycle, farm, isLoading, draftSeasons } = page;
+  const breadcrumbs: BreadcrumbItem[] = currentLabel
+    ? [
+        ...page.breadcrumbs.map((item, idx) =>
+          idx === page.breadcrumbs.length - 1
+            ? { ...item, href: page.hrefs.base }
+            : item,
+        ),
+        { label: currentLabel },
+      ]
+    : page.breadcrumbs;
   const publishCycle = usePublishCycle(page.cycleId);
   const updateCycle = useUpdateCycle(page.cycleId);
   const canEdit = useCan("CYCLE_CRUD");
@@ -172,65 +191,67 @@ export function CyclePageShell({
     <>
       <BreadcrumbBack items={breadcrumbs} />
 
-      <PageHero
-        variant="inverted"
-        icon={<Leaf className="size-6" />}
-        eyebrow={cycle.backfill ? "Arquivo de safra · histórico" : "Safra"}
-        title={cycle.name}
-        titleAction={
-          canEdit ? (
-            <Button
-              variant="secondary"
-              size="icon-xs"
-              onClick={openEdit}
-              aria-label="Editar nome da safra"
-            >
-              <Pencil />
-            </Button>
-          ) : undefined
-        }
-        titleBadge={
-          <span className="inline-flex flex-wrap items-center gap-1.5">
-            {cycle.backfill ? <HistoricalCycleFlag /> : null}
-            {isPlanning ? (
-              <Badge variant="neutral">Em planejamento</Badge>
-            ) : cycle.backfill ? null : (
-              <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"}>
-                {labelStatus(CYCLE_STATUS_LABELS, cycle.status)}
-              </Badge>
-            )}
-            {cycle.awaiting_purchase ? (
-              <Badge variant="warning">Aguardando compra</Badge>
-            ) : null}
-          </span>
-        }
-        actions={
-          <>
-            <CycleExportButton
-              cycleId={page.cycleId}
-              producerId={page.producerId}
-            />
-            {draftSeasons.length > 0 ? (
+      {hideHero ? null : (
+        <PageHero
+          variant="inverted"
+          icon={<Leaf className="size-6" />}
+          eyebrow={cycle.backfill ? "Arquivo de safra · histórico" : "Safra"}
+          title={cycle.name}
+          titleAction={
+            canEdit ? (
               <Button
-                className={`gap-1.5 ${INVERTED_HERO_CTA_CLASS}`}
-                onClick={() => setPublishConfirm(true)}
-                disabled={publishCycle.isPending}
+                variant="secondary"
+                size="icon-xs"
+                onClick={openEdit}
+                aria-label="Editar nome da safra"
               >
-                <Rocket className="size-4" />
-                {publishCycle.isPending
-                  ? cycle.backfill
-                    ? "Registrando..."
-                    : "Publicando..."
-                  : cycle.backfill
-                    ? "Registrar programação"
-                    : "Revisar e publicar"}
+                <Pencil />
               </Button>
-            ) : null}
-            {actions}
-          </>
-        }
-        stats={heroStats}
-      />
+            ) : undefined
+          }
+          titleBadge={
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              {cycle.backfill ? <HistoricalCycleFlag /> : null}
+              {isPlanning ? (
+                <Badge variant="neutral">Em planejamento</Badge>
+              ) : cycle.backfill ? null : (
+                <Badge variant={cycle.status === "ACTIVE" ? "success" : "neutral"}>
+                  {labelStatus(CYCLE_STATUS_LABELS, cycle.status)}
+                </Badge>
+              )}
+              {cycle.awaiting_purchase ? (
+                <Badge variant="warning">Aguardando compra</Badge>
+              ) : null}
+            </span>
+          }
+          actions={
+            <>
+              <CycleExportButton
+                cycleId={page.cycleId}
+                producerId={page.producerId}
+              />
+              {draftSeasons.length > 0 ? (
+                <Button
+                  className={`gap-1.5 ${INVERTED_HERO_CTA_CLASS}`}
+                  onClick={() => setPublishConfirm(true)}
+                  disabled={publishCycle.isPending}
+                >
+                  <Rocket className="size-4" />
+                  {publishCycle.isPending
+                    ? cycle.backfill
+                      ? "Registrando..."
+                      : "Publicando..."
+                    : cycle.backfill
+                      ? "Registrar programação"
+                      : "Revisar e publicar"}
+                </Button>
+              ) : null}
+              {actions}
+            </>
+          }
+          stats={heroStats}
+        />
+      )}
 
       {cycle.backfill ? (
         <div

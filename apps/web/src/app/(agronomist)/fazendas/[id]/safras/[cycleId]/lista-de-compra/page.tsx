@@ -40,7 +40,12 @@ export default function CyclePurchaseListPage() {
   }, [listIsDraft, page.hrefs.novaListaDeCompra, router]);
 
   return (
-    <CyclePageShell page={page} backHref={page.hrefs.base}>
+    <CyclePageShell
+      page={page}
+      backHref={page.hrefs.base}
+      hideHero
+      currentLabel="Lista de compra"
+    >
       {loadingList ? (
         <EmptyState
           icon={ShoppingCart}
