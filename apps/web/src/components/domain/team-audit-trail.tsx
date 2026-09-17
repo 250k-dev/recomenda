@@ -212,7 +212,7 @@ export function TeamAuditTrail() {
 
   if (!canViewAudit) {
     return (
-      <div className="mx-auto max-w-[1240px]">
+      <div className="w-full">
         <BreadcrumbBack items={[{ label: "Equipe", href: routes.equipe.lista }]} />
         <EmptyState
           title="Sem permissão para a trilha."
@@ -223,7 +223,7 @@ export function TeamAuditTrail() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <BreadcrumbBack items={[{ label: "Equipe", href: routes.equipe.lista }]} />
 
       <PageHero

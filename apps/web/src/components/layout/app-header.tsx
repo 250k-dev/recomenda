@@ -33,7 +33,7 @@ export function AppHeader() {
 
   return (
     <header className="border-b border-border/70 bg-canvas/95 px-2 py-1.5 backdrop-blur-md md:border-0 md:bg-transparent md:px-8 md:pt-6 md:pb-2 md:backdrop-blur-none">
-      <div className="mx-auto flex min-h-12 w-full max-w-7xl items-center gap-1">
+      <div className="mx-auto flex min-h-12 w-full max-w-app items-center gap-1">
         {isHome ? (
           <div className="min-w-0 flex-1 pl-2">
             <div className="md:hidden">

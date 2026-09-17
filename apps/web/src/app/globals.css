@@ -36,6 +36,9 @@
   --font-display: var(--font-poppins), var(--font-inter), ui-sans-serif, sans-serif;
   --font-heading: var(--font-poppins), var(--font-inter), ui-sans-serif, sans-serif;
 
+  /* Largura máxima do conteúdo das páginas privadas (shells + header) — `max-w-app` */
+  --container-app: 125rem;
+
   /* shadcn semantic colors -> design tokens */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);

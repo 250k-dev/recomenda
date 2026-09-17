@@ -109,7 +109,7 @@ export function TeamAuditHome({ canManage, onInvite, pendingInvitesSlot }: Props
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-8">
+    <div className="flex w-full flex-col gap-8">
       <PageHero
         className="mb-2"
         icon={<Users className="size-6" />}

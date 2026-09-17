@@ -79,7 +79,7 @@ function FarmTeamEquipeView({ embedded = false }: { embedded?: boolean }) {
     !isLoading && members.length === 0 && pending.length === 0;
 
   return (
-    <div className={embedded ? "flex w-full flex-col gap-8" : "mx-auto flex w-full max-w-[1240px] flex-col gap-8"}>
+    <div className="flex w-full flex-col gap-8">
       {embedded ? (
         <div>
           <h2 className="text-lg font-extrabold text-[#2B2723]">Equipe da fazenda</h2>

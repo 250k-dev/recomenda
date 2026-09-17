@@ -6,7 +6,7 @@ import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 
 function TrailFallback() {
   return (
-    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <Skeleton className="h-8 w-40" />
       <Skeleton className="h-28 w-full" />
       <Skeleton className="h-64 w-full" />

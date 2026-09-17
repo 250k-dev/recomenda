@@ -107,7 +107,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
 
   if (canFarmTeam && farmTeamLoading) {
     return (
-      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
+      <div className="flex w-full flex-col gap-6">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -121,7 +121,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
 
   if (summaryLoading) {
     return (
-      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
+      <div className="flex w-full flex-col gap-6">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -131,7 +131,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
 
   if (isError || !summary) {
     return (
-      <div className="mx-auto max-w-[1240px]">
+      <div className="w-full">
         <BreadcrumbBack items={[{ label: "Equipe", href: routes.equipe.lista }]} />
         <p className="mt-6 text-sm text-muted-foreground">
           Membro não encontrado ou sem permissão para visualizar.
@@ -146,7 +146,7 @@ export function ConsultantDetailView({ userId }: { userId: string }) {
   const firstName = (summary.name ?? roleLabel).trim().split(/\s+/)[0] || roleLabel;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <BreadcrumbBack
         items={[
           { label: "Equipe", href: routes.equipe.lista },
