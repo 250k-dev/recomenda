@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BookmarkPlus } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
@@ -18,6 +18,7 @@ import { useCreatePurchaseListTemplate } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { cn } from "@recomenda/utils";
 import { FieldError } from "@/components/domain/season/_shared";
+import { IconActionButton } from "@/components/domain/icon-action-button";
 import { listItemToPayload, type ListItem } from "@recomenda/domain/purchase-list/list-item";
 
 /**
@@ -31,6 +32,7 @@ export function SavePurchaseListTemplateButton({
   crop,
   suggestedName,
   size = "default",
+  iconOnly = false,
   className,
 }: {
   items: ListItem[];
@@ -38,6 +40,8 @@ export function SavePurchaseListTemplateButton({
   /** Nome pré-preenchido no diálogo (ex.: o nome da lista). */
   suggestedName?: string;
   size?: "sm" | "default" | "lg";
+  /** Só o ícone, com o nome no tooltip (barra de ações do PageHero). */
+  iconOnly?: boolean;
   className?: string;
 }) {
   const createTemplate = useCreatePurchaseListTemplate();
@@ -73,17 +77,29 @@ export function SavePurchaseListTemplateButton({
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        size={size}
-        onClick={openDialog}
-        disabled={items.length === 0}
-        className={cn("gap-1.5", className)}
-      >
-        <BookmarkPlus className="h-4 w-4" />
-        Salvar como template
-      </Button>
+      {iconOnly ? (
+        <IconActionButton
+          type="button"
+          variant="outline"
+          label="Salvar como template"
+          icon={<Bookmark className="h-4 w-4" />}
+          onClick={openDialog}
+          disabled={items.length === 0}
+          className={className}
+        />
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size={size}
+          onClick={openDialog}
+          disabled={items.length === 0}
+          className={cn("gap-1.5", className)}
+        >
+          <Bookmark className="h-4 w-4" />
+          Salvar como template
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">

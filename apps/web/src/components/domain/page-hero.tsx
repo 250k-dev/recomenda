@@ -127,6 +127,7 @@ export function PageHero({
   titleAction,
   actions,
   stats,
+  statsActions,
   children,
   className,
   variant = "default",
@@ -143,6 +144,11 @@ export function PageHero({
   titleAction?: ReactNode;
   actions?: ReactNode;
   stats?: PageHeroStat[];
+  /**
+   * Ações secundárias à direita da faixa de métricas (desktop). No mobile
+   * entram na grade de azulejos, depois de `actions`.
+   */
+  statsActions?: ReactNode;
   /** Conteúdo extra após as métricas (ex.: banner de alerta no mobile). */
   children?: ReactNode;
   className?: string;
@@ -205,17 +211,9 @@ export function PageHero({
           </div>
         </div>
         {actions ? (
-          // Sem sticky: ocupa a sobra ao lado do título e quebra dentro da largura.
-          // Com sticky (ex.: lista de compra): linha própria em largura total —
-          // barra densa não espreme o título em tablet.
-          <div
-            className={cn(
-              "hidden max-w-full min-w-0 flex-wrap gap-2 sm:flex",
-              sticky
-                ? "w-full basis-full justify-start"
-                : "flex-1 basis-52 justify-end",
-            )}
-          >
+          // Ocupa a sobra ao lado do título e quebra dentro da largura; sem
+          // espaço, desce inteira para a linha de baixo (o título tem min-w).
+          <div className="hidden max-w-full min-w-0 flex-1 basis-52 flex-wrap justify-end gap-2 sm:flex">
             {actions}
           </div>
         ) : null}
@@ -223,7 +221,7 @@ export function PageHero({
 
       {/* Mobile: grade 2×2 (3 colunas em telas um pouco mais largas), azulejos
           quadrados — sem scroll horizontal. */}
-      {actions ? (
+      {actions || statsActions ? (
         <div
           className={cn(
             "mt-3.5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-3 sm:hidden",
@@ -233,6 +231,7 @@ export function PageHero({
           )}
         >
           {actions}
+          {statsActions}
         </div>
       ) : null}
 
@@ -241,22 +240,33 @@ export function PageHero({
           inteira é deslocada para a esquerda pelo tamanho do gutter e o pai
           recorta o excesso — assim toda primeira célula de linha encosta na
           margem e só os divisores internos aparecem. */}
-      {stats && stats.length > 0 ? (
+      {(stats && stats.length > 0) || statsActions ? (
         <div
           className={cn(
-            "mt-4 sm:mt-5 sm:overflow-x-clip sm:border-t sm:pt-4.5",
+            "mt-4 sm:mt-5 sm:flex sm:items-center sm:gap-x-6 sm:border-t sm:pt-4.5",
             inverted ? "sm:border-white/20" : "sm:border-border",
           )}
         >
-          <div className="grid grid-cols-2 gap-2.5 sm:-ml-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4 lg:-ml-7">
-            {stats.map((stat, idx) => (
-              <PageHeroStatCell
-                key={`${idx}-${stat.label}`}
-                stat={stat}
-                inverted={inverted}
-              />
-            ))}
-          </div>
+          {stats && stats.length > 0 ? (
+            <div className="min-w-0 sm:min-w-1/2 sm:flex-1 sm:overflow-x-clip">
+              <div className="grid grid-cols-2 gap-2.5 sm:-ml-5 sm:flex sm:flex-wrap sm:gap-x-0 sm:gap-y-4 lg:-ml-7">
+                {stats.map((stat, idx) => (
+                  <PageHeroStatCell
+                    key={`${idx}-${stat.label}`}
+                    stat={stat}
+                    inverted={inverted}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {/* Sempre na mesma linha, à direita. Sem espaço, as métricas quebram em
+              mais linhas (até metade da largura) e os botões, entre si. */}
+          {statsActions ? (
+            <div className="hidden flex-wrap items-center justify-end gap-2 sm:ml-auto sm:flex">
+              {statsActions}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

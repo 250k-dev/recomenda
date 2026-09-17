@@ -5,7 +5,7 @@ import { routes } from "@recomenda/config";
 import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, Eye, FileDown, Leaf, Pencil, Plus, Store, Target, X, Check, Loader2 } from "lucide-react";
+import { Boxes, Eye, Leaf, Pencil, Plus, Share2, Store, Target, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@recomenda/ui/forms/select";
 import { PageHero } from "@/components/domain/page-hero";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
@@ -54,6 +54,7 @@ import { Card, CardContent } from "@recomenda/ui/primitives/card";
 import { DataTable } from "@recomenda/ui/patterns/data-table";
 import { FulfillWithoutQuoteButton } from "@/components/domain/fulfill-without-quote-dialog";
 import { PurchaseListExportDialog } from "@/components/domain/purchase-list-export-dialog";
+import { IconActionButton } from "@/components/domain/icon-action-button";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { PurchaseListTargetsDialog } from "@/components/domain/purchase-list-targets-dialog";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
@@ -528,7 +529,7 @@ export function FarmPurchaseListTab({
           ) : (
             <>
               {!effectiveReadOnly ? (
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={startEditing}>
+                <Button size="sm" className="gap-1.5" onClick={startEditing}>
                   <Pencil className="h-4 w-4" />
                   Editar lista
                 </Button>
@@ -540,17 +541,21 @@ export function FarmPurchaseListTab({
                   items={viewItems}
                   crop={list.crop ?? "ANY"}
                   suggestedName={list.name}
-                  size="sm"
+                  iconOnly
                 />
               ) : null}
-              <Button
-                size="sm"
-                className={`gap-1.5 ${EXPORT_ACTION_CLASS}`}
+              <IconActionButton
+                label="Exportar"
+                icon={<Share2 className="h-4 w-4" />}
+                className={EXPORT_ACTION_CLASS}
                 onClick={() => setExportOpen(true)}
-              >
-                <FileDown className="h-4 w-4" />
-                Exportar
-              </Button>
+              />
+            </>
+          )
+        }
+        statsActions={
+          editing ? undefined : (
+            <>
               {canQuoteCrud && quotesHref ? (
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={quotesHref}>
@@ -559,7 +564,7 @@ export function FarmPurchaseListTab({
                   </Link>
                 </Button>
               ) : null}
-              {canQuoteCrud && !editing && list.status !== "draft" ? (
+              {canQuoteCrud && list.status !== "draft" ? (
                 <FulfillWithoutQuoteButton
                   listId={list.id}
                   pending={hasPendingBuy}
