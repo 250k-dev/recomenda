@@ -48,5 +48,15 @@
     "company": "250K",
     "active": true,
     "createdAt": "2026-09-17T15:05:19.068Z"
+  },
+  {
+    "id": "usr_1789657546237",
+    "name": "João Victor Belentani",
+    "email": "joaovictor@250k.org",
+    "passwordHash": "admin123",
+    "role": "client",
+    "company": "250K",
+    "active": true,
+    "createdAt": "2026-09-17T15:05:46.237Z"
   }
 ]
