@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
   type ReactNode,
@@ -131,6 +132,12 @@ const STATUS_ICON: Record<string, ReactNode> = {
   SKIPPED: <SkipForward className="h-3.5 w-3.5" />,
 };
 
+/** Mesma grade do cabeçalho e das linhas (grip | # | form | produto | dose | ações). */
+const PRODUCT_MIX_GRID =
+  "sm:grid sm:grid-cols-[2rem_1.5rem_2.75rem_minmax(0,1fr)_minmax(8rem,auto)_4rem] sm:items-center sm:gap-x-2 sm:gap-y-0";
+const PRODUCT_MIX_GRID_NO_GRIP =
+  "sm:grid sm:grid-cols-[1.5rem_2.75rem_minmax(0,1fr)_minmax(8rem,auto)_4rem] sm:items-center sm:gap-x-2 sm:gap-y-0";
+
 function StageDateBadge({
   label,
   date,
@@ -207,7 +214,7 @@ function ProductRow({
   /** Posição 1-based na ordem de mistura (tanque). */
   mixPosition?: number;
   isDragging?: boolean;
-  onDragStart?: () => void;
+  onDragStart?: (e: DragEvent) => void;
   onDragOver?: (e: DragEvent) => void;
   onDragEnd?: () => void;
 }) {
@@ -253,58 +260,77 @@ function ProductRow({
     item.formulation_key ?? resolveFormulationKey(item.equivalence_group);
   const formShort = formulationShortLabel(formKey);
 
+  const identity = (
+    <>
+      {canReorder ? (
+        <span
+          draggable
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          title="Arrastar para reordenar"
+          aria-label="Arrastar produto na ordem de mistura"
+          className="inline-flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg border border-border bg-surface-2 text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground active:cursor-grabbing"
+        >
+          <GripVertical className="size-[18px]" strokeWidth={2.25} aria-hidden />
+        </span>
+      ) : null}
+      {mixPosition != null ? (
+        <span
+          className="flex h-6 w-6 shrink-0 items-center justify-center justify-self-center rounded-md border border-border bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground"
+          title={`Ordem de mistura #${mixPosition}`}
+        >
+          {mixPosition}
+        </span>
+      ) : (
+        <FlaskConical className="h-3.5 w-3.5 shrink-0 justify-self-center text-muted-foreground" />
+      )}
+      <span
+        className="inline-flex h-6 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 px-1 text-[10px] font-bold tracking-wide text-muted-foreground"
+        title={`Formulação: ${formShort}`}
+      >
+        {formShort}
+      </span>
+      <span className="min-w-0 flex-1 break-words font-medium leading-snug text-foreground">
+        {item.product_name}
+        {item.is_substitution && (
+          <span className="ml-1.5 text-[10px] text-warning-strong">
+            (substituído)
+          </span>
+        )}
+        {outOfProgram ? (
+          <span className="ml-1.5 mt-0.5 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive align-middle">
+            <CircleAlert className="w-3 h-3" />
+            Fora da programação
+          </span>
+        ) : null}
+      </span>
+    </>
+  );
+
   return (
     <div
-      draggable={canReorder}
-      onDragStart={canReorder ? onDragStart : undefined}
       onDragOver={canReorder ? onDragOver : undefined}
-      onDragEnd={canReorder ? onDragEnd : undefined}
       className={cn(
-        "flex min-w-0 flex-col gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm",
-        !editing && "sm:flex-row sm:items-center",
+        "min-w-0 rounded-lg border bg-card px-3 py-2.5 text-sm",
+        editing
+          ? "flex flex-col gap-2"
+          : cn(
+              "flex flex-col gap-2",
+              canReorder ? PRODUCT_MIX_GRID : PRODUCT_MIX_GRID_NO_GRIP,
+            ),
         outOfProgram && "border-destructive/40 bg-destructive/5",
-        canReorder && "cursor-grab active:cursor-grabbing",
         isDragging && "opacity-60 ring-1 ring-primary/40",
       )}
     >
-      <div className="flex min-w-0 flex-1 items-start gap-2">
-        {canReorder ? (
-          <GripVertical
-            className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
-            aria-hidden
-          />
-        ) : null}
-        {mixPosition != null ? (
-          <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground"
-            title={`Ordem de mistura #${mixPosition}`}
-          >
-            {mixPosition}
-          </span>
-        ) : (
-          <FlaskConical className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        )}
-        <span
-          className="inline-flex h-6 min-w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 px-1 text-[10px] font-bold tracking-wide text-muted-foreground"
-          title={`Formulação: ${formShort}`}
-        >
-          {formShort}
-        </span>
-        <span className="min-w-0 flex-1 break-words font-medium leading-snug text-foreground">
-          {item.product_name}
-          {item.is_substitution && (
-            <span className="ml-1.5 text-[10px] text-warning-strong">
-              (substituído)
-            </span>
-          )}
-          {outOfProgram ? (
-            <span className="ml-1.5 mt-0.5 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive align-middle">
-              <CircleAlert className="w-3 h-3" />
-              Fora da programação
-            </span>
-          ) : null}
-        </span>
-      </div>
+      {editing ? (
+        <div className="flex min-w-0 items-center gap-2">
+          {identity}
+        </div>
+      ) : (
+        <div className="flex min-w-0 items-center gap-2 sm:contents">
+          {identity}
+        </div>
+      )}
 
       {editing ? (
         <div className="grid w-full min-w-0 gap-2">
@@ -386,8 +412,8 @@ function ProductRow({
           </div>
         </div>
       ) : (
-        <div className="flex min-w-0 items-center justify-between gap-2 pl-8 sm:justify-end sm:pl-0">
-          <span className="min-w-0 text-xs tabular-nums text-muted-foreground">
+        <div className="flex min-w-0 items-center justify-between gap-2 pl-8 sm:contents sm:pl-0">
+          <span className="min-w-0 text-xs tabular-nums text-muted-foreground sm:text-right">
             {item.dose_per_hectare} {item.dose_unit}/ha
             {item.total_quantity > 0 ? (
               <>
@@ -404,7 +430,7 @@ function ProductRow({
             ) : null}
             {item.area_note ? <> · {item.area_note}</> : null}
           </span>
-          <div className="flex shrink-0 items-center">
+          <div className="flex shrink-0 items-center justify-end">
             <Button
               size="icon"
               variant="ghost"
@@ -1082,15 +1108,18 @@ export function RecommendationCard({
   const [orderedProductIds, setOrderedProductIds] = useState<string[]>(() =>
     serverProductItems.map((i) => i.id),
   );
-  const [orderDirty, setOrderDirty] = useState(false);
+  const orderedProductIdsRef = useRef(orderedProductIds);
+  orderedProductIdsRef.current = orderedProductIds;
+  const draggingRef = useRef(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
+  const reorderItemsMut = useReorderRecommendationItems(seasonId);
+
   useEffect(() => {
+    if (draggingRef.current || reorderItemsMut.isPending) return;
     setOrderedProductIds(serverProductItems.map((i) => i.id));
-    setOrderDirty(false);
-    setDragIndex(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when server order/set changes
-  }, [serverProductOrderKey]);
+  }, [serverProductOrderKey, reorderItemsMut.isPending]);
 
   const productById = useMemo(
     () => new Map(serverProductItems.map((i) => [i.id, i] as const)),
@@ -1100,6 +1129,29 @@ export function RecommendationCard({
     .map((id) => productById.get(id))
     .filter((it): it is RecommendationItem => Boolean(it));
 
+  const persistProductOrder = (ids: string[]) => {
+    const serverIds = serverProductItems.map((i) => i.id);
+    if (
+      ids.length === 0 ||
+      ids.length !== serverIds.length ||
+      ids.every((id, i) => id === serverIds[i])
+    ) {
+      return;
+    }
+    reorderItemsMut.mutate(
+      { recommendationId: rec.id, itemIds: ids },
+      {
+        onSuccess: () => toast.success("Ordem da etapa salva."),
+        onError: (e: unknown) => {
+          setOrderedProductIds(serverIds);
+          toast.error(
+            apiErrorMessage(e, "Não foi possível salvar a ordem."),
+          );
+        },
+      },
+    );
+  };
+
   const moveProduct = (from: number, to: number) => {
     if (to < 0 || to >= orderedProductIds.length || from === to) return;
     setOrderedProductIds((prev) => {
@@ -1108,7 +1160,6 @@ export function RecommendationCard({
       next.splice(to, 0, item);
       return next;
     });
-    setOrderDirty(true);
   };
 
   const [registering, setRegistering] = useState(false);
@@ -1126,7 +1177,6 @@ export function RecommendationCard({
   const applyMut = useApplyRecommendation(seasonId);
   const skipMut = useSkipRecommendation(seasonId);
   const undoMut = useUndoRecommendation(seasonId);
-  const reorderItemsMut = useReorderRecommendationItems(seasonId);
   const isBusy =
     patchMut.isPending ||
     deleteMut.isPending ||
@@ -1398,74 +1448,25 @@ export function RecommendationCard({
 
           <div className="min-w-0 overflow-hidden rounded-xl border bg-card p-3 shadow-sm sm:p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Produtos recomendados
-                </p>
-                {productItems.length > 0 ? (
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Ordem de mistura (#1 entra primeiro). Arraste para ajustar
-                    só nesta etapa.
-                  </p>
-                ) : null}
-              </div>
-              {orderDirty && canEditStructure ? (
-                <div className="flex shrink-0 gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8"
-                    disabled={isBusy}
-                    onClick={() => {
-                      setOrderedProductIds(serverProductItems.map((i) => i.id));
-                      setOrderDirty(false);
-                      setDragIndex(null);
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    disabled={isBusy}
-                    onClick={() => {
-                      reorderItemsMut.mutate(
-                        {
-                          recommendationId: rec.id,
-                          itemIds: orderedProductIds,
-                        },
-                        {
-                          onSuccess: () => {
-                            setOrderDirty(false);
-                            toast.success("Ordem da etapa salva.");
-                          },
-                          onError: (e: unknown) => {
-                            toast.error(
-                              apiErrorMessage(
-                                e,
-                                "Não foi possível salvar a ordem.",
-                              ),
-                            );
-                          },
-                        },
-                      );
-                    }}
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    Salvar
-                  </Button>
-                </div>
-              ) : null}
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Produtos recomendados
+              </p>
             </div>
             {productItems.length > 0 ? (
               <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="mb-0.5 hidden items-center gap-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:flex">
-                  {canEditStructure ? <span className="w-4" /> : null}
-                  <span className="w-6 text-center">#</span>
-                  <span className="w-10 text-center">Form.</span>
-                  <span className="flex-1">Produto</span>
+                <div
+                  className={cn(
+                    "mb-0.5 hidden px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:grid",
+                    canEditStructure ? PRODUCT_MIX_GRID : PRODUCT_MIX_GRID_NO_GRIP,
+                  )}
+                >
+                  <span className={canEditStructure ? "col-span-2" : undefined}>
+                    #
+                  </span>
+                  <span className="text-center">Form.</span>
+                  <span>Produto</span>
+                  <span className="text-right">Dose</span>
+                  <span aria-hidden />
                 </div>
                 {productItems.map((item, index) => (
                   <ProductRow
@@ -1477,14 +1478,23 @@ export function RecommendationCard({
                     canReorder={canEditStructure}
                     mixPosition={index + 1}
                     isDragging={dragIndex === index}
-                    onDragStart={() => setDragIndex(index)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", item.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      draggingRef.current = true;
+                      setDragIndex(index);
+                    }}
                     onDragOver={(e) => {
                       e.preventDefault();
                       if (dragIndex == null || dragIndex === index) return;
                       moveProduct(dragIndex, index);
                       setDragIndex(index);
                     }}
-                    onDragEnd={() => setDragIndex(null)}
+                    onDragEnd={() => {
+                      persistProductOrder(orderedProductIdsRef.current);
+                      draggingRef.current = false;
+                      setDragIndex(null);
+                    }}
                     outOfProgram={
                       listReady && !inProgramProductIds.has(item.local_product_id)
                     }

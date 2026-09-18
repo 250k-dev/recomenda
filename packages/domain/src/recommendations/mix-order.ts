@@ -18,7 +18,10 @@ export function recommendationItemMixOrder(item: RecommendationItem): number {
 export function sortRecommendationItemsByMixOrder<T extends RecommendationItem>(
   items: T[],
 ): T[] {
-  return items
-    .slice()
-    .sort((a, b) => recommendationItemMixOrder(a) - recommendationItemMixOrder(b));
+  return items.slice().sort((a, b) => {
+    const byMix =
+      recommendationItemMixOrder(a) - recommendationItemMixOrder(b);
+    if (byMix !== 0) return byMix;
+    return a.id.localeCompare(b.id);
+  });
 }

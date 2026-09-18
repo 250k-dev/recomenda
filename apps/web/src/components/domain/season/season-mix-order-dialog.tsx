@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import { GripVertical, ListOrdered, RotateCcw, Save } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -22,23 +22,30 @@ import {
 } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 
+function beginHtml5Drag(e: DragEvent, payload: string) {
+  e.dataTransfer.setData("text/plain", payload);
+  e.dataTransfer.effectAllowed = "move";
+}
+
 /**
- * Configura a ordem de mistura da calda nesta safra.
- * Default = guia oficial por formulação (SG → WP → SC → EC → SL…).
- * O agrônomo arrasta as opções e salva; export PDF/WhatsApp respeitam essa ordem.
+ * Configura a ordem de mistura da calda por tipo de formulação.
+ * Default = guia oficial (SG → WP → SC → EC → SL…).
  */
-export function SeasonMixOrderDialog({
+export function MixFormulationOrderDialog({
   open,
   onOpenChange,
-  seasonId,
   currentOrder,
+  onSave,
+  isPending = false,
+  description = "Padrão oficial por tipo de formulação (SG, WP, SC, EC, SL…). Arraste para personalizar. PDF e WhatsApp usam essa ordem.",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  seasonId: string;
   currentOrder?: FormulationKey[] | null;
+  onSave: (order: FormulationKey[]) => void;
+  isPending?: boolean;
+  description?: string;
 }) {
-  const updateMut = useUpdateSeason(seasonId);
   const [order, setOrder] = useState<FormulationKey[]>(
     () =>
       normalizeFormulationMixOrder(currentOrder) ?? [
@@ -66,25 +73,6 @@ export function SeasonMixOrderDialog({
     });
   };
 
-  const handleSave = () => {
-    updateMut.mutate(
-      { mix_formulation_order: order },
-      {
-        onSuccess: () => {
-          toast.success("Ordem de mistura salva para esta safra.");
-          onOpenChange(false);
-        },
-        onError: (e: unknown) => {
-          toast.error(apiErrorMessage(e, "Não foi possível salvar a ordem."));
-        },
-      },
-    );
-  };
-
-  const handleReset = () => {
-    setOrder([...DEFAULT_FORMULATION_MIX_ORDER]);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[min(90vh,720px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
@@ -93,10 +81,7 @@ export function SeasonMixOrderDialog({
             <ListOrdered className="h-5 w-5 shrink-0" />
             Ordem de mistura na calda
           </DialogTitle>
-          <DialogDescription>
-            Padrão oficial por tipo de formulação (SG, WP, SC, EC, SL…). Arraste
-            para personalizar nesta safra. PDF e WhatsApp usam essa ordem.
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
@@ -107,20 +92,28 @@ export function SeasonMixOrderDialog({
               return (
                 <li
                   key={key}
-                  draggable
-                  onDragStart={() => setDragIndex(index)}
                   onDragOver={(e) => {
                     e.preventDefault();
                     if (dragIndex == null || dragIndex === index) return;
                     moveItem(dragIndex, index);
                     setDragIndex(index);
                   }}
-                  onDragEnd={() => setDragIndex(null)}
-                  className={`flex w-full cursor-grab items-start gap-2 rounded-lg border border-border bg-card px-2.5 py-2 active:cursor-grabbing ${
+                  className={`flex w-full items-start gap-2 rounded-lg border border-border bg-card px-2.5 py-2 ${
                     isDragging ? "opacity-60 ring-1 ring-primary/40" : ""
                   }`}
                 >
-                  <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span
+                    draggable
+                    onDragStart={(e) => {
+                      beginHtml5Drag(e, key);
+                      setDragIndex(index);
+                    }}
+                    onDragEnd={() => setDragIndex(null)}
+                    className="mt-0.5 shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing"
+                    aria-label="Arrastar formulação"
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </span>
                   <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-2 text-[11px] font-bold tabular-nums text-muted-foreground">
                     {index + 1}
                   </span>
@@ -146,7 +139,7 @@ export function SeasonMixOrderDialog({
             variant="ghost"
             size="sm"
             className="gap-1.5"
-            onClick={handleReset}
+            onClick={() => setOrder([...DEFAULT_FORMULATION_MIX_ORDER])}
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Restaurar padrão
@@ -155,14 +148,57 @@ export function SeasonMixOrderDialog({
             type="button"
             size="sm"
             className="gap-1.5"
-            onClick={handleSave}
-            disabled={updateMut.isPending}
+            onClick={() => onSave(order)}
+            disabled={isPending}
           >
             <Save className="h-3.5 w-3.5" />
-            {updateMut.isPending ? "Salvando…" : "Salvar ordem"}
+            {isPending ? "Salvando…" : "Salvar ordem"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Ordem de mistura da calda nesta safra.
+ */
+export function SeasonMixOrderDialog({
+  open,
+  onOpenChange,
+  seasonId,
+  currentOrder,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  seasonId: string;
+  currentOrder?: FormulationKey[] | null;
+}) {
+  const updateMut = useUpdateSeason(seasonId);
+
+  const handleSave = (order: FormulationKey[]) => {
+    updateMut.mutate(
+      { mix_formulation_order: order },
+      {
+        onSuccess: () => {
+          toast.success("Ordem de mistura salva para esta safra.");
+          onOpenChange(false);
+        },
+        onError: (e: unknown) => {
+          toast.error(apiErrorMessage(e, "Não foi possível salvar a ordem."));
+        },
+      },
+    );
+  };
+
+  return (
+    <MixFormulationOrderDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      currentOrder={currentOrder}
+      onSave={handleSave}
+      isPending={updateMut.isPending}
+      description="Padrão oficial por tipo de formulação (SG, WP, SC, EC, SL…). Arraste para personalizar nesta safra. PDF e WhatsApp usam essa ordem."
+    />
   );
 }

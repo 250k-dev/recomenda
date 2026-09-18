@@ -32,6 +32,13 @@ import {
 import { getCycle } from "@recomenda/api/cycles";
 import type { Plot } from "@recomenda/api/farms";
 import { CROP_LABELS } from "@recomenda/utils";
+import {
+  PlotNameSortHeader,
+  PlotNameSortIconButton,
+  comparePlotName,
+  nextPlotNameSortDir,
+  type PlotNameSortDir,
+} from "@/components/domain/plot-name-sort-button";
 
 const plotSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -72,6 +79,7 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
   const deletePlot = useDeletePlot(farmId);
 
   const [search, setSearch] = useState("");
+  const [plotSortDir, setPlotSortDir] = useState<PlotNameSortDir>("asc");
   const [sheetState, setSheetState] = useState<PlotSheetState>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     id: string;
@@ -161,8 +169,11 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
 
   const sortedPlots = useMemo(() => {
     if (!plots) return [];
-    return [...plots].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [plots]);
+    const list = [...plots];
+    if (!plotSortDir) return list;
+    list.sort((a, b) => comparePlotName(a.name, b.name, plotSortDir));
+    return list;
+  }, [plots, plotSortDir]);
 
   const filteredPlots = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
@@ -189,16 +200,24 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
         </h2>
         <div className="hidden min-w-4 flex-1 sm:block" />
         {sortedPlots.length > 0 ? (
-          <div className="relative w-full sm:w-60 lg:w-72">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar talhão…"
-              aria-label="Buscar talhão"
-              className="h-10 pl-9"
-            />
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-60 lg:w-72">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar talhão…"
+                aria-label="Buscar talhão"
+                className="h-10 pl-9"
+              />
+            </div>
+            <span className="md:hidden">
+              <PlotNameSortIconButton
+                dir={plotSortDir}
+                onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
+              />
+            </span>
           </div>
         ) : null}
         <Button
@@ -234,7 +253,10 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
         <>
           <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
             <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_7rem] gap-4 bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-              <span>Talhão</span>
+              <PlotNameSortHeader
+                dir={plotSortDir}
+                onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
+              />
               <span>Área</span>
               <span>Em safra</span>
               <span>Cultura atual</span>

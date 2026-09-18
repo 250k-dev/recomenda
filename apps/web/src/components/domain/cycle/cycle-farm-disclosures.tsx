@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -44,6 +44,13 @@ import {
   RegisterHarvestDialog,
 } from "@/components/domain/season/register-harvest-dialog";
 import { HARVEST_ROW_ACTION_CLASS } from "@/components/domain/export-action-class";
+import {
+  PlotNameSortHeader,
+  PlotNameSortIconButton,
+  comparePlotName,
+  nextPlotNameSortDir,
+  type PlotNameSortDir,
+} from "@/components/domain/plot-name-sort-button";
 
 const PLOT_GRID =
   "grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_17rem] items-center gap-4";
@@ -143,6 +150,7 @@ export function CycleFarmDisclosures({
   const removeCycleFarm = useRemoveCycleFarm(cycle.id);
 
   const [plotFilter, setPlotFilter] = useState("");
+  const [plotSortDir, setPlotSortDir] = useState<PlotNameSortDir>(null);
   const [addFarmOpen, setAddFarmOpen] = useState(false);
   const [bulkApplyOpen, setBulkApplyOpen] = useState(false);
   const [removeFarm, setRemoveFarm] = useState<{
@@ -187,6 +195,14 @@ export function CycleFarmDisclosures({
       seasonsByFarm.set(id, list);
     }
 
+    if (plotSortDir) {
+      for (const list of seasonsByFarm.values()) {
+        list.sort((a, b) =>
+          comparePlotName(a.plot_name, b.plot_name, plotSortDir),
+        );
+      }
+    }
+
     return (cycle.farms ?? []).map((farm) => ({
       farmId: farm.id,
       farmName: farm.name,
@@ -194,13 +210,7 @@ export function CycleFarmDisclosures({
       cadastralHa: farm.area_hectares_sum,
       seasons: seasonsByFarm.get(farm.id) ?? [],
     }));
-  }, [cycle.farms, cycle.farm_id, seasons, plotFilter, locationByFarm]);
-
-  const farmIdsKey = (cycle.farms ?? []).map((f) => f.id).join(",");
-  // Abre todas as fazendas na primeira carga / quando a lista de fazendas muda.
-  useEffect(() => {
-    setOpenFarms(new Set(farmIdsKey ? farmIdsKey.split(",") : []));
-  }, [cycle.id, farmIdsKey]);
+  }, [cycle.farms, cycle.farm_id, seasons, plotFilter, locationByFarm, plotSortDir]);
 
   const toggleFarm = (farmId: string) => {
     setOpenFarms((prev) => {
@@ -233,16 +243,24 @@ export function CycleFarmDisclosures({
           </Button>
         ) : null}
         {seasons.length > 0 ? (
-          <div className="relative w-full sm:w-60 lg:w-72">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={plotFilter}
-              onChange={(e) => setPlotFilter(e.target.value)}
-              placeholder="Filtrar talhão…"
-              aria-label="Filtrar talhão"
-              className="h-10 pl-9"
-            />
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-60 lg:w-72">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={plotFilter}
+                onChange={(e) => setPlotFilter(e.target.value)}
+                placeholder="Filtrar talhão…"
+                aria-label="Filtrar talhão"
+                className="h-10 pl-9"
+              />
+            </div>
+            <span className="md:hidden">
+              <PlotNameSortIconButton
+                dir={plotSortDir}
+                onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
+              />
+            </span>
           </div>
         ) : null}
         {canManage && cycle.can_add_farms !== false ? (
@@ -426,7 +444,10 @@ export function CycleFarmDisclosures({
                         {/* Desktop: padrão atual da linha de talhão */}
                         <div className="hidden md:block">
                           <div className={`${PLOT_GRID} bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase`}>
-                            <span>Talhão</span>
+                            <PlotNameSortHeader
+                              dir={plotSortDir}
+                              onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
+                            />
                             <span>Cultura / variedade</span>
                             <span>Área</span>
                             <span>Progresso</span>

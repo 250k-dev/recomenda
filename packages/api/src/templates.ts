@@ -9,6 +9,7 @@ export interface MixTemplateItem {
   dose_unit?: string;
   /** Categoria do produto, derivada no servidor (não depende do catálogo local paginado). */
   category?: string | null;
+  order_index?: number;
 }
 
 export interface TimingStage {
@@ -31,6 +32,7 @@ export interface TimingTemplate {
   crop: string;
   producer_id?: string | null;
   is_archived: boolean;
+  mix_formulation_order?: string[] | null;
   stages?: TimingStage[];
 }
 

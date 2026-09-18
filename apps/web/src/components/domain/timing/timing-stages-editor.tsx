@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CircleAlert, FlaskConical, Info, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState, type DragEvent } from "react";
+import { ArrowDown, ArrowUp, CircleAlert, FlaskConical, GripVertical, Info, ListOrdered, Plus, Trash2 } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { BrazilianDateInput } from "@recomenda/ui/forms/brazilian-date-input";
@@ -254,6 +254,7 @@ function StageProductsEditor({
   const createLocal = useCreateLocalProduct();
   const [resolvingKey, setResolvingKey] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   // Todas as categorias de defensivo/fertilizante (sementes já saíram do catálogo).
   const availableCategories = useMemo(
@@ -280,6 +281,14 @@ function StageProductsEditor({
 
   const removeProduct = (key: string) => {
     onChange(products.filter((item) => item.key !== key));
+  };
+
+  const moveProduct = (from: number, to: number) => {
+    if (to < 0 || to >= products.length || from === to) return;
+    const next = [...products];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange(next);
   };
 
   const resolveProduct = async (
@@ -381,7 +390,7 @@ function StageProductsEditor({
         </p>
       ) : (
         <div className="flex flex-col gap-2">
-          {products.map((item) => {
+          {products.map((item, index) => {
             const expanded = expandedKeys.has(item.key);
             const rowProducts = productsForPurchaseListCategory(
               expanded ? catalogProducts : listCatalog,
@@ -392,13 +401,36 @@ function StageProductsEditor({
             return (
             <div
               key={item.key}
+              onDragOver={(e: DragEvent) => {
+                e.preventDefault();
+                if (dragIndex == null || dragIndex === index) return;
+                moveProduct(dragIndex, index);
+                setDragIndex(index);
+              }}
               className={cn(
-                "grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_120px_88px_auto]",
+                "grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[auto_minmax(0,0.9fr)_minmax(0,1.1fr)_120px_88px_auto]",
                 ((item.productId && overBudgetProductIds.has(item.productId)) ||
                   item.outOfProgram) &&
                   "border-destructive/40 bg-destructive/5",
+                dragIndex === index && "opacity-60 ring-1 ring-primary/40",
               )}
             >
+              <div className="flex items-center sm:items-end sm:pb-0.5">
+                <span
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", item.key);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDragIndex(index);
+                  }}
+                  onDragEnd={() => setDragIndex(null)}
+                  title="Arrastar para reordenar"
+                  aria-label="Arrastar produto na ordem de mistura"
+                  className="inline-flex size-9 shrink-0 cursor-grab items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground active:cursor-grabbing"
+                >
+                  <GripVertical className="size-[18px]" strokeWidth={2.25} />
+                </span>
+              </div>
               <Field label="Categoria">
                 <Select
                   value={item.category}
@@ -556,6 +588,7 @@ export function TimingStagesEditor({
   isSaving = false,
   saveDisabled = false,
   showSaveButton = false,
+  onMixOrder,
 }: {
   stages: TimingStageField[];
   onChange: (key: string, patch: Partial<TimingStageField>) => void;
@@ -574,6 +607,7 @@ export function TimingStagesEditor({
   isSaving?: boolean;
   saveDisabled?: boolean;
   showSaveButton?: boolean;
+  onMixOrder?: () => void;
 }) {
   const canTemplateCrud = useCan("TEMPLATE_CRUD");
   const { purchaseLists } = usePurchaseListCatalogProducts(producerId, crop, farmId);
@@ -601,6 +635,18 @@ export function TimingStagesEditor({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {onMixOrder ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={onMixOrder}
+            >
+              <ListOrdered className="h-4 w-4" />
+              Ordem de mistura
+            </Button>
+          ) : null}
           {showSaveButton && onSave ? (
             <Button
               type="button"

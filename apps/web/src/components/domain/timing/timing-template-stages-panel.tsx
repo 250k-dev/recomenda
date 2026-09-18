@@ -19,6 +19,7 @@ import {
   useLocalCatalog,
   useMe,
   useReorderTimingStages,
+  useUpdateTimingTemplate,
   queryKeys,
 } from "@recomenda/api-hooks";
 import {
@@ -26,6 +27,9 @@ import {
   planStageProducts,
 } from "@recomenda/domain/timing/sync-stage-products";
 import { applyStageProductsPlan } from "@/components/domain/timing/apply-stage-products-plan";
+import { MixFormulationOrderDialog } from "@/components/domain/season/season-mix-order-dialog";
+import { apiErrorMessage } from "@recomenda/api/api-error";
+import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@recomenda/domain/timing/window-days";
 import {
   readLocalDraft,
@@ -50,7 +54,6 @@ function serverFingerprint(stages: TimingStage[]): string {
     .map((stage) => {
       const items = (stage.mix_items ?? [])
         .map((item) => `${item.local_product_id}:${item.dose_per_hectare}:${item.dose_unit ?? ""}`)
-        .sort()
         .join(",");
       return [
         stage.id,
@@ -89,6 +92,8 @@ export function TimingTemplateStagesPanel({
   const createStage = useCreateTimingStage(templateId);
   const deleteStage = useDeleteTimingStage(templateId);
   const reorder = useReorderTimingStages(templateId);
+  const updateTemplate = useUpdateTimingTemplate(templateId, producerId);
+  const [mixOrderOpen, setMixOrderOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data: catalogData } = useLocalCatalog();
   // Memoizado para manter a referência estável (senão `[]` muda a cada render e
@@ -361,6 +366,7 @@ export function TimingTemplateStagesPanel({
   }
 
   return (
+    <>
     <TimingStagesEditor
       stages={editorStages}
       minStages={0}
@@ -372,11 +378,34 @@ export function TimingTemplateStagesPanel({
       isSaving={isSaving}
       saveDisabled={!isDirty}
       onSave={() => void saveAll()}
+      onMixOrder={() => setMixOrderOpen(true)}
       onChange={handleStageChange}
       onAdd={(presetName) => void handleAddStage(presetName)}
       onRemove={(key) => void handleRemoveStage(key)}
       onMoveUp={(key) => void moveStage(key, "up")}
       onMoveDown={(key) => void moveStage(key, "down")}
     />
+    <MixFormulationOrderDialog
+      open={mixOrderOpen}
+      onOpenChange={setMixOrderOpen}
+      currentOrder={template.mix_formulation_order as FormulationKey[] | null | undefined}
+      isPending={updateTemplate.isPending}
+      description="Padrão oficial por tipo de formulação (SG, WP, SC, EC, SL…). Arraste para personalizar neste modelo. Ao aplicar em um talhão sem ordem própria, essa ordem vai junto."
+      onSave={(order) => {
+        updateTemplate.mutate(
+          { mix_formulation_order: order },
+          {
+            onSuccess: () => {
+              toast.success("Ordem de mistura salva neste modelo.");
+              setMixOrderOpen(false);
+            },
+            onError: (e: unknown) => {
+              toast.error(apiErrorMessage(e, "Não foi possível salvar a ordem."));
+            },
+          },
+        );
+      }}
+    />
+    </>
   );
 }

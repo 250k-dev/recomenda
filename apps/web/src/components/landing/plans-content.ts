@@ -39,7 +39,7 @@ export const plansIntro = {
 export const plotPlans: readonly PlotPlan[] = [
   {
     id: "semente",
-    name: "Semente",
+    name: "Grátis",
     plotRange: "Até 3 talhões",
     monthlyBrl: 0,
     billing: "free",
@@ -51,7 +51,7 @@ export const plotPlans: readonly PlotPlan[] = [
   },
   {
     id: "plantio",
-    name: "Plantio",
+    name: "Starter",
     plotRange: "Até 10 talhões",
     monthlyBrl: 9.99,
     billing: "monthly",
@@ -64,7 +64,7 @@ export const plotPlans: readonly PlotPlan[] = [
   },
   {
     id: "lavoura",
-    name: "Lavoura",
+    name: "Plus",
     plotRange: "11 a 20 talhões",
     monthlyBrl: 19.99,
     billing: "harvest",
@@ -76,7 +76,7 @@ export const plotPlans: readonly PlotPlan[] = [
   },
   {
     id: "fazenda",
-    name: "Fazenda",
+    name: "Pro",
     plotRange: "21 a 50 talhões",
     monthlyBrl: 29.99,
     billing: "harvest",
@@ -88,7 +88,7 @@ export const plotPlans: readonly PlotPlan[] = [
   },
   {
     id: "carteira",
-    name: "Carteira",
+    name: "Pro+",
     plotRange: "51 a 100 talhões",
     monthlyBrl: 39.99,
     billing: "harvest",
@@ -100,7 +100,7 @@ export const plotPlans: readonly PlotPlan[] = [
   },
   {
     id: "campo",
-    name: "Campo",
+    name: "Pro Max",
     plotRange: "Acima de 100 talhões",
     monthlyBrl: 49.99,
     billing: "harvest",
@@ -123,13 +123,13 @@ export const plusPlan: ExtraPlan = {
   features: [
     "WhatsApp para o produtor no campo",
     "Ciclo de 12 meses",
-    "Combina com Semente, Plantio ou as faixas de 12 meses",
+    "Combina com Grátis, Starter ou as faixas de 12 meses",
   ],
 };
 
 export const masterPlan: ExtraPlan = {
   id: "casa-250k",
-  name: "Casa 250k",
+  name: "Premium",
   eyebrow: "Tudo incluso",
   description:
     "Talhões ilimitados e WhatsApp ilimitado, no mesmo ciclo de 12 meses.",

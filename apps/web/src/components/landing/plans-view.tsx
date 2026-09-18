@@ -365,7 +365,7 @@ export function PlansView() {
               </li>
               <li className="inline-flex items-center gap-2">
                 <Phone width={18} height={18} className="text-brand-600" />
-                Lico e Casa 250k com WhatsApp
+                Lico e Premium com WhatsApp
               </li>
             </ul>
           </Reveal>
@@ -379,7 +379,7 @@ export function PlansView() {
               <BillingToggle mode={mode} onChange={setMode} />
               <p className="max-w-xl text-sm text-muted">
                 O PIX à vista aplica 10% sobre o ciclo de 12 meses das faixas
-                de talhões, do Lico e da Casa 250k.
+                de talhões, do Lico e do Premium.
               </p>
             </div>
           </Reveal>
@@ -406,7 +406,7 @@ export function PlansView() {
               onSelect={() =>
                 setTarget({
                   slug: "plantio",
-                  name: "Plantio + Lico",
+                  name: "Starter + Lico",
                   billing: "monthly",
                   addOnLico: true,
                 })
