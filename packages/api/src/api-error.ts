@@ -27,6 +27,23 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Status HTTP do envelope Axios ou do `ApiError` do interceptor. */
+export function apiHttpStatus(error: unknown): number | null {
+  if (isAxiosError(error)) return error.response?.status ?? null;
+  if (error instanceof Error && "status" in error) {
+    const status = (error as ApiError).status;
+    return typeof status === "number" ? status : null;
+  }
+  return null;
+}
+
+/** 401/403/404 não melhoram com retry — só enchem log (produtor em rascunho). */
+export function retryUnlessClientForbidden(failureCount: number, error: unknown): boolean {
+  const status = apiHttpStatus(error);
+  if (status === 401 || status === 403 || status === 404) return false;
+  return failureCount < 2;
+}
+
 /** Mensagem amigável para falhas de publicação de safra/ciclo. */
 export function publishBlockedMessage(
   error: unknown,

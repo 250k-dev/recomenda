@@ -19,6 +19,7 @@ import {
   softDeleteQuoteResponse,
   updateQuoteResponse,
 } from "@recomenda/api/quotes";
+import { retryUnlessClientForbidden } from "@recomenda/api/api-error";
 import {
   type ConfirmPurchaseLine,
   confirmPurchaseListPurchases,
@@ -45,6 +46,7 @@ export function usePurchaseListQuotes(listId: string, enabled = true) {
     queryKey: queryKeys.purchaseListQuotes(listId),
     queryFn: () => getPurchaseListQuotes(listId),
     enabled: Boolean(listId) && enabled,
+    retry: retryUnlessClientForbidden,
   });
 }
 
@@ -53,6 +55,7 @@ export function usePurchaseListQuoteTrash(listId: string, enabled = true) {
     queryKey: queryKeys.purchaseListQuoteTrash(listId),
     queryFn: () => getPurchaseListQuoteTrash(listId),
     enabled: Boolean(listId) && enabled,
+    retry: retryUnlessClientForbidden,
   });
 }
 
@@ -142,6 +145,7 @@ export function usePurchaseListProgress(listId: string, enabled = true) {
     queryKey: queryKeys.purchaseListProgress(listId),
     queryFn: () => getPurchaseListProgress(listId),
     enabled: Boolean(listId) && enabled,
+    retry: retryUnlessClientForbidden,
   });
 }
 

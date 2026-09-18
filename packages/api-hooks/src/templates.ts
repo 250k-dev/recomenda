@@ -14,6 +14,7 @@ import {
   deleteTimingStage,
   reorderTimingStages,
 } from "@recomenda/api/templates";
+import { retryUnlessClientForbidden } from "@recomenda/api/api-error";
 import { queryKeys } from "./queryKeys";
 
 export function useTimingTemplates(producerId: string) {
@@ -21,6 +22,7 @@ export function useTimingTemplates(producerId: string) {
     queryKey: queryKeys.timingTemplates(producerId),
     queryFn: () => getTimingTemplates(producerId),
     enabled: Boolean(producerId),
+    retry: retryUnlessClientForbidden,
   });
 }
 

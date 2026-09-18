@@ -32,6 +32,7 @@ import {
   deleteRecommendationItem,
   reorderRecommendationItems,
 } from "@recomenda/api/seasons";
+import { retryUnlessClientForbidden } from "@recomenda/api/api-error";
 import { queryKeys } from "./queryKeys";
 import { useWalletScopeKey } from "./use-active-scope";
 
@@ -88,6 +89,7 @@ export function useSeason(id: string) {
     queryKey: queryKeys.season(id),
     queryFn: () => getSeason(id),
     enabled: Boolean(id),
+    retry: retryUnlessClientForbidden,
   });
 }
 
@@ -262,6 +264,7 @@ export function useSeasonTimeline(seasonId: string) {
     queryKey: queryKeys.seasonTimeline(seasonId),
     queryFn: () => getTimeline(seasonId),
     enabled: Boolean(seasonId),
+    retry: retryUnlessClientForbidden,
   });
 }
 
