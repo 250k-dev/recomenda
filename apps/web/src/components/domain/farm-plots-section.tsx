@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { MapPin, Pencil, Plus, Trash2, Search } from "lucide-react";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
-import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Input } from "@recomenda/ui/primitives/input";
 import {
@@ -31,14 +30,21 @@ import {
 } from "@recomenda/api-hooks";
 import { getCycle } from "@recomenda/api/cycles";
 import type { Plot } from "@recomenda/api/farms";
+import { apiErrorCode, plotInCycleNames } from "@recomenda/api/api-error";
 import { CROP_LABELS } from "@recomenda/utils";
 import {
-  PlotNameSortHeader,
-  PlotNameSortIconButton,
-  comparePlotName,
-  nextPlotNameSortDir,
-  type PlotNameSortDir,
-} from "@/components/domain/plot-name-sort-button";
+  applyTableView,
+  columnOptions,
+  ColumnFilterHeader,
+  isTableViewActive,
+  withColumnFilter,
+  type ColumnAccessor,
+  type TableView,
+} from "@/components/domain/table-column-filter";
+import {
+  PlotDeleteDialog,
+  type PlotDeleteTarget,
+} from "@/components/domain/plot-delete-dialog";
 
 const plotSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -54,6 +60,23 @@ const fmtHa = (n: number) =>
 type PlotMeta = {
   cycleName: string | null;
   cropLabel: string | null;
+};
+
+type PlotCol = "name" | "area" | "season" | "crop";
+
+type PlotRow = Plot & {
+  area: number;
+  seasonLabel: string;
+  cropLabel: string;
+};
+
+const EMPTY_PLOT_VIEW: TableView<PlotCol> = { sort: null, filters: {} };
+
+const PLOT_COLUMNS: Record<PlotCol, ColumnAccessor<PlotRow>> = {
+  name: { kind: "text", get: (p) => p.name },
+  area: { kind: "range", get: (p) => p.area },
+  season: { kind: "options", get: (p) => p.seasonLabel },
+  crop: { kind: "options", get: (p) => p.cropLabel },
 };
 
 /** Talhões cadastrados da fazenda — tabela com Em safra, cultura e ações (lápis/lixeira). */
@@ -79,12 +102,11 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
   const deletePlot = useDeletePlot(farmId);
 
   const [search, setSearch] = useState("");
-  const [plotSortDir, setPlotSortDir] = useState<PlotNameSortDir>("asc");
+  const [tableView, setTableView] = useState<TableView<PlotCol>>(EMPTY_PLOT_VIEW);
   const [sheetState, setSheetState] = useState<PlotSheetState>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<PlotDeleteTarget | null>(
+    null,
+  );
 
   const plotForm = useForm<PlotFormValues>({
     resolver: zodResolver(plotSchema),
@@ -167,21 +189,94 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
     return map;
   }, [cycleDetailQueries, seasons]);
 
-  const sortedPlots = useMemo(() => {
-    if (!plots) return [];
-    const list = [...plots];
-    if (!plotSortDir) return list;
-    list.sort((a, b) => comparePlotName(a.name, b.name, plotSortDir));
-    return list;
-  }, [plots, plotSortDir]);
+  const askDeletePlot = (plot: Plot) => {
+    const cycleName = metaByPlot.get(plot.id)?.cycleName;
+    setDeleteConfirm({
+      id: plot.id,
+      name: plot.name,
+      cycleNames: cycleName ? [cycleName] : [],
+    });
+  };
 
-  const filteredPlots = useMemo(() => {
+  const runDeletePlot = async (id: string, unlinkFromCycle: boolean) => {
+    const snapshot = deleteConfirm;
+    setDeleteConfirm(null);
+    try {
+      await deletePlot.mutateAsync({ id, unlinkFromCycle });
+      toast.success(
+        unlinkFromCycle
+          ? "Talhão removido da safra e excluído."
+          : "Talhão excluído.",
+      );
+    } catch (err) {
+      if (apiErrorCode(err) === "PLOT_IN_CYCLE") {
+        setDeleteConfirm({
+          id,
+          name: snapshot?.name ?? "Talhão",
+          cycleNames: plotInCycleNames(err),
+        });
+        return;
+      }
+      toast.error(
+        "Não foi possível excluir o talhão. Verifique se ele não está em uso em alguma safra.",
+      );
+    }
+  };
+
+  const plotRows = useMemo((): PlotRow[] => {
+    return (plots ?? []).map((plot) => {
+      const meta = metaByPlot.get(plot.id);
+      return {
+        ...plot,
+        area: Number(plot.area_hectares) || 0,
+        seasonLabel: meta?.cycleName?.trim() || "Sem safra",
+        cropLabel: meta?.cropLabel?.trim() || "",
+      };
+    });
+  }, [plots, metaByPlot]);
+
+  const searchedPlots = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
-    if (!query) return sortedPlots;
-    return sortedPlots.filter((plot) =>
+    if (!query) return plotRows;
+    return plotRows.filter((plot) =>
       plot.name.toLocaleLowerCase("pt-BR").includes(query),
     );
-  }, [sortedPlots, search]);
+  }, [plotRows, search]);
+
+  const filteredPlots = useMemo(
+    () => applyTableView(searchedPlots, tableView, PLOT_COLUMNS),
+    [searchedPlots, tableView],
+  );
+
+  const renderPlotHeader = (column: PlotCol, label: string) => {
+    const accessor = PLOT_COLUMNS[column];
+    return (
+      <ColumnFilterHeader
+        label={label}
+        kind={accessor.kind}
+        sort={tableView.sort?.column === column ? tableView.sort.dir : null}
+        onSortChange={(dir) =>
+          setTableView((v) => ({
+            ...v,
+            sort: dir
+              ? { column, dir }
+              : v.sort?.column === column
+                ? null
+                : v.sort,
+          }))
+        }
+        filter={tableView.filters[column]}
+        onFilterChange={(filter) =>
+          setTableView((v) => withColumnFilter(v, column, filter))
+        }
+        options={
+          accessor.kind === "options"
+            ? columnOptions(searchedPlots, accessor)
+            : undefined
+        }
+      />
+    );
+  };
 
   const sheetOpen = sheetState !== null;
   const isEditing = sheetState?.mode === "edit";
@@ -192,14 +287,14 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="min-w-0 font-display text-lg font-semibold text-text-strong">
           Talhões cadastrados
-          {sortedPlots.length > 0 ? (
+          {plotRows.length > 0 ? (
             <span className="ml-2 text-base font-medium text-muted-foreground">
-              {sortedPlots.length}
+              {plotRows.length}
             </span>
           ) : null}
         </h2>
         <div className="hidden min-w-4 flex-1 sm:block" />
-        {sortedPlots.length > 0 ? (
+        {plotRows.length > 0 ? (
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <div className="relative w-full sm:w-60 lg:w-72">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -212,12 +307,6 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
                 className="h-10 pl-9"
               />
             </div>
-            <span className="md:hidden">
-              <PlotNameSortIconButton
-                dir={plotSortDir}
-                onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
-              />
-            </span>
           </div>
         ) : null}
         <Button
@@ -231,7 +320,7 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
 
       {loadingPlots ? (
         <ListCardsSkeleton count={4} />
-      ) : sortedPlots.length === 0 ? (
+      ) : plotRows.length === 0 ? (
         <EmptyState
           icon={MapPin}
           title="Nenhum talhão cadastrado"
@@ -247,19 +336,20 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
         <EmptyState
           variant="inline"
           title="Nenhum talhão encontrado."
-          description={`Não há talhões com o nome "${search.trim()}".`}
+          description={
+            isTableViewActive(tableView)
+              ? "Nenhum talhão com esses filtros."
+              : `Não há talhões com o nome "${search.trim()}".`
+          }
         />
       ) : (
         <>
           <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
             <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_7rem] gap-4 bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
-              <PlotNameSortHeader
-                dir={plotSortDir}
-                onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
-              />
-              <span>Área</span>
-              <span>Em safra</span>
-              <span>Cultura atual</span>
+              {renderPlotHeader("name", "Talhão")}
+              {renderPlotHeader("area", "Área")}
+              {renderPlotHeader("season", "Em safra")}
+              {renderPlotHeader("crop", "Cultura atual")}
               <span className="text-right">Ações</span>
             </div>
             {filteredPlots.map((plot) => {
@@ -305,9 +395,7 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
                       className="text-warning-strong hover:bg-warning-soft hover:text-warning-strong"
                       aria-label={`Excluir talhão ${plot.name}`}
                       disabled={deletePlot.isPending}
-                      onClick={() =>
-                        setDeleteConfirm({ id: plot.id, name: plot.name })
-                      }
+                        onClick={() => askDeletePlot(plot)}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -359,9 +447,7 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
                         className="text-warning-strong hover:bg-warning-soft"
                         aria-label={`Excluir talhão ${plot.name}`}
                         disabled={deletePlot.isPending}
-                        onClick={() =>
-                          setDeleteConfirm({ id: plot.id, name: plot.name })
-                        }
+                        onClick={() => askDeletePlot(plot)}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -442,31 +528,12 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
         </SheetContent>
       </Sheet>
 
-      <ConfirmDialog
-        open={!!deleteConfirm}
-        onOpenChange={(open) => !open && setDeleteConfirm(null)}
-        title="Excluir talhão"
-        description={
-          deleteConfirm
-            ? `Excluir o talhão "${deleteConfirm.name}"? Esta ação não pode ser desfeita.`
-            : undefined
-        }
-        confirmLabel="Excluir"
-        tone="destructive"
+      <PlotDeleteDialog
+        target={deleteConfirm}
         loading={deletePlot.isPending}
-        onConfirm={async () => {
-          if (!deleteConfirm) return;
-          const id = deleteConfirm.id;
-          setDeleteConfirm(null);
-          try {
-            await deletePlot.mutateAsync(id);
-            toast.success("Talhão excluído.");
-          } catch {
-            toast.error(
-              "Não foi possível excluir o talhão. Verifique se ele não está em uso em alguma safra.",
-            );
-          }
-        }}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        onDelete={(id) => runDeletePlot(id, false)}
+        onUnlinkAndDelete={(id) => runDeletePlot(id, true)}
       />
     </section>
   );

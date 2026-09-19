@@ -83,8 +83,10 @@ export async function updatePlot(
   return data;
 }
 
-export async function deletePlot(id: string) {
-  await api.delete(`/plots/${id}`);
+export async function deletePlot(id: string, unlinkFromCycle = false) {
+  await api.delete(`/plots/${id}`, {
+    params: unlinkFromCycle ? { unlink_from_cycle: true } : undefined,
+  });
 }
 
 export async function getFarmSeasons(farmId: string) {

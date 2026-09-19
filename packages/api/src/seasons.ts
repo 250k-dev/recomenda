@@ -145,6 +145,13 @@ export async function updateSeason(
   return data;
 }
 
+export async function reassignSeasonPlot(id: string, plotId: string) {
+  const { data } = await api.patch<SeasonDetail>(`/seasons/${id}/plot`, {
+    plot_id: plotId,
+  });
+  return data;
+}
+
 export async function updateSeasonVarieties(
   id: string,
   varieties: Array<{

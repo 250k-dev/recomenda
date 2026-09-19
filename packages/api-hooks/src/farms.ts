@@ -138,9 +138,14 @@ export function useUpdatePlot(farmId: string) {
 export function useDeletePlot(farmId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: deletePlot,
-    // Remove o talhão da lista na hora (sem esperar refetch / F5).
-    onMutate: async (plotId: string) => {
+    mutationFn: (input: string | { id: string; unlinkFromCycle?: boolean }) => {
+      const id = typeof input === "string" ? input : input.id;
+      const unlink =
+        typeof input === "object" ? Boolean(input.unlinkFromCycle) : false;
+      return deletePlot(id, unlink);
+    },
+    onMutate: async (input) => {
+      const plotId = typeof input === "string" ? input : input.id;
       await queryClient.cancelQueries({ queryKey: queryKeys.farmPlots(farmId) });
       const previous = queryClient.getQueryData<
         Awaited<ReturnType<typeof getFarmPlots>>
@@ -163,6 +168,9 @@ export function useDeletePlot(farmId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.farm(farmId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.farms });
       queryClient.invalidateQueries({ queryKey: queryKeys.farmSeasons(farmId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonsArchived });
       // Contagens de talhão na carteira do produtor / cards de fazenda.
       queryClient.invalidateQueries({ queryKey: ["producer-farms"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.producers });

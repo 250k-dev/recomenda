@@ -73,6 +73,21 @@ export function apiErrorDetails(error: unknown): unknown {
   return undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** Nomes de safras no 409 `PLOT_IN_CYCLE`. */
+export function plotInCycleNames(error: unknown): string[] {
+  const details = apiErrorDetails(error);
+  if (!isRecord(details) || !Array.isArray(details.cycles)) return [];
+  return details.cycles.flatMap((row) => {
+    if (!isRecord(row)) return [];
+    const name = String(row.name ?? "").trim();
+    return name ? [name] : [];
+  });
+}
+
 export type PublishBlockItem = {
   id: string;
   name: string;
@@ -83,10 +98,6 @@ export type PublishBlockSummary = {
   message: string;
   items: PublishBlockItem[];
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 function fmtQty(value: number): string {
   return value.toLocaleString("pt-BR", { maximumFractionDigits: 3 });

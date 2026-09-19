@@ -73,6 +73,8 @@ export interface CycleSeasonRow {
   harvest_total_bags?: number | null;
   harvest_bags_per_hectare?: number | null;
   harvest_date?: string | null;
+  /** Cadastro do talhão foi excluído — a programação ficou órfã. */
+  plot_missing?: boolean;
 }
 
 export interface CycleBlock {

@@ -14,6 +14,7 @@ import {
   hardDeleteSeason,
   publishSeason,
   updateSeason,
+  reassignSeasonPlot,
   updateSeasonVarieties,
   applySeasonTemplate,
   getArchivedSeasons,
@@ -104,6 +105,29 @@ export function useArchiveSeason() {
         predicate: (query) =>
           Array.isArray(query.queryKey) && query.queryKey[0] === "farm-seasons",
       });
+    },
+  });
+}
+
+export function useReassignSeasonPlot(cycleId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ seasonId, plotId }: { seasonId: string; plotId: string }) =>
+      reassignSeasonPlot(seasonId, plotId),
+    onSuccess: () => {
+      if (cycleId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycleId) });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.cycleAvailablePlots(cycleId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.cyclePurchaseList(cycleId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.cycleCostPlan(cycleId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasons });
     },
   });
 }

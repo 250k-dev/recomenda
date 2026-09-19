@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  ArrowLeftRight,
   ChevronDown,
   ChevronRight,
+  Link2,
   MapPinned,
   Pencil,
   Plus,
@@ -37,6 +39,7 @@ import {
 } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { AddCycleFarmDialog } from "@/components/domain/cycle/cycle-farms-section";
+import { ReassignSeasonPlotDialog } from "@/components/domain/cycle/reassign-season-plot-dialog";
 import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
 import { BulkApplyTemplateDialog } from "@/components/domain/cycle/bulk-apply-template-dialog";
 import {
@@ -45,15 +48,16 @@ import {
 } from "@/components/domain/season/register-harvest-dialog";
 import { HARVEST_ROW_ACTION_CLASS } from "@/components/domain/export-action-class";
 import {
-  PlotNameSortHeader,
-  PlotNameSortIconButton,
-  comparePlotName,
-  nextPlotNameSortDir,
-  type PlotNameSortDir,
-} from "@/components/domain/plot-name-sort-button";
+  applyTableView,
+  columnOptions,
+  ColumnFilterHeader,
+  withColumnFilter,
+  type ColumnAccessor,
+  type TableView,
+} from "@/components/domain/table-column-filter";
 
 const PLOT_GRID =
-  "grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_17rem] items-center gap-4";
+  "grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(17rem,auto)] items-center gap-4";
 
 function canRegisterHarvest(status: string) {
   return status === "PUBLISHED" || status === "IN_PROGRESS";
@@ -72,6 +76,31 @@ function seasonDisplayName(season: CycleSeasonRow): string {
     varietyLabel ? ` — ${varietyLabel}` : ""
   }`;
 }
+
+type SeasonCol = "plot" | "crop" | "area" | "progress" | "harvest" | "status";
+
+const EMPTY_SEASON_VIEW: TableView<SeasonCol> = { sort: null, filters: {} };
+
+const SEASON_COLUMNS: Record<SeasonCol, ColumnAccessor<CycleSeasonRow>> = {
+  plot: { kind: "text", get: (s) => s.plot_name },
+  crop: { kind: "options", get: (s) => seasonDisplayName(s) },
+  area: {
+    kind: "range",
+    get: (s) => s.planted_area_ha ?? s.plot_area_ha,
+  },
+  progress: {
+    kind: "range",
+    get: (s) =>
+      s.recommendations_total > 0
+        ? Math.round((s.recommendations_done / s.recommendations_total) * 100)
+        : null,
+  },
+  harvest: { kind: "range", get: (s) => s.harvest_total_bags ?? null },
+  status: {
+    kind: "options",
+    get: (s) => labelStatus(STATUS_LABELS, s.status),
+  },
+};
 
 function seasonRowData(
   season: CycleSeasonRow,
@@ -150,7 +179,8 @@ export function CycleFarmDisclosures({
   const removeCycleFarm = useRemoveCycleFarm(cycle.id);
 
   const [plotFilter, setPlotFilter] = useState("");
-  const [plotSortDir, setPlotSortDir] = useState<PlotNameSortDir>(null);
+  const [tableView, setTableView] =
+    useState<TableView<SeasonCol>>(EMPTY_SEASON_VIEW);
   const [addFarmOpen, setAddFarmOpen] = useState(false);
   const [bulkApplyOpen, setBulkApplyOpen] = useState(false);
   const [removeFarm, setRemoveFarm] = useState<{
@@ -161,6 +191,10 @@ export function CycleFarmDisclosures({
   const [openFarms, setOpenFarms] = useState<Set<string>>(new Set());
   const [editingCrop, setEditingCrop] = useState<CycleSeasonRow | null>(null);
   const [harvesting, setHarvesting] = useState<CycleSeasonRow | null>(null);
+  const [reassigning, setReassigning] = useState<{
+    season: CycleSeasonRow;
+    farmId: string;
+  } | null>(null);
 
   const locationByFarm = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -195,14 +229,6 @@ export function CycleFarmDisclosures({
       seasonsByFarm.set(id, list);
     }
 
-    if (plotSortDir) {
-      for (const list of seasonsByFarm.values()) {
-        list.sort((a, b) =>
-          comparePlotName(a.plot_name, b.plot_name, plotSortDir),
-        );
-      }
-    }
-
     return (cycle.farms ?? []).map((farm) => ({
       farmId: farm.id,
       farmName: farm.name,
@@ -210,7 +236,7 @@ export function CycleFarmDisclosures({
       cadastralHa: farm.area_hectares_sum,
       seasons: seasonsByFarm.get(farm.id) ?? [],
     }));
-  }, [cycle.farms, cycle.farm_id, seasons, plotFilter, locationByFarm, plotSortDir]);
+  }, [cycle.farms, cycle.farm_id, seasons, plotFilter, locationByFarm]);
 
   const toggleFarm = (farmId: string) => {
     setOpenFarms((prev) => {
@@ -219,6 +245,40 @@ export function CycleFarmDisclosures({
       else next.add(farmId);
       return next;
     });
+  };
+
+  const renderSeasonHeader = (
+    column: SeasonCol,
+    label: string,
+    rows: CycleSeasonRow[],
+  ) => {
+    const accessor = SEASON_COLUMNS[column];
+    return (
+      <ColumnFilterHeader
+        label={label}
+        kind={accessor.kind}
+        sort={tableView.sort?.column === column ? tableView.sort.dir : null}
+        onSortChange={(dir) =>
+          setTableView((v) => ({
+            ...v,
+            sort: dir
+              ? { column, dir }
+              : v.sort?.column === column
+                ? null
+                : v.sort,
+          }))
+        }
+        filter={tableView.filters[column]}
+        onFilterChange={(filter) =>
+          setTableView((v) => withColumnFilter(v, column, filter))
+        }
+        options={
+          accessor.kind === "options"
+            ? columnOptions(rows, accessor)
+            : undefined
+        }
+      />
+    );
   };
 
   const canRemoveFarm = (cycle.farms?.length ?? 0) > 1;
@@ -243,24 +303,16 @@ export function CycleFarmDisclosures({
           </Button>
         ) : null}
         {seasons.length > 0 ? (
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <div className="relative w-full sm:w-60 lg:w-72">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                value={plotFilter}
-                onChange={(e) => setPlotFilter(e.target.value)}
-                placeholder="Filtrar talhão…"
-                aria-label="Filtrar talhão"
-                className="h-10 pl-9"
-              />
-            </div>
-            <span className="md:hidden">
-              <PlotNameSortIconButton
-                dir={plotSortDir}
-                onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
-              />
-            </span>
+          <div className="relative w-full sm:w-60 lg:w-72">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={plotFilter}
+              onChange={(e) => setPlotFilter(e.target.value)}
+              placeholder="Filtrar talhão…"
+              aria-label="Filtrar talhão"
+              className="h-10 pl-9"
+            />
           </div>
         ) : null}
         {canManage && cycle.can_add_farms !== false ? (
@@ -326,6 +378,13 @@ export function CycleFarmDisclosures({
               .filter(Boolean)
               .join(" · ");
             const canAddPlotToFarm = farmsWithAvailablePlots.has(group.farmId);
+            const visibleSeasons = applyTableView(
+              group.seasons,
+              tableView,
+              SEASON_COLUMNS,
+            );
+            const filteredOut =
+              group.seasons.length > 0 && visibleSeasons.length === 0;
 
             return (
               <div
@@ -439,23 +498,38 @@ export function CycleFarmDisclosures({
                           </Button>
                         ) : null}
                       </div>
+                    ) : filteredOut ? (
+                      <div className="px-4 py-8 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          Nenhum talhão com esses filtros nesta fazenda.
+                        </p>
+                      </div>
                     ) : (
                       <>
                         {/* Desktop: padrão atual da linha de talhão */}
                         <div className="hidden md:block">
                           <div className={`${PLOT_GRID} bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase`}>
-                            <PlotNameSortHeader
-                              dir={plotSortDir}
-                              onCycle={() => setPlotSortDir(nextPlotNameSortDir)}
-                            />
-                            <span>Cultura / variedade</span>
-                            <span>Área</span>
-                            <span>Progresso</span>
-                            <span>Sacas colhidas</span>
-                            <span>Status</span>
+                            {renderSeasonHeader("plot", "Talhão", group.seasons)}
+                            {renderSeasonHeader(
+                              "crop",
+                              "Cultura / variedade",
+                              group.seasons,
+                            )}
+                            {renderSeasonHeader("area", "Área", group.seasons)}
+                            {renderSeasonHeader(
+                              "progress",
+                              "Progresso",
+                              group.seasons,
+                            )}
+                            {renderSeasonHeader(
+                              "harvest",
+                              "Sacas colhidas",
+                              group.seasons,
+                            )}
+                            {renderSeasonHeader("status", "Status", group.seasons)}
                             <span className="text-right">Ações</span>
                           </div>
-                          {group.seasons.map((season) => {
+                          {visibleSeasons.map((season) => {
                             const row = seasonRowData(
                               season,
                               group.farmId,
@@ -466,8 +540,15 @@ export function CycleFarmDisclosures({
                                 key={season.id}
                                 className={`${PLOT_GRID} border-t border-border px-5 py-3.5 text-sm`}
                               >
-                                <span className="truncate font-semibold text-text-strong">
-                                  Talhão {season.plot_name}
+                                <span className="min-w-0">
+                                  <span className="truncate font-semibold text-text-strong">
+                                    Talhão {season.plot_name}
+                                  </span>
+                                  {season.plot_missing ? (
+                                    <span className="mt-0.5 block text-xs font-medium text-danger-strong">
+                                      Cadastro do talhão excluído
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span className="min-w-0">
                                   <span className="flex min-w-0 items-center gap-1.5">
@@ -536,6 +617,32 @@ export function CycleFarmDisclosures({
                                   </Badge>
                                 </span>
                                 <span className="flex justify-end gap-2">
+                                  {canEditCrop && season.status === "DRAFT" ? (
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      className="gap-1.5"
+                                      title={
+                                        season.plot_missing
+                                          ? "Vincular talhão"
+                                          : "Trocar talhão"
+                                      }
+                                      onClick={() =>
+                                        setReassigning({
+                                          season,
+                                          farmId: group.farmId,
+                                        })
+                                      }
+                                    >
+                                      {season.plot_missing ? (
+                                        <Link2 className="size-3.5" />
+                                      ) : (
+                                        <ArrowLeftRight className="size-3.5" />
+                                      )}
+                                      {season.plot_missing ? "Vincular" : "Trocar"}
+                                    </Button>
+                                  ) : null}
                                   {canHarvest && canRegisterHarvest(season.status) ? (
                                     <Button
                                       type="button"
@@ -576,7 +683,7 @@ export function CycleFarmDisclosures({
 
                         {/* Mobile: card de talhão atual */}
                         <div className="flex flex-col gap-2.5 p-3 md:hidden">
-                          {group.seasons.map((season) => {
+                          {visibleSeasons.map((season) => {
                             const row = seasonRowData(
                               season,
                               group.farmId,
@@ -592,6 +699,11 @@ export function CycleFarmDisclosures({
                                     <p className="truncate text-sm font-semibold text-text-strong">
                                       Talhão {season.plot_name}
                                     </p>
+                                    {season.plot_missing ? (
+                                      <p className="mt-0.5 text-xs font-medium text-danger-strong">
+                                        Cadastro do talhão excluído
+                                      </p>
+                                    ) : null}
                                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
                                       {row.displayName} · {fmtHa(row.area)}
                                       {row.partialArea
@@ -643,6 +755,28 @@ export function CycleFarmDisclosures({
                                   </div>
                                 ) : null}
                                 <div className="mt-3 flex flex-wrap gap-2">
+                                  {canEditCrop && season.status === "DRAFT" ? (
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() =>
+                                        setReassigning({
+                                          season,
+                                          farmId: group.farmId,
+                                        })
+                                      }
+                                    >
+                                      {season.plot_missing ? (
+                                        <Link2 />
+                                      ) : (
+                                        <ArrowLeftRight />
+                                      )}
+                                      {season.plot_missing
+                                        ? "Vincular talhão"
+                                        : "Trocar talhão"}
+                                    </Button>
+                                  ) : null}
                                   {canHarvest &&
                                   canRegisterHarvest(season.status) ? (
                                     <Button
@@ -728,6 +862,17 @@ export function CycleFarmDisclosures({
         onOpenChange={setBulkApplyOpen}
         cycle={cycle}
         producerId={producerId}
+      />
+
+      <ReassignSeasonPlotDialog
+        open={!!reassigning}
+        onOpenChange={(open) => {
+          if (!open) setReassigning(null);
+        }}
+        cycleId={cycle.id}
+        season={reassigning?.season ?? null}
+        farmId={reassigning?.farmId ?? ""}
+        plots={availablePlots}
       />
 
       <RegisterHarvestDialog

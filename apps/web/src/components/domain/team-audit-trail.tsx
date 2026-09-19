@@ -27,6 +27,7 @@ const CATEGORY_OPTIONS = [
   { value: "Estoque", label: "Estoque", entity: "stock" },
   { value: "Aplicação", label: "Aplicação", entity: "application" },
   { value: "Acesso", label: "Acesso", entity: "access" },
+  { value: "Cadastro", label: "Cadastro", entity: "farm,plot" },
   { value: "Outros", label: "Outros", entity: "" },
 ] as const;
 
