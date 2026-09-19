@@ -88,6 +88,8 @@ export function useSeasonPage() {
     seasonId,
     farmId,
     producerId,
+    cycleId,
+    cycleFarmId,
     openRecommendationId,
     season,
     farm,

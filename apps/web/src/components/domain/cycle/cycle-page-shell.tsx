@@ -28,7 +28,12 @@ import {
   usePublishCycle,
   useUpdateCycle,
 } from "@recomenda/api-hooks";
-import { apiErrorMessage, publishBlockedMessage } from "@recomenda/api/api-error";
+import {
+  apiErrorMessage,
+  publishBlockSummaryFromError,
+  type PublishBlockItem,
+} from "@recomenda/api/api-error";
+import { PublishBlockedDialog } from "@/components/domain/publish-blocked-dialog";
 import type { CycleSeasonRow } from "@recomenda/api/cycles";
 import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
@@ -156,6 +161,10 @@ export function CyclePageShell({
   const updateCycle = useUpdateCycle(page.cycleId);
   const canEdit = useCan("CYCLE_CRUD");
   const [publishConfirm, setPublishConfirm] = useState(false);
+  const [publishBlock, setPublishBlock] = useState<{
+    message: string;
+    items: PublishBlockItem[];
+  } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
 
@@ -363,12 +372,25 @@ export function CyclePageShell({
                 resolve();
               },
               onError: (err) => {
-                toast.error(publishBlockedMessage(err));
+                setPublishConfirm(false);
+                const summary = publishBlockSummaryFromError(err);
+                toast.error(summary.message);
+                setPublishBlock(summary);
                 reject(err);
               },
             }),
           );
         }}
+      />
+
+      <PublishBlockedDialog
+        open={publishBlock != null}
+        onOpenChange={(open) => {
+          if (!open) setPublishBlock(null);
+        }}
+        message={publishBlock?.message ?? ""}
+        items={publishBlock?.items ?? []}
+        listHref={page.hrefs.listaDeCompra}
       />
     </>
   );

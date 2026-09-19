@@ -46,7 +46,9 @@ import {
   createTimingStage,
   updateTimingTemplate,
 } from "@recomenda/api";
-import { publishBlockedMessage } from "@recomenda/api/api-error";
+import { publishBlockSummaryFromError, type PublishBlockItem } from "@recomenda/api/api-error";
+import { PublishBlockedDialog } from "@/components/domain/publish-blocked-dialog";
+import { routes } from "@recomenda/config";
 import type { CycleDetail } from "@recomenda/api/cycles";
 import {
   TimingStagesEditor,
@@ -610,6 +612,10 @@ function StepPlots({
   // "Publicar agora") — sem isso as seasons ficam DRAFT e nada cai no cronograma.
   // Publicar exige compras 100% — default off para não publicar sem querer.
   const [publishNow, setPublishNow] = useState(false);
+  const [publishBlock, setPublishBlock] = useState<{
+    message: string;
+    items: PublishBlockItem[];
+  } | null>(null);
 
   const plots = availablePlots ?? [];
   const selectedPlots = plots.filter((p) => selected.has(p.id));
@@ -815,10 +821,11 @@ function StepPlots({
                 onDone();
               },
               onError: (err: unknown) => {
+                const summary = publishBlockSummaryFromError(err);
                 toast.error(
-                  `Talhões aplicados, mas a publicação falhou: ${publishBlockedMessage(err)}. Use o botão "Revisar e publicar" na safra.`,
+                  `Talhões aplicados, mas a publicação falhou: ${summary.message} Use o botão "Revisar e publicar" na safra.`,
                 );
-                onDone();
+                setPublishBlock(summary);
               },
             });
             return;
@@ -1167,6 +1174,22 @@ function StepPlots({
           setConfirmOtherCycle(false);
           submit();
         }}
+      />
+
+      <PublishBlockedDialog
+        open={publishBlock != null}
+        onOpenChange={(open) => {
+          if (!open) setPublishBlock(null);
+        }}
+        message={publishBlock?.message ?? ""}
+        items={publishBlock?.items ?? []}
+        listHref={
+          cycle.farm_id
+            ? routes.fazendas.safraListaDeCompra(cycle.farm_id, cycle.id, {
+                producer_id: cycle.producer_id,
+              })
+            : null
+        }
       />
     </div>
   );

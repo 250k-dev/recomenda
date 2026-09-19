@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { usePublishSeason } from "@recomenda/api-hooks";
-import { publishBlockedMessage } from "@recomenda/api/api-error";
+import {
+  publishBlockItemsFromProgress,
+  publishBlockSummaryFromError,
+  type PublishBlockItem,
+} from "@recomenda/api/api-error";
+import { routes } from "@recomenda/config";
 import { useSeasonPage } from "@/components/domain/season/use-season-page";
 import { usePublishSeasonGuard } from "@/components/domain/season/use-publish-season-guard";
+import { PublishBlockedDialog } from "@/components/domain/publish-blocked-dialog";
 import { cn, STATUS_VARIANTS } from "@recomenda/utils";
 
 /**
@@ -25,9 +31,21 @@ export default function SeasonDetailLayout({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const { seasonId, season, statusLabel, breadcrumbs, hrefs } = useSeasonPage();
+  const { seasonId, season, statusLabel, breadcrumbs, hrefs, producerId, cycleId, cycleFarmId } =
+    useSeasonPage();
   const publishMutation = usePublishSeason(seasonId || "");
   const publishGuard = usePublishSeasonGuard(season?.cycle_id);
+  const [publishBlock, setPublishBlock] = useState<{
+    message: string;
+    items: PublishBlockItem[];
+  } | null>(null);
+
+  const listHref =
+    cycleFarmId && cycleId
+      ? routes.fazendas.safraListaDeCompra(cycleFarmId, cycleId, {
+          producer_id: producerId || undefined,
+        })
+      : null;
 
   const activeTab = pathname.endsWith("/plano-de-custo")
     ? "plano-de-custo"
@@ -37,16 +55,25 @@ export default function SeasonDetailLayout({
 
   const handlePublish = () => {
     if (!publishGuard.canPublish) {
-      toast.error(
+      const message =
         publishGuard.reason ??
-          "Finalize 100% das compras da lista antes de publicar a safra.",
-      );
+        "Finalize 100% das compras da lista antes de publicar a safra.";
+      toast.error(message);
+      setPublishBlock({
+        message,
+        items: publishBlockItemsFromProgress(publishGuard.pendingItems),
+      });
       return;
     }
     publishMutation.mutate([], {
       onSuccess: () => toast.success("Safra publicada com sucesso!"),
       onError: (error: unknown) => {
-        toast.error(publishBlockedMessage(error, "Falha ao publicar safra"));
+        const summary = publishBlockSummaryFromError(
+          error,
+          "Falha ao publicar safra",
+        );
+        toast.error(summary.message);
+        setPublishBlock(summary);
       },
     });
   };
@@ -101,11 +128,7 @@ export default function SeasonDetailLayout({
               size="sm"
               className="gap-2"
               onClick={handlePublish}
-              disabled={
-                publishMutation.isPending ||
-                publishGuard.isLoading ||
-                !publishGuard.canPublish
-              }
+              disabled={publishMutation.isPending || publishGuard.isLoading}
               title={publishGuard.reason ?? undefined}
             >
               <Send className="w-4 h-4" />
@@ -116,6 +139,16 @@ export default function SeasonDetailLayout({
       </div>
 
       {children}
+
+      <PublishBlockedDialog
+        open={publishBlock != null}
+        onOpenChange={(open) => {
+          if (!open) setPublishBlock(null);
+        }}
+        message={publishBlock?.message ?? ""}
+        items={publishBlock?.items ?? []}
+        listHref={listHref}
+      />
     </>
   );
 }

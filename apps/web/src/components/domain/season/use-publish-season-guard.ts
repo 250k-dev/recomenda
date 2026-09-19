@@ -16,6 +16,12 @@ export function usePublishSeasonGuard(cycleId?: string | null) {
   const progressQuery = usePurchaseListProgress(listId, Boolean(listId));
 
   return useMemo(() => {
+    const emptyItems: Array<{
+      purchase_list_item_id: string;
+      product_name: string;
+      stage: string;
+      remaining_qty: number;
+    }> = [];
     if (!cycleId) {
       return {
         canPublish: true,
@@ -23,6 +29,7 @@ export function usePublishSeasonGuard(cycleId?: string | null) {
         reason: null as string | null,
         percent: 100,
         listId: null as string | null,
+        pendingItems: emptyItems,
       };
     }
     if (listQuery.isLoading || (listId && progressQuery.isLoading)) {
@@ -32,6 +39,7 @@ export function usePublishSeasonGuard(cycleId?: string | null) {
         reason: null as string | null,
         percent: 0,
         listId: listId || null,
+        pendingItems: emptyItems,
       };
     }
     if (!listQuery.data) {
@@ -41,6 +49,7 @@ export function usePublishSeasonGuard(cycleId?: string | null) {
         reason: null as string | null,
         percent: 100,
         listId: null as string | null,
+        pendingItems: emptyItems,
       };
     }
     const progress = progressQuery.data;
@@ -51,8 +60,10 @@ export function usePublishSeasonGuard(cycleId?: string | null) {
         reason: null as string | null,
         percent: 0,
         listId,
+        pendingItems: emptyItems,
       };
     }
+    const pendingItems = progress.items.filter((item) => item.remaining_qty > 1e-9);
     if (!progress.is_complete) {
       return {
         canPublish: false,
@@ -60,6 +71,7 @@ export function usePublishSeasonGuard(cycleId?: string | null) {
         reason: `Compras da lista em ${progress.percent}% — confirme 100% das compras antes de publicar.`,
         percent: progress.percent,
         listId,
+        pendingItems,
       };
     }
     return {
@@ -68,6 +80,7 @@ export function usePublishSeasonGuard(cycleId?: string | null) {
       reason: null as string | null,
       percent: progress.percent,
       listId,
+      pendingItems,
     };
   }, [
     cycleId,
