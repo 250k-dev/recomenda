@@ -144,118 +144,129 @@ function MetaView({
           ) : null}
         </div>
 
-        <CollapsibleContent asChild>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="py-2 pl-3 pr-3 text-left font-medium">Categoria</th>
-                  <th className="px-3 py-2 text-right font-medium">Realizado R$</th>
-                  <th className="px-3 py-2 text-right font-medium">Realizado sc/ha</th>
-                  <th className="px-3 py-2 text-center font-medium">Meta sc/ha</th>
-                  <th className="w-[36%] min-w-[160px] py-2 pl-3 text-left font-medium">
-                    Progresso
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const color = CATEGORY_COLORS[r.category] ?? CATEGORY_COLORS.OTHER;
-                  const hasTarget = r.target > 0;
-                  const overOne = hasTarget && r.real > r.target;
-                  const progress = hasTarget ? (r.real / r.target) * 100 : 0;
-                  return (
-                    <tr
-                      key={r.category}
-                      className={cn(
-                        "border-t border-border/60",
-                        overOne && "bg-danger-soft",
-                      )}
-                    >
-                      <td
+        {rows.length === 0 ? (
+          // Sem gasto nem meta: o card continua na tela (a lista de compra o
+          // mostra sempre), só com o recado no lugar da tabela vazia.
+          <CollapsibleContent asChild>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Informe os preços dos produtos da lista, ou defina as metas da
+              safra.
+            </p>
+          </CollapsibleContent>
+        ) : (
+          <CollapsibleContent asChild>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 pl-3 pr-3 text-left font-medium">Categoria</th>
+                    <th className="px-3 py-2 text-right font-medium">Realizado R$</th>
+                    <th className="px-3 py-2 text-right font-medium">Realizado sc/ha</th>
+                    <th className="px-3 py-2 text-center font-medium">Meta sc/ha</th>
+                    <th className="w-[36%] min-w-[160px] py-2 pl-3 text-left font-medium">
+                      Progresso
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const color = CATEGORY_COLORS[r.category] ?? CATEGORY_COLORS.OTHER;
+                    const hasTarget = r.target > 0;
+                    const overOne = hasTarget && r.real > r.target;
+                    const progress = hasTarget ? (r.real / r.target) * 100 : 0;
+                    return (
+                      <tr
+                        key={r.category}
                         className={cn(
-                          "whitespace-nowrap border-l-[3px] py-2.5 pl-3 pr-3 font-medium text-foreground",
-                          overOne
-                            ? "border-l-danger-strong font-semibold"
-                            : "border-l-transparent",
+                          "border-t border-border/60",
+                          overOne && "bg-danger-soft",
                         )}
                       >
-                        {CATEGORY_LABELS[r.category] ?? r.category}
-                      </td>
-                      <td
-                        className={cn(
-                          "whitespace-nowrap px-3 py-2.5 text-right tabular-nums",
-                          overOne ? "text-danger" : "text-muted-foreground",
-                        )}
-                      >
-                        {brlSmall(r.totalBrl)}
-                      </td>
-                      <td
-                        className={cn(
-                          "whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums",
-                          overOne ? "text-danger-strong" : "text-foreground",
-                        )}
-                      >
-                        {num(r.real, 1)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center">
-                        {hasTarget ? (
-                          <span className="inline-block rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium tabular-nums text-primary-strong">
-                            {num(r.target)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/60">—</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 pl-3">
-                        {hasTarget ? (
-                          <div className="flex items-center gap-2.5">
-                            {/* Barra: 100% = meta (marcador à direita); enche até o realizado. */}
-                            <div className="relative min-w-[80px] flex-1">
-                              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                                <div
+                        <td
+                          className={cn(
+                            "whitespace-nowrap border-l-[3px] py-2.5 pl-3 pr-3 font-medium text-foreground",
+                            overOne
+                              ? "border-l-danger-strong font-semibold"
+                              : "border-l-transparent",
+                          )}
+                        >
+                          {CATEGORY_LABELS[r.category] ?? r.category}
+                        </td>
+                        <td
+                          className={cn(
+                            "whitespace-nowrap px-3 py-2.5 text-right tabular-nums",
+                            overOne ? "text-danger" : "text-muted-foreground",
+                          )}
+                        >
+                          {brlSmall(r.totalBrl)}
+                        </td>
+                        <td
+                          className={cn(
+                            "whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums",
+                            overOne ? "text-danger-strong" : "text-foreground",
+                          )}
+                        >
+                          {num(r.real, 1)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-center">
+                          {hasTarget ? (
+                            <span className="inline-block rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium tabular-nums text-primary-strong">
+                              {num(r.target)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/60">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pl-3">
+                          {hasTarget ? (
+                            <div className="flex items-center gap-2.5">
+                              {/* Barra: 100% = meta (marcador à direita); enche até o realizado. */}
+                              <div className="relative min-w-[80px] flex-1">
+                                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                                  <div
+                                    className={cn(
+                                      "h-full rounded-full transition-all",
+                                      overOne && "bg-danger-strong",
+                                    )}
+                                    style={{
+                                      width: `${Math.min(100, progress)}%`,
+                                      background: overOne ? undefined : color,
+                                    }}
+                                  />
+                                </div>
+                                <span
                                   className={cn(
-                                    "h-full rounded-full transition-all",
-                                    overOne && "bg-danger-strong",
+                                    "absolute top-1/2 h-2.5 w-[2px] -translate-y-1/2 rounded-full",
+                                    overOne ? "bg-danger-strong" : "bg-primary-strong",
                                   )}
-                                  style={{
-                                    width: `${Math.min(100, progress)}%`,
-                                    background: overOne ? undefined : color,
-                                  }}
+                                  style={{ left: "calc(100% - 2px)" }}
                                 />
                               </div>
                               <span
                                 className={cn(
-                                  "absolute top-1/2 h-2.5 w-[2px] -translate-y-1/2 rounded-full",
-                                  overOne ? "bg-danger-strong" : "bg-primary-strong",
+                                  "w-11 shrink-0 text-right text-xs tabular-nums",
+                                  overOne
+                                    ? "font-semibold text-danger-strong"
+                                    : "text-muted-foreground",
                                 )}
-                                style={{ left: "calc(100% - 2px)" }}
-                              />
+                              >
+                                {num(progress, 0)}%
+                              </span>
                             </div>
-                            <span
-                              className={cn(
-                                "w-11 shrink-0 text-right text-xs tabular-nums",
-                                overOne
-                                  ? "font-semibold text-danger-strong"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              {num(progress, 0)}%
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">
+                              Sem meta definida
                             </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/50">
-                            Sem meta definida
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CollapsibleContent>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleContent>
+        )}
       </section>
     </Collapsible>
   );
