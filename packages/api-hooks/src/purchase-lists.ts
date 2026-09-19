@@ -27,30 +27,22 @@ export function useUpdatePurchaseList(id: string, options?: { farmId?: string })
     mutationFn: (payload: Partial<PurchaseListInput>) => updatePurchaseList(id, payload),
     onSuccess: (data) => {
       if (data.season_id) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.seasonCostPlan(data.season_id) });
+        queryClient.setQueryData(queryKeys.seasonCostPlan(data.season_id), data);
       }
       if (data.producer_id) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.producerPurchaseLists(data.producer_id),
-        });
-        // Sync lista → estoque no save: atualiza a tela de estoque / prefill.
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.producerStock(data.producer_id),
-        });
-        queryClient.invalidateQueries({ queryKey: ["purchase-lists-coverage"] });
+        queryClient.setQueryData(
+          queryKeys.producerPurchaseLists(data.producer_id),
+          (old: unknown) => {
+            if (!Array.isArray(old)) return old;
+            return old.map((row: { id: string }) => (row.id === data.id ? data : row));
+          },
+        );
       }
       if (options?.farmId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.farmPurchaseLists(options.farmId) });
       }
-      // A lista da safra alimenta o editor na página da safra. Sem invalidar aqui,
-      // a tela seguia mostrando os itens ANTIGOS depois de salvar — e ao reabrir a
-      // edição o rascunho era semeado com esse estado velho, que o autosave então
-      // gravava por cima, apagando o que tinha acabado de ser salvo.
       if (data.cycle_id) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.cyclePurchaseList(data.cycle_id),
-        });
-        queryClient.invalidateQueries({ queryKey: queryKeys.cycleCostPlan(data.cycle_id) });
+        queryClient.setQueryData(queryKeys.cyclePurchaseList(data.cycle_id), data);
       }
     },
   });

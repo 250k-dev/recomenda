@@ -107,7 +107,11 @@ export function CostPlanView({
   const catalog = useLocalCatalog();
   const products = catalog.data?.data ?? [];
 
-  const { fxRate: globalFxRate, setFxRate: setGlobalFxRate } = useCurrencyStore();
+  const {
+    fxRate: globalFxRate,
+    setFxRate: setGlobalFxRate,
+    setFxRateFromUser,
+  } = useCurrencyStore();
   const [grainPrice, setGrainPrice] = useState<string>("");
   const [targets, setTargets] = useState<Record<string, number>>({});
   const [items, setItems] = useState<EditableItem[]>([]);
@@ -117,8 +121,8 @@ export function CostPlanView({
 
   const fxRate = globalFxRate;
   const setFxRate = useCallback(
-    (v: string) => setGlobalFxRate(v),
-    [setGlobalFxRate],
+    (v: string) => setFxRateFromUser(v),
+    [setFxRateFromUser],
   );
 
   /* eslint-disable react-hooks/set-state-in-effect -- dívida pré-existente (baseline desde A1): semeia o formulário a partir do plano carregado. Corrigir exige `key` no pai ou estado derivado, e mexe no fluxo de edição do plano de custo — fora do escopo de uma fase de config. */

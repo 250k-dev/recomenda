@@ -267,10 +267,10 @@ export function validateListItems(items: ListItem[]): string | null {
     if (isSeedItem(it)) {
       if (!Number(it.seedsPerMeter))
         return "Informe a semente/metro nas variedades/híbridos.";
-      // Aceita o volume de bags (input novo) OU a área plantada (listas antigas,
-      // salvas antes de o bag virar manual) — só trava se a semente não tiver
-      // nenhum dos dois. Assim listas existentes voltam a salvar normalmente.
-      if (!Number(it.bagsOverride) && !Number(it.seedingArea))
+      // Linha nova (`i-…`): bags/sacos é obrigatório — a área plantada deriva deles.
+      // Lista antiga: aceita área plantada gravada antes de o bag virar manual.
+      const isUnsavedRow = it.key.startsWith("i-");
+      if (!Number(it.bagsOverride) && (isUnsavedRow || !Number(it.seedingArea)))
         return "Informe o volume de bags/sacos nas variedades/híbridos.";
       // Bag/saco é unidade física fechada: não existe meio bag.
       if (it.bagsOverride && !Number.isInteger(Number(it.bagsOverride)))

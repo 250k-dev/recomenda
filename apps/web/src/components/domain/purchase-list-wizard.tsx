@@ -517,7 +517,11 @@ function StepList({
     setError(null);
     if (!listName.trim()) return setError("Dê um nome para a lista de compra.");
     const itemsError = validateListItems(items);
-    if (itemsError) return setError(itemsError);
+    if (itemsError) {
+      setError(itemsError);
+      toast.error(itemsError);
+      return;
+    }
     onNext();
   };
 

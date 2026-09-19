@@ -209,7 +209,11 @@ function TemplateEditor({
     setError(null);
     if (!name.trim()) return setError("Dê um nome para o template.");
     const itemsError = validateListItems(items);
-    if (itemsError) return setError(itemsError);
+    if (itemsError) {
+      setError(itemsError);
+      toast.error(itemsError);
+      return;
+    }
 
     const payload = {
       crop,

@@ -9,7 +9,10 @@ export const DEFAULT_SPACING_M = 0.65;
 
 interface CurrencyState {
   fxRate: string;
+  /** true depois da primeira edição manual da cotação — a API ao vivo não sobrescreve. */
+  fxRateUserEdited: boolean;
   setFxRate: (v: string) => void;
+  setFxRateFromUser: (v: string) => void;
   /** Preço da saca (R$) — converte custo em sacas na lista de compra. */
   grainPrice: string;
   setGrainPrice: (v: string) => void;
@@ -22,7 +25,9 @@ export const useCurrencyStore = create<CurrencyState>()(
   persist(
     (set) => ({
       fxRate: "",
+      fxRateUserEdited: false,
       setFxRate: (fxRate) => set({ fxRate }),
+      setFxRateFromUser: (fxRate) => set({ fxRate, fxRateUserEdited: true }),
       grainPrice: "",
       setGrainPrice: (grainPrice) => set({ grainPrice }),
       spacing: "",

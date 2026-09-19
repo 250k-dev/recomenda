@@ -5,6 +5,7 @@ import { routes } from "@recomenda/config";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { runLeaveBusy } from "@/hooks/use-leave-busy-guard";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -70,7 +71,11 @@ export function NotificationsPanel({
       } catch {
         /* navigation continues if marking read fails */
       }
-      if (path) router.push(path);
+      if (path) {
+        void runLeaveBusy(() => {
+          router.push(path);
+        });
+      }
     })();
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DollarSign, PaperBag, RulerDimensionLine } from "lucide-react";
 import { Input } from "@recomenda/ui/primitives/input";
 import { MoneyInput } from "@recomenda/ui/forms/money-input";
@@ -67,6 +67,8 @@ export function PurchaseListParamsRow({
   const {
     fxRate,
     setFxRate,
+    setFxRateFromUser,
+    fxRateUserEdited,
     grainPrice,
     setGrainPrice,
     spacing: spacingStr,
@@ -76,18 +78,34 @@ export function PurchaseListParamsRow({
   const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
   const spacing = Number(spacingStr) || DEFAULT_SPACING_M;
 
-  // Item 4: traz a cotação real do dólar como valor padrão a cada abertura da
-  // lista, mas sem sobrescrever uma edição manual feita nesta tela.
+  // Cotação ao vivo só entra como padrão enquanto o usuário nunca editou o
+  // campo (flag persistida). Depois da primeira digitação, o valor dele fica.
   const liveFx = useLiveFxRate();
   const fxDefaultedRef = useRef(false);
-  const fxUserEditedRef = useRef(false);
+  const [storeHydrated, setStoreHydrated] = useState(
+    () => useCurrencyStore.persist.hasHydrated(),
+  );
   useEffect(() => {
-    if (readOnly || fxUserEditedRef.current || fxDefaultedRef.current) return;
+    const unsub = useCurrencyStore.persist.onFinishHydration(() => {
+      setStoreHydrated(true);
+    });
+    if (useCurrencyStore.persist.hasHydrated()) setStoreHydrated(true);
+    return unsub;
+  }, []);
+  useEffect(() => {
+    if (
+      !storeHydrated ||
+      readOnly ||
+      fxRateUserEdited ||
+      fxDefaultedRef.current
+    ) {
+      return;
+    }
     if (liveFx.rate != null) {
       fxDefaultedRef.current = true;
       setFxRate(String(liveFx.rate));
     }
-  }, [liveFx.rate, readOnly, setFxRate]);
+  }, [storeHydrated, liveFx.rate, readOnly, fxRateUserEdited, setFxRate]);
 
   const toBuyByKey = listItemsToBuyByKey(items, totalHa);
   const totals = items.reduce(
@@ -142,10 +160,7 @@ export function PurchaseListParamsRow({
               <MoneyInput
                 placeholder="5,50"
                 value={fxRate}
-                onValueChange={(v) => {
-                  fxUserEditedRef.current = true;
-                  setFxRate(v);
-                }}
+                onValueChange={setFxRateFromUser}
                 className="h-8 w-24"
               />
             </div>

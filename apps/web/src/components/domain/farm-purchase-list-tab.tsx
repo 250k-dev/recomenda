@@ -10,8 +10,13 @@ import { PageHero } from "@/components/domain/page-hero";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { Button } from "@recomenda/ui/primitives/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@recomenda/ui/primitives/dialog";
 import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
-import { FieldError } from "@/components/domain/season/_shared";
 import { apiErrorCode, apiErrorMessage } from "@recomenda/api/api-error";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import { PurchaseListParamsRow } from "@/components/domain/purchase-list-params-row";
@@ -32,6 +37,7 @@ import {
   useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
 import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
+import { useLeaveBusyGuard } from "@/hooks/use-leave-busy-guard";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
 import {
   CategoryMetaProgress,
@@ -182,7 +188,6 @@ export function FarmPurchaseListTab({
   }, [producerStock, list?.items]);
   const [editing, setEditing] = useState(false);
   const [draftItems, setDraftItems] = useState<ListItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [targetsOpen, setTargetsOpen] = useState(false);
   const [metasOpen, setMetasOpen] = useState(false);
@@ -196,6 +201,7 @@ export function FarmPurchaseListTab({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
+  const [leaveUi, setLeaveUi] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [restoreItems, setRestoreItems] = useState<ListItem[] | null>(null);
 
@@ -224,7 +230,6 @@ export function FarmPurchaseListTab({
   const [trackedListId, setTrackedListId] = useState<string | undefined>(undefined);
   if (list?.id !== trackedListId) {
     setTrackedListId(list?.id);
-    setError(null);
     setEditing(false);
     setDraftItems(list ? itemsFromList(list) : []);
     setSaveState("idle");
@@ -259,12 +264,10 @@ export function FarmPurchaseListTab({
   const startEditing = () => {
     if (!list) return;
     setDraftItems(itemsFromList(list));
-    setError(null);
     setEditing(true);
   };
 
   const cancelEditing = () => {
-    setError(null);
     resetDraft();
     setEditing(false);
     // Cancelar = descartar as alterações, inclusive o backup local.
@@ -277,7 +280,6 @@ export function FarmPurchaseListTab({
   const restoreBackup = () => {
     if (!restoreItems) return;
     setDraftItems(restoreItems);
-    setError(null);
     setSaveState("idle");
     setEditing(true);
   };
@@ -286,17 +288,25 @@ export function FarmPurchaseListTab({
     setRestoreItems(null);
   };
 
-  const saveItems = async (opts?: { silent?: boolean }) => {
-    if (!list) return;
-    setError(null);
+  const saveInFlightRef = useRef(false);
+  const saveWaitersRef = useRef<Array<(ok: boolean) => void>>([]);
+  const notifySaveWaiters = (ok: boolean) => {
+    const waiters = saveWaitersRef.current;
+    saveWaitersRef.current = [];
+    for (const waiter of waiters) waiter(ok);
+  };
+  const saveItems = async (opts?: { silent?: boolean }): Promise<boolean> => {
+    if (!list) return false;
+    if (saveInFlightRef.current) return false;
     const validationError = validateItems(draftItems);
     if (validationError) {
       // Autosave não grita validação no meio da digitação; o Salvar manual sim.
-      if (!opts?.silent) setError(validationError);
-      return;
+      if (!opts?.silent) toast.error(validationError);
+      return false;
     }
 
     try {
+      saveInFlightRef.current = true;
       setSaveState("saving");
       const {
         fxRate: fxRaw,
@@ -324,6 +334,8 @@ export function FarmPurchaseListTab({
         toast.success("Lista de compra atualizada.");
         setEditing(false);
       }
+      notifySaveWaiters(true);
+      return true;
     } catch (e) {
       // NÃO engole o erro: marca "não salvo" (o backup local continua guardado).
       setSaveState("error");
@@ -335,11 +347,16 @@ export function FarmPurchaseListTab({
         toast.error(apiErrorMessage(e, "Não foi possível remover o produto da lista."));
         resetDraft();
         cascadeRecommendationItemsRef.current = false;
-        return;
+        notifySaveWaiters(false);
+        return false;
       }
       if (!opts?.silent) {
-        setError(apiErrorMessage(e, "Não foi possível salvar a lista."));
+        toast.error(apiErrorMessage(e, "Não foi possível salvar a lista."));
       }
+      notifySaveWaiters(false);
+      return false;
+    } finally {
+      saveInFlightRef.current = false;
     }
   };
 
@@ -382,8 +399,29 @@ export function FarmPurchaseListTab({
       JSON.stringify(listItemsToPayload(viewItems, list?.crop)),
     [draftItems, viewItems, list?.crop],
   );
+  const dirtyRef = useRef(false);
+  const saveItemsRef = useRef(saveItems);
+  dirtyRef.current = draftIsDirty;
+  saveItemsRef.current = saveItems;
+  useLeaveBusyGuard(
+    {
+      isBusy: () => dirtyRef.current || saveInFlightRef.current,
+      flush: async () => {
+        if (saveInFlightRef.current) {
+          return new Promise((resolve) => saveWaitersRef.current.push(resolve));
+        }
+        if (dirtyRef.current) {
+          return saveItemsRef.current({ silent: true });
+        }
+        return true;
+      },
+      setLeaveUi,
+    },
+    Boolean(editing && (draftIsDirty || saveState === "saving" || leaveUi)),
+  );
   useEffect(() => {
     if (!editing || !list || draftItems.length === 0 || !draftIsDirty) return;
+    if (saveInFlightRef.current || saveState === "saving") return;
     const timer = setTimeout(() => {
       if (validateItems(draftItems) === null) {
         void saveItems({ silent: true });
@@ -391,7 +429,7 @@ export function FarmPurchaseListTab({
     }, 2500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftItems, editing, list?.id, draftIsDirty]);
+  }, [draftItems, editing, list?.id, draftIsDirty, saveState]);
 
   // Backup local contínuo (400ms) enquanto edita — guarda QUALQUER estado, mesmo
   // inválido ou incompleto, então nada se perde se o autosave do servidor falhar.
@@ -492,6 +530,20 @@ export function FarmPurchaseListTab({
 
   return (
     <div className="flex flex-col gap-5">
+      <Dialog open={leaveUi}>
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-xs items-center py-10 text-center"
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          <Loader2 className="size-10 animate-spin text-primary" aria-hidden />
+          <DialogTitle>Salvando…</DialogTitle>
+          <DialogDescription>
+            Aguarde a lista gravar antes de sair desta tela.
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
       {purchaseLists.length > 1 ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Lista</span>
@@ -499,7 +551,7 @@ export function FarmPurchaseListTab({
             value={selectedListId}
             onValueChange={onSelectList}
             className="min-w-[220px]"
-            disabled={editing}
+            disabled={editing || saveState === "saving"}
             options={purchaseLists.map((l) => ({
               value: l.id,
               label: `${l.name}${l.variety ? ` — ${l.variety}` : ""}${
@@ -663,7 +715,7 @@ export function FarmPurchaseListTab({
                     size="sm"
                     className="gap-1.5"
                     onClick={() => void saveItems()}
-                    disabled={updateMutation.isPending}
+                    disabled={updateMutation.isPending || saveState === "saving"}
                   >
                     {updateMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -690,12 +742,7 @@ export function FarmPurchaseListTab({
             onRemovalCascadeArmed={() => {
               cascadeRecommendationItemsRef.current = true;
             }}
-          />
-          {error ? (
-            <div className="max-w-xl">
-              <FieldError message={error} />
-            </div>
-          ) : null}
+            />
         </div>
       ) : (
         <EmptyState

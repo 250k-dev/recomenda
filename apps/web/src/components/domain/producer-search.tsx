@@ -10,6 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
+import { runLeaveBusy } from "@/hooks/use-leave-busy-guard";
 import type { Route } from "next";
 import { Search, Users, Plus, Package } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -96,7 +97,9 @@ export function ProducerSearchButton({
 
   const go = <T extends string>(path: Route<T>) => {
     setDialogOpen(false);
-    router.push(path);
+    void runLeaveBusy(() => {
+      router.push(path);
+    });
   };
 
   // Global ⌘K / Ctrl+K shortcut to open the search modal.
