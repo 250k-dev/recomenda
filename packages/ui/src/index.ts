@@ -41,6 +41,8 @@ export * from "./primitives/sidebar";
 export * from "./primitives/skeleton";
 export * from "./primitives/table";
 export * from "./primitives/textarea";
+export * from "./primitives/toggle";
+export * from "./primitives/toggle-group";
 export * from "./primitives/tooltip";
 
 // ---- Entrada de dados ----
