@@ -135,7 +135,7 @@ function SaveDraftButton({
       ) : (
         <Save className="h-4 w-4" />
       )}
-      Salvar rascunho
+      Rascunho
     </Button>
   );
 }
@@ -514,14 +514,24 @@ function StepList({
   };
 
   const next = () => {
-    setError(null);
-    if (!listName.trim()) return setError("Dê um nome para a lista de compra.");
+    if (!listName.trim()) {
+      const message = "Dê um nome para a lista de compra.";
+      setError(message);
+      toast.error(message);
+      document.getElementById("list-name")?.focus();
+      document.getElementById("list-name")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      return;
+    }
     const itemsError = validateListItems(items);
     if (itemsError) {
       setError(itemsError);
       toast.error(itemsError);
       return;
     }
+    setError(null);
     onNext();
   };
 
@@ -569,11 +579,15 @@ function StepList({
             <Input
               id="list-name"
               value={listName}
-              onChange={(e) => setListName(e.target.value)}
+              onChange={(e) => {
+                setListName(e.target.value);
+                if (error) setError(null);
+              }}
               placeholder="Ex: Soja 26/27"
               className="h-12 border-primary/35 bg-background text-lg font-semibold shadow-sm focus-visible:border-primary focus-visible:ring-primary/30 placeholder:font-normal placeholder:text-muted-foreground/80"
               autoFocus
             />
+            {error ? <FieldError message={error} /> : null}
             <p className="text-xs text-muted-foreground">
               Use um nome que identifique a safra ou o planejamento desta fazenda.
             </p>
@@ -720,31 +734,24 @@ function StepList({
             stockByProductId={stockByProductId}
             listId={listId}
             onRemovalCascadeArmed={onRemovalCascadeArmed}
+            fullBleedTabs={false}
+            footerActions={
+              <>
+                <SaveDraftButton
+                  onSaveDraft={onSaveDraft}
+                  savingDraft={savingDraft}
+                  size="default"
+                />
+                <Button type="button" onClick={next} className="gap-2">
+                  Próximo
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </>
+            }
           />
         </div>
       </section>
 
-      {error ? (
-        <div className="mt-4 max-w-xl">
-          <FieldError message={error} />
-        </div>
-      ) : null}
-
-      <StepFooter
-        secondary={
-          <SaveDraftButton
-            onSaveDraft={onSaveDraft}
-            savingDraft={savingDraft}
-            size="default"
-          />
-        }
-        primary={
-          <Button onClick={next} className="gap-2">
-            Próximo
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        }
-      />
     </div>
   );
 }

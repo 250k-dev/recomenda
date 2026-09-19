@@ -30,7 +30,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
         position="top-right"
         closeButton
         theme="light"
+        className="!z-[200]"
+        offset={88}
         toastOptions={{
+          className: "!z-[200]",
           style: {
             fontFamily: "var(--font-inter)",
             borderRadius: "var(--radius)",

@@ -678,22 +678,9 @@ export function FarmPurchaseListTab({
           antigas por categoria seguem na tabela Realizado × Meta. */}
       {canViewPrices ? (
         <div className="flex flex-col gap-4">
-          {hasSingleTotalTarget(list.category_targets ?? {}) ? (
-            <CategoryMetaProgress
-              items={editing ? draftItems : viewItems}
-              totalHa={totalHa}
-              targets={list.category_targets ?? {}}
-            />
-          ) : null}
-          <CategoryDistributionPanel
-            breakdown={kpis.categoryBreakdown}
-            targets={
-              hasSingleTotalTarget(list.category_targets ?? {})
-                ? undefined
-                : (list.category_targets ?? {})
-            }
-            action={
-              !editing && !effectiveReadOnly ? (
+          <div className="flex flex-col gap-2">
+            {!editing && !effectiveReadOnly ? (
+              <div className="flex justify-end">
                 <Button
                   variant="outline"
                   size="sm"
@@ -703,7 +690,22 @@ export function FarmPurchaseListTab({
                   <Target className="h-4 w-4" />
                   Editar metas
                 </Button>
-              ) : undefined
+              </div>
+            ) : null}
+            {hasSingleTotalTarget(list.category_targets ?? {}) ? (
+              <CategoryMetaProgress
+                items={editing ? draftItems : viewItems}
+                totalHa={totalHa}
+                targets={list.category_targets ?? {}}
+              />
+            ) : null}
+          </div>
+          <CategoryDistributionPanel
+            breakdown={kpis.categoryBreakdown}
+            targets={
+              hasSingleTotalTarget(list.category_targets ?? {})
+                ? undefined
+                : (list.category_targets ?? {})
             }
           />
         </div>

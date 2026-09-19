@@ -97,6 +97,16 @@ type PurchaseListItemsEditorProps = {
   hideParams?: boolean;
   /** Ação à direita da linha das abas (ex.: "Editar Lista de Compras"). */
   tabsActions?: ReactNode;
+  /**
+   * Ações à direita da barra fixa de adicionar (ex.: wizard: rascunho + Próximo).
+   * Só a criação da lista usa isso — a lista já salva não passa.
+   */
+  footerActions?: ReactNode;
+  /**
+   * Faixa das abas sangra até as bordas da janela (lista já salva).
+   * No wizard a tabela vive dentro de um card: desligar, senão a faixa estoura.
+   */
+  fullBleedTabs?: boolean;
   /** Lista persistida: ao remover um produto, consulta recomendações da safra. */
   listId?: string | null;
   /** Marca o próximo PUT para cascatear exclusão nas recomendações pendentes. */
@@ -239,6 +249,8 @@ export function PurchaseListItemsEditor({
   readOnly = false,
   hideParams = false,
   tabsActions,
+  footerActions,
+  fullBleedTabs = true,
   listId,
   onRemovalCascadeArmed,
 }: PurchaseListItemsEditorProps) {
@@ -1882,10 +1894,9 @@ export function PurchaseListItemsEditor({
           <div
             className={cn(
               "relative mb-3",
-              "max-md:static md:sticky md:top-0 md:z-10",
-              // Sangra até as bordas da janela; o conteúdo segue alinhado com a
-              // página pelo contêiner de dentro.
-              "md:mx-[calc(50%-50vw)] md:w-screen",
+              fullBleedTabs && "max-md:static md:sticky md:top-0 md:z-10",
+              // Lista salva: sangra até as bordas da janela. Wizard: fica no card.
+              fullBleedTabs && "md:mx-[calc(50%-50vw)] md:w-screen",
             )}
           >
             {/* Camada só do fundo: a opacidade acompanha o scroll sem levar
@@ -1893,11 +1904,17 @@ export function PurchaseListItemsEditor({
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0 -z-10 bg-card shadow-[0_6px_20px_-8px_rgb(0_0_0/0.25)]"
-              style={{ opacity: tabsStickProgress }}
+              style={{ opacity: fullBleedTabs ? tabsStickProgress : 0 }}
             />
             {/* A largura máxima soma o px-8 do `main`: sem isso o recuo entra
               duas vezes e as abas saem da prumada da tabela em tela larga. */}
-            <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 md:max-w-[calc(var(--container-app)+4rem)] md:px-8 md:py-2">
+            <div
+              className={cn(
+                "mx-auto flex w-full flex-wrap items-center justify-between gap-3",
+                fullBleedTabs &&
+                  "md:max-w-[calc(var(--container-app)+4rem)] md:px-8 md:py-2",
+              )}
+            >
               {bands.length > 1 ? (
                 <SegmentedTabs
                   value={activeBand?.id ?? bands[0].id}
@@ -2003,6 +2020,7 @@ export function PurchaseListItemsEditor({
               <Plus className="h-4 w-4" />
               Adicionar produto
             </Button>
+            {footerActions}
           </div>
         </div>
       ) : null}
