@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Plus, Sprout, Trash2 } from "lucide-react";
+import { AlertTriangle, ListFilter, Plus, Sprout, Trash2 } from "lucide-react";
 import { useCurrencyStore } from "@/stores/currency";
 import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
@@ -32,6 +32,16 @@ import {
 import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
 import { PurchaseListParamsRow } from "@/components/domain/purchase-list-params-row";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import {
+  applyTableView,
+  columnOptions,
+  ColumnFilterHeader,
+  hasActiveFilters,
+  isTableViewActive,
+  withColumnFilter,
+  type ColumnAccessor,
+  type TableView,
+} from "@/components/domain/table-column-filter";
 import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
 import {
   Tooltip,
@@ -41,6 +51,7 @@ import {
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { removePurchaseListItems } from "@recomenda/api/purchase-lists";
 import {
+  areaFactorOf,
   areaFromBags,
   doseFromCommercialVolume,
   hasVolumeOverride,
@@ -110,6 +121,76 @@ function seedQuantityUnitAbbrev(category: string): string {
 }
 
 type BandId = "seed" | "dose" | "out";
+
+/** Colunas que ordenam e filtram. As de semente e as de defensivo dividem as
+ *  compartilhadas (estoque em diante). */
+type ColumnId =
+  | "category"
+  | "product"
+  | "seedsPerMeter"
+  | "cycle"
+  | "population"
+  | "bags"
+  | "seedArea"
+  | "formulation"
+  | "dose"
+  | "unit"
+  | "nApps"
+  | "volume"
+  | "areaPercent"
+  | "areaNote"
+  | "stock"
+  | "priceUsd"
+  | "priceBrl"
+  | "toBuy"
+  | "totalBrl"
+  | "totalUsd";
+
+const EMPTY_VIEW: TableView<ColumnId> = { sort: null, filters: {} };
+
+/**
+ * Larguras das colunas da tabela (px), em faixas. Nenhum título quebra linha:
+ * cada coluna entra na menor faixa em que cabem o título (em uma linha, com o
+ * botão de filtro) e o conteúdo — lido e em edição. As compartilhadas (estoque
+ * em diante) medem igual nas duas tabelas, então trocar de aba não mexe nelas.
+ *
+ * Medidas em Inter, título 11px: texto + ~38px de botão, vão e recuo da célula.
+ */
+const COL = {
+  /** Checkbox e o espaçador do outro lado. */
+  edge: 36,
+  /** Form., Dose, Un., Nº apl., % área, Ciclo. Quem pede os 100 é o select
+   *  de unidade em edição ("Dose" + seta). */
+  xs: 100,
+  /** Volume, Qtde final, Preço US$, Valor. Cabe "QTDE FINAL" e "R$ 12.345,67". */
+  sm: 112,
+  /** Total, Total US$, Semente/metro, População final, Volume BAG's, Área
+   *  plantado, Obs. área. Cabe "POPULAÇÃO FINAL" e o total do rodapé em
+   *  negrito, "R$ 15.522.769,62". */
+  md: 148,
+  /** Estoque disponível — o título mais longo da tabela. */
+  lg: 168,
+  /** Classe: cabe "Fertilizante" com a seta do select. */
+  classe: 144,
+  /** Categoria e Variedades: cabe "Híbrido de milho" com a seta do select. */
+  seedName: 184,
+  /** Produto: mínimo — é a única coluna que cresce com o card, porque nome de
+   *  produto é o que trunca ("Soberan / Terex / Habil / …"). */
+  product: 240,
+} as const;
+
+type ColSpec = { width: number; grow?: boolean };
+
+/** Select na tabela com a altura dos inputs dela (h-8) — o `sm` dos selects é
+ *  h-9, e a linha ficava com campos de duas alturas. */
+const TABLE_SELECT_CLASS = "[&>button]:h-8";
+
+/** "" vira `null` (a célula mostra "—"); o resto, número. */
+function numberOrNull(raw: string | undefined): number | null {
+  if (raw === undefined || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 
 type Band = {
   id: BandId;
@@ -228,6 +309,30 @@ export function PurchaseListItemsEditor({
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   /** Item novo entra no fim: a última página é onde ele aparece. */
   const goToLastPage = () => setPage(Number.MAX_SAFE_INTEGER);
+
+  // Ordenação e filtros das colunas, um conjunto por aba: as colunas mudam de
+  // uma tabela para a outra, e voltar à aba devolve o que estava lá.
+  const [views, setViews] = useState<
+    Partial<Record<BandId, TableView<ColumnId>>>
+  >({});
+  const viewOf = (id: BandId) => views[id] ?? EMPTY_VIEW;
+  const updateView = (
+    id: BandId,
+    update: (view: TableView<ColumnId>) => TableView<ColumnId>,
+  ) => {
+    setViews((prev) => ({ ...prev, [id]: update(prev[id] ?? EMPTY_VIEW) }));
+    setPage(1);
+  };
+  // Em edição, a ordem da tabela não segue o que se digita: ordenada ou
+  // filtrada, cada tecla faria a linha pular de página ou sumir no meio da
+  // conta. A ordem é tirada quando a ordenação/filtro muda e fica congelada até
+  // a próxima mudança; item novo entra no fim, visível mesmo fora do filtro.
+  const [frozenView, setFrozenView] = useState<{
+    token: string;
+    keys: string[];
+    /** Tudo o que a aba tinha na hora — o que não está aqui é item novo. */
+    seen: ReadonlySet<string>;
+  } | null>(null);
 
   const toBuyByKey = useMemo(
     () => listItemsToBuyByKey(items, totalHa),
@@ -718,12 +823,68 @@ export function PurchaseListItemsEditor({
       maximumFractionDigits: 2,
     });
 
+  // O valor de cada coluna, como a célula o mostra — é o que ordena e filtra.
+  const categoryLabelOf = (it: ListItem): string =>
+    PRODUCT_CATEGORY_LABELS[
+      it.category as keyof typeof PRODUCT_CATEGORY_LABELS
+    ] ?? it.category;
+  const hasPriceOf = (it: ListItem) => Boolean(it.price || it.priceUsd);
+  const toBuyOf = (it: ListItem) => toBuyByKey.get(it.key) ?? 0;
+  const columns: Record<ColumnId, ColumnAccessor<ListItem>> = {
+    category: { kind: "options", get: categoryLabelOf },
+    product: { kind: "text", get: (it) => it.productName },
+    seedsPerMeter: {
+      kind: "range",
+      get: (it) => numberOrNull(it.seedsPerMeter),
+    },
+    cycle: { kind: "range", get: (it) => numberOrNull(it.cycleDays) },
+    population: {
+      kind: "range",
+      get: (it) => Number(it.thousandPlants || 0) || null,
+    },
+    bags: { kind: "range", get: (it) => listItemQuantity(it, totalHa) },
+    seedArea: {
+      kind: "range",
+      get: (it) => Number(it.seedingArea || 0) || null,
+    },
+    formulation: {
+      kind: "options",
+      get: (it) => {
+        const label = formulationShortLabel(
+          resolveFormulationKey(it.equivalenceGroup),
+        );
+        return label === "—" ? "" : label;
+      },
+    },
+    dose: { kind: "range", get: (it) => numberOrNull(it.dose) },
+    unit: { kind: "options", get: (it) => it.unit },
+    nApps: { kind: "range", get: (it) => numberOrNull(it.nApps) },
+    volume: { kind: "range", get: (it) => listItemQuantity(it, totalHa) },
+    areaPercent: { kind: "range", get: (it) => areaFactorOf(it) * 100 },
+    areaNote: { kind: "text", get: (it) => it.areaNote ?? "" },
+    stock: { kind: "range", get: (it) => Number(it.stock || 0) },
+    priceUsd: { kind: "range", get: (it) => numberOrNull(it.priceUsd) },
+    priceBrl: {
+      kind: "range",
+      get: (it) => (hasPriceOf(it) ? unitBrl(it) : null),
+    },
+    toBuy: { kind: "range", get: toBuyOf },
+    totalBrl: {
+      kind: "range",
+      get: (it) => (hasPriceOf(it) ? toBuyOf(it) * unitBrl(it) : null),
+    },
+    totalUsd: {
+      kind: "range",
+      get: (it) =>
+        hasPriceOf(it) && unitUsd(it) > 0 ? toBuyOf(it) * unitUsd(it) : null,
+    },
+  };
+
   // Tabela com rolagem horizontal simples — nenhuma coluna fixa. As colunas de
   // resumo à direita ganham um leve tom "rail" só para agrupá-las visualmente.
   const summaryCellClass =
-    "bg-rail/50 px-1.5 py-1.5 text-right text-sm tabular-nums whitespace-nowrap";
-  const summaryHeaderClass =
-    "bg-rail/50 px-1.5 py-2 text-right leading-tight whitespace-nowrap";
+    "bg-rail/50 px-1.5 py-1.5 text-sm tabular-nums whitespace-nowrap";
+  const summaryHeaderClass = "bg-rail/50 px-1.5 py-2 leading-tight";
 
   const renderRow = (it: ListItem, rowIndex: number) => {
     const seed = isSeedItem(it);
@@ -747,12 +908,6 @@ export function PurchaseListItemsEditor({
       ] ??
       it.category ??
       "—";
-    const categoryTint =
-      it.category === "CULTIVAR_SOJA"
-        ? "rounded-lg bg-primary/10"
-        : it.category === "HIBRIDO_MILHO"
-          ? "rounded-lg bg-amber-100/70"
-          : "";
     const rowProducts = readOnly
       ? []
       : productsForPurchaseListCategory(
@@ -768,10 +923,11 @@ export function PurchaseListItemsEditor({
         key={it.key}
         data-item-key={it.key}
         className={cn(
-          // 52px: a altura da linha em edição — select h-9 (38px, porque o
-          // html deste app usa font-size 17px e o rem escala junto) + o py-1.5
-          // das células + a borda. A altura vai nas CÉLULAS, onde o navegador a
-          // trata como mínimo; em <tr> ela nem sempre pega.
+          // 52px: a mesma altura lida ou em edição. Em edição, campos e selects
+          // têm h-8 (34px, porque o html deste app usa font-size 17px e o rem
+          // escala junto); o resto é o py-1.5 das células e respiro. A altura
+          // vai nas CÉLULAS, onde o navegador a trata como mínimo; em <tr> ela
+          // nem sempre pega.
           "align-middle [&>td]:h-[52px]",
           // Zebra: branco e um tom acima, para o olho não pular de linha.
           rowIndex % 2 === 0 ? "bg-card" : "bg-surface-2",
@@ -829,7 +985,7 @@ export function PurchaseListItemsEditor({
                 }),
               )}
               panelMinWidth={260}
-              className={cn("min-w-0 max-w-none", categoryTint)}
+              className={cn("min-w-0 max-w-none", TABLE_SELECT_CLASS)}
             />
           )}
         </td>
@@ -839,11 +995,15 @@ export function PurchaseListItemsEditor({
               {it.productName || "—"}
             </span>
           ) : (
-            renderProductField(it, rowProducts, "min-w-0")
+            renderProductField(
+              it,
+              rowProducts,
+              cn("min-w-0", TABLE_SELECT_CLASS),
+            )
           )}
         </td>
         {!seed ? (
-          <td className="px-1.5 py-1.5 text-center">
+          <td className="px-1.5 py-1.5">
             <span
               className="inline-flex h-6 min-w-[2.5rem] items-center justify-center rounded-md border border-border bg-surface-2 px-1.5 text-[10px] font-bold tracking-wide text-muted-foreground"
               title={it.equivalenceGroup ?? undefined}
@@ -857,7 +1017,7 @@ export function PurchaseListItemsEditor({
         {seed ? (
           <>
             {/* Semente/metro */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {fmt(Number(it.seedsPerMeter || 0))}
@@ -868,12 +1028,12 @@ export function PurchaseListItemsEditor({
                   step="0.01"
                   value={it.seedsPerMeter ?? ""}
                   onChange={(e) => setSeedsPerMeter(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
                 />
               )}
             </td>
             {/* Ciclo (dias) */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {it.cycleDays ? it.cycleDays : "—"}
@@ -887,12 +1047,12 @@ export function PurchaseListItemsEditor({
                   onChange={(e) =>
                     updateItem(it.key, { cycleDays: e.target.value })
                   }
-                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
                 />
               )}
             </td>
             {/* População final — derivada de semente/metro ÷ espaçamento */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               <span
                 className="text-sm tabular-nums text-muted-foreground"
                 title="População final = semente/metro × 10.000 ÷ espaçamento"
@@ -903,7 +1063,7 @@ export function PurchaseListItemsEditor({
               </span>
             </td>
             {/* Volume BAG's — digitado à mão (não calcula sozinho) */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {`${fmt(required)} ${seedQuantityUnitAbbrev(it.category)}`}
@@ -916,12 +1076,12 @@ export function PurchaseListItemsEditor({
                   placeholder={seedQuantityUnitAbbrev(it.category)}
                   value={it.bagsOverride ?? ""}
                   onChange={(e) => setBags(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
                 />
               )}
             </td>
             {/* Área plantado (ha) — derivada dos bags ÷ população */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               <span
                 className="text-sm tabular-nums text-muted-foreground"
                 title="Área plantada = volume de bags × sementes/unidade ÷ população"
@@ -935,7 +1095,7 @@ export function PurchaseListItemsEditor({
         ) : (
           <>
             {/* Dose */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {fmt(Number(it.dose || 0))}
@@ -946,7 +1106,7 @@ export function PurchaseListItemsEditor({
                   step="0.01"
                   value={it.dose}
                   onChange={(e) => setDose(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
                 />
               )}
             </td>
@@ -959,12 +1119,12 @@ export function PurchaseListItemsEditor({
                   value={it.unit}
                   onChange={(val) => updateItem(it.key, { unit: val })}
                   size="sm"
-                  className="w-full min-w-0"
+                  className={cn("w-full min-w-0", TABLE_SELECT_CLASS)}
                 />
               )}
             </td>
             {/* Nº aplicações — só inteiros ≥ 1 */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">{`${it.nApps}×`}</span>
               ) : (
@@ -980,12 +1140,12 @@ export function PurchaseListItemsEditor({
                       .replace(/\D/g, "");
                     setNApps(it.key, whole === "" ? "" : whole);
                   }}
-                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
                 />
               )}
             </td>
             {/* Volume — editável; se mexer, recalcula a dose (ha/% ficam) */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {fmt(required)}
@@ -1003,12 +1163,12 @@ export function PurchaseListItemsEditor({
                         : ""
                   }
                   onChange={(e) => setVolumeOverride(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
                 />
               )}
             </td>
             {/* % da área — hectares da linha = % × área da lista */}
-            <td className="px-1.5 py-1.5 text-right">
+            <td className="px-1.5 py-1.5">
               {readOnly ? (
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {it.areaPercent || "100"}
@@ -1022,7 +1182,7 @@ export function PurchaseListItemsEditor({
                   placeholder="100"
                   value={it.areaPercent ?? ""}
                   onChange={(e) => setAreaPercent(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
                 />
               )}
             </td>
@@ -1045,7 +1205,7 @@ export function PurchaseListItemsEditor({
             </td>
           </>
         )}
-        <td className="px-1.5 py-1.5 text-right">
+        <td className="px-1.5 py-1.5">
           {readOnly ? (
             <span className="text-sm tabular-nums text-muted-foreground">
               {Number(it.stock || 0).toLocaleString("pt-BR", {
@@ -1061,12 +1221,12 @@ export function PurchaseListItemsEditor({
               onValueChange={(v) => updateItem(it.key, { stock: v })}
               decimals={2}
               grouping={false}
-              className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+              className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
             />
           )}
         </td>
         {canViewPrices ? (
-          <td className="px-1.5 py-1.5 text-right">
+          <td className="px-1.5 py-1.5">
             {readOnly ? (
               <span className="text-sm tabular-nums text-muted-foreground">
                 {it.priceUsd ? fmtUsd(Number(it.priceUsd)) : "—"}
@@ -1076,13 +1236,13 @@ export function PurchaseListItemsEditor({
                 placeholder="US$"
                 value={it.priceUsd}
                 onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
-                className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
               />
             )}
           </td>
         ) : null}
         {canViewPrices ? (
-          <td className="px-1.5 py-1.5 text-right">
+          <td className="px-1.5 py-1.5">
             {readOnly ? (
               <span className="text-sm tabular-nums text-muted-foreground">
                 {hasPrice ? fmtBrl(rowUnitBrl) : "—"}
@@ -1099,7 +1259,7 @@ export function PurchaseListItemsEditor({
                 placeholder="R$"
                 value={it.price}
                 onValueChange={(v) => updateItem(it.key, { price: v })}
-                className="h-8 w-full min-w-0 px-2 text-right text-sm tabular-nums"
+                className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
               />
             )}
           </td>
@@ -1114,7 +1274,7 @@ export function PurchaseListItemsEditor({
           {exceedsStock ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="inline-flex cursor-help items-center justify-end gap-1">
+                <span className="inline-flex cursor-help items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
                   {fmt(toBuy)}
                 </span>
@@ -1128,7 +1288,7 @@ export function PurchaseListItemsEditor({
               </TooltipContent>
             </Tooltip>
           ) : (
-            <span className="inline-flex items-center justify-end gap-1">
+            <span className="inline-flex items-center gap-1">
               {fmt(toBuy)}
             </span>
           )}
@@ -1148,32 +1308,82 @@ export function PurchaseListItemsEditor({
     );
   };
 
+  /** Título de coluna com o botão que abre ordenação e filtro. */
+  const renderHeaderCell = (
+    band: Band,
+    column: ColumnId,
+    label: string,
+    className = "px-1.5 py-2 text-left leading-tight",
+  ) => {
+    const view = viewOf(band.id);
+    const accessor = columns[column];
+    return (
+      <td className={className}>
+        <ColumnFilterHeader
+          label={label}
+          kind={accessor.kind}
+          sort={view.sort?.column === column ? view.sort.dir : null}
+          onSortChange={(dir) =>
+            updateView(band.id, (v) => ({
+              ...v,
+              sort: dir
+                ? { column, dir }
+                : v.sort?.column === column
+                  ? null
+                  : v.sort,
+            }))
+          }
+          filter={view.filters[column]}
+          onFilterChange={(filter) =>
+            updateView(band.id, (v) => withColumnFilter(v, column, filter))
+          }
+          options={
+            accessor.kind === "options"
+              ? columnOptions(band.items, accessor)
+              : undefined
+          }
+        />
+      </td>
+    );
+  };
+
   // Cabeçalho das colunas compartilhadas (à direita) — igual para sementes e
   // defensivos. As de resumo (Necessário → Total US$) ganham o tom "rail".
-  const sharedHeaderCells = (
+  const renderSharedHeaderCells = (band: Band) => (
     <>
-      <td className="px-1.5 py-2 text-right">Estoque disponível</td>
-      {canViewPrices ? (
-        <td className="px-1.5 py-2 text-right">Preço US$</td>
-      ) : null}
-      {canViewPrices ? <td className="px-1.5 py-2 text-right">Valor</td> : null}
-      <td className={summaryHeaderClass}>Qtde final</td>
-      {canViewPrices ? <td className={summaryHeaderClass}>Total</td> : null}
-      {canViewPrices ? <td className={summaryHeaderClass}>Total US$</td> : null}
+      {renderHeaderCell(band, "stock", "Estoque disponível")}
+      {canViewPrices
+        ? renderHeaderCell(band, "priceUsd", "Preço US$")
+        : null}
+      {canViewPrices
+        ? renderHeaderCell(band, "priceBrl", "Valor")
+        : null}
+      {renderHeaderCell(band, "toBuy", "Qtde final", summaryHeaderClass)}
+      {canViewPrices
+        ? renderHeaderCell(band, "totalBrl", "Total", summaryHeaderClass)
+        : null}
+      {canViewPrices
+        ? renderHeaderCell(band, "totalUsd", "Total US$", summaryHeaderClass)
+        : null}
       {/* Espaçador: o mesmo recuo da coluna do checkbox, do outro lado. */}
       <td className={summaryHeaderClass} />
     </>
   );
 
   // Cada banda (sementes / defensivos) vira sua própria tabela com rolagem
-  // horizontal simples, pois têm conjuntos de colunas diferentes.
-  const renderBandTable = (band: Band) => {
+  // horizontal simples, pois têm conjuntos de colunas diferentes. `rows` são os
+  // itens da banda já filtrados e ordenados.
+  const renderBandTable = (band: Band, rows: ListItem[]) => {
     const seedBand = band.seed;
-    // Colunas de resumo à direita (as do `sharedHeaderCells`) — o rodapé usa a
-    // conta para saber quanto a célula do rótulo precisa cobrir à esquerda.
+    // Com filtro, o rodapé soma só o que passou nele — como o subtotal de uma
+    // planilha filtrada — e diz quantos itens ficaram de fora.
+    const filtered = hasActiveFilters(viewOf(band.id));
+    // Colunas de resumo à direita (as do `renderSharedHeaderCells`) — o rodapé
+    // usa a conta para saber quanto a célula do rótulo precisa cobrir à
+    // esquerda.
     // +1: a coluna-espaçador da direita.
     const summaryColCount = 3 + (canViewPrices ? 4 : 0);
-    const bandTotals = band.items.reduce(
+    const bandTotals = rows.reduce(
       (acc, it) => {
         const toBuy = toBuyByKey.get(it.key) ?? 0;
         acc.qty += toBuy;
@@ -1183,134 +1393,123 @@ export function PurchaseListItemsEditor({
       },
       { qty: 0, brl: 0, usd: 0 },
     );
-    const bandOverStock = band.items.filter(exceedsStockOf).length;
-    const pageItems = band.items.slice(
+    const bandOverStock = rows.filter(exceedsStockOf).length;
+    const pageItems = rows.slice(
       (safePage - 1) * pageSize,
       safePage * pageSize,
     );
     const seedArea = seedBand
-      ? band.items.reduce((acc, it) => acc + (Number(it.seedingArea) || 0), 0)
+      ? rows.reduce((acc, it) => acc + (Number(it.seedingArea) || 0), 0)
       : 0;
     // Culturas que passaram dos hectares da safra — marcam o total no rodapé.
+    // Contam a lista inteira, com ou sem filtro: é a conferência contra a safra.
     const seedAreaAlerts = seedBand
       ? seedAreaRows(band.items).filter((row) => row.over)
       : [];
-    // Defensivos: Form. + Dose/Un/Nº + % área + obs. Sem PRICE_VIEW, −4 cols de preço.
-    const priceCols = canViewPrices ? 4 : 0;
-    const colCount = (seedBand ? 15 : 17) - (4 - priceCols);
+    // Uma entrada por coluna, na ordem do cabeçalho. Sem PRICE_VIEW, saem as
+    // quatro de preço.
+    const colSpecs: ColSpec[] = [
+      { width: COL.edge },
+      ...(seedBand
+        ? [
+            { width: COL.seedName }, // Categoria
+            { width: COL.seedName }, // Variedades
+            { width: COL.md }, // Semente/metro
+            { width: COL.xs }, // Ciclo
+            { width: COL.md }, // População final
+            { width: COL.md }, // Volume BAG's
+            { width: COL.md }, // Área plantado
+          ]
+        : [
+            { width: COL.classe },
+            { width: COL.product, grow: true },
+            { width: COL.xs }, // Form.
+            { width: COL.xs }, // Dose
+            { width: COL.xs }, // Un.
+            { width: COL.xs }, // Nº apl.
+            { width: COL.sm }, // Volume
+            { width: COL.xs }, // % área
+            { width: COL.md }, // Obs. área
+          ]),
+      { width: COL.lg }, // Estoque disponível
+      ...(canViewPrices
+        ? [{ width: COL.sm }, { width: COL.sm }] // Preço US$, Valor
+        : []),
+      { width: COL.sm }, // Qtde final
+      ...(canViewPrices
+        ? [{ width: COL.md }, { width: COL.md }] // Total, Total US$
+        : []),
+      { width: COL.edge },
+    ];
+    const colCount = colSpecs.length;
     // Soma das colunas: largura mínima (abaixo dela, rola na horizontal). Acima,
-    // a tabela ocupa o card inteiro e as colunas crescem na proporção.
-    const tableMinWidth = seedBand
-      ? canViewPrices
-        ? "min-w-[1824px]"
-        : "min-w-[1320px]"
-      : canViewPrices
-        ? "min-w-[1996px]"
-        : "min-w-[1492px]";
+    // o que sobra do card vai para o Produto; sem coluna que cresça (sementes),
+    // a sobra se reparte na proporção e as faixas continuam iguais entre si.
+    const tableMinWidth = colSpecs.reduce((sum, col) => sum + col.width, 0);
     return (
       <div
         key={band.id}
         className="overflow-hidden rounded-xl border bg-card shadow-sm"
       >
         <div className="overflow-x-auto">
-          <table className={cn("w-full table-fixed text-sm", tableMinWidth)}>
+          <table
+            className="w-full table-fixed text-sm"
+            style={{ minWidth: tableMinWidth }}
+          >
+            {/* Coluna sem largura, na tabela `table-fixed`, fica com o resto. */}
             <colgroup>
-              {seedBand ? (
-                <>
-                  <col className="w-[36px]" />
-                  <col className="w-[144px]" />
-                  <col className="w-[240px]" />
-                  <col className="w-[112px]" />
-                  <col className="w-[88px]" />
-                  <col className="w-[112px]" />
-                  <col className="w-[128px]" />
-                  <col className="w-[112px]" />
-                  <col className="w-[104px]" />
-                  {canViewPrices ? <col className="w-[120px]" /> : null}
-                  {canViewPrices ? <col className="w-[128px]" /> : null}
-                  <col className="w-[104px]" />
-                  {canViewPrices ? <col className="w-[128px]" /> : null}
-                  {canViewPrices ? <col className="w-[128px]" /> : null}
-                  <col className="w-[36px]" />
-                </>
-              ) : (
-                <>
-                  <col className="w-[36px]" />
-                  <col className="w-[144px]" />
-                  <col className="w-[260px]" />
-                  <col className="w-[80px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[120px]" />
-                  {/* volume + % área + obs. área */}
-                  <col className="w-[104px]" />
-                  <col className="w-[80px]" />
-                  <col className="w-[160px]" />
-                  <col className="w-[104px]" />
-                  {canViewPrices ? <col className="w-[120px]" /> : null}
-                  {canViewPrices ? <col className="w-[128px]" /> : null}
-                  <col className="w-[104px]" />
-                  {canViewPrices ? <col className="w-[128px]" /> : null}
-                  {canViewPrices ? <col className="w-[128px]" /> : null}
-                  <col className="w-[36px]" />
-                </>
-              )}
+              {colSpecs.map((col, i) => (
+                <col
+                  key={i}
+                  style={col.grow ? undefined : { width: col.width }}
+                />
+              ))}
             </colgroup>
             <tbody className="divide-y">
               <tr className="bg-muted/40 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <td className="px-1.5 py-2" />
-                <td className="px-1.5 py-2 text-left">
-                  {seedBand ? "Categoria" : "Classe"}
-                </td>
-                <td className="px-1.5 py-2 text-left">
-                  {seedBand ? "Variedades" : "Produto"}
-                </td>
+                {renderHeaderCell(
+                  band,
+                  "category",
+                  seedBand ? "Categoria" : "Classe",
+                )}
+                {renderHeaderCell(
+                  band,
+                  "product",
+                  seedBand ? "Variedades" : "Produto",
+                )}
                 {seedBand ? (
                   <>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Semente/metro
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Ciclo
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      População final
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Volume BAG&apos;s
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Área plantado
-                    </td>
+                    {renderHeaderCell(band, "seedsPerMeter", "Semente/metro")}
+                    {renderHeaderCell(band, "cycle", "Ciclo")}
+                    {renderHeaderCell(band, "population", "População final")}
+                    {renderHeaderCell(band, "bags", "Volume BAG's")}
+                    {renderHeaderCell(band, "seedArea", "Área plantado")}
                   </>
                 ) : (
                   <>
-                    <td className="px-1.5 py-2 text-center leading-tight">
-                      Form.
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Dose
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Un.
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Nº apl.
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      Volume
-                    </td>
-                    <td className="px-1.5 py-2 text-right leading-tight">
-                      % área
-                    </td>
-                    <td className="px-1.5 py-2 text-left leading-tight">
-                      Obs. área
-                    </td>
+                    {renderHeaderCell(band, "formulation", "Form.")}
+                    {renderHeaderCell(band, "dose", "Dose")}
+                    {renderHeaderCell(band, "unit", "Un.")}
+                    {renderHeaderCell(band, "nApps", "Nº apl.")}
+                    {renderHeaderCell(band, "volume", "Volume")}
+                    {renderHeaderCell(band, "areaPercent", "% área")}
+                    {renderHeaderCell(band, "areaNote", "Obs. área")}
                   </>
                 )}
-                {sharedHeaderCells}
+                {renderSharedHeaderCells(band)}
               </tr>
               {pageItems.map((it, idx) => renderRow(it, idx))}
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={colCount}
+                    className="px-3 py-10 text-center text-sm text-muted-foreground"
+                  >
+                    Nenhum item com esses filtros.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
             <tfoot>
               {/* Mesmo fundo do cabeçalho das colunas — o `[&>td]` apaga o tom
@@ -1321,19 +1520,36 @@ export function PurchaseListItemsEditor({
                   colSpan={colCount - summaryColCount - 1 - (seedBand ? 1 : 0)}
                   className="px-1.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  {bandOverStock > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-amber-700">
-                      <AlertTriangle className="h-3 w-3" />
-                      {bandOverStock} acima do estoque
-                    </span>
-                  ) : null}
+                  <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {filtered ? (
+                      <span className="inline-flex items-center gap-1.5 text-primary">
+                        <ListFilter className="h-3 w-3" />
+                        {rows.length} de {band.items.length} itens
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateView(band.id, (v) => ({ ...v, filters: {} }))
+                          }
+                          className="uppercase tracking-wide underline-offset-2 hover:underline"
+                        >
+                          · limpar filtros
+                        </button>
+                      </span>
+                    ) : null}
+                    {bandOverStock > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-amber-700">
+                        <AlertTriangle className="h-3 w-3" />
+                        {bandOverStock} acima do estoque
+                      </span>
+                    ) : null}
+                  </span>
                 </td>
                 {/* Área plantada em vermelho quando alguma cultura passou dos
                     hectares da safra — mesma conta da faixa abaixo. */}
                 {seedBand ? (
                   <td
                     className={cn(
-                      "px-1.5 py-2.5 text-right text-sm font-semibold tabular-nums whitespace-nowrap",
+                      "px-1.5 py-2.5 text-sm font-semibold tabular-nums whitespace-nowrap",
                       seedAreaAlerts.length > 0
                         ? "text-danger-strong"
                         : "text-foreground",
@@ -1342,7 +1558,7 @@ export function PurchaseListItemsEditor({
                     {seedAreaAlerts.length > 0 ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="inline-flex cursor-help items-center justify-end gap-1">
+                          <span className="inline-flex cursor-help items-center gap-1">
                             <AlertTriangle className="h-3 w-3" />
                             {fmtArea(seedArea)}
                           </span>
@@ -1578,10 +1794,44 @@ export function PurchaseListItemsEditor({
       desktop.removeEventListener("change", schedule);
     };
   }, [showTabsRow]);
-  const totalPages = Math.max(
-    1,
-    Math.ceil((activeBand?.items.length ?? 0) / pageSize),
-  );
+  // Itens da aba aberta como a tabela os mostra: filtrados e ordenados — ou,
+  // em edição, na ordem congelada (ver `frozenView`). Os incluídos nesta edição
+  // (verdes) ficam fora do filtro e da ordem, sempre no fim: quem acabou de
+  // adicionar uma linha vazia precisa vê-la, não perdê-la para o filtro.
+  const activeView = activeBand ? viewOf(activeBand.id) : EMPTY_VIEW;
+  let visibleItems: ListItem[] = activeBand?.items ?? [];
+  if (!activeBand || !isTableViewActive(activeView)) {
+    // Solta a ordem congelada: a próxima ordenação/filtro tira uma nova.
+    if (frozenView !== null) setFrozenView(null);
+  } else if (readOnly) {
+    visibleItems = applyTableView(activeBand.items, activeView, columns);
+    if (frozenView !== null) setFrozenView(null);
+  } else {
+    const viewToken = `${activeBand.id}:${JSON.stringify(activeView)}`;
+    const base = activeBand.items.filter((it) => !addedKeys.has(it.key));
+    const added = activeBand.items.filter((it) => addedKeys.has(it.key));
+    // Chave que a foto não conhece e não foi incluída aqui: a lista foi
+    // trocada por fora (rascunho restaurado) — a foto não vale mais.
+    const stale =
+      frozenView?.token !== viewToken ||
+      base.some((it) => !frozenView.seen.has(it.key));
+    if (stale) {
+      const ordered = applyTableView(base, activeView, columns);
+      setFrozenView({
+        token: viewToken,
+        keys: ordered.map((it) => it.key),
+        seen: new Set(base.map((it) => it.key)),
+      });
+      visibleItems = [...ordered, ...added];
+    } else {
+      const byKey = new Map(base.map((it) => [it.key, it]));
+      visibleItems = [
+        ...frozenView.keys.flatMap((key) => byKey.get(key) ?? []),
+        ...added,
+      ];
+    }
+  }
+  const totalPages = Math.max(1, Math.ceil(visibleItems.length / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
 
   return (
@@ -1686,12 +1936,12 @@ export function PurchaseListItemsEditor({
         <div className="hidden lg:block">
           {activeBand ? (
             <>
-              {renderBandTable(activeBand)}
+              {renderBandTable(activeBand, visibleItems)}
               <PaginationBar
                 className="border-0 bg-transparent px-0 pb-0"
                 page={safePage}
                 pageSize={pageSize}
-                total={activeBand.items.length}
+                total={visibleItems.length}
                 onPageChange={setPage}
                 pageSizeOptions={PAGE_SIZE_OPTIONS}
                 onPageSizeChange={(size) => {
