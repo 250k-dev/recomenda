@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@recomenda/ui/primitives/dialog";
+import type { Route } from "next";
 import type { PublishBlockItem } from "@recomenda/api/api-error";
 
 const PAGE_SIZE = 12;
@@ -27,7 +28,7 @@ export function PublishBlockedDialog({
   onOpenChange: (open: boolean) => void;
   message: string;
   items: PublishBlockItem[];
-  listHref?: string | null;
+  listHref?: Route | null;
 }) {
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
