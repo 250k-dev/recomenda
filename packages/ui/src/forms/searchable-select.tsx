@@ -364,8 +364,11 @@ export function BaseSelect({
             return !current;
           });
         }}
+        // Fundo opaco, igual ao do Input: transparente, o select deixava vazar
+        // a cor de uma linha zebrada ou destacada. Quem quer o select "sem
+        // caixa" passa `[&>button]:bg-transparent` no className.
         className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-3 text-sm shadow-xs transition-colors outline-none",
+          "flex w-full items-center justify-between gap-2 rounded-lg border border-input bg-surface px-3 text-sm shadow-xs transition-colors outline-none",
           size === "sm" ? "h-9" : "h-10",
           "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",

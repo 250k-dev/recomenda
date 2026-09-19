@@ -29,6 +29,9 @@ export function DoseUnitSelect({
         label: DOSE_UNIT_SHORT_LABELS[unit],
       }))}
       className={cn("min-w-[5.5rem] w-[5.5rem] shrink-0", className)}
+      // O painel herda a largura do botão, estreito demais para o ✓ e o rótulo:
+      // "Dose" quebrava em "Dos/e".
+      panelMinWidth={128}
     />
   );
 }
