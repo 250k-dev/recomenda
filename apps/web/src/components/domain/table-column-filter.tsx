@@ -221,6 +221,9 @@ export function ColumnFilterHeader({
             "relative inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground/60 transition-colors outline-none",
             "hover:bg-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40",
             "data-[state=open]:bg-hover data-[state=open]:text-text-strong",
+            // No toque, 20px é pouco para acertar: a área de toque cresce para
+            // uns 38px sem mudar o desenho.
+            "pointer-coarse:before:absolute pointer-coarse:before:-inset-2",
             (sort || filtered) &&
               "text-primary hover:text-primary data-[state=open]:text-primary",
           )}

@@ -29,7 +29,7 @@ import {
   type PurchaseListCatalogProduct,
   type PurchaseListCrop,
 } from "@recomenda/domain/catalog/purchase-list-catalog";
-import { Field, fmt, fmtArea } from "@/components/domain/season/_shared";
+import { fmt, fmtArea } from "@/components/domain/season/_shared";
 import { PurchaseListParamsRow } from "@/components/domain/purchase-list-params-row";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import {
@@ -43,6 +43,7 @@ import {
   type TableView,
 } from "@/components/domain/table-column-filter";
 import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
+import { useIsMobile } from "@recomenda/ui/hooks/use-mobile";
 import {
   Tooltip,
   TooltipContent,
@@ -177,6 +178,9 @@ const COL = {
   /** Produto: mínimo — é a única coluna que cresce com o card, porque nome de
    *  produto é o que trunca ("Soberan / Terex / Habil / …"). */
   product: 240,
+  /** Produto e Variedades no celular, presos à esquerda: estreitos o bastante
+   *  para sobrar tela para as colunas que rolam por baixo. */
+  pinned: 152,
 } as const;
 
 type ColSpec = { width: number; grow?: boolean };
@@ -184,6 +188,29 @@ type ColSpec = { width: number; grow?: boolean };
 /** Select na tabela com a altura dos inputs dela (h-8) — o `sm` dos selects é
  *  h-9, e a linha ficava com campos de duas alturas. */
 const TABLE_SELECT_CLASS = "[&>button]:h-8";
+
+/** Input da tabela. No celular, 16px: abaixo disso o Safari do iPhone dá zoom
+ *  na página ao focar o campo. */
+const TABLE_INPUT_CLASS =
+  "h-8 w-full min-w-0 px-2 text-sm tabular-nums max-md:text-base";
+
+/**
+ * Coluna do produto (ou da variedade) abaixo de `lg` — celular e tablet, onde a
+ * tabela sempre rola de lado: presa à esquerda, para a linha não perder o nome. As outras colunas passam por
+ * baixo, então o fundo tem de ser opaco — e com a cor da linha, que é
+ * translúcida no cabeçalho e na linha selecionada: daí as misturas com o card.
+ * O `!` vence o `[&>td]:bg-transparent` das linhas destacadas.
+ */
+const PIN_CLASS =
+  "max-lg:sticky max-lg:left-0 max-lg:z-[1] max-lg:shadow-[6px_0_8px_-6px_rgb(0_0_0/0.25)]";
+const PIN_HEADER_BG =
+  "max-lg:bg-[color-mix(in_srgb,var(--color-muted)_40%,var(--color-card))]!";
+
+/** Conteúdo de linha que atravessa a tabela toda (rodapé, área plantada, sem
+ *  resultado): abaixo de `lg` a célula é bem mais larga que a tela, então o
+ *  texto fica preso na parte visível ao rolar de lado, e quebra linha nela. */
+const SPAN_TEXT_CLASS =
+  "max-lg:sticky max-lg:left-2 max-lg:w-fit max-lg:max-w-[calc(100vw-5rem)]";
 
 /** "" vira `null` (a célula mostra "—"); o resto, número. */
 function numberOrNull(raw: string | undefined): number | null {
@@ -216,6 +243,7 @@ export function PurchaseListItemsEditor({
 }: PurchaseListItemsEditorProps) {
   const canViewPrices = useCan("PRICE_VIEW");
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const platformCatalog = usePlatformCatalog();
   const globalCatalog = useGlobalCatalog();
   const cloneGlobal = useCloneGlobalProduct();
@@ -493,16 +521,6 @@ export function PurchaseListItemsEditor({
     });
   };
 
-  const dropItem = (key: string) => {
-    setItems((prev) => prev.filter((it) => it.key !== key));
-    setSelectedKeys((prev) => {
-      if (!prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-  };
-
   const toggleSelected = (key: string) => {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
@@ -510,17 +528,6 @@ export function PurchaseListItemsEditor({
       else next.add(key);
       return next;
     });
-  };
-
-  const removeItem = (key: string) => {
-    const item = items.find((it) => it.key === key);
-    if (!item) return;
-    if (!listId || !item.productId) {
-      dropItem(key);
-      return;
-    }
-    setSelectedKeys(new Set([key]));
-    setConfirmOpen(true);
   };
 
   const confirmRemoval = () => {
@@ -880,11 +887,15 @@ export function PurchaseListItemsEditor({
     },
   };
 
-  // Tabela com rolagem horizontal simples — nenhuma coluna fixa. As colunas de
-  // resumo à direita ganham um leve tom "rail" só para agrupá-las visualmente.
+  // Colunas de resumo à direita (Qtde final, Total, Total US$ e o espaçador da
+  // ponta): laranja claro do tema no cabeçalho e nas linhas, para se
+  // destacarem. Translúcido, para a zebra das linhas continuar aparecendo.
   const summaryCellClass =
-    "bg-rail/50 px-1.5 py-1.5 text-sm tabular-nums whitespace-nowrap";
-  const summaryHeaderClass = "bg-rail/50 px-1.5 py-2 leading-tight";
+    "bg-clay-soft/60 px-1.5 py-1.5 text-sm tabular-nums whitespace-nowrap";
+  const summaryHeaderClass = "bg-clay-soft/60 px-1.5 py-2 leading-tight";
+  /** Célula do rodapé: sem o laranja das colunas de resumo. */
+  const footerCellClass =
+    "px-1.5 py-1.5 text-sm tabular-nums whitespace-nowrap";
 
   const renderRow = (it: ListItem, rowIndex: number) => {
     const seed = isSeedItem(it);
@@ -929,9 +940,11 @@ export function PurchaseListItemsEditor({
           // vai nas CÉLULAS, onde o navegador a trata como mínimo; em <tr> ela
           // nem sempre pega.
           "align-middle [&>td]:h-[52px]",
-          // Zebra: branco e um tom acima, para o olho não pular de linha.
-          rowIndex % 2 === 0 ? "bg-card" : "bg-surface-2",
-          // `[&>td]` apaga o tom "rail" das colunas de resumo, para o verde
+          // Zebra: branco e meio tom acima, para o olho não pular de linha.
+          // O `surface-2` inteiro pesava demais. A coluna presa do celular
+          // repete a mesma mistura, opaca.
+          rowIndex % 2 === 0 ? "bg-card" : "bg-surface-2/50",
+          // `[&>td]` apaga o laranja das colunas de resumo, para o verde
           // valer na linha inteira.
           isNew && "bg-primary-soft [&>td]:bg-transparent",
           selectedKeys.has(it.key) && "bg-primary/10 [&>td]:bg-transparent",
@@ -989,7 +1002,20 @@ export function PurchaseListItemsEditor({
             />
           )}
         </td>
-        <td className="px-1.5 py-1.5">
+        <td
+          className={cn(
+            "px-1.5 py-1.5",
+            PIN_CLASS,
+            // Mesma cor da linha, só que opaca (ver `PIN_CLASS`).
+            selectedKeys.has(it.key)
+              ? "max-lg:bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-card))]!"
+              : isNew
+                ? "max-lg:bg-primary-soft!"
+                : rowIndex % 2 === 0
+                  ? "max-lg:bg-card!"
+                  : "max-lg:bg-[color-mix(in_srgb,var(--color-surface-2)_50%,var(--color-card))]!",
+          )}
+        >
           {readOnly ? (
             <span className="block truncate text-sm font-medium text-foreground">
               {it.productName || "—"}
@@ -1028,7 +1054,7 @@ export function PurchaseListItemsEditor({
                   step="0.01"
                   value={it.seedsPerMeter ?? ""}
                   onChange={(e) => setSeedsPerMeter(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1047,7 +1073,7 @@ export function PurchaseListItemsEditor({
                   onChange={(e) =>
                     updateItem(it.key, { cycleDays: e.target.value })
                   }
-                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1076,7 +1102,7 @@ export function PurchaseListItemsEditor({
                   placeholder={seedQuantityUnitAbbrev(it.category)}
                   value={it.bagsOverride ?? ""}
                   onChange={(e) => setBags(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1106,7 +1132,7 @@ export function PurchaseListItemsEditor({
                   step="0.01"
                   value={it.dose}
                   onChange={(e) => setDose(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1140,7 +1166,7 @@ export function PurchaseListItemsEditor({
                       .replace(/\D/g, "");
                     setNApps(it.key, whole === "" ? "" : whole);
                   }}
-                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1163,7 +1189,7 @@ export function PurchaseListItemsEditor({
                         : ""
                   }
                   onChange={(e) => setVolumeOverride(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1182,7 +1208,7 @@ export function PurchaseListItemsEditor({
                   placeholder="100"
                   value={it.areaPercent ?? ""}
                   onChange={(e) => setAreaPercent(it.key, e.target.value)}
-                  className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1199,7 +1225,7 @@ export function PurchaseListItemsEditor({
                   onChange={(e) =>
                     updateItem(it.key, { areaNote: e.target.value })
                   }
-                  className="h-8 w-full min-w-0 px-2 text-sm"
+                  className={TABLE_INPUT_CLASS}
                 />
               )}
             </td>
@@ -1221,7 +1247,7 @@ export function PurchaseListItemsEditor({
               onValueChange={(v) => updateItem(it.key, { stock: v })}
               decimals={2}
               grouping={false}
-              className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+              className={TABLE_INPUT_CLASS}
             />
           )}
         </td>
@@ -1236,7 +1262,7 @@ export function PurchaseListItemsEditor({
                 placeholder="US$"
                 value={it.priceUsd}
                 onValueChange={(v) => updateItem(it.key, { priceUsd: v })}
-                className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                className={TABLE_INPUT_CLASS}
               />
             )}
           </td>
@@ -1259,7 +1285,7 @@ export function PurchaseListItemsEditor({
                 placeholder="R$"
                 value={it.price}
                 onValueChange={(v) => updateItem(it.key, { price: v })}
-                className="h-8 w-full min-w-0 px-2 text-sm tabular-nums"
+                className={TABLE_INPUT_CLASS}
               />
             )}
           </td>
@@ -1348,7 +1374,7 @@ export function PurchaseListItemsEditor({
   };
 
   // Cabeçalho das colunas compartilhadas (à direita) — igual para sementes e
-  // defensivos. As de resumo (Necessário → Total US$) ganham o tom "rail".
+  // defensivos. As de resumo (Qtde final → Total US$) ganham o laranja.
   const renderSharedHeaderCells = (band: Band) => (
     <>
       {renderHeaderCell(band, "stock", "Estoque disponível")}
@@ -1413,7 +1439,7 @@ export function PurchaseListItemsEditor({
       ...(seedBand
         ? [
             { width: COL.seedName }, // Categoria
-            { width: COL.seedName }, // Variedades
+            { width: isMobile ? COL.pinned : COL.seedName }, // Variedades
             { width: COL.md }, // Semente/metro
             { width: COL.xs }, // Ciclo
             { width: COL.md }, // População final
@@ -1422,7 +1448,9 @@ export function PurchaseListItemsEditor({
           ]
         : [
             { width: COL.classe },
-            { width: COL.product, grow: true },
+            isMobile
+              ? { width: COL.pinned }
+              : { width: COL.product, grow: true },
             { width: COL.xs }, // Form.
             { width: COL.xs }, // Dose
             { width: COL.xs }, // Un.
@@ -1451,7 +1479,9 @@ export function PurchaseListItemsEditor({
         key={band.id}
         className="overflow-hidden rounded-xl border bg-card shadow-sm"
       >
-        <div className="overflow-x-auto">
+        {/* `overscroll-x-contain`: no celular, chegar à borda da tabela rolando
+            de lado não vira o gesto de voltar do navegador. */}
+        <div className="overflow-x-auto overscroll-x-contain">
           <table
             className="w-full table-fixed text-sm"
             style={{ minWidth: tableMinWidth }}
@@ -1477,6 +1507,11 @@ export function PurchaseListItemsEditor({
                   band,
                   "product",
                   seedBand ? "Variedades" : "Produto",
+                  cn(
+                    "px-1.5 py-2 text-left leading-tight",
+                    PIN_CLASS,
+                    PIN_HEADER_BG,
+                  ),
                 )}
                 {seedBand ? (
                   <>
@@ -1504,23 +1539,32 @@ export function PurchaseListItemsEditor({
                 <tr>
                   <td
                     colSpan={colCount}
-                    className="px-3 py-10 text-center text-sm text-muted-foreground"
+                    className="px-3 py-10 text-center text-sm text-muted-foreground max-lg:text-left"
                   >
-                    Nenhum item com esses filtros.
+                    <div className={SPAN_TEXT_CLASS}>
+                      Nenhum item com esses filtros.
+                    </div>
                   </td>
                 </tr>
               ) : null}
             </tbody>
             <tfoot>
-              {/* Mesmo fundo do cabeçalho das colunas — o `[&>td]` apaga o tom
-                "rail" das colunas de resumo para a faixa ficar uniforme. */}
-              <tr className="border-t bg-muted/40 text-sm [&>td]:bg-transparent">
-                <td className={summaryCellClass} />
+              {/* Uma cor só, um tom acima do cabeçalho, e sem o laranja das
+                colunas de resumo: o rodapé fecha a tabela como faixa própria.
+                `h-11` (47px): um pouco mais alto que o conteúdo pede, para os
+                totais respirarem. */}
+              <tr className="border-t bg-muted/70 text-sm [&>td]:h-11">
+                <td className={footerCellClass} />
                 <td
                   colSpan={colCount - summaryColCount - 1 - (seedBand ? 1 : 0)}
                   className="px-1.5 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span
+                    className={cn(
+                      "inline-flex flex-wrap items-center gap-x-4 gap-y-1",
+                      SPAN_TEXT_CLASS,
+                    )}
+                  >
                     {filtered ? (
                       <span className="inline-flex items-center gap-1.5 text-primary">
                         <ListFilter className="h-3 w-3" />
@@ -1582,12 +1626,12 @@ export function PurchaseListItemsEditor({
                 {/* Estoque e preço unitário não somam — são por linha. A qtde
                     final soma mesmo misturando unidade (L, kg, sacas): é o mesmo
                     número que a coluna mostra item a item. */}
-                <td className={summaryCellClass} />
-                {canViewPrices ? <td className={summaryCellClass} /> : null}
-                {canViewPrices ? <td className={summaryCellClass} /> : null}
+                <td className={footerCellClass} />
+                {canViewPrices ? <td className={footerCellClass} /> : null}
+                {canViewPrices ? <td className={footerCellClass} /> : null}
                 <td
                   className={cn(
-                    summaryCellClass,
+                    footerCellClass,
                     "font-semibold text-foreground",
                   )}
                 >
@@ -1596,7 +1640,7 @@ export function PurchaseListItemsEditor({
                 {canViewPrices ? (
                   <td
                     className={cn(
-                      summaryCellClass,
+                      footerCellClass,
                       "font-semibold text-foreground",
                     )}
                   >
@@ -1604,11 +1648,11 @@ export function PurchaseListItemsEditor({
                   </td>
                 ) : null}
                 {canViewPrices ? (
-                  <td className={cn(summaryCellClass, "text-muted-foreground")}>
+                  <td className={cn(footerCellClass, "text-muted-foreground")}>
                     {fmtUsd(bandTotals.usd)}
                   </td>
                 ) : null}
-                <td className={summaryCellClass} />
+                <td className={footerCellClass} />
               </tr>
               {seedBand ? renderSeedAreaTableRows(band.items, colCount) : null}
             </tfoot>
@@ -1662,41 +1706,8 @@ export function PurchaseListItemsEditor({
     );
   };
 
-  /** Cartão solto (mobile, onde não há tabela). */
-  const renderSeedAreaSummary = (seedItems: ListItem[]) => {
-    const rows = seedAreaRows(seedItems);
-    if (rows.length === 0) return null;
-    return (
-      <div className="flex flex-col gap-1.5">
-        {rows.map((row) => (
-          <div
-            key={row.category}
-            className={cn(
-              "flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm",
-              row.over
-                ? "border-danger-border bg-danger-soft text-danger-strong"
-                : row.near
-                  ? "border-warning-border bg-warning-soft text-warning-strong"
-                  : "border-border bg-card text-muted-foreground",
-            )}
-          >
-            <span className="flex items-center gap-1.5 font-medium">
-              {row.over || row.near ? (
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-              ) : (
-                <Sprout className="h-4 w-4 shrink-0" />
-              )}
-              Área plantada · {row.label}
-            </span>
-            <span className="tabular-nums">{row.detail}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   /**
-   * Linhas da mesma tabela (desktop). Dentro do `tfoot` elas herdam as colunas,
+   * Linhas da mesma tabela. Dentro do `tfoot` elas herdam as colunas,
    * então o texto encosta exatamente onde encosta o conteúdo das células — o
    * recuo acompanha a coluna-espaçador, que estica junto com a tabela.
    */
@@ -1715,7 +1726,15 @@ export function PurchaseListItemsEditor({
       >
         <td />
         <td colSpan={colCount - 2} className="px-1.5 py-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-2",
+              // Abaixo de `lg`, o número vem logo depois do rótulo: com o
+              // `justify-between`, ficaria na outra ponta da tabela.
+              "max-lg:justify-start max-lg:gap-x-3",
+              SPAN_TEXT_CLASS,
+            )}
+          >
             <span className="flex items-center gap-1.5 font-semibold uppercase tracking-wide">
               {row.over || row.near ? (
                 <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -1852,8 +1871,7 @@ export function PurchaseListItemsEditor({
         />
       )}
 
-      {/* Abas (só no desktop, onde há tabela) e a ação da lista, que vale em
-          qualquer largura — por isso a linha fica fora do bloco `lg:block`. */}
+      {/* Abas das tabelas e a ação da lista. */}
       {showTabsRow ? (
         // Fica no topo ao rolar: as abas e a ação da lista seguem à mão com a
         // tabela longa. Só em md+ — no mobile o topo já é da barra do app.
@@ -1881,7 +1899,6 @@ export function PurchaseListItemsEditor({
             <div className="mx-auto flex w-full flex-wrap items-center justify-between gap-3 md:max-w-[calc(var(--container-app)+4rem)] md:px-8 md:py-2">
               {bands.length > 1 ? (
                 <SegmentedTabs
-                  className="hidden lg:inline-flex"
                   value={activeBand?.id ?? bands[0].id}
                   onValueChange={(id: BandId) => {
                     setBandTab(id);
@@ -1929,400 +1946,26 @@ export function PurchaseListItemsEditor({
         </>
       ) : null}
       {items.length === 0 ? (
-        <div className="hidden rounded-xl border bg-card px-3 py-10 text-center text-sm text-muted-foreground shadow-sm lg:block">
+        <div className="rounded-xl border bg-card px-3 py-10 text-center text-sm text-muted-foreground shadow-sm">
           Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
         </div>
-      ) : (
-        <div className="hidden lg:block">
-          {activeBand ? (
-            <>
-              {renderBandTable(activeBand, visibleItems)}
-              <PaginationBar
-                className="border-0 bg-transparent px-0 pb-0"
-                page={safePage}
-                pageSize={pageSize}
-                total={visibleItems.length}
-                onPageChange={setPage}
-                pageSizeOptions={PAGE_SIZE_OPTIONS}
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setPage(1);
-                }}
-              />
-            </>
-          ) : null}
-        </div>
-      )}
-
-      <div className="mt-6 space-y-3 lg:hidden">
-        {items.some((it) => isSeedItem(it))
-          ? renderSeedAreaSummary(items.filter((it) => isSeedItem(it)))
-          : null}
-        {items.length === 0 ? (
-          <div className="rounded-xl border border-dashed bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhum produto adicionado.
-          </div>
-        ) : readOnly ? (
-          items.map((it) => {
-            const seed = isSeedItem(it);
-            const toBuy = toBuyByKey.get(it.key) ?? 0;
-            const rowUnitBrl = unitBrl(it);
-            const rowUnitUsd = unitUsd(it);
-            const hasPrice = Boolean(it.price || it.priceUsd);
-            const totalValue = toBuy * rowUnitBrl;
-            const totalValueUsd = toBuy * rowUnitUsd;
-            const catLabel =
-              PRODUCT_CATEGORY_LABELS[
-                it.category as keyof typeof PRODUCT_CATEGORY_LABELS
-              ] ??
-              it.category ??
-              "—";
-            return (
-              <div
-                key={it.key}
-                data-item-key={it.key}
-                className="rounded-xl border bg-card p-4 shadow-sm"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {catLabel}
-                  {it.outOfProgram ? (
-                    <span className="ml-2 inline-flex items-center rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-destructive">
-                      Fora da programação
-                    </span>
-                  ) : null}
-                </p>
-                <p className="mt-1 text-base font-medium text-foreground">
-                  {it.productName || "—"}
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Estoque disponível
-                    </span>
-                    <p className="mt-0.5 tabular-nums">
-                      {Number(it.stock || 0).toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      {seed ? seedQuantityUnitLabel(it.category) : it.unit}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {seed ? "População" : "Dose/ha"}
-                    </span>
-                    <p className="mt-0.5 tabular-nums">
-                      {seed
-                        ? `${fmt(Number(it.thousandPlants || 0))} plantas/ha · ${fmtArea(Number(it.seedingArea || 0))} ha`
-                        : `${fmt(Number(it.dose || 0))} ${it.unit}/ha · ${it.nApps}×`}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      A comprar
-                    </span>
-                    <p className="mt-0.5 font-semibold tabular-nums">
-                      {fmt(toBuy)}{" "}
-                      {seed ? seedQuantityUnitLabel(it.category) : it.unit}
-                    </p>
-                  </div>
-                  {canViewPrices ? (
-                    <div>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Preço
-                      </span>
-                      <p className="mt-0.5 tabular-nums">
-                        {it.priceUsd ? `${fmtUsd(Number(it.priceUsd))} · ` : ""}
-                        {hasPrice ? fmtBrl(rowUnitBrl) : "—"}
-                      </p>
-                    </div>
-                  ) : null}
-                  {canViewPrices ? (
-                    <div className="col-span-2 min-w-0">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Valor total
-                      </span>
-                      <p className="mt-0.5 break-words font-semibold tabular-nums">
-                        {hasPrice ? fmtBrl(totalValue) : "—"}
-                        {hasPrice && rowUnitUsd > 0 ? (
-                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                            {fmtUsd(totalValueUsd)}
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          items.map((it) => {
-            const rowProducts = productsForPurchaseListCategory(
-              products,
-              it.category,
-              toProductOptionValue(it),
-              it.productName,
-              listCrop,
-            );
-            const seed = isSeedItem(it);
-            const required = listItemQuantity(it, totalHa);
-            const toBuy = toBuyByKey.get(it.key) ?? 0;
-            return (
-              <div
-                key={it.key}
-                data-item-key={it.key}
-                className={cn(
-                  "rounded-xl border p-4 shadow-sm",
-                  addedKeys.has(it.key) ? "bg-primary-soft" : "bg-card",
-                )}
-              >
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <label className="flex items-center gap-2">
-                    {!readOnly ? (
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={selectedKeys.has(it.key)}
-                        onChange={() => toggleSelected(it.key)}
-                        aria-label="Selecionar para excluir"
-                      />
-                    ) : null}
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Insumo
-                      {it.outOfProgram ? (
-                        <span className="ml-2 inline-flex items-center rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-destructive">
-                          Fora da programação
-                        </span>
-                      ) : null}
-                    </p>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(it.key)}
-                    disabled={removalBusy}
-                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                    aria-label="Remover"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <Field label="Categoria">
-                    <Select
-                      value={it.category}
-                      onValueChange={(category) =>
-                        handleCategoryChange(it.key, category, it.category)
-                      }
-                      placeholder="Selecione…"
-                      filterLabel="Categoria"
-                      options={(seed ? seedCategories : nonSeedCategories).map(
-                        (category) => ({
-                          value: category,
-                          label: PRODUCT_CATEGORY_LABELS[category],
-                        }),
-                      )}
-                    />
-                  </Field>
-                  <Field label="Produto">
-                    {renderProductField(it, rowProducts)}
-                  </Field>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  {seed ? (
-                    <>
-                      <Field
-                        label="Semente/metro"
-                        hint={
-                          Number(it.thousandPlants || 0) > 0
-                            ? `${fmt(Number(it.thousandPlants || 0))} pl/ha`
-                            : undefined
-                        }
-                      >
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={it.seedsPerMeter ?? ""}
-                          onChange={(e) =>
-                            setSeedsPerMeter(it.key, e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Ciclo (dias)">
-                        <Input
-                          type="number"
-                          step="1"
-                          value={it.cycleDays ?? ""}
-                          onChange={(e) =>
-                            updateItem(it.key, { cycleDays: e.target.value })
-                          }
-                        />
-                      </Field>
-                      <Field
-                        label={`Volume BAG's (${seedQuantityUnitLabel(it.category)})`}
-                      >
-                        <Input
-                          type="number"
-                          step="1"
-                          min="0"
-                          placeholder={seedQuantityUnitLabel(it.category)}
-                          value={it.bagsOverride ?? ""}
-                          onChange={(e) => setBags(it.key, e.target.value)}
-                        />
-                      </Field>
-                      <Field
-                        label="Área plantado (ha)"
-                        hint="calculada pelos bags"
-                      >
-                        <div className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
-                          {Number(it.seedingArea || 0) > 0
-                            ? `${fmtArea(Number(it.seedingArea || 0))} ha`
-                            : "—"}
-                        </div>
-                      </Field>
-                    </>
-                  ) : (
-                    <>
-                      <Field label="Dose/ha">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={it.dose}
-                          onChange={(e) => setDose(it.key, e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Unidade">
-                        <DoseUnitSelect
-                          value={it.unit}
-                          onChange={(val) => updateItem(it.key, { unit: val })}
-                        />
-                      </Field>
-                      <Field label="Nº aplicações">
-                        <Input
-                          type="number"
-                          step="1"
-                          min="1"
-                          inputMode="numeric"
-                          value={it.nApps}
-                          onChange={(e) => {
-                            const whole = e.target.value
-                              .replace(/[.,].*$/, "")
-                              .replace(/\D/g, "");
-                            setNApps(it.key, whole === "" ? "" : whole);
-                          }}
-                        />
-                      </Field>
-                      <Field
-                        label="Volume"
-                        hint="Digite o volume comercial; a dose recalcula. Digite a dose e o volume sai sozinho."
-                      >
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={
-                            it.volumeOverride !== undefined &&
-                            it.volumeOverride !== ""
-                              ? it.volumeOverride
-                              : required > 0
-                                ? String(Number(required.toFixed(4)))
-                                : ""
-                          }
-                          onChange={(e) =>
-                            setVolumeOverride(it.key, e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field
-                        label="% da área"
-                        hint="Vazio = 100% da safra. 20 = só 20% dos hectares."
-                      >
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="100"
-                          placeholder="100"
-                          value={it.areaPercent ?? ""}
-                          onChange={(e) =>
-                            setAreaPercent(it.key, e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field
-                        label="Observação da área"
-                        hint="Só aparece no PDF."
-                      >
-                        <Input
-                          placeholder="Ex: áreas sujas"
-                          value={it.areaNote ?? ""}
-                          onChange={(e) =>
-                            updateItem(it.key, { areaNote: e.target.value })
-                          }
-                        />
-                      </Field>
-                    </>
-                  )}
-                  <Field label="Estoque disponível">
-                    <MoneyInput
-                      value={it.stock}
-                      onValueChange={(v) => updateItem(it.key, { stock: v })}
-                      decimals={2}
-                      grouping={false}
-                    />
-                  </Field>
-                  {canViewPrices ? (
-                    <Field label="Preço US$/un.">
-                      <MoneyInput
-                        placeholder="US$"
-                        value={it.priceUsd}
-                        onValueChange={(v) =>
-                          updateItem(it.key, { priceUsd: v })
-                        }
-                      />
-                    </Field>
-                  ) : null}
-                  {canViewPrices ? (
-                    <Field label="Preço R$/un.">
-                      {it.priceUsd && fx > 0 ? (
-                        <div className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
-                          {fmtBrl(unitBrl(it))}{" "}
-                          <span className="ml-1 text-[10px]">(do US$)</span>
-                        </div>
-                      ) : (
-                        <MoneyInput
-                          placeholder="R$"
-                          value={it.price}
-                          onValueChange={(v) =>
-                            updateItem(it.key, { price: v })
-                          }
-                        />
-                      )}
-                    </Field>
-                  ) : null}
-                </div>
-
-                <div className="mt-3 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">
-                    Necessário{" "}
-                    <span className="tabular-nums text-foreground">
-                      {fmt(required)}
-                    </span>
-                  </span>
-                  <span className="font-semibold">
-                    A comprar{" "}
-                    <span className="tabular-nums text-foreground">
-                      {fmt(toBuy)}
-                    </span>
-                  </span>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+      ) : activeBand ? (
+        <>
+          {renderBandTable(activeBand, visibleItems)}
+          <PaginationBar
+            className="border-0 bg-transparent px-0 pb-0"
+            page={safePage}
+            pageSize={pageSize}
+            total={visibleItems.length}
+            onPageChange={setPage}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </>
+      ) : null}
 
       {!readOnly ? (
         // Faixa fixa no rodapé da janela: adicionar produto fica à mão em lista
