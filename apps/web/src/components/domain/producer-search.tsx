@@ -13,7 +13,11 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Search, Users, Plus, Package } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
-import { Dialog, DialogContent, DialogTitle } from "@recomenda/ui/primitives/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@recomenda/ui/primitives/dialog";
 import { useMe, useProducers } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
@@ -53,7 +57,8 @@ export function ProducerSearchButton({
   const hideSearch =
     me?.role === "PRODUCER" ||
     (me?.role === "STAFF" &&
-      (me.access_level === "FARM_MANAGER" || me.access_level === "FARM_OPERATOR"));
+      (me.access_level === "FARM_MANAGER" ||
+        me.access_level === "FARM_OPERATOR"));
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -186,22 +191,22 @@ export function ProducerSearchButton({
           <Search />
         </Button>
         {iconOnly ? null : (
-        <button
-          type="button"
-          aria-label={
-            isMac ? "Buscar produtor (⌘K)" : "Buscar produtor (Ctrl+K)"
-          }
-          onClick={() => setOpen(true)}
-          className="hidden h-11 w-full max-w-72 items-center gap-2.5 rounded-lg border border-border-strong bg-search px-3.5 text-sm shadow-xs outline-none transition-colors hover:bg-hover focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 @min-[14rem]:flex"
-        >
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <span className="flex-1 truncate text-left text-placeholder">
-            Buscar produtor…
-          </span>
-          <kbd className="pointer-events-none flex select-none items-center rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground">
-            {isMac ? "⌘K" : "Ctrl K"}
-          </kbd>
-        </button>
+          <button
+            type="button"
+            aria-label={
+              isMac ? "Buscar produtor (⌘K)" : "Buscar produtor (Ctrl+K)"
+            }
+            onClick={() => setOpen(true)}
+            className="hidden h-11 w-full max-w-96 items-center gap-2.5 rounded-lg border border-border-strong bg-search px-3.5 text-sm shadow-xs outline-none transition-colors hover:bg-hover focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 @min-[14rem]:flex"
+          >
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <span className="flex-1 truncate text-left text-placeholder">
+              Buscar produtor…
+            </span>
+            <kbd className="pointer-events-none flex select-none items-center rounded border border-border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground">
+              {isMac ? "⌘K" : "Ctrl K"}
+            </kbd>
+          </button>
         )}
       </div>
 
