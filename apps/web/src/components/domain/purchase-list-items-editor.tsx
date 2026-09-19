@@ -74,6 +74,7 @@ import {
 
 const DEFAULT_ITEM_STAGE = "Outra";
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 50;
 /** Em quantos pixels de scroll o fundo da faixa fixa entra por completo. */
 const STICK_RAMP_PX = 40;
 /** Ciclo padrão da semente (dias) — soja gira em ~110 dias. */
@@ -334,7 +335,7 @@ export function PurchaseListItemsEditor({
   // em vez de ficar desbotando depois que o dedo já parou.
   const tabsSentinelRef = useRef<HTMLDivElement | null>(null);
   const [tabsStickProgress, setTabsStickProgress] = useState(0);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   /** Item novo entra no fim: a última página é onde ele aparece. */
   const goToLastPage = () => setPage(Number.MAX_SAFE_INTEGER);
 
