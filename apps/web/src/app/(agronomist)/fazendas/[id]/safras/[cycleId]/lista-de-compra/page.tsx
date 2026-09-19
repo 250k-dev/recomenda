@@ -42,7 +42,6 @@ export default function CyclePurchaseListPage() {
   return (
     <CyclePageShell
       page={page}
-      backHref={page.hrefs.base}
       hideHero
       trail={[{ label: "Lista de compra" }]}
     >

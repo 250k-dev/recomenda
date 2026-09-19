@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
-import { ChevronLeft, Leaf, Pencil, Rocket } from "lucide-react";
+import { Leaf, Pencil, Rocket } from "lucide-react";
 import { toast } from "sonner";
-import type { Route } from "next";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
@@ -116,8 +114,9 @@ export function useCyclePage() {
 export type CyclePage = ReturnType<typeof useCyclePage>;
 
 /**
- * Moldura das telas da safra: breadcrumb + hero (nome, status, publicar) e,
- * nas subrotas, o link de volta. Publicar fica visível em TODAS as telas
+ * Moldura das telas da safra: breadcrumb + hero (nome, status, publicar). O
+ * voltar das subrotas é o do header, que sobe um nível na trilha — a tela não
+ * desenha o seu. Publicar fica visível em TODAS as telas
  * enquanto houver talhão em rascunho — sem isso a programação não aparece no
  * cronograma e o botão passava despercebido.
  */
@@ -125,7 +124,6 @@ export function CyclePageShell({
   page,
   stats = [],
   actions,
-  backHref,
   hideHero = false,
   trail,
   children,
@@ -135,8 +133,6 @@ export function CyclePageShell({
   stats?: PageHeroStat[];
   /** Ações extras do hero, depois do botão Publicar. */
   actions?: ReactNode;
-  /** Quando definido, mostra "Voltar à safra" acima do conteúdo. */
-  backHref?: Route;
   /** Omite o hero da safra — para telas que já têm hero próprio (lista de compra). */
   hideHero?: boolean;
   /**
@@ -270,16 +266,6 @@ export function CyclePageShell({
         >
           Arquivo de safra — não altera o galpão de hoje. Lista e estoque desta
           safra ficam só no retrato histórico.
-        </div>
-      ) : null}
-
-      {backHref ? (
-        <div className="mb-6 md:hidden">
-          <Button asChild variant="ghost" size="icon-lg" className="-ml-2">
-            <Link href={backHref} aria-label="Voltar">
-              <ChevronLeft className="size-7" />
-            </Link>
-          </Button>
         </div>
       ) : null}
 

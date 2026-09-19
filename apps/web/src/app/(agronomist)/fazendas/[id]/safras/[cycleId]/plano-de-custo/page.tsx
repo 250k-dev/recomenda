@@ -13,7 +13,7 @@ export default function CycleCostPlanPage() {
   const page = useCyclePage();
 
   return (
-    <CyclePageShell page={page} backHref={page.hrefs.base}>
+    <CyclePageShell page={page}>
       <CycleCostPlanView
         cycleId={page.cycleId}
         producerName={page.producer?.name}
