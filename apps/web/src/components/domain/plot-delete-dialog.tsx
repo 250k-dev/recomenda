@@ -33,10 +33,9 @@ export function PlotDeleteDialog({
   onDelete: (id: string) => void | Promise<void>;
   onUnlinkAndDelete: (id: string) => void | Promise<void>;
 }) {
-  const inCycle = Boolean(target && target.cycleNames.length > 0);
   const open = target !== null;
 
-  if (!inCycle) {
+  if (!target || target.cycleNames.length === 0) {
     return (
       <ConfirmDialog
         open={open}
