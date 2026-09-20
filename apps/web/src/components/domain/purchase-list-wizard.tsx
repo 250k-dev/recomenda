@@ -53,7 +53,7 @@ import {
 } from "@recomenda/api-hooks";
 import { useProducerStock } from "@recomenda/api-hooks/producers";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
-import { CROP_LABELS } from "@recomenda/utils";
+import { CROP_LABELS, cn } from "@recomenda/utils";
 import {
   FieldError,
   StepFooter,
@@ -116,17 +116,19 @@ function SaveDraftButton({
   onSaveDraft,
   savingDraft,
   size = "lg",
+  className,
 }: {
   onSaveDraft: () => void;
   savingDraft: boolean;
   size?: "default" | "lg";
+  className?: string;
 }) {
   return (
     <Button
       type="button"
       variant="outline"
       size={size}
-      className="gap-2"
+      className={cn("gap-2", className)}
       onClick={onSaveDraft}
       disabled={savingDraft}
     >
@@ -741,8 +743,13 @@ function StepList({
                   onSaveDraft={onSaveDraft}
                   savingDraft={savingDraft}
                   size="default"
+                  className="w-full md:w-auto"
                 />
-                <Button type="button" onClick={next} className="gap-2">
+                <Button
+                  type="button"
+                  onClick={next}
+                  className="w-full gap-2 md:w-auto"
+                >
                   Próximo
                   <ArrowRight className="h-4 w-4" />
                 </Button>

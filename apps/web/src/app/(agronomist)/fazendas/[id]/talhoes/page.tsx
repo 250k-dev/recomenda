@@ -208,7 +208,11 @@ export default function FarmPlotsPage() {
     [searchedPlots, tableView],
   );
 
-  const renderPlotHeader = (column: PlotCol, label: string) => {
+  const renderPlotHeader = (
+    column: PlotCol,
+    label: string,
+    showFilter = true,
+  ) => {
     const accessor = PLOT_COLUMNS[column];
     return (
       <ColumnFilterHeader
@@ -234,6 +238,7 @@ export default function FarmPlotsPage() {
             ? columnOptions(searchedPlots, accessor)
             : undefined
         }
+        showFilter={showFilter}
       />
     );
   };
@@ -363,6 +368,9 @@ export default function FarmPlotsPage() {
           />
         ) : (
           <>
+            <div className="mb-2 flex justify-end md:hidden">
+              {renderPlotHeader("name", "Talhão", false)}
+            </div>
             {/* Desktop: tabela */}
             <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
               <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.6fr)_13rem] gap-4 bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">

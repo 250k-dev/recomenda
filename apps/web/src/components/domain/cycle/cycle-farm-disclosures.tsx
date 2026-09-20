@@ -251,6 +251,7 @@ export function CycleFarmDisclosures({
     column: SeasonCol,
     label: string,
     rows: CycleSeasonRow[],
+    showFilter = true,
   ) => {
     const accessor = SEASON_COLUMNS[column];
     return (
@@ -277,6 +278,7 @@ export function CycleFarmDisclosures({
             ? columnOptions(rows, accessor)
             : undefined
         }
+        showFilter={showFilter}
       />
     );
   };
@@ -454,6 +456,17 @@ export function CycleFarmDisclosures({
                       <Plus className="size-3.5" />
                       Talhão
                     </Button>
+                  ) : null}
+
+                  {open && group.seasons.length > 0 ? (
+                    <div className="shrink-0 md:hidden">
+                      {renderSeasonHeader(
+                        "plot",
+                        "Talhão",
+                        group.seasons,
+                        false,
+                      )}
+                    </div>
                   ) : null}
 
                   {canManage && canRemoveFarm ? (

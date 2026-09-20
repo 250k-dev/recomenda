@@ -415,7 +415,31 @@ function StageProductsEditor({
                 dragIndex === index && "opacity-60 ring-1 ring-primary/40",
               )}
             >
-              <div className="flex items-center sm:items-end sm:pb-0.5">
+              <div className="flex items-center gap-1 sm:items-end sm:pb-0.5">
+                <div className="flex sm:hidden">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="size-9 rounded-r-none"
+                    disabled={index === 0}
+                    aria-label="Subir produto na ordem de mistura"
+                    onClick={() => moveProduct(index, index - 1)}
+                  >
+                    <ArrowUp className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="-ml-px size-9 rounded-l-none"
+                    disabled={index === products.length - 1}
+                    aria-label="Descer produto na ordem de mistura"
+                    onClick={() => moveProduct(index, index + 1)}
+                  >
+                    <ArrowDown className="size-4" />
+                  </Button>
+                </div>
                 <span
                   draggable
                   onDragStart={(e) => {
@@ -426,7 +450,7 @@ function StageProductsEditor({
                   onDragEnd={() => setDragIndex(null)}
                   title="Arrastar para reordenar"
                   aria-label="Arrastar produto na ordem de mistura"
-                  className="inline-flex size-9 shrink-0 cursor-grab items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground active:cursor-grabbing"
+                  className="hidden size-9 shrink-0 cursor-grab items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground active:cursor-grabbing sm:inline-flex"
                 >
                   <GripVertical className="size-[18px]" strokeWidth={2.25} />
                 </span>

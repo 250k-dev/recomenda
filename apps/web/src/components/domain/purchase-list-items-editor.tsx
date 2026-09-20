@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AlertTriangle, ListFilter, Plus, Sprout, Trash2 } from "lucide-react";
 import { useCurrencyStore } from "@/stores/currency";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ import {
   type PurchaseListCatalogProduct,
   type PurchaseListCrop,
 } from "@recomenda/domain/catalog/purchase-list-catalog";
+import { CATEGORY_COLORS } from "@recomenda/domain/cost-plan/categories";
 import { fmt, fmtArea } from "@/components/domain/season/_shared";
 import { PurchaseListParamsRow } from "@/components/domain/purchase-list-params-row";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
@@ -932,6 +933,9 @@ export function PurchaseListItemsEditor({
       ] ??
       it.category ??
       "—";
+    const catColor = CATEGORY_COLORS[it.category] ?? CATEGORY_COLORS.OTHER;
+    const catWash = `color-mix(in srgb, ${catColor} ${rowIndex % 2 === 0 ? 10 : 16}%, var(--color-card))`;
+    const rowHighlight = isNew || selectedKeys.has(it.key);
     const rowProducts = readOnly
       ? []
       : productsForPurchaseListCategory(
@@ -953,16 +957,12 @@ export function PurchaseListItemsEditor({
           // vai nas CÉLULAS, onde o navegador a trata como mínimo; em <tr> ela
           // nem sempre pega.
           "align-middle [&>td]:h-[52px]",
-          // Zebra: branco e meio tom acima, para o olho não pular de linha.
-          // O `surface-2` inteiro pesava demais. A coluna presa do celular
-          // repete a mesma mistura, opaca.
-          rowIndex % 2 === 0 ? "bg-card" : "bg-surface-2/50",
-          // `[&>td]` apaga o laranja das colunas de resumo, para o verde
-          // valer na linha inteira.
+          // Tom da classe (as mesmas cores de Gastos por categoria), bem leve.
           isNew && "bg-primary-soft [&>td]:bg-transparent",
           selectedKeys.has(it.key) && "bg-primary/10 [&>td]:bg-transparent",
           !readOnly && "cursor-pointer",
         )}
+        style={rowHighlight ? undefined : { backgroundColor: catWash }}
         onClick={
           readOnly
             ? undefined
@@ -993,41 +993,50 @@ export function PurchaseListItemsEditor({
           )}
         </td>
         <td className="px-1.5 py-1.5">
-          {readOnly ? (
-            <span className="text-sm text-muted-foreground">{catLabel}</span>
-          ) : (
-            <Select
-              value={it.category}
-              onValueChange={(category) =>
-                handleCategoryChange(it.key, category, it.category)
-              }
-              placeholder="Selecione…"
-              filterLabel="Categoria"
-              size="sm"
-              options={(seed ? seedCategories : nonSeedCategories).map(
-                (category) => ({
-                  value: category,
-                  label: PRODUCT_CATEGORY_LABELS[category],
-                }),
-              )}
-              panelMinWidth={260}
-              className={cn("min-w-0 max-w-none", TABLE_SELECT_CLASS)}
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: catColor }}
+              aria-hidden
             />
-          )}
+            {readOnly ? (
+              <span className="text-sm text-muted-foreground">{catLabel}</span>
+            ) : (
+              <Select
+                value={it.category}
+                onValueChange={(category) =>
+                  handleCategoryChange(it.key, category, it.category)
+                }
+                placeholder="Selecione…"
+                filterLabel="Categoria"
+                size="sm"
+                options={(seed ? seedCategories : nonSeedCategories).map(
+                  (category) => ({
+                    value: category,
+                    label: PRODUCT_CATEGORY_LABELS[category],
+                  }),
+                )}
+                panelMinWidth={260}
+                className={cn("min-w-0 flex-1 max-w-none", TABLE_SELECT_CLASS)}
+              />
+            )}
+          </div>
         </td>
         <td
           className={cn(
             "px-1.5 py-1.5",
             PIN_CLASS,
-            // Mesma cor da linha, só que opaca (ver `PIN_CLASS`).
             selectedKeys.has(it.key)
               ? "max-lg:bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-card))]!"
               : isNew
                 ? "max-lg:bg-primary-soft!"
-                : rowIndex % 2 === 0
-                  ? "max-lg:bg-card!"
-                  : "max-lg:bg-[color-mix(in_srgb,var(--color-surface-2)_50%,var(--color-card))]!",
+                : "max-lg:[background-color:var(--cat-wash)]!",
           )}
+          style={
+            rowHighlight
+              ? undefined
+              : ({ ["--cat-wash"]: catWash } as CSSProperties)
+          }
         >
           {readOnly ? (
             <span className="block truncate text-sm font-medium text-foreground">
@@ -1871,7 +1880,7 @@ export function PurchaseListItemsEditor({
       className={cn(
         "flex min-w-0 w-full flex-col",
         // Espaço para a faixa fixa do rodapé não cobrir o fim da lista.
-        !readOnly && "pb-24",
+        !readOnly && "max-md:pb-40 md:pb-24",
         className,
       )}
     >
@@ -1990,37 +1999,50 @@ export function PurchaseListItemsEditor({
         // longa, sem rolar até o fim. O `pb` do container abre o espaço para o
         // fim da lista não terminar embaixo dela.
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-[0_-6px_20px_-8px_rgb(0_0_0/0.25)] backdrop-blur">
-          <div className="mx-auto flex w-full max-w-[calc(var(--container-app)+2rem)] flex-wrap items-center justify-end gap-2 px-4 py-3 md:max-w-[calc(var(--container-app)+4rem)] md:px-8">
+          <div className="mx-auto grid w-full max-w-[calc(var(--container-app)+2rem)] grid-cols-2 gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex md:max-w-[calc(var(--container-app)+4rem)] md:flex-wrap md:items-center md:justify-end md:px-8">
             {selectedKeys.size > 0 ? (
               <Button
                 type="button"
                 variant="destructive"
                 onClick={() => setConfirmOpen(true)}
                 disabled={removalBusy}
-                // O `destructive` do sistema é o vermelho suave; aqui a ação
-                // pede o vermelho cheio.
-                className="mr-auto shrink-0 gap-2 border-transparent bg-danger-strong text-white hover:bg-danger-strong/90"
+                className="col-span-2 w-full gap-2 border-transparent bg-danger-strong text-white hover:bg-danger-strong/90 md:mr-auto md:w-auto"
               >
                 <Trash2 className="h-4 w-4" />
-                Remover {selectedKeys.size}{" "}
-                {selectedKeys.size === 1 ? "selecionado" : "selecionados"}
+                <span className="md:hidden">
+                  Remover {selectedKeys.size}
+                </span>
+                <span className="hidden md:inline">
+                  Remover {selectedKeys.size}{" "}
+                  {selectedKeys.size === 1 ? "selecionado" : "selecionados"}
+                </span>
               </Button>
             ) : null}
             {seedCategories.length > 0 ? (
               <Button
                 type="button"
                 onClick={addSeedItem}
-                className="shrink-0 gap-2"
+                className="w-full gap-2 md:w-auto"
               >
                 <Plus className="h-4 w-4" />
-                Adicionar semente
+                <span className="md:hidden">Semente</span>
+                <span className="hidden md:inline">Adicionar semente</span>
               </Button>
             ) : null}
-            <Button type="button" onClick={addItem} className="shrink-0 gap-2">
+            <Button
+              type="button"
+              onClick={addItem}
+              className="w-full gap-2 md:w-auto"
+            >
               <Plus className="h-4 w-4" />
-              Adicionar produto
+              <span className="md:hidden">Produto</span>
+              <span className="hidden md:inline">Adicionar produto</span>
             </Button>
-            {footerActions}
+            {footerActions ? (
+              <div className="col-span-2 grid grid-cols-2 gap-2 md:contents">
+                {footerActions}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

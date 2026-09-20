@@ -248,7 +248,11 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
     [searchedPlots, tableView],
   );
 
-  const renderPlotHeader = (column: PlotCol, label: string) => {
+  const renderPlotHeader = (
+    column: PlotCol,
+    label: string,
+    showFilter = true,
+  ) => {
     const accessor = PLOT_COLUMNS[column];
     return (
       <ColumnFilterHeader
@@ -274,6 +278,7 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
             ? columnOptions(searchedPlots, accessor)
             : undefined
         }
+        showFilter={showFilter}
       />
     );
   };
@@ -344,6 +349,9 @@ export function FarmPlotsSection({ farmId }: { farmId: string }) {
         />
       ) : (
         <>
+          <div className="mb-2 flex justify-end md:hidden">
+            {renderPlotHeader("name", "Talhão", false)}
+          </div>
           <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
             <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_7rem] gap-4 bg-surface-2 px-5 py-3 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
               {renderPlotHeader("name", "Talhão")}

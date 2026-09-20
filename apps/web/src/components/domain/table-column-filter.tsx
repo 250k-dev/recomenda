@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ListFilter, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ListFilter, Trash2 } from "lucide-react";
 import { cn } from "@recomenda/utils";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
@@ -193,6 +193,8 @@ type ColumnFilterHeaderProps = {
   onFilterChange: (filter: ColumnFilter | undefined) => void;
   /** Só em `options`: os valores que a coluna tem hoje. */
   options?: ColumnOption[];
+  /** Sem a seção Filtrar — só A→Z / Z→A (listas de talhão no celular). */
+  showFilter?: boolean;
 };
 
 /**
@@ -208,12 +210,14 @@ export function ColumnFilterHeader({
   filter,
   onFilterChange,
   options = [],
+  showFilter = true,
 }: ColumnFilterHeaderProps) {
   const filtered = isFilterActive(filter);
 
   const trigger = (
     <Popover>
       <PopoverTrigger asChild>
+        {showFilter ? (
         <button
           type="button"
           aria-label={`Ordenar e filtrar ${label}`}
@@ -221,8 +225,6 @@ export function ColumnFilterHeader({
             "relative inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground/60 transition-colors outline-none",
             "hover:bg-hover hover:text-text-strong focus-visible:ring-2 focus-visible:ring-ring/40",
             "data-[state=open]:bg-hover data-[state=open]:text-text-strong",
-            // No toque, 20px é pouco para acertar: a área de toque cresce para
-            // uns 38px sem mudar o desenho.
             "pointer-coarse:before:absolute pointer-coarse:before:-inset-2",
             (sort || filtered) &&
               "text-primary hover:text-primary data-[state=open]:text-primary",
@@ -242,6 +244,27 @@ export function ColumnFilterHeader({
             />
           ) : null}
         </button>
+        ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={`Ordenar por ${label}`}
+          className={cn(
+            "shrink-0 gap-1.5",
+            sort && "border-primary/40 text-primary-strong",
+          )}
+        >
+          {sort === "asc" ? (
+            <ArrowUp className="size-3.5" />
+          ) : sort === "desc" ? (
+            <ArrowDown className="size-3.5" />
+          ) : (
+            <ArrowUpDown className="size-3.5" />
+          )}
+          {label}
+        </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent
         align="start"
@@ -258,10 +281,10 @@ export function ColumnFilterHeader({
               type="button"
               size="xs"
               variant="ghost"
-              disabled={!sort && !filtered}
+              disabled={!sort && !(showFilter && filtered)}
               onClick={() => {
                 if (sort) onSortChange(null);
-                onFilterChange(undefined);
+                if (showFilter) onFilterChange(undefined);
               }}
               className="h-6 gap-1 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-text-strong disabled:text-muted-foreground/50 disabled:opacity-100"
             >
@@ -302,6 +325,7 @@ export function ColumnFilterHeader({
             </ToggleGroup>
           </div>
 
+          {showFilter ? (
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-text-strong">
               Filtrar
@@ -332,15 +356,16 @@ export function ColumnFilterHeader({
               />
             )}
           </div>
+          ) : null}
         </div>
       </PopoverContent>
     </Popover>
   );
 
+  if (!showFilter) return trigger;
+
   return (
     <div className="flex items-center gap-1">
-      {/* Uma linha só: se a coluna ficar estreita demais, o título corta com
-          reticências em vez de quebrar ou invadir a coluna vizinha. */}
       <span className="min-w-0 truncate">{label}</span>
       {trigger}
     </div>

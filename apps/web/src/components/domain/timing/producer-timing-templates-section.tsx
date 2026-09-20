@@ -170,18 +170,20 @@ export function ProducerTimingTemplatesPanel({
                   <Link
                     key={template.id}
                     href={templateHref(template.id)}
-                    className="group flex flex-wrap items-center gap-3 rounded-xl border bg-background p-4 transition-all hover:border-primary/30 hover:shadow-sm"
+                    className="group flex flex-col gap-3 rounded-xl border bg-background p-4 transition-all hover:border-primary/30 hover:shadow-sm sm:flex-row sm:items-center"
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Leaf className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-foreground">{template.name}</p>
-                      <Badge variant="outline" className="mt-1.5">
-                        {CROP_LABELS[template.crop] ?? template.crop}
-                      </Badge>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Leaf className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground">{template.name}</p>
+                        <Badge variant="outline" className="mt-1.5">
+                          {CROP_LABELS[template.crop] ?? template.crop}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 items-center justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
