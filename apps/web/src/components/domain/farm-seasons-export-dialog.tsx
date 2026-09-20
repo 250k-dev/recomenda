@@ -20,10 +20,16 @@ import {
   type DocumentCover,
 } from "@recomenda/domain/recommendations/print-document";
 import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
+import type {
+  NotebookSectionId,
+  SeasonNotebookData,
+} from "@recomenda/domain/season-notebook/notebook-document";
 import {
   readPricePreference,
   writePricePreference,
 } from "@/components/domain/export/price-preference";
+import { SeasonNotebookPanel } from "@/components/domain/export/season-notebook-panel";
+import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { cn } from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
@@ -34,6 +40,8 @@ export interface FarmExportItem {
   data: RecommendationShareData;
 }
 
+type ExportMode = "share" | "notebook";
+
 export function FarmSeasonsExportDialog({
   open,
   onOpenChange,
@@ -42,6 +50,8 @@ export function FarmSeasonsExportDialog({
   isLoading = false,
   items,
   cover,
+  notebook,
+  notebookUnavailable,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,14 +61,29 @@ export function FarmSeasonsExportDialog({
   items: FarmExportItem[];
   /** Capa do documento (números da safra/fazenda + consolidado). */
   cover?: DocumentCover | null;
+  /**
+   * Dados do Caderno de Safra. Ausente → a aba não aparece e o diálogo fica
+   * como era (só compartilhar), que é o caso dos escopos sem lista/estoque.
+   */
+  notebook?: SeasonNotebookData | null;
+  /** Sobrescreve o motivo padrão de uma seção indisponível do caderno. */
+  notebookUnavailable?: Partial<Record<NotebookSectionId, string>>;
 }) {
+  const [mode, setMode] = useState<ExportMode>("share");
+  const [notebookDragging, setNotebookDragging] = useState(false);
   const [copied, setCopied] = useState(false);
   const [shareAll, setShareAll] = useState(true);
   const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set());
   const [showPrices, setShowPrices] = useState(() => readPricePreference());
   // Só oferece a escolha quando há preço no payload (isto é, quem exporta tem
   // PRICE_VIEW). Sem isso o documento sai sem valores de qualquer forma.
-  const canChoosePrices = items.some((item) => item.data.unitPriceByProduct);
+  // A lista de compra conta: no caderno ela pode trazer preço mesmo quando as
+  // etapas do cronograma não trazem.
+  const canChoosePrices =
+    items.some((item) => item.data.unitPriceByProduct) ||
+    (notebook?.purchaseList?.items ?? []).some(
+      (item) => Number(item.unit_price_brl) > 0,
+    );
 
   const allStageIds = useMemo(
     () => items.flatMap((i) => i.data.recommendations.map((rec) => rec.id)),
@@ -71,6 +96,7 @@ export function FarmSeasonsExportDialog({
   if (nextResetKey !== resetKey) {
     setResetKey(nextResetKey);
     if (open) {
+      setMode("share");
       setShareAll(true);
       setSelectedStageIds(new Set(allStageKey ? allStageKey.split("|") : []));
     }
@@ -221,16 +247,43 @@ export function FarmSeasonsExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      {/* A aba do caderno tem duas colunas (seções + prévia) e precisa de espaço. */}
+      <DialogContent
+        className={mode === "notebook" ? "max-w-4xl" : "max-w-2xl"}
+        // Esc reordenando pelo teclado cancela o arrasto (o dnd-kit continua
+        // recebendo a tecla); sem isto ele fechava o diálogo junto.
+        onEscapeKeyDown={(event) => {
+          if (notebookDragging) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Exportar safra</DialogTitle>
           <DialogDescription>
-            Exporte a safra completa ou escolha etapas específicas dentro dos talhões.
+            {mode === "notebook"
+              ? "Monte o caderno para imprimir e encadernar: escolha as seções e a ordem."
+              : "Exporte a safra completa ou escolha etapas específicas dentro dos talhões."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto px-6 py-5">
-          {/* Primeiro item do modal: é a decisão que muda o que sai no documento. */}
+        {notebook ? (
+          <div className="shrink-0 border-b border-border px-6 pt-1 pb-4">
+            <SegmentedTabs
+              value={mode}
+              onValueChange={setMode}
+              items={[
+                { value: "share", label: "Compartilhar" },
+                { value: "notebook", label: "Caderno de safra" },
+              ]}
+            />
+          </div>
+        ) : null}
+
+        {/* Layout de bloco, não flex: num `flex-col` com overflow-y-auto os
+            filhos encolhem antes de a rolagem entrar, e quem tem altura fixa
+            (a barra de abas, por exemplo) sai cortado. */}
+        <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
+          {/* Primeiro item do modal: é a decisão que muda o que sai no documento.
+              Vale para as duas abas — o caderno usa o mesmo showPrices. */}
           {canChoosePrices ? (
             <section className="rounded-xl border border-border bg-surface-2 p-4">
               <label className="flex cursor-pointer items-start gap-2.5">
@@ -245,14 +298,16 @@ export function FarmSeasonsExportDialog({
                     Incluir preços e custos
                   </span>
                   <span className="mt-0.5 block text-[13px] text-muted-foreground">
-                    Custo por talhão e total da safra. Desmarque para entregar só a
-                    parte técnica.
+                    Custo por talhão, lista de compra e totais. Desmarque para
+                    entregar só a parte técnica.
                   </span>
                 </span>
               </label>
             </section>
           ) : null}
 
+          {mode === "share" ? (
+            <>
           <section className="rounded-xl border border-border bg-surface-2 p-4">
             <label className="flex cursor-pointer items-center gap-2.5">
               <input
@@ -517,6 +572,18 @@ export function FarmSeasonsExportDialog({
               </Button>
             </div>
           </section>
+            </>
+          ) : notebook ? (
+            <SeasonNotebookPanel
+              data={notebook}
+              unavailableReasons={notebookUnavailable}
+              isLoading={isLoading}
+              showPrices={showPrices}
+              canChoosePrices={canChoosePrices}
+              onBeforePrint={() => onOpenChange(false)}
+              onDraggingChange={setNotebookDragging}
+            />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

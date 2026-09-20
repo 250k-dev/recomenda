@@ -10,6 +10,7 @@ import {
   headerHtml,
   htmlShell,
   printHtml,
+  sheetHtml,
 } from "../print/print-core";
 
 export interface StockExportItem {
@@ -41,11 +42,17 @@ function formatQtyUnit(item: StockExportItem): string {
   return item.dose_unit ? `${qty} ${item.dose_unit}` : qty;
 }
 
-function summaryHtml(data: StockExportData): string {
+/** Suprime colunas de dinheiro mesmo quando os itens trazem preço. */
+export interface StockSectionOptions {
+  showPrices?: boolean;
+}
+
+function summaryHtml(data: StockExportData, opts: StockSectionOptions = {}): string {
   const productCount = data.items.length;
   const totalQty = data.items.reduce((s, r) => s + r.quantity, 0);
   const totalValue = data.items.reduce((s, r) => s + (r.value_brl ?? 0), 0);
   const withPrice = data.items.filter((r) => r.price_brl != null).length;
+  const money = opts.showPrices !== false;
 
   return `<div class="summary">
     <div class="summary-item">
@@ -56,21 +63,29 @@ function summaryHtml(data: StockExportData): string {
       <span class="summary-label">Qtde total</span>
       <span class="summary-value">${fmtQty(totalQty)}</span>
     </div>
-    <div class="summary-item">
+    ${
+      money
+        ? `<div class="summary-item">
       <span class="summary-label">Valor estimado</span>
       <span class="summary-value">${fmtBrl(totalValue)}</span>
     </div>
     <div class="summary-item">
       <span class="summary-label">Com preço</span>
       <span class="summary-value">${withPrice}/${productCount}</span>
-    </div>
+    </div>`
+        : ""
+    }
   </div>`;
 }
 
-function itemsTableHtml(items: StockExportItem[]): string {
+function itemsTableHtml(
+  items: StockExportItem[],
+  opts: StockSectionOptions = {},
+): string {
   if (items.length === 0) {
     return `<p class="empty">Nenhum produto em estoque.</p>`;
   }
+  const money = opts.showPrices !== false;
 
   const rows = items
     .map(
@@ -79,18 +94,24 @@ function itemsTableHtml(items: StockExportItem[]): string {
           <td>${escapeHtml(it.product_name)}</td>
           <td>${escapeHtml(it.category_label || it.category || "—")}</td>
           <td class="num">${escapeHtml(formatQtyUnit(it))}</td>
-          <td class="num">${it.price_brl != null ? fmtBrl(it.price_brl) : "&mdash;"}</td>
-          <td class="num">${it.value_brl != null ? fmtBrl(it.value_brl) : "&mdash;"}</td>
+          ${
+            money
+              ? `<td class="num">${it.price_brl != null ? fmtBrl(it.price_brl) : "&mdash;"}</td>
+          <td class="num">${it.value_brl != null ? fmtBrl(it.value_brl) : "&mdash;"}</td>`
+              : ""
+          }
         </tr>`,
     )
     .join("");
 
   const totalValue = items.reduce((s, r) => s + (r.value_brl ?? 0), 0);
-  const foot = `
+  const foot = money
+    ? `
     <tr>
       <td colspan="4">Valor estimado total</td>
       <td class="num">${fmtBrl(totalValue)}</td>
-    </tr>`;
+    </tr>`
+    : "";
 
   return `
     <table class="data-table">
@@ -99,13 +120,27 @@ function itemsTableHtml(items: StockExportItem[]): string {
           <th>Produto</th>
           <th>Categoria</th>
           <th class="num">Quantidade</th>
-          <th class="num">Preço</th>
-          <th class="num">Valor</th>
+          ${money ? `<th class="num">Preço</th><th class="num">Valor</th>` : ""}
         </tr>
       </thead>
       <tbody>${rows}</tbody>
-      <tfoot>${foot}</tfoot>
+      ${foot ? `<tfoot>${foot}</tfoot>` : ""}
     </table>`;
+}
+
+/**
+ * Miolo do estoque (resumo + tabela de itens), sem cabeçalho/rodapé nem shell.
+ * O PDF do estoque e o Caderno de Safra montam a mesma seção a partir daqui.
+ */
+export function stockSectionHtml(
+  data: StockExportData,
+  opts: StockSectionOptions = {},
+): string {
+  return `${summaryHtml(data, opts)}
+    <section>
+      <h2 class="section-title">Itens em estoque</h2>
+      ${itemsTableHtml(data.items, opts)}
+    </section>`;
 }
 
 function buildBody(data: StockExportData): string {
@@ -124,21 +159,17 @@ function buildBody(data: StockExportData): string {
     tags.push(`<span>${escapeHtml(data.note)}</span>`);
   }
 
-  return `
-  <div class="doc">
-    ${headerHtml(emittedAt)}
+  return sheetHtml({
+    header: headerHtml(emittedAt, heading),
+    body: `
     <div class="title-block">
       <p class="kicker">${escapeHtml(heading)}</p>
       <h1 class="title">${escapeHtml(title)}</h1>
       ${tags.length ? `<div class="tags">${tags.join("")}</div>` : ""}
     </div>
-    ${summaryHtml(data)}
-    <section>
-      <h2 class="section-title">Itens em estoque</h2>
-      ${itemsTableHtml(data.items)}
-    </section>
-    ${footerHtml(data.agronomistName)}
-  </div>`;
+    ${stockSectionHtml(data)}`,
+    footer: footerHtml(data.agronomistName),
+  });
 }
 
 export function printStock(data: StockExportData): void {

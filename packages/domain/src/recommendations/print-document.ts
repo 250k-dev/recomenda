@@ -13,6 +13,7 @@ import {
   headerHtml,
   htmlShell,
   printHtml,
+  sheetHtml,
 } from "../print/print-core";
 
 /** Capa dos escopos acima do talhão (fazenda, safra). */
@@ -327,8 +328,10 @@ interface RenderOpts {
 }
 
 /** CSS específico da recomendação (etapas/produtos/status/ficha). O genérico
- *  (cabeçalho, título, resumo, rodapé) vem do CORE_CSS em print-core. */
-const REC_CSS = `
+ *  (cabeçalho, título, resumo, rodapé) vem do CORE_CSS em print-core.
+ *  Exportado para documentos compostos — o Caderno de Safra embute estas
+ *  páginas e precisa do mesmo CSS no shell. */
+export const REC_CSS = `
   .stage { border: 1px solid #e2e0d6; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; background: #ffffff; break-inside: avoid; page-break-inside: avoid; }
   .stage-head { display: flex; align-items: center; gap: 10px; }
   .stage-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: #2f6d3f; color: #ffffff; font-size: 11px; font-weight: 700; flex-shrink: 0; }
@@ -342,6 +345,7 @@ const REC_CSS = `
   .products th { text-align: left; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #7a7a70; padding: 4px 8px; border-bottom: 1px solid #e2e0d6; }
   .products td { padding: 5px 8px; border-bottom: 1px solid #efeee8; color: #2b2b27; }
   .products tfoot td { font-weight: 700; border-top: 1px solid #e2e0d6; border-bottom: none; }
+  .products > tfoot { display: table-row-group; }
   .products .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .products .firm { font-size: 10px; color: #4a4a42; max-width: 10rem; }
   .products .form { width: 3.2rem; text-align: center; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; color: #6b6b62; white-space: nowrap; }
@@ -406,9 +410,12 @@ function buildDocBody(
           .join("")
       : `<p class="empty" style="margin-left:0">Nenhuma etapa cadastrada nesta safra.</p>`;
 
-  return `
-  <div class="doc"${pageBreak ? ' style="page-break-before: always"' : ""}>
-    ${headerHtml(emittedAt)}
+  // O cabeçalho repetido nomeia o talhão: uma recomendação de muitas etapas
+  // passa de uma página, e a 2ª saía sem dizer de quem era.
+  return sheetHtml({
+    pageBreak,
+    header: headerHtml(emittedAt, data.plotName ? `Talhão ${data.plotName}` : null),
+    body: `
     <div class="title-block">
       <p class="kicker">Recomendação agronômica</p>
       <h1 class="title">${escapeHtml(data.title)}</h1>
@@ -420,9 +427,9 @@ function buildDocBody(
       <h2 class="section-title">Cronograma de aplicações</h2>
       ${stages}
     </section>
-    ${plotSummaryHtml(data, stageOpts)}
-    ${footerHtml(data.agronomistName)}
-  </div>`;
+    ${plotSummaryHtml(data, stageOpts)}`,
+    footer: footerHtml(data.agronomistName),
+  });
 }
 
 /** Linha do consolidado: um produto somado em todos os talhões do escopo. */
@@ -527,9 +534,10 @@ function buildCoverBody(
     .join("");
   const productsTotal = rows.reduce((sum, row) => sum + (row.cost ?? 0), 0);
 
-  return `
-  <div class="doc">
-    ${headerHtml(emittedAt)}
+  return sheetHtml({
+    header: headerHtml(emittedAt, cover.kicker),
+    footer: footerHtml(list[0]?.agronomistName),
+    body: `
     <div class="title-block">
       <p class="kicker">${escapeHtml(cover.kicker)}</p>
       <h1 class="title">${escapeHtml(cover.title)}</h1>
@@ -579,10 +587,8 @@ function buildCoverBody(
              }
            </table>`
         : `<p class="empty" style="margin-left:0">Nenhum produto programado.</p>`
-    }
-
-    ${footerHtml(list[0]?.agronomistName)}
-  </div>`;
+    }`,
+  });
 }
 
 export function buildRecommendationHtml(
@@ -618,6 +624,22 @@ export function buildRecommendationsHtml(
     .map((data, index) => buildDocBody(data, Boolean(cover) || index > 0, opts))
     .join("");
   return htmlShell(title, cover + bodies, REC_CSS);
+}
+
+/**
+ * Páginas detalhadas por talhão (uma por talhão), sem shell nem capa — para
+ * compor documentos maiores. Cada página abre em folha nova, então só faz
+ * sentido depois de algum conteúdo (no Caderno, depois do resumo).
+ */
+export function buildRecommendationPages(
+  list: RecommendationShareData[],
+  options: PrintOptions = {},
+): string {
+  const opts: RenderOpts = {
+    money: hasAnyPrice(list, options.showPrices),
+    registry: hasRegistryData(list),
+  };
+  return list.map((data) => buildDocBody(data, true, opts)).join("");
 }
 
 /**

@@ -102,11 +102,16 @@ export {
   isPurchaseListFullyPriced,
   computePortfolioPriceCoverage,
 } from "./purchase-list/metrics";
-export type { PurchaseListPrintContext } from "./purchase-list/purchase-list-print-document";
+export type {
+  PurchaseListPrintContext,
+  PurchaseListSectionOptions,
+} from "./purchase-list/purchase-list-print-document";
 export {
   printPurchaseList,
   buildPurchaseListHtml,
   buildPurchaseListWhatsappMessage,
+  purchaseListSectionHtml,
+  PURCHASE_LIST_CSS,
 } from "./purchase-list/purchase-list-print-document";
 
 // ---- cotações ----------------------------------------------------------
@@ -145,8 +150,10 @@ export type {
 export {
   buildRecommendationHtml,
   buildRecommendationsHtml,
+  buildRecommendationPages,
   printRecommendation,
   printRecommendations,
+  REC_CSS,
 } from "./recommendations/print-document";
 export type { FormulationKey, FormulationOption } from "./recommendations/formulation-mix-order";
 export {
@@ -169,16 +176,44 @@ export {
   formatReportMargin,
 } from "./reports/metrics";
 
+// ---- caderno de safra --------------------------------------------------
+// Compositor do PDF para imprimir e encadernar: monta, na ordem escolhida pelo
+// agrônomo, as seções que os documentos acima já sabem desenhar.
+export type {
+  NotebookSectionId,
+  NotebookSectionMeta,
+  NotebookSectionState,
+  NotebookOptions,
+  NotebookPlotRow,
+  SeasonNotebookData,
+} from "./season-notebook/notebook-document";
+export {
+  NOTEBOOK_SECTION_IDS,
+  NOTEBOOK_SECTIONS,
+  DEFAULT_NOTEBOOK_SECTIONS,
+  DEFAULT_NOTES_PAGES,
+  MAX_NOTES_PAGES,
+  MIN_NOTES_PAGES,
+  resolveNotesPages,
+  normalizeNotebookSections,
+  notebookSectionAvailable,
+  resolvedNotebookSections,
+  buildSeasonNotebookHtml,
+  printSeasonNotebook,
+} from "./season-notebook/notebook-document";
+
 // ---- estoque -----------------------------------------------------------
 export type {
   StockExportItem,
   StockExportData,
+  StockSectionOptions,
 } from "./stock/stock-export";
 export {
   printStock,
   buildStockHtml,
   buildStockWhatsappMessage,
   downloadStockCsv,
+  stockSectionHtml,
 } from "./stock/stock-export";
 
 // ---- timing ------------------------------------------------------------

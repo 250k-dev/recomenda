@@ -12,6 +12,7 @@ import {
   headerHtml,
   htmlShell,
   printHtml,
+  sheetHtml,
 } from "../print/print-core";
 
 type PurchaseListItem = PurchaseListDetail["items"][number];
@@ -40,9 +41,16 @@ function formatVolume(it: PurchaseListItem): string {
   return `${fmtQty(it.quantity_to_buy)} ${unit}`;
 }
 
-const LIST_CSS = `
+/** CSS próprio da lista (o genérico vem do CORE_CSS). Exportado para documentos
+ *  compostos — o Caderno de Safra embute esta seção. */
+export const PURCHASE_LIST_CSS = `
   .area-note { display: block; font-size: 9.5px; color: #9a5a16; margin-top: 1px; }
 `;
+
+/** Suprime colunas de dinheiro mesmo quando o payload traz preço. */
+export interface PurchaseListSectionOptions {
+  showPrices?: boolean;
+}
 
 export interface PurchaseListPrintContext {
   producerName?: string | null;
@@ -53,7 +61,10 @@ function hasMoney(n: number | null | undefined): boolean {
   return n != null && Number.isFinite(Number(n)) && Number(n) > 0;
 }
 
-function summaryHtml(list: PurchaseListDetail): string {
+function summaryHtml(
+  list: PurchaseListDetail,
+  opts: PurchaseListSectionOptions = {},
+): string {
   const items: string[] = [];
   items.push(`
     <div class="summary-item">
@@ -73,14 +84,14 @@ function summaryHtml(list: PurchaseListDetail): string {
         <span class="summary-value">${fmtQty(summary.total_sacks)}</span>
       </div>`);
   }
-  if (summary && hasMoney(summary.grand_total_brl)) {
+  if (opts.showPrices !== false && summary && hasMoney(summary.grand_total_brl)) {
     items.push(`
       <div class="summary-item">
         <span class="summary-label">Custo total</span>
         <span class="summary-value">${fmtBrl(summary.grand_total_brl)}</span>
       </div>`);
   }
-  if (summary && hasMoney(summary.cost_per_ha_brl)) {
+  if (opts.showPrices !== false && summary && hasMoney(summary.cost_per_ha_brl)) {
     items.push(`
       <div class="summary-item">
         <span class="summary-label">Custo por ha</span>
@@ -90,14 +101,17 @@ function summaryHtml(list: PurchaseListDetail): string {
   return `<div class="summary">${items.join("")}</div>`;
 }
 
-function itemsTableHtml(list: PurchaseListDetail): string {
+function itemsTableHtml(
+  list: PurchaseListDetail,
+  opts: PurchaseListSectionOptions = {},
+): string {
   if (list.items.length === 0) {
     return `<p class="empty">Esta lista ainda não tem produtos.</p>`;
   }
   // Sem PRICE_VIEW o backend remove unit_price_brl/total_brl — PDF só com volume.
-  const showPrices = list.items.some(
-    (it) => hasMoney(it.unit_price_brl) || hasMoney(it.total_brl),
-  );
+  const showPrices =
+    opts.showPrices !== false &&
+    list.items.some((it) => hasMoney(it.unit_price_brl) || hasMoney(it.total_brl));
   const rows = list.items
     .map((it) => {
       // Produto aplicado em parte da área (ex.: 50% — "áreas sujas"): mostra o
@@ -153,6 +167,21 @@ function itemsTableHtml(list: PurchaseListDetail): string {
     </table>`;
 }
 
+/**
+ * Miolo da lista (resumo + tabela de produtos), sem cabeçalho/rodapé nem shell.
+ * O PDF da lista e o Caderno de Safra montam a mesma seção a partir daqui.
+ */
+export function purchaseListSectionHtml(
+  list: PurchaseListDetail,
+  opts: PurchaseListSectionOptions = {},
+): string {
+  return `${summaryHtml(list, opts)}
+    <section>
+      <h2 class="section-title">Produtos a comprar</h2>
+      ${itemsTableHtml(list, opts)}
+    </section>`;
+}
+
 function buildBody(list: PurchaseListDetail, ctx: PurchaseListPrintContext): string {
   const emittedAt = new Date().toLocaleDateString("pt-BR");
   const tags: string[] = [];
@@ -160,28 +189,28 @@ function buildBody(list: PurchaseListDetail, ctx: PurchaseListPrintContext): str
     tags.push(`<span>Produtor: ${escapeHtml(ctx.producerName)}</span>`);
   if (list.variety) tags.push(`<span>Variedade: ${escapeHtml(list.variety)}</span>`);
 
-  return `
-  <div class="doc">
-    ${headerHtml(emittedAt)}
+  return sheetHtml({
+    header: headerHtml(emittedAt, "Lista de compra"),
+    body: `
     <div class="title-block">
       <p class="kicker">Lista de compra</p>
       <h1 class="title">${escapeHtml(list.name)}</h1>
       ${tags.length ? `<div class="tags">${tags.join("")}</div>` : ""}
     </div>
-    ${summaryHtml(list)}
-    <section>
-      <h2 class="section-title">Produtos a comprar</h2>
-      ${itemsTableHtml(list)}
-    </section>
-    ${footerHtml(ctx.agronomistName)}
-  </div>`;
+    ${purchaseListSectionHtml(list)}`,
+    footer: footerHtml(ctx.agronomistName),
+  });
 }
 
 export function buildPurchaseListHtml(
   list: PurchaseListDetail,
   ctx: PurchaseListPrintContext = {},
 ): string {
-  return htmlShell(`Lista de compra - ${list.name}`, buildBody(list, ctx), LIST_CSS);
+  return htmlShell(
+    `Lista de compra - ${list.name}`,
+    buildBody(list, ctx),
+    PURCHASE_LIST_CSS,
+  );
 }
 
 export function printPurchaseList(

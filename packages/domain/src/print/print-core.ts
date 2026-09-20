@@ -38,7 +38,19 @@ export const CORE_CSS = `
     line-height: 1.5;
     padding: 0;
   }
-  .doc { max-width: 760px; margin: 0 auto; padding: 24px; }
+  .doc { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  /* Folha = tabela de uma coluna. É o único jeito de o cabeçalho repetir numa
+     seção que estoura a página: o navegador repete <thead>/<tfoot> em cada
+     página do fragmento, e não há equivalente para um <div>. O padding
+     vertical vive nas células justamente para repetir junto. */
+  .sheet { width: 100%; border-collapse: collapse; }
+  .sheet > thead > tr > td, .sheet > tbody > tr > td, .sheet > tfoot > tr > td { padding: 0; border: 0; vertical-align: top; }
+  /* padding-bottom no cabeçalho (e não margin-top no conteúdo): o conteúdo só
+     tem "topo" na 1ª página, então o respiro precisa vir da célula que repete. */
+  .sheet > thead > tr > td { padding-top: 24px; padding-bottom: 14px; }
+  .sheet > tfoot > tr > td { padding-bottom: 24px; }
+  .sheet > thead { display: table-header-group; }
+  .sheet > tfoot { display: table-footer-group; }
   .header {
     display: flex; align-items: center; justify-content: space-between;
     padding-bottom: 12px; border-bottom: 2px solid #2f6d3f;
@@ -61,6 +73,11 @@ export const CORE_CSS = `
   .data-table td { padding: 6px 8px; border-bottom: 1px solid #efeee8; color: #2b2b27; vertical-align: top; }
   .data-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .data-table tfoot td { font-weight: 700; border-top: 1px solid #e2e0d6; border-bottom: none; }
+  /* Linha de total: SÓ no fim da tabela. O padrão de <tfoot> é
+     table-footer-group, que o navegador repete em toda página — numa lista de
+     4 páginas o "Total estimado" aparecia em todas, como se fosse subtotal da
+     folha. Só o <thead> deve repetir. */
+  .data-table > tfoot { display: table-row-group; }
   .data-table .best { color: #2f6d3f; font-weight: 700; }
   .muted { color: #7a7a70; }
   .empty { font-size: 11px; color: #7a7a70; margin: 0; }
@@ -82,13 +99,42 @@ export function htmlShell(title: string, body: string, extraCss = ""): string {
 </html>`;
 }
 
-/** Cabeçalho padrão (logo Recomenda + data de emissão). */
-export function headerHtml(emittedAt: string): string {
+/**
+ * Cabeçalho padrão (logo Recomenda + data de emissão). `context` acrescenta o
+ * nome da seção — só vale a pena onde o cabeçalho se repete página a página
+ * (Caderno de Safra), para o leitor saber onde está no meio de uma tabela longa.
+ */
+export function headerHtml(emittedAt: string, context?: string | null): string {
+  const right = context
+    ? `${escapeHtml(context)} · Emitido em ${escapeHtml(emittedAt)}`
+    : `Emitido em ${escapeHtml(emittedAt)}`;
   return `
     <header class="header">
       <div class="brand">${LOGO_SVG}<span class="brand-name">Recomenda</span></div>
-      <span class="emitted">Emitido em ${escapeHtml(emittedAt)}</span>
+      <span class="emitted">${right}</span>
     </header>`;
+}
+
+/**
+ * Uma folha do documento. O cabeçalho e o rodapé entram em `<thead>`/`<tfoot>`
+ * para que o navegador os repita quando o conteúdo passa de uma página —
+ * antes, a 2ª página de uma lista longa saía sem cabeçalho nenhum.
+ */
+export function sheetHtml(opts: {
+  header: string;
+  body: string;
+  footer?: string;
+  /** Abre em folha nova (documentos com mais de uma folha). */
+  pageBreak?: boolean;
+}): string {
+  return `
+  <div class="doc"${opts.pageBreak ? ' style="page-break-before: always"' : ""}>
+    <table class="sheet">
+      <thead><tr><td>${opts.header}</td></tr></thead>
+      <tbody><tr><td>${opts.body}</td></tr></tbody>
+      ${opts.footer ? `<tfoot><tr><td>${opts.footer}</td></tr></tfoot>` : ""}
+    </table>
+  </div>`;
 }
 
 export function footerHtml(agronomistName?: string | null): string {

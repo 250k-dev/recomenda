@@ -15,6 +15,7 @@ import {
   headerHtml,
   htmlShell,
   printHtml,
+  sheetHtml,
 } from "../print/print-core";
 
 const TERM_LABEL: Record<QuotePaymentTerm, string> = {
@@ -185,9 +186,10 @@ function buildComparisonBody(
         </table>`
       : `<p class="empty">Sem cotações para exibir.</p>`;
 
-  return `
-  <div class="doc">
-    ${headerHtml(emittedAt)}
+  return sheetHtml({
+    header: headerHtml(emittedAt, "Comparação de cotações"),
+    footer: footerHtml(ctx.agronomistName),
+    body: `
     <div class="title-block">
       <p class="kicker">Comparação de cotações</p>
       <h1 class="title">${escapeHtml(ctx.listName || "Cotações das lojas")}</h1>
@@ -197,8 +199,8 @@ function buildComparisonBody(
       <h2 class="section-title">Preços por loja (${responses.length} ${responses.length === 1 ? "loja" : "lojas"})</h2>
       ${table}
     </section>
-    ${footerHtml(ctx.agronomistName)}
-  </div>`;
+`,
+  });
 }
 
 /** Documento "melhores preços": uma linha por produto com o menor preço, a(s)
@@ -255,9 +257,10 @@ function buildBestPricesBody(
         </table>`
       : `<p class="empty">Sem cotações para exibir.</p>`;
 
-  return `
-  <div class="doc">
-    ${headerHtml(emittedAt)}
+  return sheetHtml({
+    header: headerHtml(emittedAt, "Melhores preços das cotações"),
+    footer: footerHtml(ctx.agronomistName),
+    body: `
     <div class="title-block">
       <p class="kicker">Melhores preços das cotações</p>
       <h1 class="title">${escapeHtml(ctx.listName || "Cotações das lojas")}</h1>
@@ -267,8 +270,8 @@ function buildBestPricesBody(
       <h2 class="section-title">Melhor preço por produto (${responses.length} ${responses.length === 1 ? "loja consultada" : "lojas consultadas"})</h2>
       ${table}
     </section>
-    ${footerHtml(ctx.agronomistName)}
-  </div>`;
+`,
+  });
 }
 
 /** Preços por loja: uma seção por loja selecionada, com os preços dela
@@ -355,17 +358,18 @@ function buildStorePricesBody(
     })
     .join("");
 
-  return `
-  <div class="doc">
-    ${headerHtml(emittedAt)}
+  return sheetHtml({
+    header: headerHtml(emittedAt, "Preços por loja"),
+    footer: footerHtml(ctx.agronomistName),
+    body: `
     <div class="title-block">
       <p class="kicker">Preços por loja</p>
       <h1 class="title">${escapeHtml(ctx.listName || "Cotações das lojas")}</h1>
       ${titleTags(ctx, data.request?.payment_term)}
     </div>
     ${sections || `<p class="empty">Sem cotações para exibir.</p>`}
-    ${footerHtml(ctx.agronomistName)}
-  </div>`;
+`,
+  });
 }
 
 export function buildQuoteComparisonHtml(

@@ -12,15 +12,26 @@ import {
   useCyclePurchaseList,
   useMe,
   useProducer,
+  useProducerStock,
 } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import type { DocumentCover } from "@recomenda/domain/recommendations/print-document";
+import type {
+  NotebookPlotRow,
+  SeasonNotebookData,
+} from "@recomenda/domain/season-notebook/notebook-document";
+import type { StockExportItem } from "@recomenda/domain/stock/stock-export";
 import {
   FarmSeasonsExportDialog,
   type FarmExportItem,
 } from "@/components/domain/farm-seasons-export-dialog";
-import { CROP_LABELS, STATUS_LABELS, labelStatus } from "@recomenda/utils";
+import {
+  CROP_LABELS,
+  PRODUCT_CATEGORY_LABELS,
+  STATUS_LABELS,
+  labelStatus,
+} from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
 
@@ -43,8 +54,15 @@ export function CycleExportButton({
   const producerName = producer?.name ?? null;
   const { data: me } = useMe();
   const canViewPrices = useCan("PRICE_VIEW");
-  const { data: purchaseList } = useCyclePurchaseList(
-    canViewPrices ? cycleId : "",
+  // Sem PRICE_VIEW a lista vem sem preço, mas o Caderno de Safra precisa dela
+  // de qualquer forma (produtos, doses, volumes). A tela da safra já busca esta
+  // mesma query, então na prática sai do cache.
+  const { data: purchaseList } = useCyclePurchaseList(cycleId);
+  // Estoque é do galpão do produtor, não da safra: safra de arquivo (backfill)
+  // não o inclui — o retrato daquela safra é outro. Só busca com o modal aberto.
+  const includeStock = open && !cycle?.backfill;
+  const { data: stock, isLoading: loadingStock } = useProducerStock(
+    includeStock ? producerId : "",
   );
 
   const hasSchedule = (cycle?.seasons ?? []).some(
@@ -74,7 +92,9 @@ export function CycleExportButton({
     })),
   });
   const exportLoading =
-    loadingCycle || (open && timelineQueries.some((query) => query.isLoading));
+    loadingCycle ||
+    loadingStock ||
+    (open && timelineQueries.some((query) => query.isLoading));
 
   const items = useMemo<FarmExportItem[]>(() => {
     if (!cycle) return [];
@@ -159,6 +179,85 @@ export function CycleExportButton({
     };
   }, [cycle, producerName, seasons]);
 
+  const stockItems = useMemo<StockExportItem[]>(() => {
+    if (!includeStock) return [];
+    return (stock ?? []).map((item) => {
+      const price =
+        item.price_brl != null && Number.isFinite(Number(item.price_brl))
+          ? Number(item.price_brl)
+          : null;
+      const quantity = Number(item.quantity) || 0;
+      const category = item.category ?? "";
+      return {
+        product_name: item.product_name ?? "Produto",
+        category,
+        category_label:
+          PRODUCT_CATEGORY_LABELS[
+            category as keyof typeof PRODUCT_CATEGORY_LABELS
+          ] ?? category,
+        quantity,
+        dose_unit: item.dose_unit ?? "",
+        price_brl: price,
+        value_brl: price != null ? price * quantity : null,
+      };
+    });
+  }, [includeStock, stock]);
+
+  /** Talhão · material (variedade) · área — ordenado como o produtor lê. */
+  const notebookPlots = useMemo<NotebookPlotRow[]>(
+    () =>
+      seasons
+        .map((season) => ({
+          plotName: season.plot_name,
+          farmName: season.farm_name ?? null,
+          material:
+            (season.varieties ?? []).map((v) => v.variety).join(", ") ||
+            season.variety ||
+            null,
+          areaHa: season.plot_area_ha ?? null,
+        }))
+        .sort(
+          (a, b) =>
+            (a.farmName ?? "").localeCompare(b.farmName ?? "", "pt-BR") ||
+            a.plotName.localeCompare(b.plotName, "pt-BR", { numeric: true }),
+        ),
+    [seasons],
+  );
+
+  const notebook = useMemo<SeasonNotebookData | null>(() => {
+    if (!cycle) return null;
+    const farmNames = [
+      ...new Set(
+        seasons
+          .map((season) => season.farm_name)
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ];
+    return {
+      cycleName: cycle.name,
+      producerName,
+      agronomistName: me?.name ?? null,
+      farmNames: farmNames.length ? farmNames : cycle.farms.map((f) => f.name),
+      cropLabels: cycle.crops.map((crop) => CROP_LABELS[crop] ?? crop),
+      plots: notebookPlots,
+      purchaseList: purchaseList ?? null,
+      stockItems,
+      schedule: items.map((item) => item.data),
+      note: cycle.backfill
+        ? "Arquivo de safra: o estoque do galpão de hoje não entra neste caderno."
+        : null,
+    };
+  }, [
+    cycle,
+    items,
+    me?.name,
+    notebookPlots,
+    producerName,
+    purchaseList,
+    seasons,
+    stockItems,
+  ]);
+
   if (!hasSchedule) return null;
 
   return (
@@ -178,6 +277,12 @@ export function CycleExportButton({
         isLoading={exportLoading}
         items={items}
         cover={cover}
+        notebook={notebook}
+        notebookUnavailable={
+          cycle?.backfill
+            ? { stock: "Safra de arquivo: o estoque de hoje não é o desta safra." }
+            : undefined
+        }
       />
     </>
   );

@@ -11,13 +11,17 @@
     "codegen": "pnpm --filter @recomenda/api codegen"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.2.2",
     "@recomenda/api": "workspace:*",
     "@recomenda/api-hooks": "workspace:*",
     "@recomenda/config": "workspace:*",
     "@recomenda/domain": "workspace:*",
     "@recomenda/ui": "workspace:*",
     "@recomenda/utils": "workspace:*",
-    "@hookform/resolvers": "^5.2.2",
     "@tanstack/react-query": "^5.100.8",
     "axios": "^1.16.0",
     "date-fns": "^4.4.0",
