@@ -5,6 +5,7 @@ import { Logo } from "@recomenda/ui/assets/logo";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
+import { maskPhoneBR } from "@recomenda/utils";
 import { ZapLinkError } from "./zap-link-error";
 import { formatZapExpiry, type ZapLoadResult, type ZapProducerDto } from "./zap-types";
 
@@ -126,9 +127,11 @@ function ZapProducerForm({ token, initial }: { token: string; initial: ZapProduc
           <Label htmlFor="zap-producer-phone">Telefone (opcional)</Label>
           <Input
             id="zap-producer-phone"
+            inputMode="tel"
+            autoComplete="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="(66) 99999-0000"
+            onChange={(e) => setPhone(maskPhoneBR(e.target.value))}
+            placeholder="(00) 00000-0000"
           />
         </div>
 

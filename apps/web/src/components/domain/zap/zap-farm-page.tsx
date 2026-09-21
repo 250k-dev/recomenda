@@ -12,7 +12,7 @@ import {
 import { formatFarmLocation } from "@recomenda/utils";
 import { FarmLocationFields } from "@/components/domain/farm-location-fields";
 import { ZapLinkError } from "./zap-link-error";
-import type { ZapFarmDto, ZapLoadResult } from "./zap-types";
+import { formatZapExpiry, type ZapFarmDto, type ZapLoadResult } from "./zap-types";
 
 export function ZapFarmPage({
   token,
@@ -47,6 +47,8 @@ function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto })
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
 
+  const producerName =
+    initial.producers.find((p) => p.id === producerId)?.name || initial.producerName;
   const preenchidos = plots.filter((p) => p.name.trim().length > 0);
   const podeGravar =
     !busy &&
@@ -124,7 +126,8 @@ function ZapFarmForm({ token, initial }: { token: string; initial: ZapFarmDto })
           <div>
             <p className="font-display text-base font-bold text-text-strong">Nova fazenda</p>
             <p className="text-xs text-muted-foreground">
-              {initial.producerName ? initial.producerName : "Escolha o produtor"}
+              {producerName || "Escolha o produtor"}
+              {` · ${formatZapExpiry(initial.expiresAt)}`}
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
@@ -9,7 +9,15 @@ import {
   NativeSelectOption,
 } from "@recomenda/ui/primitives/native-select";
 import { TIMING_TRIGGER_TYPES } from "@/components/domain/timing/timing-stages-editor";
+import {
+  GLOBAL_PRODUCT_CATEGORIES,
+  PRODUCT_CATEGORY_LABELS,
+} from "@recomenda/utils";
 import type { ZapCatalogItem } from "./zap-types";
+
+const TIMING_CATEGORIES = GLOBAL_PRODUCT_CATEGORIES.filter(
+  (id) => id !== "SEED" && id !== "CULTIVAR_SOJA" && id !== "HIBRIDO_MILHO",
+);
 
 export type ZapDraftProduct = {
   key: string;
@@ -140,23 +148,22 @@ function ZapStageProducts({
   products: ZapDraftProduct[];
   onChange: (products: ZapDraftProduct[]) => void;
 }) {
+  const categoryFieldId = useId();
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
   const [hits, setHits] = useState<ZapCatalogItem[]>([]);
   const [busy, setBusy] = useState(false);
 
-  async function search(value: string) {
+  async function search(value: string, categoryId = category) {
     setQuery(value);
-    if (value.trim().length < 2 || !producerId) {
+    if (!producerId || !categoryId) {
       setHits([]);
       return;
     }
     setBusy(true);
     try {
-      const params = new URLSearchParams({
-        token,
-        q: value,
-        producerId,
-      });
+      const params = new URLSearchParams({ token, producerId, category: categoryId });
+      if (value.trim().length >= 2) params.set("q", value);
       const response = await fetch(`/api/v1/zap/catalog?${params.toString()}`);
       if (!response.ok) return;
       const json = (await response.json()) as { items: ZapCatalogItem[] };
@@ -196,10 +203,38 @@ function ZapStageProducts({
           </Button>
         </div>
       ))}
+      <div className="grid gap-1.5">
+        <Label htmlFor={categoryFieldId}>Categoria</Label>
+        <NativeSelect
+          id={categoryFieldId}
+          className="w-full"
+          value={category}
+          onChange={(e) => {
+            const next = e.target.value;
+            setCategory(next);
+            setHits([]);
+            if (next) void search(query, next);
+          }}
+        >
+          <NativeSelectOption value="">Escolha a categoria</NativeSelectOption>
+          {TIMING_CATEGORIES.map((id) => (
+            <NativeSelectOption key={id} value={id}>
+              {PRODUCT_CATEGORY_LABELS[id]}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </div>
       <Input
         value={query}
+        disabled={!category}
         onChange={(e) => void search(e.target.value)}
-        placeholder={busy ? "Buscando…" : "Buscar produto (2 letras)"}
+        placeholder={
+          !category
+            ? "Escolha a categoria primeiro"
+            : busy
+              ? "Buscando…"
+              : "Filtrar produto nesta categoria"
+        }
       />
       {hits.length > 0 ? (
         <ul className="grid max-h-40 gap-1 overflow-auto">
