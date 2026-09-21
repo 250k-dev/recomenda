@@ -72,6 +72,38 @@ function draftOf(item: ZapListItem): ItemDraft {
   };
 }
 
+function parseDecimal(raw: string): number {
+  return Number(String(raw).replace(",", ".").trim());
+}
+
+function treatedHectaresFor(areaPercent: string, totalHectares: number): number {
+  return areaFactorOf({ areaPercent }) * Math.max(0, Number(totalHectares) || 0);
+}
+
+/** Volume comercial implícito: dose × ha tratados × aplicações (igual ao web). */
+function volumeFromDose(dose: string, treatedHa: number, nAppsRaw: string): string {
+  const doseN = parseDecimal(dose);
+  const nApps = parseDecimal(nAppsRaw) || 1;
+  if (!(doseN > 0) || !(treatedHa > 0) || !(nApps > 0)) return "";
+  return String(Number((doseN * treatedHa * nApps).toFixed(4)));
+}
+
+function shownVolume(
+  volumeOverride: string,
+  dose: string,
+  treatedHa: number,
+  nApps: string,
+): string {
+  if (volumeOverride.trim() !== "") return volumeOverride;
+  return volumeFromDose(dose, treatedHa, nApps);
+}
+
+function doseFromVolumeInput(raw: string, treatedHa: number, nAppsRaw: string): string {
+  const vol = parseDecimal(raw);
+  const nApps = parseDecimal(nAppsRaw) || 1;
+  return vol > 0 ? doseFromCommercialVolume(vol, treatedHa, nApps) : "";
+}
+
 function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }) {
   const [data, setData] = useState(initial);
   const [query, setQuery] = useState("");
@@ -99,6 +131,8 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
       return true;
     }).map((id) => [id, PRODUCT_CATEGORY_LABELS[id]] as const);
   }, [data.list.crop]);
+
+  const addTreatedHa = treatedHectaresFor(addArea, data.list.totalHectares);
 
   const visible = data.list.items.filter((item) => {
     const q = query.trim().toLowerCase();
@@ -245,6 +279,10 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
             visible.map((item) => {
               const draft = draftFor(item);
               const seed = isSeedCategory(item.category);
+              const treatedHa = treatedHectaresFor(
+                draft.areaPercent,
+                data.list.totalHectares,
+              );
               return (
                 <li
                   key={item.id}
@@ -280,12 +318,27 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                             id={`napps-${item.id}`}
                             inputMode="numeric"
                             value={draft.nApplications}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const nApplications = e.target.value;
+                              const nextDose = draft.volume.trim()
+                                ? doseFromVolumeInput(
+                                    draft.volume,
+                                    treatedHectaresFor(
+                                      draft.areaPercent,
+                                      data.list.totalHectares,
+                                    ),
+                                    nApplications,
+                                  )
+                                : "";
                               setEditing((prev) => ({
                                 ...prev,
-                                [item.id]: { ...draft, nApplications: e.target.value },
-                              }))
-                            }
+                                [item.id]: {
+                                  ...draft,
+                                  nApplications,
+                                  ...(nextDose ? { dose: nextDose } : {}),
+                                },
+                              }));
+                            }}
                           />
                         </div>
                       </div>
@@ -331,7 +384,11 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                               onChange={(e) =>
                                 setEditing((prev) => ({
                                   ...prev,
-                                  [item.id]: { ...draft, dose: e.target.value, volume: "" },
+                                  [item.id]: {
+                                    ...draft,
+                                    dose: e.target.value,
+                                    volume: "",
+                                  },
                                 }))
                               }
                             />
@@ -341,22 +398,25 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                             <Input
                               id={`vol-${item.id}`}
                               inputMode="decimal"
-                              value={draft.volume}
+                              value={shownVolume(
+                                draft.volume,
+                                draft.dose,
+                                treatedHa,
+                                draft.nApplications,
+                              )}
                               onChange={(e) => {
                                 const raw = e.target.value;
-                                const vol = Number(raw.replace(",", "."));
-                                const ha =
-                                  areaFactorOf({ areaPercent: draft.areaPercent }) *
-                                  Math.max(0, data.list.totalHectares);
-                                const nApps = Number(draft.nApplications) || 1;
-                                const nextDose =
-                                  vol > 0 ? doseFromCommercialVolume(vol, ha, nApps) : draft.dose;
+                                const nextDose = doseFromVolumeInput(
+                                  raw,
+                                  treatedHa,
+                                  draft.nApplications,
+                                );
                                 setEditing((prev) => ({
                                   ...prev,
                                   [item.id]: {
                                     ...draft,
                                     volume: raw,
-                                    dose: nextDose || draft.dose,
+                                    ...(nextDose ? { dose: nextDose } : {}),
                                   },
                                 }));
                               }}
@@ -380,6 +440,11 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                               }
                             />
                           </div>
+                          {!(data.list.totalHectares > 0) ? (
+                            <p className="col-span-2 text-xs text-muted-foreground">
+                              Sem hectares na lista, volume e dose não se recalculam.
+                            </p>
+                          ) : null}
                         </div>
                       )}
                       <div className="flex flex-wrap gap-2">
@@ -532,7 +597,18 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                       id="zap-add-napps"
                       inputMode="numeric"
                       value={addNApps}
-                      onChange={(e) => setAddNApps(e.target.value)}
+                      onChange={(e) => {
+                        const nApps = e.target.value;
+                        setAddNApps(nApps);
+                        if (addVolume.trim()) {
+                          const next = doseFromVolumeInput(
+                            addVolume,
+                            addTreatedHa,
+                            nApps,
+                          );
+                          if (next) setAddDose(next);
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -555,19 +631,12 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                     <Input
                       id="zap-add-volume"
                       inputMode="decimal"
-                      value={addVolume}
+                      value={shownVolume(addVolume, addDose, addTreatedHa, addNApps)}
                       onChange={(e) => {
                         const raw = e.target.value;
                         setAddVolume(raw);
-                        const vol = Number(raw.replace(",", "."));
-                        const ha =
-                          areaFactorOf({ areaPercent: addArea }) *
-                          Math.max(0, data.list.totalHectares);
-                        const nApps = Number(addNApps) || 1;
-                        if (vol > 0) {
-                          const next = doseFromCommercialVolume(vol, ha, nApps);
-                          if (next) setAddDose(next);
-                        }
+                        const next = doseFromVolumeInput(raw, addTreatedHa, addNApps);
+                        if (next) setAddDose(next);
                       }}
                     />
                   </div>
@@ -577,10 +646,18 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                       id="zap-add-area"
                       inputMode="decimal"
                       value={addArea}
-                      onChange={(e) => setAddArea(e.target.value)}
+                      onChange={(e) => {
+                        setAddArea(e.target.value);
+                        setAddVolume("");
+                      }}
                     />
                   </div>
                 </div>
+                {!(data.list.totalHectares > 0) ? (
+                  <p className="text-xs text-muted-foreground">
+                    Sem hectares na lista, volume e dose não se recalculam.
+                  </p>
+                ) : null}
                 <Button
                   type="button"
                   disabled={busy || !addDose}
