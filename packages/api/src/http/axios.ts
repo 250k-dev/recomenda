@@ -13,6 +13,7 @@ type PendingRequest = {
 
 let isRefreshing = false;
 let pendingRequests: PendingRequest[] = [];
+let refreshInFlight: Promise<void> | null = null;
 
 function flushPendingRequests(error?: unknown) {
   pendingRequests.forEach((request) => {
@@ -25,7 +26,7 @@ function flushPendingRequests(error?: unknown) {
   pendingRequests = [];
 }
 
-async function refreshSession() {
+async function postRefresh(): Promise<void> {
   const response = await fetch("/api/auth/refresh", {
     method: "POST",
     credentials: "include",
@@ -34,6 +35,26 @@ async function refreshSession() {
   if (!response.ok) {
     throw new Error("Failed to refresh session");
   }
+}
+
+/** Uma renovação por aba; `navigator.locks` serializa entre abas do mesmo origin. */
+async function refreshSession() {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+      if (locks?.request) {
+        await locks.request("recomenda-auth-refresh", postRefresh);
+        return;
+      }
+      await postRefresh();
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
 }
 
 async function clearSessionAndRedirect() {

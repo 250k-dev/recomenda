@@ -13,6 +13,11 @@ type CookieStore = {
 
 const isProd = process.env.NODE_ENV === "production";
 
+/** Segundos. Manter igual a `JWT_ACCESS_TTL` no recomenda-server. */
+export const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 8;
+/** Segundos. Manter igual a `JWT_REFRESH_TTL` no recomenda-server. */
+export const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+
 const baseOptions = {
   httpOnly: true,
   secure: isProd,
@@ -26,15 +31,15 @@ export function setAuthCookies(
 ) {
   cookieStore.set("refresh_token", tokens.refresh_token, {
     ...baseOptions,
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: REFRESH_TOKEN_MAX_AGE_SECONDS,
   });
   cookieStore.set("access_token", tokens.access_token, {
     ...baseOptions,
-    maxAge: 60 * 60,
+    maxAge: ACCESS_TOKEN_MAX_AGE_SECONDS,
   });
   cookieStore.set("role", tokens.role, {
     ...baseOptions,
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: REFRESH_TOKEN_MAX_AGE_SECONDS,
   });
 }
 
@@ -47,12 +52,12 @@ export function clearAuthCookies(cookieStore: CookieStore) {
 export function setAccessCookie(cookieStore: CookieStore, accessToken: string, role?: string) {
   cookieStore.set("access_token", accessToken, {
     ...baseOptions,
-    maxAge: 60 * 60,
+    maxAge: ACCESS_TOKEN_MAX_AGE_SECONDS,
   });
   if (role) {
     cookieStore.set("role", role, {
       ...baseOptions,
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: REFRESH_TOKEN_MAX_AGE_SECONDS,
     });
   }
 }

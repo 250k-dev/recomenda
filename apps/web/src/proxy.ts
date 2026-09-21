@@ -125,11 +125,11 @@ export async function proxy(request: NextRequest) {
   // Não há o que renovar: derruba tudo.
   //
   // Token só EXPIRADO não entra aqui, e a distinção é load-bearing. O access
-  // vive 1h e o refresh 30 dias, mas quem renova é o interceptor de 401 do
-  // axios (`packages/api/src/http/axios.ts:70`), que só roda depois da página
+  // vive 8h e o refresh 30 dias, mas quem renova é o interceptor de 401 do
+  // axios (`packages/api/src/http/axios.ts`), que só roda depois da página
   // carregar — o proxy roda antes, em navegação. Se ele apagasse o
-  // refresh_token aqui, toda navegação feita após 1h de sessão viraria
-  // re-login, derrubando a sessão efetiva de 30 dias para 1 hora.
+  // refresh_token aqui, toda navegação feita após o access expirar viraria
+  // re-login, derrubando a sessão efetiva de 30 dias.
   // Com refresh_token no cookie, deixa passar e o XHR renova.
   const sessaoForjada = sessao.estado === "invalido";
   const expiradoSemRenovacao = sessao.estado === "expirado" && !refreshToken;
