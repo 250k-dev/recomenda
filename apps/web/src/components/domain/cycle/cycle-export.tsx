@@ -18,6 +18,7 @@ import { useCan } from "@recomenda/api-hooks/use-can";
 import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import type { DocumentCover } from "@recomenda/domain/recommendations/print-document";
 import type {
+  NotebookModelBlock,
   NotebookPlotRow,
   SeasonNotebookData,
 } from "@recomenda/domain/season-notebook/notebook-document";
@@ -34,6 +35,84 @@ import {
 } from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
+
+function byPlotName(a: string, b: string): number {
+  return a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" });
+}
+
+function stageKey(name: string): string {
+  return name.trim().toLocaleLowerCase("pt-BR");
+}
+
+/**
+ * Cada bloco da safra é um modelo (template salvo ou montado na hora) aplicado
+ * a um conjunto de talhões. O cronograma do talhão é o modelo: a timeline nem
+ * sempre traz o id, então o vínculo também sai pelo conjunto de etapas.
+ */
+function modelsFromCycle(
+  blocks: Array<{
+    timing_template_id: string;
+    template_name: string;
+    stage_names: string[];
+    plots?: Array<{ plot_name: string; farm_name: string }>;
+  }>,
+  items: FarmExportItem[],
+): NotebookModelBlock[] {
+  const owner = new Map<string, string>();
+  for (const item of items) {
+    let best: { id: string; score: number } | null = null;
+    const names = new Set(item.data.recommendations.map((rec) => stageKey(rec.name)));
+    for (const block of blocks) {
+      const byId = item.data.recommendations.some(
+        (rec) => rec.source_timing_template_id === block.timing_template_id,
+      );
+      let score = 0;
+      if (byId) {
+        score = 1_000_000;
+      } else if (names.size > 0 && block.stage_names.length > 0) {
+        const hit = block.stage_names.filter((name) => names.has(stageKey(name))).length;
+        if (hit === block.stage_names.length) {
+          score = hit * 1000 - Math.abs(names.size - block.stage_names.length);
+        }
+      }
+      if (score > 0 && (!best || score > best.score)) {
+        best = { id: block.timing_template_id, score };
+      }
+    }
+    if (best) owner.set(item.id, best.id);
+  }
+
+  return blocks.flatMap((block) => {
+    const members = items
+      .filter((item) => owner.get(item.id) === block.timing_template_id)
+      .sort((a, b) =>
+        byPlotName(a.data.plotName ?? a.label, b.data.plotName ?? b.label),
+      );
+    const fromBlock = (block.plots ?? []).map((plot) => ({
+      plotName: plot.plot_name,
+      farmName: plot.farm_name,
+    }));
+    const fromItems = members.map((item) => ({
+      plotName: item.data.plotName ?? item.label.replace(/^Talhão\s+/i, ""),
+      farmName: item.data.spec?.farmName ?? null,
+    }));
+    const plots = (fromBlock.length > 0 ? fromBlock : fromItems).sort((a, b) =>
+      byPlotName(a.plotName, b.plotName),
+    );
+    const source = members[0];
+    const all = source?.data.recommendations ?? [];
+    const wanted = new Set(block.stage_names.map(stageKey));
+    const byTemplate = all.filter(
+      (rec) => rec.source_timing_template_id === block.timing_template_id,
+    );
+    const byStage = all.filter((rec) => wanted.has(stageKey(rec.name)));
+    const recommendations = (byTemplate.length > 0 ? byTemplate : byStage)
+      .slice()
+      .sort((a, b) => a.order_index - b.order_index);
+    if (recommendations.length === 0 && plots.length === 0) return [];
+    return [{ name: block.template_name, plots, recommendations }];
+  });
+}
 
 /**
  * Exporta a safra aberta (PDF/WhatsApp), não a primeira da fazenda.
@@ -151,6 +230,14 @@ export function CycleExportButton({
     }, []);
   }, [cycle, me?.name, producerName, purchaseList, seasons, timelineQueries, unitPrices]);
 
+  const sortedItems = useMemo(
+    () =>
+      [...items].sort((a, b) =>
+        byPlotName(a.data.plotName ?? a.label, b.data.plotName ?? b.label),
+      ),
+    [items],
+  );
+
   const cover = useMemo<DocumentCover | null>(() => {
     if (!cycle) return null;
     const areaHa = seasons.reduce((sum, s) => sum + (s.plot_area_ha ?? 0), 0);
@@ -216,11 +303,7 @@ export function CycleExportButton({
             null,
           areaHa: season.plot_area_ha ?? null,
         }))
-        .sort(
-          (a, b) =>
-            (a.farmName ?? "").localeCompare(b.farmName ?? "", "pt-BR") ||
-            a.plotName.localeCompare(b.plotName, "pt-BR", { numeric: true }),
-        ),
+        .sort((a, b) => byPlotName(a.plotName, b.plotName)),
     [seasons],
   );
 
@@ -240,16 +323,17 @@ export function CycleExportButton({
       farmNames: farmNames.length ? farmNames : cycle.farms.map((f) => f.name),
       cropLabels: cycle.crops.map((crop) => CROP_LABELS[crop] ?? crop),
       plots: notebookPlots,
+      models: modelsFromCycle(cycle.blocks ?? [], sortedItems),
       purchaseList: purchaseList ?? null,
       stockItems,
-      schedule: items.map((item) => item.data),
+      schedule: sortedItems.map((item) => item.data),
       note: cycle.backfill
         ? "Arquivo de safra: o estoque do galpão de hoje não entra neste caderno."
         : null,
     };
   }, [
     cycle,
-    items,
+    sortedItems,
     me?.name,
     notebookPlots,
     producerName,
@@ -275,7 +359,7 @@ export function CycleExportButton({
         farmName={cycle?.name ?? null}
         contextLabel="SAFRA"
         isLoading={exportLoading}
-        items={items}
+        items={sortedItems}
         cover={cover}
         notebook={notebook}
         notebookUnavailable={

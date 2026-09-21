@@ -185,6 +185,7 @@ export type {
   NotebookSectionState,
   NotebookOptions,
   NotebookPlotRow,
+  NotebookModelBlock,
   SeasonNotebookData,
 } from "./season-notebook/notebook-document";
 export {

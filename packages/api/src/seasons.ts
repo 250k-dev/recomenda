@@ -72,6 +72,7 @@ export interface Recommendation {
   predicted_date_original: string | null;
   executed_date: string | null;
   notes: string | null;
+  source_timing_template_id?: string | null;
   window_start_days: number;
   window_end_days: number;
   items: RecommendationItem[];

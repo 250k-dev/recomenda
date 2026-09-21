@@ -55,6 +55,7 @@ const UNAVAILABLE_REASON: Partial<Record<NotebookSectionId, string>> = {
   "purchase-list": "Esta safra ainda não tem lista de compra com produtos.",
   stock: "O produtor não tem nada em estoque.",
   plots: "Nenhum talhão programado nesta safra.",
+  "recommendation-model": "Nenhum modelo de recomendação aplicado nesta safra.",
   schedule: "Nenhum talhão com cronograma.",
 };
 
@@ -203,6 +204,12 @@ export function SeasonNotebookPanel({
     if (id === "notes") return resolveNotesPages(pref.notesPages);
     if (id === "schedule" && pref.detailedSchedule) {
       return 1 + data.schedule.length;
+    }
+    if (id === "recommendation-model") {
+      return Math.max(
+        1,
+        data.models.filter((model) => model.recommendations.length > 0).length,
+      );
     }
     return 1;
   };

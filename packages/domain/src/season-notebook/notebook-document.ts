@@ -12,6 +12,7 @@
  * Cada seção começa em folha nova — ao encadernar, ninguém quer a lista de
  * compra terminando no meio da página do estoque.
  */
+import type { Recommendation } from "@recomenda/api";
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 import {
   escapeHtml,
@@ -28,6 +29,7 @@ import {
 } from "../purchase-list/purchase-list-print-document";
 import { displayRecStatus, fmtDate, recommendationStatusLabel } from "../recommendations/format";
 import {
+  buildModelPages,
   buildRecommendationPages,
   REC_CSS,
 } from "../recommendations/print-document";
@@ -47,6 +49,7 @@ export const NOTEBOOK_SECTION_IDS = [
   "purchase-list",
   "stock",
   "plots",
+  "recommendation-model",
   "schedule",
   "notes",
 ] as const;
@@ -88,6 +91,11 @@ export const NOTEBOOK_SECTIONS: Record<NotebookSectionId, NotebookSectionMeta> =
     id: "plots",
     label: "Talhões e hectares",
     description: "Talhão, material e área, com o total da safra.",
+  },
+  "recommendation-model": {
+    id: "recommendation-model",
+    label: "Modelo de recomendação",
+    description: "O modelo aplicado nesta safra, com as etapas.",
   },
   schedule: {
     id: "schedule",
@@ -163,6 +171,14 @@ export function normalizeNotebookSections(input: unknown): NotebookSectionState[
 
 // ---- dados -------------------------------------------------------------
 
+/** Um modelo de recomendação aplicado a um conjunto de talhões da safra. */
+export interface NotebookModelBlock {
+  name: string;
+  plots: Array<{ plotName: string; farmName: string | null }>;
+  /** Etapas do modelo aplicado (produtos, dose/ha, observação). */
+  recommendations: Recommendation[];
+}
+
 /** Linha da tabela de talhões: "Talhão 1 · M8210 · 30 ha". */
 export interface NotebookPlotRow {
   plotName: string;
@@ -180,6 +196,7 @@ export interface SeasonNotebookData {
   farmNames: string[];
   cropLabels: string[];
   plots: NotebookPlotRow[];
+  models: NotebookModelBlock[];
   purchaseList?: PurchaseListDetail | null;
   stockItems?: StockExportItem[] | null;
   /** Um bloco por talhão — o mesmo payload do PDF de recomendações. */
@@ -232,6 +249,10 @@ export function notebookSectionAvailable(
       return (data.stockItems?.length ?? 0) > 0;
     case "plots":
       return data.plots.length > 0;
+    case "recommendation-model":
+      return data.models.some(
+        (model) => model.recommendations.length > 0 && model.plots.length > 0,
+      );
     case "schedule":
       return data.schedule.length > 0;
     default:
@@ -259,6 +280,11 @@ const fmtArea = (value: number): string =>
 
 const plural = (n: number, one: string, many: string): string =>
   `${n} ${n === 1 ? one : many}`;
+
+/** Talhão TH 2 antes de TH 10, sem diferenciar maiúscula. */
+function byPlotName(a: string, b: string): number {
+  return a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" });
+}
 
 const STATUS_CLASS: Record<string, string> = {
   PENDING: "is-pending",
@@ -305,7 +331,7 @@ const NOTEBOOK_CSS = `
   .nb-cover-sub { margin: 22px 0 0; font-size: 17px; font-weight: 600; color: #ffffff; }
   .nb-cover-meta { margin: 5px 0 0; font-size: 14px; color: rgba(255,255,255,0.78); }
   .nb-cover-foot { font-size: 12px; color: rgba(255,255,255,0.72); }
-  .nb-note { margin: 16px 0 0; padding: 8px 12px; border-left: 3px solid #f0d4ab; background: #fdf0e3; font-size: 11px; color: #9a5a16; }
+  .nb-note { margin: 16px 0 0; padding: 8px 12px; background: #fdf0e3; font-size: 11px; color: #9a5a16; }
   .nb-toc { margin-top: 26px; }
   .nb-toc ol { margin: 0; padding: 0; list-style: none; counter-reset: nb-toc; }
   .nb-toc li { counter-increment: nb-toc; display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #efeee8; }
@@ -505,11 +531,25 @@ function stockPage(
   });
 }
 
+function modelsPage(data: SeasonNotebookData, pageBreak: boolean): string {
+  const printable = data.models.filter((model) => model.recommendations.length > 0);
+  return buildModelPages(
+    printable.map((model) => ({
+      name: model.name,
+      recommendations: model.recommendations,
+      producerName: data.producerName,
+      agronomistName: data.agronomistName,
+    })),
+    pageBreak,
+  );
+}
+
 function plotsPage(data: SeasonNotebookData, pageBreak: boolean): string {
   const multiFarm = data.farmNames.length > 1;
   const area = totalAreaHa(data);
+  const plots = [...data.plots].sort((a, b) => byPlotName(a.plotName, b.plotName));
 
-  const rows = data.plots
+  const rows = plots
     .map(
       (plot) => `
         <tr>
@@ -561,7 +601,10 @@ function schedulePages(
   options: NotebookOptions,
   pageBreak: boolean,
 ): string {
-  const blocks = data.schedule
+  const schedule = [...data.schedule].sort((a, b) =>
+    byPlotName(a.plotName ?? a.title, b.plotName ?? b.title),
+  );
+  const blocks = schedule
     .map((item) => {
       const meta: string[] = [];
       if (item.title) meta.push(escapeHtml(item.title));
@@ -625,7 +668,7 @@ function schedulePages(
   // virar uma página em branco no começo do caderno.
   return (
     summary +
-    buildRecommendationPages(data.schedule, { showPrices: options.showPrices })
+    buildRecommendationPages(schedule, { showPrices: options.showPrices })
   );
 }
 
@@ -676,6 +719,8 @@ export function buildSeasonNotebookHtml(
         return stockPage(data, options, pageBreak);
       case "plots":
         return plotsPage(data, pageBreak);
+      case "recommendation-model":
+        return modelsPage(data, pageBreak);
       case "schedule":
         return schedulePages(data, options, pageBreak);
       case "notes":

@@ -84,7 +84,7 @@ function SheetContent({ id }: { id: NotebookSectionId }) {
               <div key={i} className="h-px w-full bg-foreground/15" />
             ))}
           </div>
-        ) : id === "schedule" ? (
+        ) : id === "recommendation-model" || id === "schedule" ? (
           <div className="flex flex-col gap-[7px]">
             <div>
               <div className="mb-[3px] h-[4px] w-[30%] rounded-full bg-foreground/30" />

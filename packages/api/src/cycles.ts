@@ -81,6 +81,7 @@ export interface CycleBlock {
   timing_template_id: string;
   template_name: string;
   plots_count: number;
+  plots: Array<{ plot_name: string; farm_name: string }>;
   stage_names: string[];
 }
 

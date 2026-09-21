@@ -155,6 +155,7 @@ function productRowsHtml(rec: Recommendation, opts: RenderOpts): string {
   if (rec.items.length === 0) {
     return `<p class="empty">Nenhum produto vinculado a esta etapa.</p>`;
   }
+  const showQuantity = opts.quantity !== false;
   const rows = sortRecommendationItemsByMixOrder(rec.items)
     .map((item) => {
       const cost = itemCostPerHa(item, opts.prices);
@@ -171,7 +172,7 @@ function productRowsHtml(rec: Recommendation, opts: RenderOpts): string {
               : ""
           }
           <td class="num">${item.dose_per_hectare} ${escapeHtml(item.dose_unit)}</td>
-          <td class="num">${fmtQty(item.total_quantity, item.dose_unit)}</td>
+          ${showQuantity ? `<td class="num">${fmtQty(item.total_quantity, item.dose_unit)}</td>` : ""}
           ${opts.money ? `<td class="num">${cost == null ? EM_DASH : fmtBrl(cost)}</td>` : ""}
         </tr>`;
     })
@@ -195,7 +196,9 @@ function productRowsHtml(rec: Recommendation, opts: RenderOpts): string {
           opts.registry
             ? `<th class="firm">Empresa</th><th class="num">Registro</th>`
             : ""
-        }<th class="num">Dose/ha</th><th class="num">Quantidade total</th>${
+        }<th class="num">Dose/ha</th>${
+          opts.quantity !== false ? `<th class="num">Quantidade total</th>` : ""
+        }${
           opts.money ? `<th class="num">Custo/ha</th>` : ""
         }</tr>
       </thead>
@@ -205,13 +208,14 @@ function productRowsHtml(rec: Recommendation, opts: RenderOpts): string {
 }
 
 function stageHtml(rec: Recommendation, index: number, opts: RenderOpts): string {
+  const showMeta = opts.stageMeta !== false;
   const status = displayRecStatus(rec);
   const statusClass = STATUS_CLASS[status] ?? "is-pending";
   const dates: string[] = [];
-  if (rec.predicted_date_current) {
+  if (showMeta && rec.predicted_date_current) {
     dates.push(`Previsto: ${escapeHtml(fmtDate(rec.predicted_date_current))}`);
   }
-  if (rec.executed_date) {
+  if (showMeta && rec.executed_date) {
     dates.push(`Aplicado: ${escapeHtml(fmtDate(rec.executed_date))}`);
   }
   return `
@@ -219,7 +223,11 @@ function stageHtml(rec: Recommendation, index: number, opts: RenderOpts): string
       <div class="stage-head">
         <span class="stage-num">${index + 1}</span>
         <span class="stage-name">${escapeHtml(rec.name)}</span>
-        <span class="status ${statusClass}">${escapeHtml(recommendationStatusLabel(rec))}</span>
+        ${
+          showMeta
+            ? `<span class="status ${statusClass}">${escapeHtml(recommendationStatusLabel(rec))}</span>`
+            : ""
+        }
       </div>
       ${dates.length ? `<div class="stage-dates">${dates.map((d) => `<span>${d}</span>`).join("")}</div>` : ""}
       ${productRowsHtml(rec, opts)}
@@ -325,6 +333,13 @@ interface RenderOpts {
   /** Renderiza Empresa e Registro (MAPA). */
   registry: boolean;
   prices?: Record<string, number>;
+  /**
+   * Quantidade total (dose × área do talhão). O modelo não tem talhão:
+   * a coluna sai só na recomendação aplicada.
+   */
+  quantity?: boolean;
+  /** Status, previsto e aplicado — execução do talhão, não do modelo. */
+  stageMeta?: boolean;
 }
 
 /** CSS específico da recomendação (etapas/produtos/status/ficha). O genérico
@@ -624,6 +639,65 @@ export function buildRecommendationsHtml(
     .map((data, index) => buildDocBody(data, Boolean(cover) || index > 0, opts))
     .join("");
   return htmlShell(title, cover + bodies, REC_CSS);
+}
+
+/** Modelo aplicado na safra, no mesmo miolo do PDF do talhão, sem a ficha dele. */
+export interface ModelPrintData {
+  name: string;
+  recommendations: Recommendation[];
+  producerName?: string | null;
+  agronomistName?: string | null;
+}
+
+/**
+ * Folhas do modelo: cronograma (etapa, produtos, dose/ha, observação).
+ * Sem ficha, plantio, status, datas e quantidade total — isso é do talhão.
+ */
+export function buildModelPages(models: ModelPrintData[], pageBreak = false): string {
+  const kicker =
+    models.length > 1 ? "Modelos aplicados na safra" : "Modelo aplicado na safra";
+  return models
+    .map((model, index) => {
+      const registry = model.recommendations.some((rec) =>
+        rec.items.some((item) => item.manufacturer || item.mapa_registration),
+      );
+      const opts: RenderOpts = {
+        money: false,
+        registry,
+        quantity: false,
+        stageMeta: false,
+      };
+      const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
+      const tags: string[] = [];
+      if (model.producerName) tags.push(`Produtor: ${model.producerName}`);
+      const stages =
+        model.recommendations.length > 0
+          ? model.recommendations
+              .map((rec, stageIndex) => stageHtml(rec, stageIndex, opts))
+              .join("")
+          : `<p class="empty" style="margin-left:0">Este modelo não tem etapas.</p>`;
+
+      return sheetHtml({
+        pageBreak: pageBreak || index > 0,
+        header: headerHtml(emittedAt, model.name),
+        footer: footerHtml(model.agronomistName),
+        body: `
+        <div class="title-block">
+          <p class="kicker">${escapeHtml(kicker)}</p>
+          <h1 class="title">${escapeHtml(model.name)}</h1>
+          ${
+            tags.length
+              ? `<div class="tags">${tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>`
+              : ""
+          }
+        </div>
+        <section>
+          <h2 class="section-title">Cronograma de aplicações</h2>
+          ${stages}
+        </section>`,
+      });
+    })
+    .join("");
 }
 
 /**
