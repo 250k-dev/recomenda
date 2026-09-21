@@ -19,6 +19,7 @@ export type ZapListItem = {
   thousandPlants: number | null;
   seedingArea: number | null;
   bagsOverride: number | null;
+  volumeOverride: number | null;
   totalBrl: number;
 };
 
@@ -27,6 +28,7 @@ export type ZapListDto = {
   canWrite: boolean;
   showPrices: boolean;
   expiresAt: number;
+  producerName?: string;
   list: {
     id: string;
     name: string;

@@ -323,7 +323,7 @@ function ZapSeasonWizard({
 
         {step === "place" ? (
           <>
-            {data.producers.length > 1 || !producerId ? (
+            {data.producers.length > 1 && !producerId ? (
               <div className="grid gap-1.5">
                 <Label htmlFor="zap-producer">Produtor</Label>
                 <NativeSelect

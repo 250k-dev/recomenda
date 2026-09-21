@@ -9,6 +9,11 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@recomenda/ui/primitives/native-select";
+import { areaFactorOf, doseFromCommercialVolume } from "@recomenda/domain";
+import {
+  GLOBAL_PRODUCT_CATEGORIES,
+  PRODUCT_CATEGORY_LABELS,
+} from "@recomenda/utils";
 import { ZapLinkError } from "./zap-link-error";
 import {
   formatZapExpiry,
@@ -52,6 +57,7 @@ type ItemDraft = {
   areaPercent: string;
   seedsPerMeter: string;
   bagsOverride: string;
+  volume: string;
 };
 
 function draftOf(item: ZapListItem): ItemDraft {
@@ -62,6 +68,7 @@ function draftOf(item: ZapListItem): ItemDraft {
     areaPercent: String(item.areaPercent || 100),
     seedsPerMeter: item.seedsPerMeter != null ? String(item.seedsPerMeter) : "",
     bagsOverride: item.bagsOverride != null ? String(item.bagsOverride) : "",
+    volume: item.volumeOverride != null ? String(item.volumeOverride) : "",
   };
 }
 
@@ -78,16 +85,20 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
   const [addStage, setAddStage] = useState("Avulso");
   const [addNApps, setAddNApps] = useState("1");
   const [addArea, setAddArea] = useState("100");
+  const [addVolume, setAddVolume] = useState("");
+  const [addCategory, setAddCategory] = useState("");
   const [editing, setEditing] = useState<Record<string, ItemDraft>>({});
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const categories = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const item of data.list.items) {
-      map.set(item.category, item.categoryLabel || item.category);
-    }
-    return [...map.entries()];
-  }, [data.list.items]);
+    const crop = data.list.crop;
+    return GLOBAL_PRODUCT_CATEGORIES.filter((id) => {
+      if (id === "SEED") return false;
+      if (id === "CULTIVAR_SOJA") return crop === "SOYBEAN" || crop === "ANY";
+      if (id === "HIBRIDO_MILHO") return crop === "CORN" || crop === "ANY";
+      return true;
+    }).map((id) => [id, PRODUCT_CATEGORY_LABELS[id]] as const);
+  }, [data.list.crop]);
 
   const visible = data.list.items.filter((item) => {
     const q = query.trim().toLowerCase();
@@ -130,6 +141,7 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
       setAddStage("Avulso");
       setAddNApps("1");
       setAddArea("100");
+      setAddVolume("");
       setHits([]);
       setAddQuery("");
       setConfirmRemove(null);
@@ -141,15 +153,16 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
     }
   }
 
-  async function searchCatalog(value: string) {
+  async function searchCatalog(value: string, categoryId = addCategory) {
     setAddQuery(value);
-    if (value.trim().length < 2) {
+    const params = new URLSearchParams({ token });
+    if (value.trim().length >= 2) params.set("q", value);
+    if (categoryId) params.set("category", categoryId);
+    if (value.trim().length < 2 && !categoryId) {
       setHits([]);
       return;
     }
-    const response = await fetch(
-      `/api/v1/zap/catalog?token=${encodeURIComponent(token)}&q=${encodeURIComponent(value)}`,
-    );
+    const response = await fetch(`/api/v1/zap/catalog?${params.toString()}`);
     if (!response.ok) return;
     const json = (await response.json()) as { items: ZapCatalogItem[] };
     setHits(json.items ?? []);
@@ -167,6 +180,7 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
               {data.list.name}
             </p>
             <p className="text-xs text-muted-foreground">
+              {data.producerName ? `${data.producerName} · ` : ""}
               {data.list.cropLabel ?? data.list.crop}
               {data.list.totalHectares ? ` · ${data.list.totalHectares} ha` : ""}
               {data.showPrices && data.list.costPerHaBrl
@@ -196,7 +210,7 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
 
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="zap-list-search">Buscar produto</Label>
+            <Label htmlFor="zap-list-search">Filtrar nesta lista</Label>
             <Input
               id="zap-list-search"
               value={query}
@@ -317,9 +331,35 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                               onChange={(e) =>
                                 setEditing((prev) => ({
                                   ...prev,
-                                  [item.id]: { ...draft, dose: e.target.value },
+                                  [item.id]: { ...draft, dose: e.target.value, volume: "" },
                                 }))
                               }
+                            />
+                          </div>
+                          <div className="grid gap-1">
+                            <Label htmlFor={`vol-${item.id}`}>Volume</Label>
+                            <Input
+                              id={`vol-${item.id}`}
+                              inputMode="decimal"
+                              value={draft.volume}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const vol = Number(raw.replace(",", "."));
+                                const ha =
+                                  areaFactorOf({ areaPercent: draft.areaPercent }) *
+                                  Math.max(0, data.list.totalHectares);
+                                const nApps = Number(draft.nApplications) || 1;
+                                const nextDose =
+                                  vol > 0 ? doseFromCommercialVolume(vol, ha, nApps) : draft.dose;
+                                setEditing((prev) => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    ...draft,
+                                    volume: raw,
+                                    dose: nextDose || draft.dose,
+                                  },
+                                }));
+                              }}
                             />
                           </div>
                           <div className="grid gap-1">
@@ -331,7 +371,11 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                               onChange={(e) =>
                                 setEditing((prev) => ({
                                   ...prev,
-                                  [item.id]: { ...draft, areaPercent: e.target.value },
+                                  [item.id]: {
+                                    ...draft,
+                                    areaPercent: e.target.value,
+                                    volume: "",
+                                  },
                                 }))
                               }
                             />
@@ -353,6 +397,11 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                                 nApplications: Number(draft.nApplications),
                                 stage: draft.stage,
                                 areaPercent: Number(draft.areaPercent.replace(",", ".")),
+                                volumeOverride: seed
+                                  ? undefined
+                                  : draft.volume.trim()
+                                    ? Number(draft.volume.replace(",", "."))
+                                    : null,
                                 seedsPerMeter: seed
                                   ? Number(draft.seedsPerMeter.replace(",", ".")) || null
                                   : undefined,
@@ -412,7 +461,28 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
               Adicionar produto
             </h2>
             <div className="grid gap-1.5">
-              <Label htmlFor="zap-add-search">Catálogo</Label>
+              <Label htmlFor="zap-add-category">Categoria</Label>
+              <NativeSelect
+                id="zap-add-category"
+                className="w-full"
+                value={addCategory}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setAddCategory(next);
+                  setPicked(null);
+                  void searchCatalog(addQuery, next);
+                }}
+              >
+                <NativeSelectOption value="">Escolha a categoria</NativeSelectOption>
+                {categories.map(([id, label]) => (
+                  <NativeSelectOption key={id} value={id}>
+                    {label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="zap-add-search">Produto</Label>
               <Input
                 id="zap-add-search"
                 value={addQuery}
@@ -473,8 +543,32 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                       id="zap-add-dose"
                       inputMode="decimal"
                       value={addDose}
-                      onChange={(e) => setAddDose(e.target.value)}
+                      onChange={(e) => {
+                        setAddDose(e.target.value);
+                        setAddVolume("");
+                      }}
                       placeholder={`Em ${picked.doseUnit}`}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="zap-add-volume">Volume</Label>
+                    <Input
+                      id="zap-add-volume"
+                      inputMode="decimal"
+                      value={addVolume}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setAddVolume(raw);
+                        const vol = Number(raw.replace(",", "."));
+                        const ha =
+                          areaFactorOf({ areaPercent: addArea }) *
+                          Math.max(0, data.list.totalHectares);
+                        const nApps = Number(addNApps) || 1;
+                        if (vol > 0) {
+                          const next = doseFromCommercialVolume(vol, ha, nApps);
+                          if (next) setAddDose(next);
+                        }
+                      }}
                     />
                   </div>
                   <div className="grid gap-1.5">
@@ -499,6 +593,9 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
                       stage: addStage.trim() || "Avulso",
                       nApplications: Number(addNApps) || 1,
                       areaPercent: Number(addArea.replace(",", ".")) || 100,
+                      volumeOverride: addVolume.trim()
+                        ? Number(addVolume.replace(",", "."))
+                        : null,
                     })
                   }
                 >
