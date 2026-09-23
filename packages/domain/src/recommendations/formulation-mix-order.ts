@@ -184,6 +184,22 @@ export function normalizeFormulationMixOrder(
   return next;
 }
 
+export function countProductsOffFormulationOrder<
+  T extends { equivalence_group?: string | null; order_index?: number },
+>(items: T[], customOrder?: FormulationKey[] | null): number {
+  if (items.length < 2) return 0;
+  const ranked = items.map((item, index) => ({
+    index,
+    manual: item.order_index ?? index,
+    score: formulationMixScore(item.equivalence_group, customOrder),
+  }));
+  const manual = [...ranked].sort((a, b) => a.manual - b.manual || a.index - b.index);
+  const formulated = [...ranked].sort(
+    (a, b) => a.score - b.score || a.manual - b.manual || a.index - b.index,
+  );
+  return manual.filter((row, index) => row.index !== formulated[index]?.index).length;
+}
+
 export function formulationOptionLabel(key: FormulationKey): string {
   return OPTION_BY_KEY.get(key)?.label ?? key;
 }

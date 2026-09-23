@@ -243,7 +243,7 @@ export function ProducerCyclesSection({
                         variant="ghost"
                         size="icon"
                         className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        aria-label={`Excluir safra ${cycle.name}`}
+                        aria-label={`Arquivar safra ${cycle.name}`}
                         onClick={() => setPendingDelete(cycle)}
                       >
                         <Trash2 className="size-4" />
@@ -308,26 +308,26 @@ export function ProducerCyclesSection({
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title={
           pendingDelete
-            ? `Excluir a safra "${pendingDelete.name}"?`
-            : "Excluir safra?"
+            ? `Arquivar a safra "${pendingDelete.name}"?`
+            : "Arquivar safra?"
         }
         description={
           pendingDelete ? (
             <CycleDeleteDescription cycle={pendingDelete} />
           ) : undefined
         }
-        confirmLabel="Excluir safra"
+        confirmLabel="Arquivar safra"
         tone="destructive"
         loading={deleteCycle.isPending}
         onConfirm={async () => {
           if (!pendingDelete) return;
           try {
             await deleteCycle.mutateAsync(pendingDelete.id);
-            toast.success("Safra excluída.");
+            toast.success("Safra arquivada.");
             setPendingDelete(null);
           } catch (e) {
             toast.error(
-              extractError(e) || "Não foi possível excluir a safra.",
+              extractError(e) || "Não foi possível arquivar a safra.",
             );
           }
         }}
@@ -339,37 +339,25 @@ export function ProducerCyclesSection({
 function CycleDeleteDescription({ cycle }: { cycle: CycleSummary }) {
   const hasRecommendations = cycle.recommendations_total > 0;
   const hasPurchaseList = Boolean(cycle.purchase_list_id);
-  const hasLinkedData = hasRecommendations || hasPurchaseList;
-
-  if (!hasLinkedData) {
-    return (
-      <>
-        A safra será removida da carteira. Esta ação não pode ser desfeita.
-      </>
-    );
-  }
-
   const parts: string[] = [];
   if (hasRecommendations) {
     parts.push(
       `${cycle.recommendations_total} ${
-        cycle.recommendations_total === 1
-          ? "recomendação"
-          : "recomendações"
+        cycle.recommendations_total === 1 ? "recomendação" : "recomendações"
       }`,
     );
   }
-  if (hasPurchaseList) {
-    parts.push("a lista de compra vinculada");
-  }
+  if (hasPurchaseList) parts.push("a lista de compra");
 
   return (
     <>
-      Esta safra possui {parts.join(" e ")}. Ao confirmar,{" "}
-      <strong className="font-semibold text-foreground">
-        tudo será excluído
-      </strong>{" "}
-      junto com a programação dos talhões. Esta ação não pode ser desfeita.
+      A safra sai da carteira e fica em Safras arquivadas, só para consulta.
+      {parts.length > 0 ? (
+        <>
+          {" "}
+          {parts.join(" e ")} continuam na prévia, sem edição.
+        </>
+      ) : null}
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Archive, Leaf } from "lucide-react";
@@ -14,6 +14,7 @@ import { CROP_LABELS } from "@recomenda/utils";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Card, CardContent } from "@recomenda/ui/primitives/card";
+import { ArchivedCyclePreview } from "@/components/domain/archived-cycle-preview";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 
 const fmtHa = (n: number) =>
@@ -55,6 +56,8 @@ export default function ProducerArchivedSeasonsPage() {
     () => cycles.filter((c) => c.status === "ARCHIVED"),
     [cycles],
   );
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const preview = archived.find((cycle) => cycle.id === previewId) ?? null;
 
   const producerHref = routes.produtores.detalhe(producerId);
 
@@ -104,10 +107,14 @@ export default function ProducerArchivedSeasonsPage() {
             return (
               <Card
                 key={cycle.id}
-                className="gap-0 overflow-hidden p-0 transition-all hover:border-border"
+                className="gap-0 overflow-hidden p-0 transition-all hover:border-primary/30"
               >
                 <CardContent className="p-0">
-                  <div className="flex w-full items-center gap-3.5 px-4 py-4">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3.5 px-4 py-4 text-left"
+                    onClick={() => setPreviewId(cycle.id)}
+                  >
                     <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                       <Leaf className="size-5" />
                     </span>
@@ -133,13 +140,22 @@ export default function ProducerArchivedSeasonsPage() {
                         </span>
                       </span>
                     ) : null}
-                  </div>
+                  </button>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+      <ArchivedCyclePreview
+        open={preview != null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewId(null);
+        }}
+        producerId={producerId}
+        cycleId={preview?.id ?? null}
+        cycleName={preview?.name ?? "Safra arquivada"}
+      />
     </div>
   );
 }

@@ -609,11 +609,16 @@ export function SeasonRecommendationsView({
             onClose={() => setAddingStage(false)}
           />
         ) : null}
-        <SeasonMixOrderDialog
+      <SeasonMixOrderDialog
           open={mixOrderOpen}
           onOpenChange={setMixOrderOpen}
           seasonId={seasonId}
           currentOrder={mixFormulationOrder}
+          manualCount={recommendations.reduce(
+            (sum, rec) =>
+              sum + rec.items.filter((item) => item.mix_order_override != null).length,
+            0,
+          )}
         />
         <EditSeasonCropDialog
           open={cropEditOpen}
@@ -800,6 +805,11 @@ export function SeasonRecommendationsView({
         onOpenChange={setMixOrderOpen}
         seasonId={seasonId}
         currentOrder={mixFormulationOrder}
+        manualCount={recommendations.reduce(
+          (sum, rec) =>
+            sum + rec.items.filter((item) => item.mix_order_override != null).length,
+          0,
+        )}
       />
       <EditSeasonCropDialog
         open={cropEditOpen}

@@ -10,6 +10,7 @@ export interface MixTemplateItem {
   /** Categoria do produto, derivada no servidor (não depende do catálogo local paginado). */
   category?: string | null;
   order_index?: number;
+  equivalence_group?: string | null;
 }
 
 export interface TimingStage {

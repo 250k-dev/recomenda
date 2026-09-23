@@ -13,7 +13,7 @@ import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Select } from "@recomenda/ui/forms/select";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
-import { useConsultants, useFarmTeamAll, useWalletActivity } from "@recomenda/api-hooks";
+import { useConsultants, useFarmTeamAll, useMemberships, useWalletActivity } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import type { WalletActivityQuery } from "@recomenda/api/consultants";
 import { cn } from "@recomenda/utils";
@@ -115,6 +115,7 @@ export function TeamAuditTrail() {
 
   const { data: team } = useConsultants(canManage);
   const { data: farmTeam } = useFarmTeamAll(canViewAudit);
+  const { data: memberships } = useMemberships();
 
   const peopleOptions = useMemo(() => {
     const carteira = [...(team?.managers ?? []), ...(team?.assistants ?? [])].map(
@@ -127,8 +128,12 @@ export function TeamAuditTrail() {
       value: m.user_id,
       label: `${m.name}${m.access_level === "FARM_MANAGER" ? " · Gerente" : " · Operador"}`,
     }));
+    const agronomists = (memberships?.memberships ?? []).map((m) => ({
+      value: m.agronomist_id,
+      label: `${m.agronomist_name} · Agrônomo`,
+    }));
     const seen = new Set<string>();
-    const rows = [...carteira, ...farm].filter((r) => {
+    const rows = [...carteira, ...farm, ...agronomists].filter((r) => {
       if (seen.has(r.value)) return false;
       seen.add(r.value);
       return true;
@@ -137,7 +142,7 @@ export function TeamAuditTrail() {
       { value: "all", label: "Todas as pessoas" },
       ...rows.sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
     ];
-  }, [team, farmTeam]);
+  }, [team, farmTeam, memberships]);
 
   const query: WalletActivityQuery = useMemo(() => {
     const entityOpt = CATEGORY_OPTIONS.find((c) => c.value === category);

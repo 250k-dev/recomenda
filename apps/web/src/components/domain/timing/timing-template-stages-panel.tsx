@@ -30,6 +30,7 @@ import { applyStageProductsPlan } from "@/components/domain/timing/apply-stage-p
 import { MixFormulationOrderDialog } from "@/components/domain/season/season-mix-order-dialog";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
+import { countProductsOffFormulationOrder } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@recomenda/domain/timing/window-days";
 import {
   readLocalDraft,
@@ -145,6 +146,38 @@ export function TimingTemplateStagesPanel({
   const fingerprint = useMemo(() => serverFingerprint(sortedStages), [sortedStages]);
 
   const [editorStages, setEditorStages] = useState<TimingStageField[]>([]);
+  const manualMixCount = useMemo(() => {
+    const groupById = new Map(
+      catalogProducts.map((product) => {
+        const raw = (product as { equivalence_group?: unknown }).equivalence_group;
+        const group = typeof raw === "string" ? raw : null;
+        return [product.id, group] as const;
+      }),
+    );
+    const fromEditor = editorStages.reduce((sum, stage) => {
+      const items = stage.products
+        .filter((product) => product.productId)
+        .map((product, index) => ({
+          order_index: index,
+          equivalence_group: groupById.get(product.productId) ?? null,
+        }));
+      return sum + countProductsOffFormulationOrder(
+        items,
+        template.mix_formulation_order as FormulationKey[] | null | undefined,
+      );
+    }, 0);
+    if (editorStages.length > 0) return fromEditor;
+    return (template.stages ?? []).reduce((sum, stage) => {
+      const items = (stage.mix_items ?? []).map((item) => ({
+        order_index: item.order_index,
+        equivalence_group: item.equivalence_group ?? groupById.get(item.local_product_id) ?? null,
+      }));
+      return sum + countProductsOffFormulationOrder(
+        items,
+        template.mix_formulation_order as FormulationKey[] | null | undefined,
+      );
+    }, 0);
+  }, [catalogProducts, editorStages, template.mix_formulation_order, template.stages]);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const hydratedSignatureRef = useRef<string | null>(null);
@@ -390,6 +423,7 @@ export function TimingTemplateStagesPanel({
       onOpenChange={setMixOrderOpen}
       currentOrder={template.mix_formulation_order as FormulationKey[] | null | undefined}
       isPending={updateTemplate.isPending}
+      manualCount={manualMixCount}
       description="Padrão oficial por tipo de formulação (SG, WP, SC, EC, SL…). Arraste para personalizar neste modelo. Ao aplicar em um talhão sem ordem própria, essa ordem vai junto."
       onSave={(order) => {
         updateTemplate.mutate(

@@ -38,6 +38,7 @@ export function MixFormulationOrderDialog({
   onSave,
   isPending = false,
   description = "Padrão oficial por tipo de formulação (SG, WP, SC, EC, SL…). Arraste para personalizar. PDF e WhatsApp usam essa ordem.",
+  manualCount = 0,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +46,8 @@ export function MixFormulationOrderDialog({
   onSave: (order: FormulationKey[]) => void;
   isPending?: boolean;
   description?: string;
+  /** Produtos já ordenados na mão. Salvar a ordem de mistura pede confirmação. */
+  manualCount?: number;
 }) {
   const [order, setOrder] = useState<FormulationKey[]>(
     () =>
@@ -53,6 +56,7 @@ export function MixFormulationOrderDialog({
       ],
   );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -61,6 +65,7 @@ export function MixFormulationOrderDialog({
         ...DEFAULT_FORMULATION_MIX_ORDER,
       ],
     );
+    setConfirming(false);
   }, [open, currentOrder]);
 
   const moveItem = (from: number, to: number) => {
@@ -83,6 +88,26 @@ export function MixFormulationOrderDialog({
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
+        {confirming ? (
+          <div className="space-y-4 px-6 pb-6">
+            <p className="text-sm text-foreground">
+              {manualCount}{" "}
+              {manualCount === 1
+                ? "produto ordenado manualmente será reordenado"
+                : "produtos ordenados manualmente serão reordenados"}{" "}
+              para a nova ordem de mistura.
+            </p>
+            <DialogFooter className="px-0">
+              <Button type="button" variant="outline" onClick={() => setConfirming(false)} disabled={isPending}>
+                Voltar
+              </Button>
+              <Button type="button" onClick={() => onSave(order)} disabled={isPending}>
+                {isPending ? "Salvando…" : "Confirmar"}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
           <ul className="space-y-1.5">
@@ -148,13 +173,21 @@ export function MixFormulationOrderDialog({
             type="button"
             size="sm"
             className="gap-1.5"
-            onClick={() => onSave(order)}
+            onClick={() => {
+              if (manualCount > 0) {
+                setConfirming(true);
+                return;
+              }
+              onSave(order);
+            }}
             disabled={isPending}
           >
             <Save className="h-3.5 w-3.5" />
             {isPending ? "Salvando…" : "Salvar ordem"}
           </Button>
         </DialogFooter>
+        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -168,11 +201,13 @@ export function SeasonMixOrderDialog({
   onOpenChange,
   seasonId,
   currentOrder,
+  manualCount = 0,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   seasonId: string;
   currentOrder?: FormulationKey[] | null;
+  manualCount?: number;
 }) {
   const updateMut = useUpdateSeason(seasonId);
 
@@ -198,6 +233,7 @@ export function SeasonMixOrderDialog({
       currentOrder={currentOrder}
       onSave={handleSave}
       isPending={updateMut.isPending}
+      manualCount={manualCount}
       description="Padrão oficial por tipo de formulação (SG, WP, SC, EC, SL…). Arraste para personalizar nesta safra. PDF e WhatsApp usam essa ordem."
     />
   );
