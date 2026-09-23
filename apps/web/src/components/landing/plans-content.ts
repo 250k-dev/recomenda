@@ -38,7 +38,7 @@ export const plansIntro = {
 
 export const plotPlans: readonly PlotPlan[] = [
   {
-    id: "semente",
+    id: "gratis",
     name: "Grátis",
     plotRange: "Até 3 talhões",
     monthlyBrl: 0,
@@ -50,10 +50,10 @@ export const plotPlans: readonly PlotPlan[] = [
     ],
   },
   {
-    id: "plantio",
+    id: "starter",
     name: "Starter",
     plotRange: "Até 10 talhões",
-    monthlyBrl: 9.99,
+    monthlyBrl: 16.99,
     billing: "monthly",
     highlighted: true,
     features: [
@@ -63,22 +63,10 @@ export const plotPlans: readonly PlotPlan[] = [
     ],
   },
   {
-    id: "lavoura",
+    id: "plus",
     name: "Plus",
-    plotRange: "11 a 20 talhões",
-    monthlyBrl: 19.99,
-    billing: "harvest",
-    features: [
-      "11 a 20 talhões cadastrados",
-      "12 meses · duas safras",
-      "Compartilhamento ilimitado",
-    ],
-  },
-  {
-    id: "fazenda",
-    name: "Pro",
     plotRange: "21 a 50 talhões",
-    monthlyBrl: 29.99,
+    monthlyBrl: 35.99,
     billing: "harvest",
     features: [
       "21 a 50 talhões cadastrados",
@@ -87,25 +75,13 @@ export const plotPlans: readonly PlotPlan[] = [
     ],
   },
   {
-    id: "carteira",
-    name: "Pro+",
-    plotRange: "51 a 100 talhões",
-    monthlyBrl: 39.99,
+    id: "pro",
+    name: "Pro",
+    plotRange: "51 a 200 talhões",
+    monthlyBrl: 55.99,
     billing: "harvest",
     features: [
-      "51 a 100 talhões cadastrados",
-      "12 meses · duas safras",
-      "Compartilhamento ilimitado",
-    ],
-  },
-  {
-    id: "campo",
-    name: "Pro Max",
-    plotRange: "Acima de 100 talhões",
-    monthlyBrl: 49.99,
-    billing: "harvest",
-    features: [
-      "Acima de 100 talhões cadastrados",
+      "51 a 200 talhões cadastrados",
       "12 meses · duas safras",
       "Compartilhamento ilimitado",
     ],
@@ -113,7 +89,7 @@ export const plotPlans: readonly PlotPlan[] = [
 ];
 
 export const plusPlan: ExtraPlan = {
-  id: "plus",
+  id: "lico",
   name: "Lico",
   eyebrow: "Complemento",
   description:
@@ -123,17 +99,17 @@ export const plusPlan: ExtraPlan = {
   features: [
     "WhatsApp para o produtor no campo",
     "Ciclo de 12 meses",
-    "Combina com Grátis, Starter ou as faixas de 12 meses",
+    "Combina com Grátis, Starter, Plus, Pro ou Premium",
   ],
 };
 
 export const masterPlan: ExtraPlan = {
-  id: "casa-250k",
+  id: "premium",
   name: "Premium",
   eyebrow: "Tudo incluso",
   description:
     "Talhões ilimitados e WhatsApp ilimitado, no mesmo ciclo de 12 meses.",
-  monthlyBrl: 59.99,
+  monthlyBrl: 68.9,
   billing: "harvest",
   featured: true,
   features: [
@@ -186,7 +162,7 @@ export function showcaseFromCatalog(catalog: readonly CatalogPlanLite[] | undefi
   }
 
   const plots = catalog
-    .filter((plan) => plan.slug !== "lico" && plan.slug !== "casa-250k")
+    .filter((plan) => plan.slug !== "lico" && plan.slug !== "premium" && !plan.slug.startsWith("inativo-"))
     .map((plan) => {
       const fallback = plotPlans.find((item) => item.id === plan.slug);
       return {
@@ -196,13 +172,13 @@ export function showcaseFromCatalog(catalog: readonly CatalogPlanLite[] | undefi
         monthlyBrl: Number(plan.price_brl_monthly),
         billing: plan.billing_kind,
         description: plan.description?.trim() || fallback?.description,
-        highlighted: plan.slug === "plantio",
+        highlighted: plan.slug === "starter",
         features: asFeatures(plan.features, fallback?.features ?? [plan.plot_range ?? plan.name]),
       } satisfies PlotPlan;
     });
 
   const lico = catalog.find((plan) => plan.slug === "lico");
-  const casa = catalog.find((plan) => plan.slug === "casa-250k");
+  const casa = catalog.find((plan) => plan.slug === "premium");
 
   return {
     plots: plots.length ? plots : [...plotPlans],

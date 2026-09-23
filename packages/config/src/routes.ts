@@ -77,6 +77,7 @@ export const routes = {
   minhasGestoes: "/minhas-gestoes" satisfies Route,
   cronograma: (ctx?: RouteContext) => withQuery("/cronograma", ctx),
   perfil: "/perfil" satisfies Route,
+  perfilLico: "/perfil/lico" satisfies Route,
   relatorios: "/relatorios" satisfies Route,
   /** Catálogo de produtos do agrônomo (rótulo de menu: "Produtos"). */
   produtos: "/produtos" satisfies Route,

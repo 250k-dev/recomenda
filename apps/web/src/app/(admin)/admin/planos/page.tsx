@@ -37,10 +37,6 @@ const planFormSchema = z.object({
   plot_quota: z
     .string()
     .refine((s) => s.trim() === "" || /^\d+$/.test(s), "Quota inválida"),
-  timing_template_quota: z
-    .string()
-    .min(1, "Informe a quota")
-    .refine((s) => /^\d+$/.test(s) && parseInt(s, 10) >= 1, "Quota mínima 1"),
   price_brl_monthly: z
     .string()
     .min(1, "Informe o preço")
@@ -63,7 +59,6 @@ const emptyPlanForm: PlanFormValues = {
   name: "",
   slug: "",
   plot_quota: "10",
-  timing_template_quota: "3",
   price_brl_monthly: "0",
   billing_kind: "monthly",
   includes_whatsapp: false,
@@ -97,7 +92,6 @@ function toPlanWritePayload(values: PlanFormValues) {
     name: values.name,
     slug: values.slug,
     plot_quota: parseQuota(values.plot_quota),
-    timing_template_quota: parseInt(values.timing_template_quota, 10),
     price_brl_monthly: parseFloat(values.price_brl_monthly.replace(",", ".")),
     billing_kind: values.billing_kind,
     includes_whatsapp: values.includes_whatsapp,
@@ -204,7 +198,6 @@ export default function AdminPlansPage() {
       name: p.name,
       slug: p.slug,
       plot_quota: p.plot_quota == null ? "" : String(p.plot_quota),
-      timing_template_quota: String(p.timing_template_quota),
       price_brl_monthly: String(Number(p.price_brl_monthly)),
       billing_kind: p.billing_kind ?? "monthly",
       includes_whatsapp: Boolean(p.includes_whatsapp),
@@ -292,7 +285,6 @@ export default function AdminPlansPage() {
     filteredPlans?.map((p) => [
       p.name,
       p.plot_quota == null ? "Ilimitado" : String(p.plot_quota),
-      String(p.timing_template_quota),
       `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
       <StatusBadge key={`st-a-${p.id}`} tone="success">Ativo</StatusBadge>,
       <div key={`a-${p.id}`} className="flex flex-wrap justify-end gap-2">
@@ -316,7 +308,6 @@ export default function AdminPlansPage() {
     filteredPlans?.map((p) => [
       p.name,
       p.plot_quota == null ? "Ilimitado" : String(p.plot_quota),
-      String(p.timing_template_quota),
       `R$ ${Number(p.price_brl_monthly).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês`,
       <StatusBadge key={`st-r-${p.id}`} tone="neutral">Removido</StatusBadge>,
       <div key={`r-${p.id}`} className="flex flex-wrap justify-end gap-2">
@@ -406,13 +397,6 @@ export default function AdminPlansPage() {
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="plan-create-tquota">Quota de modelos</Label>
-                  <Input id="plan-create-tquota" type="number" min={1} {...createForm.register("timing_template_quota")} />
-                  {createForm.formState.errors.timing_template_quota && (
-                    <p className="text-xs text-destructive">{createForm.formState.errors.timing_template_quota.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
                   <Label htmlFor="plan-create-price">Preço mensal (R$)</Label>
                   <Input id="plan-create-price" type="number" step="0.01" min={0} {...createForm.register("price_brl_monthly")} />
                   {createForm.formState.errors.price_brl_monthly && (
@@ -465,7 +449,7 @@ export default function AdminPlansPage() {
         <TableRowsSkeleton rows={8} columns={5} />
       ) : (
         <DataTable
-          headers={["Nome", "Quota de talhões", "Quota de modelos", "Preço", "Status", ""]}
+          headers={["Nome", "Quota de talhões", "Preço", "Status", ""]}
           rows={activeTab === "ativos" ? activeRows : removedRows}
         />
       )}
@@ -507,13 +491,6 @@ export default function AdminPlansPage() {
               <Input id="plan-edit-quota" type="number" min={1} {...editForm.register("plot_quota")} />
               {editForm.formState.errors.plot_quota && (
                 <p className="text-xs text-destructive">{editForm.formState.errors.plot_quota.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="plan-edit-tquota">Quota de modelos</Label>
-              <Input id="plan-edit-tquota" type="number" min={1} {...editForm.register("timing_template_quota")} />
-              {editForm.formState.errors.timing_template_quota && (
-                <p className="text-xs text-destructive">{editForm.formState.errors.timing_template_quota.message}</p>
               )}
             </div>
             <div className="space-y-1.5">

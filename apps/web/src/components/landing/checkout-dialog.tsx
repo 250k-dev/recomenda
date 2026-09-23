@@ -32,8 +32,9 @@ export function CheckoutDialog({
   if (!target) return null;
 
   const selected = target;
-  const mode = selected.billing === "monthly" ? "monthly" : billingMode;
-  const allowLico = selected.slug !== "casa-250k";
+  const allowLico = selected.slug !== "premium";
+  const licoOn = allowLico && addOnLico;
+  const mode = selected.billing === "monthly" && !licoOn ? "monthly" : billingMode;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -86,10 +87,16 @@ export function CheckoutDialog({
                 Assinar {target.name}
               </h2>
               <p className="mt-2 text-sm text-muted">
-                {target.billing === "free"
+                {target.billing === "free" && !licoOn
                   ? "Sem cobrança. Você recebe o acesso por e-mail."
                   : "Depois do pagamento, o e-mail de acesso chega automaticamente."}
               </p>
+              {selected.billing === "monthly" && licoOn ? (
+                <p className="text-sm text-muted">
+                  Com o Lico, Starter e complemento seguem o{" "}
+                  {billingMode === "pix" ? "PIX à vista" : "parcelamento em 12x"} escolhido na página.
+                </p>
+              ) : null}
             </div>
             <label className="block text-sm font-medium text-ink">
               Nome

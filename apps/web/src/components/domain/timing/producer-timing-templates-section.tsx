@@ -40,7 +40,6 @@ import {
   useHardDeleteTimingTemplate,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
-import { usePlanQuota } from "@recomenda/api-hooks/auth";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 
@@ -70,10 +69,8 @@ export function ProducerTimingTemplatesPanel({
   const createMutation = useCreateTimingTemplate(producerId);
   const deleteMutation = useDeleteTimingTemplate(producerId);
   const hardDeleteMutation = useHardDeleteTimingTemplate(producerId);
-  const { data: planQuota } = usePlanQuota();
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [limitOpen, setLimitOpen] = useState(false);
   const [tab, setTab] = useState<"active" | "archived">("active");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(
     null,
@@ -104,19 +101,13 @@ export function ProducerTimingTemplatesPanel({
       },
       onError: (err) => {
         setSheetOpen(false);
-        if (apiErrorMessage(err, "").includes("modelos do plano")) setLimitOpen(true);
-        else toast.error(apiErrorMessage(err, "Não foi possível criar o modelo."));
+        toast.error(apiErrorMessage(err, "Não foi possível criar o modelo."));
       },
     });
   });
 
   const templatesData = templates ?? [];
-  const modelQuota = planQuota?.plan?.timing_template_quota ?? 3;
-  const atModelLimit = templatesData.length >= modelQuota;
-  const handleNewModel = () => {
-    if (atModelLimit) setLimitOpen(true);
-    else setSheetOpen(true);
-  };
+  const handleNewModel = () => setSheetOpen(true);
   const archivedData = archived ?? [];
   const templateHref = (templateId: string) =>
     routes.produtores.modeloDeTiming(producerId, templateId);
@@ -291,17 +282,6 @@ export function ProducerTimingTemplatesPanel({
           </form>
         </SheetContent>
       </Sheet>
-
-      <ConfirmDialog
-        open={limitOpen}
-        onOpenChange={setLimitOpen}
-        title="Limite de modelos do plano atingido"
-        description={`O seu plano permite no máximo ${modelQuota} ${
-          modelQuota === 1 ? "modelo" : "modelos"
-        } de recomendação. Para criar mais, contate o administrador para um plano com quota maior — ou exclua um modelo existente.`}
-        confirmLabel="Entendi"
-        onConfirm={async () => setLimitOpen(false)}
-      />
 
       <ConfirmDialog
         open={!!deleteConfirm}

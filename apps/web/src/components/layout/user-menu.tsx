@@ -4,7 +4,7 @@ import { routes } from "@recomenda/config";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BarChart3, Briefcase, Check, LogOut, User } from "lucide-react";
+import { BarChart3, Briefcase, Check, LogOut, MessageCircle, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -137,6 +137,17 @@ export function UserMenu() {
               Meu perfil
             </Link>
           </DropdownMenuItem>
+          {showOwnPlan ? (
+            <DropdownMenuItem
+              asChild
+              className="gap-3 rounded-lg px-2.5 py-2.5 text-sm"
+            >
+              <Link href={routes.perfilLico}>
+                <MessageCircle className="size-4.5" />
+                Lico
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
           {/* Relatórios agregam a carteira própria — fora do modo gestão. */}
           {!activeScope ? (
             <DropdownMenuItem

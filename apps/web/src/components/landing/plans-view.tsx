@@ -405,7 +405,7 @@ export function PlansView() {
               delay={80}
               onSelect={() =>
                 setTarget({
-                  slug: "plantio",
+                  slug: "starter",
                   name: "Starter + Lico",
                   billing: "monthly",
                   addOnLico: true,
@@ -418,7 +418,7 @@ export function PlansView() {
               delay={140}
               onSelect={() =>
                 setTarget({
-                  slug: "casa-250k",
+                  slug: "premium",
                   name: showcase.master.name,
                   billing: "harvest",
                 })

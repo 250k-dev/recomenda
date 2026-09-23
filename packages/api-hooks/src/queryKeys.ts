@@ -5,6 +5,7 @@ export const queryKeys = {
   me: ["me"],
   memberships: ["memberships"],
   quota: ["quota"],
+  licoRoster: ["lico-roster"],
   farms: ["farms"],
   farm: (id: string) => ["farm", id],
   farmPlots: (farmId: string) => ["farm-plots", farmId],
