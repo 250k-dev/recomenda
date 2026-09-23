@@ -18,10 +18,13 @@ import { useCan } from "@recomenda/api-hooks/use-can";
 import { getTimeline, type Recommendation } from "@recomenda/api/seasons";
 import type { DocumentCover } from "@recomenda/domain/recommendations/print-document";
 import type {
+  FieldSheet,
+  FieldSheetRow,
   NotebookModelBlock,
   NotebookPlotRow,
   SeasonNotebookData,
 } from "@recomenda/domain/season-notebook/notebook-document";
+import { windowToTargetDay } from "@recomenda/domain/timing/window-days";
 import type { StockExportItem } from "@recomenda/domain/stock/stock-export";
 import {
   FarmSeasonsExportDialog,
@@ -112,6 +115,118 @@ function modelsFromCycle(
     if (recommendations.length === 0 && plots.length === 0) return [];
     return [{ name: block.template_name, plots, recommendations }];
   });
+}
+
+function plotKey(farm: string | null | undefined, plot: string): string {
+  return `${(farm ?? "").trim().toLocaleLowerCase("pt-BR")}\0${plot.trim().toLocaleLowerCase("pt-BR")}`;
+}
+
+function compareFieldRows(a: FieldSheetRow, b: FieldSheetRow): number {
+  return byPlotName(a.farmName ?? "", b.farmName ?? "") || byPlotName(a.plotName, b.plotName);
+}
+
+/** A dose impressa no caderno usa a unidade da lista de compra, não a da etapa. */
+function withPurchaseListUnits(
+  recommendations: Recommendation[],
+  unitByProduct: Map<string, string>,
+): Recommendation[] {
+  if (unitByProduct.size === 0) return recommendations;
+  return recommendations.map((rec) => ({
+    ...rec,
+    items: rec.items.map((item) => {
+      const unit = unitByProduct.get(item.local_product_id);
+      if (!unit || unit === item.dose_unit) return item;
+      return { ...item, dose_unit: unit };
+    }),
+  }));
+}
+
+/**
+ * Uma grade por conjunto de etapas. Talhão sem modelo entra numa grade só
+ * com as colunas fixas (plantio, ciclo, colheita).
+ */
+function fieldSheetsFrom(
+  models: NotebookModelBlock[],
+  seasons: Array<{
+    plot_name: string;
+    farm_name?: string | null;
+    plot_area_ha: number | null;
+    variety: string | null;
+    varieties?: Array<{ variety: string }>;
+    planting_date: string | null;
+    cycle_days: number | null;
+  }>,
+): FieldSheet[] {
+  const rowFrom = (season: (typeof seasons)[number]): FieldSheetRow => ({
+    farmName: season.farm_name ?? null,
+    plotName: season.plot_name,
+    variety:
+      (season.varieties ?? []).map((item) => item.variety).filter(Boolean).join(", ") ||
+      season.variety ||
+      null,
+    areaHa: season.plot_area_ha,
+    plantingDate: season.planting_date,
+    cycleDays: season.cycle_days,
+  });
+  const byPlot = new Map(
+    seasons.map((season) => [plotKey(season.farm_name, season.plot_name), season]),
+  );
+  const used = new Set<string>();
+  const buckets = new Map<string, FieldSheet>();
+
+  for (const model of models) {
+    const stages = model.recommendations
+      .map((rec) => ({
+        name: rec.name,
+        dap: windowToTargetDay(rec.window_start_days, rec.window_end_days),
+        order: rec.order_index,
+      }))
+      .sort((a, b) => a.dap - b.dap || a.order - b.order)
+      .map(({ name, dap }) => ({ name, dap }));
+    const signature = stages.map((stage) => `${stage.dap}:${stageKey(stage.name)}`).join("|");
+    const bucket = buckets.get(signature) ?? {
+      modelName: model.name,
+      stages,
+      rows: [],
+    };
+    for (const plot of model.plots) {
+      const key = plotKey(plot.farmName, plot.plotName);
+      if (used.has(key)) continue;
+      used.add(key);
+      const season = byPlot.get(key);
+      bucket.rows.push(
+        season
+          ? rowFrom(season)
+          : {
+              farmName: plot.farmName,
+              plotName: plot.plotName,
+              variety: null,
+              areaHa: null,
+              plantingDate: null,
+              cycleDays: null,
+            },
+      );
+    }
+    if (bucket.rows.length > 0) buckets.set(signature, bucket);
+  }
+
+  const leftover = seasons
+    .filter((season) => !used.has(plotKey(season.farm_name, season.plot_name)))
+    .map(rowFrom);
+  const sheets = [...buckets.values()];
+  if (leftover.length > 0) {
+    sheets.push({
+      modelName: sheets.length > 0 ? "Sem modelo" : null,
+      stages: [],
+      rows: leftover,
+    });
+  }
+  const several = sheets.length > 1;
+  return sheets.map((sheet) => ({
+    ...sheet,
+    modelName: several ? sheet.modelName : null,
+    rows: [...sheet.rows].sort(compareFieldRows),
+  }));
 }
 
 /**
@@ -316,6 +431,17 @@ export function CycleExportButton({
           .filter((name): name is string => Boolean(name)),
       ),
     ];
+    const models = modelsFromCycle(cycle.blocks ?? [], sortedItems);
+    const unitByProduct = new Map<string, string>();
+    for (const item of purchaseList?.items ?? []) {
+      if (!unitByProduct.has(item.local_product_id)) {
+        unitByProduct.set(item.local_product_id, item.dose_unit);
+      }
+    }
+    const modelsForNotebook = models.map((model) => ({
+      ...model,
+      recommendations: withPurchaseListUnits(model.recommendations, unitByProduct),
+    }));
     return {
       cycleName: cycle.name,
       producerName,
@@ -323,10 +449,17 @@ export function CycleExportButton({
       farmNames: farmNames.length ? farmNames : cycle.farms.map((f) => f.name),
       cropLabels: cycle.crops.map((crop) => CROP_LABELS[crop] ?? crop),
       plots: notebookPlots,
-      models: modelsFromCycle(cycle.blocks ?? [], sortedItems),
+      models: modelsForNotebook,
       purchaseList: purchaseList ?? null,
       stockItems,
-      schedule: sortedItems.map((item) => item.data),
+      schedule: sortedItems.map((item) => ({
+        ...item.data,
+        recommendations: withPurchaseListUnits(
+          item.data.recommendations,
+          unitByProduct,
+        ),
+      })),
+      fieldSheets: fieldSheetsFrom(models, seasons),
       note: cycle.backfill
         ? "Arquivo de safra: o estoque do galpão de hoje não entra neste caderno."
         : null,

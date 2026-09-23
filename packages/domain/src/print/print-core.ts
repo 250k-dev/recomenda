@@ -126,9 +126,12 @@ export function sheetHtml(opts: {
   footer?: string;
   /** Abre em folha nova (documentos com mais de uma folha). */
   pageBreak?: boolean;
+  /** Classe extra no invólucro (ex.: folha paisagem do caderno). */
+  docClass?: string;
 }): string {
+  const docClass = opts.docClass ? ` ${opts.docClass}` : "";
   return `
-  <div class="doc"${opts.pageBreak ? ' style="page-break-before: always"' : ""}>
+  <div class="doc${docClass}"${opts.pageBreak ? ' style="page-break-before: always"' : ""}>
     <table class="sheet">
       <thead><tr><td>${opts.header}</td></tr></thead>
       <tbody><tr><td>${opts.body}</td></tr></tbody>

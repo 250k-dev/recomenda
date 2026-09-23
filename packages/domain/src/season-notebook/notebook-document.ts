@@ -27,7 +27,12 @@ import {
   PURCHASE_LIST_CSS,
   purchaseListSectionHtml,
 } from "../purchase-list/purchase-list-print-document";
-import { displayRecStatus, fmtDate, recommendationStatusLabel } from "../recommendations/format";
+import {
+  displayRecStatus,
+  fmtDate,
+  isDesiccationRec,
+  recommendationStatusLabel,
+} from "../recommendations/format";
 import {
   buildModelPages,
   buildRecommendationPages,
@@ -51,6 +56,7 @@ export const NOTEBOOK_SECTION_IDS = [
   "plots",
   "recommendation-model",
   "schedule",
+  "field-sheet",
   "notes",
 ] as const;
 
@@ -101,6 +107,11 @@ export const NOTEBOOK_SECTIONS: Record<NotebookSectionId, NotebookSectionMeta> =
     id: "schedule",
     label: "Programação",
     description: "Resumo do cronograma de cada talhão.",
+  },
+  "field-sheet": {
+    id: "field-sheet",
+    label: "Acompanhamento",
+    description: "Grade para preencher à mão: um talhão por linha e o DAP da safra.",
   },
   notes: {
     id: "notes",
@@ -179,6 +190,33 @@ export interface NotebookModelBlock {
   recommendations: Recommendation[];
 }
 
+/** Coluna de aplicação da ficha: o dia alvo (DAP) e o nome da etapa. */
+export interface FieldSheetStage {
+  name: string;
+  dap: number;
+}
+
+/** Uma linha da ficha — o que o sistema já sabe. As datas de aplicação ficam em branco. */
+export interface FieldSheetRow {
+  farmName: string | null;
+  plotName: string;
+  variety: string | null;
+  areaHa: number | null;
+  plantingDate: string | null;
+  cycleDays: number | null;
+}
+
+/**
+ * Uma grade. Safra com dois modelos de etapas diferentes vira duas grades,
+ * cada uma só com os talhões daquele modelo.
+ */
+export interface FieldSheet {
+  /** Preenchido quando a safra tem mais de uma grade. */
+  modelName: string | null;
+  stages: FieldSheetStage[];
+  rows: FieldSheetRow[];
+}
+
 /** Linha da tabela de talhões: "Talhão 1 · M8210 · 30 ha". */
 export interface NotebookPlotRow {
   plotName: string;
@@ -201,6 +239,8 @@ export interface SeasonNotebookData {
   stockItems?: StockExportItem[] | null;
   /** Um bloco por talhão — o mesmo payload do PDF de recomendações. */
   schedule: RecommendationShareData[];
+  /** Grades de acompanhamento. Vazio: a seção usa os talhões, sem colunas de DAP. */
+  fieldSheets: FieldSheet[];
   /** Aviso da capa (ex.: safra histórica, estoque é retrato do galpão hoje). */
   note?: string | null;
 }
@@ -255,6 +295,8 @@ export function notebookSectionAvailable(
       );
     case "schedule":
       return data.schedule.length > 0;
+    case "field-sheet":
+      return data.plots.length > 0 || data.fieldSheets.some((sheet) => sheet.rows.length > 0);
     default:
       return true;
   }
@@ -309,6 +351,7 @@ const NOTEBOOK_CSS = `
      pelo Chrome, que é quem imprime aqui); onde não for, a capa só fica com a
      moldura — degrada sem quebrar. */
   @page cover { size: A4; margin: 0; }
+  @page field { size: A4 landscape; margin: 10mm 10mm 10mm 16mm; }
   /* Margem de lombada: o miolo é furado/encadernado pela esquerda, então a
      margem esquerda é maior que as outras — com 14mm iguais a espiral come o
      começo das linhas. Sobrepõe o @page do CORE_CSS só neste documento. */
@@ -348,6 +391,19 @@ const NOTEBOOK_CSS = `
   .nb-note-meta { display: flex; gap: 28px; margin: 18px 0 10px; font-size: 11px; color: #6b6b62; }
   .nb-lines { margin-top: 6px; }
   .nb-lines div { height: 8mm; border-bottom: 1px solid #dedcd2; }
+  .nb-field-doc { max-width: none; padding: 0; page: field; }
+  .nb-field-doc .title-block { margin-top: 8px; }
+  .nb-field-doc .title { font-size: 16px; }
+  .nb-field { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 8px; table-layout: fixed; }
+  .nb-field th, .nb-field td { border: 1px solid #d8d6cc; padding: 2px 3px; text-align: center; vertical-align: middle; }
+  .nb-field thead { display: table-header-group; }
+  .nb-field th { background: #2f6d3f; color: #ffffff; font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.15; }
+  .nb-field td { height: 8mm; }
+  .nb-field col.nb-field-farm { width: 22mm; }
+  .nb-field col.nb-field-plot { width: 16mm; }
+  .nb-field .nb-field-id { text-align: left; font-weight: 600; color: #20201c; line-height: 1.15; overflow-wrap: anywhere; }
+  .nb-field .nb-field-dap { display: block; font-size: 7px; }
+  .nb-field .nb-field-stage { display: block; font-weight: 600; text-transform: none; letter-spacing: 0; }
 `;
 
 // ---- montagem das folhas -----------------------------------------------
@@ -502,7 +558,10 @@ function purchaseListPage(
     kicker: "Lista de compra",
     title: list.name,
     tags,
-    body: purchaseListSectionHtml(list, { showPrices: options.showPrices }),
+    body: purchaseListSectionHtml(list, {
+      showPrices: options.showPrices,
+      groupByCategory: true,
+    }),
     agronomistName: data.agronomistName,
     pageBreak,
   });
@@ -679,6 +738,146 @@ function schedulePages(
  */
 const NOTE_LINES = 22;
 
+/** dd/MM — a célula da ficha é estreita; o ano cabe no nome da safra. */
+function fmtShortDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return value;
+  return `${match[3]}/${match[2]}`;
+}
+
+function fmtHa(value: number): string {
+  return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+
+function fieldSheetTable(sheet: FieldSheet, multiFarm: boolean): string {
+  const showDesiccation = !sheet.stages.some((stage) => isDesiccationRec(stage));
+  const infoSpan = multiFarm ? 4 : 3;
+  const closeSpan = 3 + (showDesiccation ? 1 : 0);
+  const stageHeads =
+    sheet.stages.length > 0
+      ? `<th colspan="${sheet.stages.length}">Aplicações</th>`
+      : "";
+  const stageLabels = sheet.stages
+    .map(
+      (stage) =>
+        `<th><span class="nb-field-dap">${stage.dap} DAP</span><span class="nb-field-stage">${escapeHtml(stage.name)}</span></th>`,
+    )
+    .join("");
+  const desiccationHead = showDesiccation ? "<th>Dessec.</th>" : "";
+  const blankStages = sheet.stages.map(() => "<td></td>").join("");
+  const desiccationCell = showDesiccation ? "<td></td>" : "";
+
+  const rows = sheet.rows
+    .map((row) => {
+      const area =
+        row.areaHa != null && row.areaHa > 0 ? fmtHa(row.areaHa) : "";
+      const planting = row.plantingDate ? escapeHtml(fmtShortDate(row.plantingDate)) : "";
+      const cycle =
+        row.cycleDays != null && Number.isFinite(row.cycleDays)
+          ? String(row.cycleDays)
+          : "";
+      return `<tr>
+        ${multiFarm ? `<td class="nb-field-id">${row.farmName ? escapeHtml(row.farmName) : ""}</td>` : ""}
+        <td class="nb-field-id">${escapeHtml(row.plotName)}</td>
+        <td>${row.variety ? escapeHtml(row.variety) : ""}</td>
+        <td>${area}</td>
+        <td>${planting}</td>
+        <td></td>
+        ${blankStages}
+        <td>${cycle}</td>
+        ${desiccationCell}
+        <td></td>
+        <td></td>
+      </tr>`;
+    })
+    .join("");
+
+  return `<table class="nb-field">
+    <colgroup>
+      ${multiFarm ? `<col class="nb-field-farm" />` : ""}
+      <col class="nb-field-plot" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th colspan="${infoSpan}">Informação</th>
+        <th colspan="2">Plantio</th>
+        ${stageHeads}
+        <th colspan="${closeSpan}">Colheita</th>
+      </tr>
+      <tr>
+        ${multiFarm ? "<th>Fazenda</th>" : ""}
+        <th>Talhão</th>
+        <th>Variedade</th>
+        <th>ha</th>
+        <th>Início</th>
+        <th>Final</th>
+        ${stageLabels}
+        <th>Ciclo</th>
+        ${desiccationHead}
+        <th>Colheita</th>
+        <th>sc/ha</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function fieldSheetPages(data: SeasonNotebookData, _pageBreak: boolean): string {
+  const sheets =
+    data.fieldSheets.length > 0
+      ? data.fieldSheets.filter((sheet) => sheet.rows.length > 0)
+      : [
+          {
+            modelName: null,
+            stages: [],
+            rows: [...data.plots]
+              .sort(
+                (a, b) =>
+                  byPlotName(a.farmName ?? "", b.farmName ?? "") ||
+                  byPlotName(a.plotName, b.plotName),
+              )
+              .map((plot) => ({
+                farmName: plot.farmName,
+                plotName: plot.plotName,
+                variety: plot.material,
+                areaHa: plot.areaHa,
+                plantingDate: null,
+                cycleDays: null,
+              })),
+          },
+        ];
+
+  return sheets
+    .map((sheet, index) => {
+      const farms = new Set(
+        sheet.rows.map((row) => row.farmName).filter((name): name is string => Boolean(name)),
+      );
+      const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
+      const title = sheet.modelName ?? data.cycleName;
+      const tags = data.producerName ? [`Produtor: ${data.producerName}`] : [];
+      return sheetHtml({
+        // A troca de página nomeada já quebra antes da primeira paisagem.
+        // Entre duas grades o nome não muda, então a quebra é explícita.
+        pageBreak: index > 0,
+        docClass: "nb-field-doc",
+        header: headerHtml(emittedAt, "Acompanhamento"),
+        footer: footerHtml(data.agronomistName),
+        body: `
+        <div class="title-block">
+          <p class="kicker">Acompanhamento</p>
+          <h1 class="title">${escapeHtml(title)}</h1>
+          ${
+            tags.length
+              ? `<div class="tags">${tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>`
+              : ""
+          }
+        </div>
+        ${fieldSheetTable(sheet, farms.size > 1)}`,
+      });
+    })
+    .join("");
+}
+
 function notesPages(data: SeasonNotebookData, count: number): string {
   const lines = Array.from({ length: NOTE_LINES }, () => "<div></div>").join("");
   return Array.from({ length: count }, () =>
@@ -723,6 +922,8 @@ export function buildSeasonNotebookHtml(
         return modelsPage(data, pageBreak);
       case "schedule":
         return schedulePages(data, options, pageBreak);
+      case "field-sheet":
+        return fieldSheetPages(data, pageBreak);
       case "notes":
         return notesPages(data, resolveNotesPages(options.notesPages));
     }

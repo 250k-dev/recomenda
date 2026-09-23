@@ -57,6 +57,7 @@ const UNAVAILABLE_REASON: Partial<Record<NotebookSectionId, string>> = {
   plots: "Nenhum talhão programado nesta safra.",
   "recommendation-model": "Nenhum modelo de recomendação aplicado nesta safra.",
   schedule: "Nenhum talhão com cronograma.",
+  "field-sheet": "Nenhum talhão programado nesta safra.",
 };
 
 /**
@@ -209,6 +210,12 @@ export function SeasonNotebookPanel({
       return Math.max(
         1,
         data.models.filter((model) => model.recommendations.length > 0).length,
+      );
+    }
+    if (id === "field-sheet") {
+      return Math.max(
+        1,
+        data.fieldSheets.filter((sheet) => sheet.rows.length > 0).length,
       );
     }
     return 1;

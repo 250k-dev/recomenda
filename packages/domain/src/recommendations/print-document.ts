@@ -1,4 +1,5 @@
 import type { Recommendation, RecommendationItem } from "@recomenda/api";
+import { DOSE_UNIT_SHORT_LABELS } from "@recomenda/utils";
 import { displayRecStatus, fmtDate, recommendationStatusLabel } from "./format";
 import {
   formulationShortLabel,
@@ -65,9 +66,13 @@ function fmtMeasure(value: number, digits = 2): string {
   });
 }
 
+function doseUnitLabel(unit: string): string {
+  return (DOSE_UNIT_SHORT_LABELS as Record<string, string>)[unit] ?? unit;
+}
+
 function fmtQty(value: number, unit: string): string {
   if (value <= 0) return EM_DASH;
-  return `${fmtNum(value)} ${escapeHtml(unit)}`;
+  return `${fmtNum(value)} ${escapeHtml(doseUnitLabel(unit))}`;
 }
 
 /** Quantidade da etapa já inclui o recorte de área (`area_factor`). */
@@ -171,7 +176,7 @@ function productRowsHtml(rec: Recommendation, opts: RenderOpts): string {
                  <td class="num">${item.mapa_registration ? escapeHtml(item.mapa_registration) : EM_DASH}</td>`
               : ""
           }
-          <td class="num">${item.dose_per_hectare} ${escapeHtml(item.dose_unit)}</td>
+          <td class="num">${item.dose_per_hectare} ${escapeHtml(doseUnitLabel(item.dose_unit))}</td>
           ${showQuantity ? `<td class="num">${fmtQty(item.total_quantity, item.dose_unit)}</td>` : ""}
           ${opts.money ? `<td class="num">${cost == null ? EM_DASH : fmtBrl(cost)}</td>` : ""}
         </tr>`;

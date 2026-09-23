@@ -78,6 +78,15 @@ function SheetContent({ id }: { id: NotebookSectionId }) {
             </div>
             <Rows count={5} withValue={false} />
           </>
+        ) : id === "field-sheet" ? (
+          <>
+            <div className="mb-[6px] flex gap-[4px]">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-[8px] flex-1 rounded-[2px] bg-primary/80" />
+              ))}
+            </div>
+            <Rows count={5} withValue={false} />
+          </>
         ) : id === "notes" ? (
           <div className="flex flex-col gap-[5px]">
             {Array.from({ length: 9 }, (_, i) => (

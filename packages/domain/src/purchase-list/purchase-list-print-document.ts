@@ -3,7 +3,9 @@
  * Mesmo visual dos PDFs de recomendação (usa o núcleo em print-core).
  */
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
+import { DOSE_UNIT_SHORT_LABELS } from "@recomenda/utils";
 import { CATEGORY_LABELS } from "../cost-plan/categories";
+import { CATEGORY_ORDER } from "../cost-plan/calculate";
 import { SEED_CATEGORIES, seedQuantityUnitLabel } from "./list-item";
 import {
   escapeHtml,
@@ -23,21 +25,29 @@ const fmtQty = (n: number) =>
 const categoryLabel = (code: string): string =>
   (CATEGORY_LABELS as Record<string, string>)[code] ?? code;
 
+const unitLabel = (unit: string): string =>
+  (DOSE_UNIT_SHORT_LABELS as Record<string, string>)[unit] ?? unit;
+
 const isSeedCategory = (category: string) => SEED_CATEGORIES.includes(category);
+
+function categoryRank(code: string): number {
+  const index = (CATEGORY_ORDER as readonly string[]).indexOf(code);
+  return index === -1 ? CATEGORY_ORDER.length : index;
+}
 
 /** Dose/ha; sementes sem dose usam travessão. */
 function formatDose(it: PurchaseListItem): string {
   if (isSeedCategory(it.category) && !(it.dose_per_hectare > 0)) {
     return "—";
   }
-  return `${fmtQty(it.dose_per_hectare)} ${it.dose_unit}/ha`;
+  return `${fmtQty(it.dose_per_hectare)} ${unitLabel(it.dose_unit)}/ha`;
 }
 
 /** Volume a comprar (quantity_to_buy) com unidade adequada. */
 function formatVolume(it: PurchaseListItem): string {
   const unit = isSeedCategory(it.category)
     ? seedQuantityUnitLabel(it.category)
-    : it.dose_unit;
+    : unitLabel(it.dose_unit);
   return `${fmtQty(it.quantity_to_buy)} ${unit}`;
 }
 
@@ -45,11 +55,14 @@ function formatVolume(it: PurchaseListItem): string {
  *  compostos — o Caderno de Safra embute esta seção. */
 export const PURCHASE_LIST_CSS = `
   .area-note { display: block; font-size: 9.5px; color: #9a5a16; margin-top: 1px; }
+  .cat-row td { background: #f1f0ea; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #2f6d3f; padding-top: 8px; }
 `;
 
 /** Suprime colunas de dinheiro mesmo quando o payload traz preço. */
 export interface PurchaseListSectionOptions {
   showPrices?: boolean;
+  /** Agrupa os produtos pela categoria, na ordem do plano. */
+  groupByCategory?: boolean;
 }
 
 export interface PurchaseListPrintContext {
@@ -112,7 +125,17 @@ function itemsTableHtml(
   const showPrices =
     opts.showPrices !== false &&
     list.items.some((it) => hasMoney(it.unit_price_brl) || hasMoney(it.total_brl));
-  const rows = list.items
+  const grouped = opts.groupByCategory === true;
+  const items = grouped
+    ? [...list.items].sort(
+        (a, b) =>
+          categoryRank(a.category) - categoryRank(b.category) ||
+          a.product_name.localeCompare(b.product_name, "pt-BR"),
+      )
+    : list.items;
+  const dataCols = (grouped ? 3 : 4) + (showPrices ? 2 : 0);
+  let lastCategory = "";
+  const rows = items
     .map((it) => {
       // Produto aplicado em parte da área (ex.: 50% — "áreas sujas"): mostra o
       // percentual e a observação logo abaixo do nome, para o produtor entender
@@ -130,10 +153,16 @@ function itemsTableHtml(
         ? `<td class="num">${hasMoney(it.unit_price_brl) ? fmtBrl(it.unit_price_brl) : "&mdash;"}</td>
           <td class="num">${hasMoney(it.total_brl) ? fmtBrl(it.total_brl) : "&mdash;"}</td>`
         : "";
+      const categoryHead =
+        grouped && it.category !== lastCategory
+          ? `<tr class="cat-row"><td colspan="${dataCols}">${escapeHtml(categoryLabel(it.category))}</td></tr>`
+          : "";
+      lastCategory = it.category;
       return `
+        ${categoryHead}
         <tr>
           <td>${escapeHtml(it.product_name)}${areaLine}</td>
-          <td>${escapeHtml(categoryLabel(it.category))}</td>
+          ${grouped ? "" : `<td>${escapeHtml(categoryLabel(it.category))}</td>`}
           <td class="num">${dose === "—" ? "&mdash;" : escapeHtml(dose)}</td>
           <td class="num">${escapeHtml(volume)}</td>
           ${priceCells}
@@ -146,7 +175,7 @@ function itemsTableHtml(
     showPrices && hasMoney(total)
       ? `
     <tr>
-      <td colspan="5">Total estimado</td>
+      <td colspan="${dataCols - 1}">Total estimado</td>
       <td class="num">${fmtBrl(total)}</td>
     </tr>`
       : "";
@@ -156,7 +185,7 @@ function itemsTableHtml(
       <thead>
         <tr>
           <th>Produto</th>
-          <th>Categoria</th>
+          ${grouped ? "" : `<th>Categoria</th>`}
           <th class="num">Dose</th>
           <th class="num">Volume</th>
           ${showPrices ? `<th class="num">Custo unit.</th><th class="num">Total</th>` : ""}

@@ -186,6 +186,9 @@ export type {
   NotebookOptions,
   NotebookPlotRow,
   NotebookModelBlock,
+  FieldSheet,
+  FieldSheetStage,
+  FieldSheetRow,
   SeasonNotebookData,
 } from "./season-notebook/notebook-document";
 export {
