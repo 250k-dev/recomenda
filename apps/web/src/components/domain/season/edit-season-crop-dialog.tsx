@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -14,6 +14,10 @@ import {
 } from "@recomenda/ui/primitives/dialog";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@recomenda/ui/primitives/native-select";
 import { useCyclePurchaseList, useUpdateSeasonVarieties } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
@@ -25,11 +29,13 @@ export type SeasonCropVarietyDraft = {
   thousand_plants_per_ha: number | null;
 };
 
+/** `null` = o usuário não mexeu (mostra a sugestão da lista/talhão);
+ *  `""` = apagou de propósito (fica vazio e salva sem valor). */
 type Row = {
   id: string;
   variety: string;
-  plantedArea: string;
-  population: string;
+  plantedArea: string | null;
+  population: string | null;
 };
 
 let rowSeq = 0;
@@ -38,15 +44,20 @@ function nextRowId(): string {
   return `variety-${rowSeq}`;
 }
 
-function parseNum(value: string): number | null {
+function parseNum(value: string | null): number | null {
+  if (value == null) return null;
   const n = Number(value.replace(",", ".").trim());
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function areaLabel(value: number | string | null | undefined): string {
-  if (value == null || value === "") return "";
+function areaLabel(value: number | string | null | undefined): string | null {
+  if (value == null || value === "") return null;
   const n = typeof value === "number" ? value : Number(String(value).replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? String(n) : "";
+  return Number.isFinite(n) && n > 0 ? String(n) : null;
+}
+
+function nameKey(name: string): string {
+  return name.trim().toLowerCase();
 }
 
 function sumPlantedArea(rows: Row[]): number {
@@ -61,14 +72,14 @@ function rowsFromInitial(
   fallbackVariety: string | null | undefined,
   plotAreaHa: number | null | undefined,
 ): Row[] {
-  const plotArea = plotAreaHa != null && plotAreaHa > 0 ? String(plotAreaHa) : "";
+  const plotArea = plotAreaHa != null && plotAreaHa > 0 ? String(plotAreaHa) : null;
   const list = (initial ?? []).filter((v) => v.variety.trim());
   if (list.length > 0) {
     return list.map((v, index) => ({
       id: nextRowId(),
       variety: v.variety,
       plantedArea:
-        areaLabel(v.planted_area_ha) || (list.length === 1 && index === 0 ? plotArea : ""),
+        areaLabel(v.planted_area_ha) ?? (list.length === 1 && index === 0 ? plotArea : null),
       population: areaLabel(v.thousand_plants_per_ha),
     }));
   }
@@ -77,7 +88,7 @@ function rowsFromInitial(
       id: nextRowId(),
       variety: fallbackVariety?.trim() ?? "",
       plantedArea: plotArea,
-      population: "",
+      population: null,
     },
   ];
 }
@@ -135,13 +146,16 @@ function EditSeasonCropForm({
   plotAreaHa?: number | null;
   onClose: () => void;
 }) {
-  const { data: purchaseList } = useCyclePurchaseList(cycleId ?? "");
+  const { data: purchaseList, isLoading: listLoading } = useCyclePurchaseList(
+    cycleId ?? "",
+  );
   const updateMut = useUpdateSeasonVarieties(seasonId);
-  const datalistId = useId();
   const [rows, setRows] = useState<Row[]>(() =>
     rowsFromInitial(initialVarieties, fallbackVariety, plotAreaHa),
   );
 
+  /** Só as sementes da lista de compra da safra (cultura do talhão): variedade
+   *  fora da lista não puxa estoque nem preço. */
   const seedOptions = useMemo(() => {
     const names = new Set<string>();
     for (const item of purchaseList?.items ?? []) {
@@ -149,14 +163,16 @@ function EditSeasonCropForm({
       if (crop && item.crop && item.crop !== crop) continue;
       names.add(item.product_name);
     }
-    for (const row of initialVarieties ?? []) {
-      const name = row.variety.trim();
-      if (name) names.add(name);
-    }
-    const fallback = fallbackVariety?.trim();
-    if (fallback) names.add(fallback);
     return [...names].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [purchaseList, crop, initialVarieties, fallbackVariety]);
+  }, [purchaseList, crop]);
+
+  const seedByKey = useMemo(
+    () => new Map(seedOptions.map((name) => [nameKey(name), name])),
+    [seedOptions],
+  );
+  /** Grafia da lista quando só muda maiúscula/espaço (o backend casa assim). */
+  const canonical = (variety: string): string =>
+    seedByKey.get(nameKey(variety)) ?? variety.trim();
 
   const popByName = useMemo(() => {
     const map = new Map<string, number>();
@@ -186,7 +202,7 @@ function EditSeasonCropForm({
       sum === 0 &&
       rows.length === 1 &&
       cadastral > 0 &&
-      !rows[0]?.plantedArea
+      rows[0]?.plantedArea == null
     ) {
       return cadastral;
     }
@@ -196,7 +212,7 @@ function EditSeasonCropForm({
 
   const allocatedForVariety = (name: string): number =>
     rows.reduce((sum, row) => {
-      if (row.variety.trim() !== name) return sum;
+      if (canonical(row.variety) !== name) return sum;
       return sum + (parseNum(row.plantedArea) ?? 0);
     }, 0);
 
@@ -205,13 +221,7 @@ function EditSeasonCropForm({
   };
 
   const handleVarietyChange = (index: number, variety: string) => {
-    const fromList = popByName.get(variety);
-    updateRow(index, {
-      variety,
-      ...(fromList && !rows[index]?.population
-        ? { population: String(fromList) }
-        : {}),
-    });
+    updateRow(index, { variety });
   };
 
   const handleSave = () => {
@@ -221,12 +231,12 @@ function EditSeasonCropForm({
       thousand_plants_per_ha: number | null;
     }> = [];
     for (const row of rows) {
-      const variety = row.variety.trim();
+      const variety = canonical(row.variety);
       if (!variety) continue;
-      const fromList = !row.population ? popByName.get(row.variety) : undefined;
+      const fromList = row.population == null ? popByName.get(variety) : undefined;
       const areaValue =
-        row.plantedArea ||
-        (rows.length === 1 && cadastral > 0 ? String(cadastral) : "");
+        row.plantedArea ??
+        (rows.length === 1 && cadastral > 0 ? String(cadastral) : null);
       varieties.push({
         variety,
         planted_area_ha: parseNum(areaValue),
@@ -279,33 +289,43 @@ function EditSeasonCropForm({
         </div>
 
         {rows.map((row, index) => {
-          const name = row.variety.trim();
+          const name = canonical(row.variety);
           const listArea = name ? seedAreaByVariety.get(name) : undefined;
           const allocated = name ? allocatedForVariety(name) : 0;
           const overList = listArea != null && allocated > listArea;
-          const listPop = popByName.get(row.variety);
+          const listPop = popByName.get(name);
+          const outOfList = !!name && !seedByKey.has(nameKey(name));
           return (
             <div key={row.id} className="flex flex-col gap-2">
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1 space-y-1">
                   <Label className="text-xs text-muted-foreground">Cultivar</Label>
-                  <Input
-                    list={seedOptions.length > 0 ? datalistId : undefined}
-                    value={row.variety}
+                  <NativeSelect
+                    className="w-full"
+                    value={name}
                     onChange={(e) => handleVarietyChange(index, e.target.value)}
-                    placeholder={
-                      seedOptions.length > 0
-                        ? "Selecione ou digite"
-                        : "Ex: BMX Potência RR"
-                    }
                     aria-label={`Variedade ${index + 1}`}
-                  />
+                  >
+                    <NativeSelectOption value="">
+                      {listLoading ? "Carregando…" : "Selecione"}
+                    </NativeSelectOption>
+                    {outOfList ? (
+                      <NativeSelectOption value={name}>
+                        {name} (fora da lista)
+                      </NativeSelectOption>
+                    ) : null}
+                    {seedOptions.map((option) => (
+                      <NativeSelectOption key={option} value={option}>
+                        {option}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
                 </div>
                 <div className="w-28 shrink-0 space-y-1">
                   <Label className="text-xs text-muted-foreground">Plantas/ha</Label>
                   <Input
                     inputMode="decimal"
-                    value={row.population || (listPop != null ? String(listPop) : "")}
+                    value={row.population ?? (listPop != null ? String(listPop) : "")}
                     onChange={(e) =>
                       updateRow(index, { population: e.target.value })
                     }
@@ -319,7 +339,7 @@ function EditSeasonCropForm({
                     min={0}
                     step="0.01"
                     value={
-                      row.plantedArea ||
+                      row.plantedArea ??
                       (rows.length === 1 && cadastral > 0 ? String(cadastral) : "")
                     }
                     onChange={(e) =>
@@ -343,6 +363,12 @@ function EditSeasonCropForm({
                   <Trash2 className="size-4" />
                 </Button>
               </div>
+              {outOfList && !listLoading ? (
+                <p className="text-xs text-warning-strong">
+                  Este cultivar não está na lista de compra da safra — não puxa
+                  estoque nem preço. Escolha uma semente da lista.
+                </p>
+              ) : null}
               {listArea != null ? (
                 <p
                   className={
@@ -361,12 +387,11 @@ function EditSeasonCropForm({
           );
         })}
 
-        {seedOptions.length > 0 ? (
-          <datalist id={datalistId}>
-            {seedOptions.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
+        {!listLoading && seedOptions.length === 0 ? (
+          <p className="text-xs text-warning-strong">
+            A lista de compra desta safra não tem sementes. Cadastre a semente na
+            lista de compra para poder escolhê-la aqui.
+          </p>
         ) : null}
 
         <Button
@@ -377,7 +402,7 @@ function EditSeasonCropForm({
           onClick={() =>
             setRows((prev) => [
               ...prev,
-              { id: nextRowId(), variety: "", plantedArea: "", population: "" },
+              { id: nextRowId(), variety: "", plantedArea: null, population: null },
             ])
           }
         >
