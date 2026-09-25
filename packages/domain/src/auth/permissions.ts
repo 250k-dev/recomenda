@@ -78,6 +78,7 @@ const PRODUCER_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   "LIST_CRUD",
   "QUOTE_CRUD",
   "STOCK_ADJUST",
+  "CATALOG_CRUD",
   "HARVEST_REGISTER",
   "EXPORT",
   "PRICE_VIEW",
