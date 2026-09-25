@@ -8,13 +8,13 @@ import { BrazilianDateInput } from "@recomenda/ui/forms/brazilian-date-input";
 import { Textarea } from "@recomenda/ui/primitives/textarea";
 import { Select, SearchableSelect } from "@recomenda/ui/forms/select";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
+import { QuickCreateProductDialog } from "@/components/domain/quick-create-product-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@recomenda/ui/primitives/tooltip";
 import { Field } from "@/components/domain/season/_shared";
 import {
   usePlatformCatalog,
   useGlobalCatalog,
   useCloneGlobalProduct,
-  useCreateLocalProduct,
   useProducerPurchaseLists,
   useFarmPurchaseLists,
 } from "@recomenda/api-hooks";
@@ -251,7 +251,12 @@ function StageProductsEditor({
     }
     return map;
   }, [purchaseLists]);
-  const createLocal = useCreateLocalProduct();
+  // Produto digitado que não existe: abre o cadastro rápido (unidade + formulação).
+  const [quickCreate, setQuickCreate] = useState<{
+    key: string;
+    category: string;
+    name: string;
+  } | null>(null);
   const [resolvingKey, setResolvingKey] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -323,26 +328,6 @@ function StageProductsEditor({
       toast.error("Não foi possível adicionar o produto da plataforma.");
     } finally {
       setResolvingKey(null);
-    }
-  };
-
-  const confirmCreateProduct = async (key: string, category: string, rawName: string) => {
-    const name = rawName.trim();
-    if (!name) return;
-    try {
-      const created = await createLocal.mutateAsync({
-        name,
-        category: category || "OTHER",
-        dose_unit: "L",
-      });
-      updateProduct(key, {
-        productId: created.id,
-        productName: created.name ?? name,
-        unit: created.dose_unit ?? "L",
-        outOfProgram: true,
-      });
-    } catch {
-      toast.error("Não foi possível cadastrar o produto.");
     }
   };
 
@@ -526,10 +511,14 @@ function StageProductsEditor({
                     ) : (
                       <button
                         type="button"
-                        disabled={!query.trim() || createLocal.isPending}
+                        disabled={!query.trim()}
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={async () => {
-                          await confirmCreateProduct(item.key, item.category, query);
+                        onClick={() => {
+                          setQuickCreate({
+                            key: item.key,
+                            category: item.category || "OTHER",
+                            name: query.trim(),
+                          });
                           close();
                         }}
                         className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/8 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-transparent"
@@ -590,6 +579,24 @@ function StageProductsEditor({
           })}
         </div>
       )}
+      <QuickCreateProductDialog
+        open={quickCreate !== null}
+        initialName={quickCreate?.name ?? ""}
+        category={quickCreate?.category ?? ""}
+        defaultUnit="L"
+        onCancel={() => setQuickCreate(null)}
+        onCreated={(created) => {
+          if (quickCreate) {
+            updateProduct(quickCreate.key, {
+              productId: created.id,
+              productName: created.name,
+              unit: created.dose_unit,
+              outOfProgram: true,
+            });
+          }
+          setQuickCreate(null);
+        }}
+      />
     </div>
   );
 }

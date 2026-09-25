@@ -12,7 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { runLeaveBusy } from "@/hooks/use-leave-busy-guard";
 import type { Route } from "next";
-import { Search, Users, Plus, Package } from "lucide-react";
+import { Search, Users, Plus } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
   Dialog,
@@ -311,21 +311,6 @@ export function ProducerSearchButton({
               >
                 <Users className="size-4 shrink-0 text-muted-foreground" />
                 Ver todos os produtores
-              </button>
-              <button
-                type="button"
-                role="option"
-                data-option
-                aria-selected={activeKey === "catalog"}
-                onFocus={() => setActiveKey("catalog")}
-                onMouseEnter={() => setActiveKey("catalog")}
-                onKeyDown={onOptionKeyDown}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => go(routes.produtos)}
-                className={optionClass("catalog")}
-              >
-                <Package className="size-4 shrink-0 text-muted-foreground" />
-                Ver todos os produtos
               </button>
               {canCreateProducer ? (
                 <button

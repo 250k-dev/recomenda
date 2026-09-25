@@ -82,9 +82,9 @@ export function useUpdateLocalProduct() {
       name?: string;
       category?: string;
       dose_unit?: string;
-      price_brl?: string;
-      price_usd?: string;
-      label_url?: string;
+      price_brl?: string | null;
+      price_usd?: string | null;
+      label_url?: string | null;
       is_active?: boolean;
       global_product_id?: string | null;
       equivalence_group?: string | null;

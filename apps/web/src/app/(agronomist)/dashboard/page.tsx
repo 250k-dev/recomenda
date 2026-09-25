@@ -18,6 +18,7 @@ import {
   Info,
   FileText,
   UserCog,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -299,6 +300,14 @@ export default function DashboardPage() {
                 sub="Carteira completa"
               />
             )}
+        {!isOwnOperation ? (
+          <ShortcutCard
+            href={routes.produtos}
+            icon={Package}
+            title="Catálogo de produtos"
+            sub="Global e customizados"
+          />
+        ) : null}
         {!isOwnOperation && canTemplates ? (
           <ShortcutCard
             href={routes.templatesDeCompra}

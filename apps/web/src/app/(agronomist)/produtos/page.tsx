@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Package } from "lucide-react";
+import { Plus, Package, UserCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/domain/page-header";
 import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
@@ -31,6 +31,7 @@ import {
   useUpdateLocalProduct,
 } from "@recomenda/api-hooks";
 import {
+  cn,
   deactivateOutlineButtonClass,
   DOSE_UNIT_LABELS,
   GLOBAL_DOSE_UNITS,
@@ -38,31 +39,46 @@ import {
   PRODUCT_CATEGORY_LABELS,
 } from "@recomenda/utils";
 import type { PlatformCatalogEntry } from "@recomenda/api";
+import { apiErrorMessage } from "@recomenda/api/api-error";
 import {
-  FORMULATION_MIX_OPTIONS,
   formulationEquivalenceGroup,
   formulationShortLabel,
   resolveFormulationKey,
   type FormulationKey,
 } from "@recomenda/domain/recommendations/formulation-mix-order";
+import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
+import {
+  categoryHasFormulation,
+  defaultDoseUnitForCategory,
+  fixedDoseUnitForCategory,
+  FORMULATION_SELECT_OPTIONS,
+} from "@/components/domain/product-form-options";
 
 const CATALOG_PAGE_SIZE = 15;
-
-const FORMULATION_SELECT_OPTIONS = FORMULATION_MIX_OPTIONS.map((o) => ({
-  value: o.key,
-  label: o.label,
-}));
 
 function formulationCellLabel(equivalenceGroup: string | null | undefined): string {
   return formulationShortLabel(resolveFormulationKey(equivalenceGroup));
 }
 
 const createSchema = z.object({
-  name: z.string().min(1, "Nome obrigatório"),
-  category: z.string().optional(),
+  name: z.string().trim().min(1, "Nome obrigatório"),
+  category: z.string().min(1, "Escolha a categoria"),
+  dose_unit: z.string().min(1, "Escolha a unidade"),
   label_url: z.string().optional(),
   formulation_key: z.string().optional(),
 });
+
+/** Campo de texto opcional: em branco vira null (não string vazia no banco). */
+function textOrNull(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed ? trimmed : null;
+}
+
+/** Preço digitado: em branco vira null (o banco é numeric); vírgula vira ponto. */
+function priceOrNull(value: string | undefined): string | null {
+  const trimmed = value?.trim().replace(",", ".") ?? "";
+  return trimmed ? trimmed : null;
+}
 
 const editSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -112,6 +128,8 @@ export default function CatalogPage() {
   const [filterName, setFilterName] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterDoseUnit, setFilterDoseUnit] = useState("");
+  /** Customizados: só os que o próprio usuário criou. */
+  const [onlyMine, setOnlyMine] = useState(false);
 
   const [globalPage, setGlobalPage] = useState(1);
   const [customPage, setCustomPage] = useState(1);
@@ -122,10 +140,13 @@ export default function CatalogPage() {
     defaultValues: {
       name: "",
       category: "",
+      dose_unit: "DOSE",
       label_url: "",
       formulation_key: "",
     },
   });
+
+  const createCategory = createForm.watch("category") ?? "";
 
   const editForm = useForm<EditFormValues>({
     resolver: zodResolver(editSchema),
@@ -134,15 +155,17 @@ export default function CatalogPage() {
 
   const onCreateSubmit = createForm.handleSubmit((values) => {
     const key = (values.formulation_key || "") as FormulationKey | "";
+    const labelUrl = textOrNull(values.label_url);
     createProduct.mutate(
       {
         name: values.name,
         category: values.category,
-        label_url: values.label_url,
-        dose_unit: "DOSE",
-        equivalence_group: key
-          ? formulationEquivalenceGroup(key)
-          : null,
+        ...(labelUrl ? { label_url: labelUrl } : {}),
+        dose_unit: values.dose_unit,
+        equivalence_group:
+          key && categoryHasFormulation(values.category)
+            ? formulationEquivalenceGroup(key)
+            : null,
       },
       {
         onSuccess: () => {
@@ -150,7 +173,8 @@ export default function CatalogPage() {
           createForm.reset();
           toast.success("Produto adicionado ao catálogo.");
         },
-        onError: () => toast.error("Não foi possível criar o produto."),
+        onError: (err) =>
+          toast.error(apiErrorMessage(err, "Não foi possível criar o produto.")),
       },
     );
   });
@@ -161,19 +185,20 @@ export default function CatalogPage() {
       updateProduct.mutate(
         {
           id: editingId,
-          name: values.name,
-          category: values.category,
-          dose_unit: values.dose_unit,
-          price_brl: values.price_brl,
-          price_usd: values.price_usd,
-          label_url: values.label_url,
+          name: values.name.trim(),
+          // Enum no banco: vazio não é enviado (mantém o valor atual).
+          ...(values.category ? { category: values.category } : {}),
+          ...(values.dose_unit ? { dose_unit: values.dose_unit } : {}),
+          price_brl: priceOrNull(values.price_brl),
+          price_usd: priceOrNull(values.price_usd),
+          label_url: textOrNull(values.label_url),
           equivalence_group: key
             ? formulationEquivalenceGroup(key)
             : null,
           // String vazia vira null: campo em branco significa "sem registro"
           // (adjuvante, fertilizante), não texto vazio.
-          manufacturer: values.manufacturer?.trim() || null,
-          mapa_registration: values.mapa_registration?.trim() || null,
+          manufacturer: textOrNull(values.manufacturer),
+          mapa_registration: textOrNull(values.mapa_registration),
         },
         {
           onSuccess: () => {
@@ -181,31 +206,12 @@ export default function CatalogPage() {
             editForm.reset();
             toast.success("Produto atualizado.");
           },
-          onError: () => toast.error("Não foi possível salvar."),
+          onError: (err) =>
+            toast.error(apiErrorMessage(err, "Não foi possível salvar.")),
         },
       );
     }
   });
-
-  const handleFormulationChange = (
-    localProductId: string,
-    key: string,
-  ) => {
-    const formulationKey = (key || "OTHER") as FormulationKey;
-    updateProduct.mutate(
-      {
-        id: localProductId,
-        equivalence_group: formulationEquivalenceGroup(
-          formulationKey === "OTHER" ? null : formulationKey,
-        ),
-      },
-      {
-        onSuccess: () => toast.success("Tipo de formulação atualizado."),
-        onError: () =>
-          toast.error("Não foi possível atualizar a formulação."),
-      },
-    );
-  };
 
   // Memoizado: `?? []` cria um array novo a cada render e faz todos os memos
   // que dependem dele recalcularem sempre.
@@ -270,16 +276,22 @@ export default function CatalogPage() {
       ),
     [globalEntries, filterName, filterCategory, filterDoseUnit],
   );
+  const ownCustomCount = useMemo(
+    () => customEntries.filter((r) => r.entry_type === "OWN_CUSTOM").length,
+    [customEntries],
+  );
   const filteredCustom = useMemo(
     () =>
-      customEntries.filter((p) =>
-        matchesFilters(p, {
+      customEntries.filter(
+        (p) =>
+          (!onlyMine || p.entry_type === "OWN_CUSTOM") &&
+          matchesFilters(p, {
           name: filterName,
           category: filterCategory,
           doseUnit: filterDoseUnit,
         }),
       ),
-    [customEntries, filterName, filterCategory, filterDoseUnit],
+    [customEntries, onlyMine, filterName, filterCategory, filterDoseUnit],
   );
   const filteredInactive = useMemo(
     () =>
@@ -304,7 +316,7 @@ export default function CatalogPage() {
     setGlobalPage(1);
     setCustomPage(1);
     setInactivePage(1);
-  }, [filterName, filterCategory, filterDoseUnit, activeTab]);
+  }, [filterName, filterCategory, filterDoseUnit, onlyMine, activeTab]);
 
   const globalTotalPages = Math.max(
     1,
@@ -461,23 +473,7 @@ export default function CatalogPage() {
       ) : (
         "—"
       );
-    const formKey = resolveFormulationKey(p.equivalence_group);
-    const canEditFormulation =
-      p.can_edit && Boolean(p.local_product_id) && p.entry_type === "OWN_CUSTOM";
-    const formulationCell = canEditFormulation ? (
-      <Select
-        key={`cf-${p.local_product_id}`}
-        value={formKey === "OTHER" ? "" : formKey}
-        onValueChange={(v) =>
-          handleFormulationChange(p.local_product_id!, v)
-        }
-        placeholder="—"
-        filterLabel="Formulação"
-        options={FORMULATION_SELECT_OPTIONS}
-        className="min-w-[7rem] max-w-[11rem]"
-        disabled={updateProduct.isPending}
-      />
-    ) : (
+    const formulationCell = (
       <span
         key={`cf-${p.local_product_id ?? p.peer_local_product_id ?? p.name}`}
         className="font-semibold tracking-wide text-muted-foreground"
@@ -541,12 +537,18 @@ export default function CatalogPage() {
   const hasActiveFilters = Boolean(
     filterName.trim() || filterCategory || filterDoseUnit,
   );
+  // "Meus produtos" fica fora: liga e desliga no próprio botão.
+  const clearFilters = () => {
+    setFilterName("");
+    setFilterCategory("");
+    setFilterDoseUnit("");
+  };
 
   return (
     <>
       <PageHeader
         icon={<Package className="h-5 w-5" />}
-        title="Produtos"
+        title="Catálogo de produtos"
         description="Catálogo da plataforma e seus produtos customizados. Edite ou desative apenas o que você criou; copie itens de outros agrônomos para o seu catálogo."
         action={
           <Sheet open={openCreate} onOpenChange={setOpenCreate}>
@@ -573,8 +575,21 @@ export default function CatalogPage() {
                   <Label htmlFor="catalog-category">Categoria</Label>
                   <Select
                     id="catalog-category"
-                    {...createForm.register("category")}
-                    value={createForm.watch("category") ?? ""}
+                    value={createCategory}
+                    onValueChange={(v) => {
+                      createForm.setValue("category", v, {
+                        shouldValidate: true,
+                      });
+                      // Semente/fertilizante têm unidade fixa; nas demais,
+                      // sugere "Dose" só se o usuário ainda não escolheu.
+                      const fixed = fixedDoseUnitForCategory(v);
+                      if (fixed || fixedDoseUnitForCategory(createCategory)) {
+                        createForm.setValue(
+                          "dose_unit",
+                          defaultDoseUnitForCategory(v),
+                        );
+                      }
+                    }}
                     placeholder="Selecionar…"
                     filterLabel="Categoria"
                     options={GLOBAL_PRODUCT_CATEGORIES.map((c) => ({
@@ -582,20 +597,36 @@ export default function CatalogPage() {
                       label: PRODUCT_CATEGORY_LABELS[c],
                     }))}
                   />
+                  {createForm.formState.errors.category && (
+                    <p className="text-xs text-destructive">
+                      {createForm.formState.errors.category.message}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="catalog-formulation">Tipo de formulação</Label>
-                  <Select
-                    id="catalog-formulation"
-                    value={createForm.watch("formulation_key") ?? ""}
-                    onValueChange={(v) =>
-                      createForm.setValue("formulation_key", v)
-                    }
-                    placeholder="Selecionar…"
-                    filterLabel="Formulação"
-                    options={FORMULATION_SELECT_OPTIONS}
+                  <Label>Unidade de dose</Label>
+                  <DoseUnitSelect
+                    value={createForm.watch("dose_unit") ?? "DOSE"}
+                    onChange={(v) => createForm.setValue("dose_unit", v)}
+                    disabled={Boolean(fixedDoseUnitForCategory(createCategory))}
+                    className="w-full"
                   />
                 </div>
+                {categoryHasFormulation(createCategory) ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="catalog-formulation">Tipo de formulação</Label>
+                    <Select
+                      id="catalog-formulation"
+                      value={createForm.watch("formulation_key") ?? ""}
+                      onValueChange={(v) =>
+                        createForm.setValue("formulation_key", v)
+                      }
+                      placeholder="Selecionar…"
+                      filterLabel="Formulação"
+                      options={FORMULATION_SELECT_OPTIONS}
+                    />
+                  </div>
+                ) : null}
                 <div className="space-y-1.5">
                   <Label htmlFor="catalog-label">Bulário (opcional)</Label>
                   <Input
@@ -605,8 +636,7 @@ export default function CatalogPage() {
                     placeholder="Link da bula ou rótulo"
                   />
                   <p className="text-xs text-muted-foreground">
-                    PDF ou link externo. A unidade de dose é definida ao montar
-                    a lista de compra.
+                    PDF ou link externo.
                   </p>
                 </div>
                 <Button
@@ -627,9 +657,8 @@ export default function CatalogPage() {
           value={activeTab}
           onValueChange={(v) => {
             setActiveTab(v);
-            setFilterName("");
-            setFilterCategory("");
-            setFilterDoseUnit("");
+            clearFilters();
+            setOnlyMine(false);
           }}
           items={[
             { value: "global", label: "Catálogo Global" },
@@ -686,17 +715,32 @@ export default function CatalogPage() {
             }))}
           />
         </div>
+        {activeTab === "customizados" ? (
+          <Button
+            type="button"
+            variant="outline"
+            aria-pressed={onlyMine}
+            onClick={() => setOnlyMine((v) => !v)}
+            className={cn(
+              "shrink-0 gap-1.5 self-end sm:self-auto",
+              onlyMine &&
+                "border-sky-300 bg-sky-100 text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-300 dark:hover:bg-sky-900 dark:hover:text-sky-200",
+            )}
+          >
+            <UserCheck className="h-4 w-4" />
+            Meus produtos
+            <span className="tabular-nums text-xs opacity-70">
+              {ownCustomCount}
+            </span>
+          </Button>
+        ) : null}
         {hasActiveFilters ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className="shrink-0 self-end sm:self-auto"
-            onClick={() => {
-              setFilterName("");
-              setFilterCategory("");
-              setFilterDoseUnit("");
-            }}
+            onClick={clearFilters}
           >
             Limpar filtros
           </Button>
@@ -754,6 +798,10 @@ export default function CatalogPage() {
           ) : customEntries.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Nenhum produto customizado ainda.
+            </p>
+          ) : onlyMine && ownCustomCount === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Você ainda não criou produtos.
             </p>
           ) : filteredCustom.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">

@@ -5,13 +5,14 @@ import { AlertTriangle, ListFilter, Plus, Sprout, Trash2 } from "lucide-react";
 import { useCurrencyStore } from "@/stores/currency";
 import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
+import { defaultDoseUnitForCategory } from "@/components/domain/product-form-options";
+import { QuickCreateProductDialog } from "@/components/domain/quick-create-product-dialog";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { MoneyInput } from "@recomenda/ui/forms/money-input";
 import { Select, SearchableSelect } from "@recomenda/ui/forms/select";
 import {
   useCloneGlobalProduct,
-  useCreateLocalProduct,
   useGlobalCatalog,
   usePlatformCatalog,
 } from "@recomenda/api-hooks";
@@ -261,7 +262,12 @@ export function PurchaseListItemsEditor({
   const platformCatalog = usePlatformCatalog();
   const globalCatalog = useGlobalCatalog();
   const cloneGlobal = useCloneGlobalProduct();
-  const createLocal = useCreateLocalProduct();
+  // Produto digitado que não existe: abre o cadastro rápido (unidade + formulação).
+  const [quickCreate, setQuickCreate] = useState<{
+    itemKey: string;
+    name: string;
+    category: string;
+  } | null>(null);
   const [resolvingProductKey, setResolvingProductKey] = useState<string | null>(
     null,
   );
@@ -269,13 +275,6 @@ export function PurchaseListItemsEditor({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [removalBusy, setRemovalBusy] = useState(false);
-
-  const defaultUnitForCategory = (category: string): string => {
-    if (category === "CULTIVAR_SOJA") return "BAG";
-    if (category === "HIBRIDO_MILHO") return "SACA";
-    if (category === "FERTILIZER") return "T_HA";
-    return "DOSE";
-  };
 
   // Cultura(s) da lista: "ANY" = soja e milho. Define quais categorias de
   // semente aparecem no seletor (a antiga "Variedade/Híbrido" foi removida).
@@ -429,7 +428,7 @@ export function PurchaseListItemsEditor({
         productName: "",
         stage: DEFAULT_ITEM_STAGE,
         dose: "",
-        unit: defaultUnitForCategory(category),
+        unit: defaultDoseUnitForCategory(category),
         nApps: "1",
         stock: "0",
         price: "",
@@ -772,26 +771,10 @@ export function PurchaseListItemsEditor({
 
   // Cadastra um produto inexistente direto pelo texto digitado na busca. Na
   // lista de compra ele entra normalmente, sem marcação de "fora da programação".
-  const createProductInline = async (it: ListItem, rawName: string) => {
+  const createProductInline = (it: ListItem, rawName: string) => {
     const name = rawName.trim();
     if (!name) return;
-    setResolvingProductKey(it.key);
-    try {
-      const created = await createLocal.mutateAsync({
-        name,
-        category: it.category || "OTHER",
-        dose_unit: defaultUnitForCategory(it.category),
-      });
-      updateItem(it.key, {
-        productId: created.id,
-        productName: created.name ?? name,
-        unit: defaultUnitForCategory(it.category),
-      });
-    } catch {
-      toast.error("Não foi possível cadastrar o produto.");
-    } finally {
-      setResolvingProductKey(null);
-    }
+    setQuickCreate({ itemKey: it.key, name, category: it.category || "OTHER" });
   };
 
   const renderProductField = (
@@ -822,7 +805,7 @@ export function PurchaseListItemsEditor({
         loading={resolvingProductKey === it.key}
         loadingMessage="Vinculando…"
         creatable={Boolean(it.category)}
-        onCreate={(name) => void createProductInline(it, name)}
+        onCreate={(name) => createProductInline(it, name)}
         size="sm"
         panelMinWidth={360}
         className={cn("w-full", minWidth)}
@@ -2046,6 +2029,23 @@ export function PurchaseListItemsEditor({
           </div>
         </div>
       ) : null}
+      <QuickCreateProductDialog
+        open={quickCreate !== null}
+        initialName={quickCreate?.name ?? ""}
+        category={quickCreate?.category ?? ""}
+        onCancel={() => setQuickCreate(null)}
+        onCreated={(created) => {
+          if (quickCreate) {
+            updateItem(quickCreate.itemKey, {
+              productId: created.id,
+              productName: created.name,
+              unit: created.dose_unit,
+              equivalenceGroup: created.equivalence_group,
+            });
+          }
+          setQuickCreate(null);
+        }}
+      />
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}

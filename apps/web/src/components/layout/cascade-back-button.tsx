@@ -17,7 +17,7 @@ export const HOME_CRUMB: BreadcrumbItem = {
 const SECTION_LABELS: Array<[prefix: string, label: string]> = [
   ["/produtores", "Produtores"],
   ["/minhas-gestoes", "Minhas Gestões"],
-  ["/produtos", "Produtos"],
+  ["/produtos", "Catálogo de produtos"],
   ["/relatorios", "Relatórios"],
   ["/equipe", "Equipe"],
   ["/perfil", "Perfil"],

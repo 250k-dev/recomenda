@@ -8,6 +8,7 @@ export interface Product {
   dose_unit?: string;
   price_brl?: string;
   label_url?: string;
+  equivalence_group?: string | null;
 }
 
 export interface GlobalProduct extends Product {
@@ -113,12 +114,14 @@ export async function updateLocalProduct(
     name?: string;
     category?: string;
     dose_unit?: string;
-    price_brl?: string;
-    price_usd?: string;
-    label_url?: string;
+    price_brl?: string | null;
+    price_usd?: string | null;
+    label_url?: string | null;
     is_active?: boolean;
     global_product_id?: string | null;
     equivalence_group?: string | null;
+    manufacturer?: string | null;
+    mapa_registration?: string | null;
   },
 ) {
   const { data } = await api.patch<Product>(`/catalog/local/${id}`, payload);
