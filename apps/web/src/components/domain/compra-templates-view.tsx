@@ -296,17 +296,55 @@ function TemplateEditor({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border bg-card p-5 shadow-sm">
-        <PurchaseListItemsEditor
-          items={items}
-          setItems={setItems}
-          totalHa={0}
-          crop={crop}
-          readOnly={readOnly}
-        />
-      </section>
-
       {error ? <p className="text-sm text-danger-strong">{error}</p> : null}
+
+      <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="border-b bg-muted/30 px-5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Produtos do template
+          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Doses e quantidades finais são calculadas na importação para o produtor.
+          </p>
+        </div>
+        <div className="p-5">
+          <PurchaseListItemsEditor
+            items={items}
+            setItems={setItems}
+            totalHa={0}
+            crop={crop}
+            readOnly={readOnly}
+            hideParams
+            fullBleedTabs={false}
+            footerActions={
+              readOnly
+                ? undefined
+                : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onDone}
+                        disabled={saving}
+                        className="w-full md:w-auto"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => void save()}
+                        disabled={saving}
+                        className="w-full gap-2 md:w-auto"
+                      >
+                        <Check className="h-4 w-4" />
+                        {saving ? "Salvando…" : "Salvar template"}
+                      </Button>
+                    </>
+                  )
+            }
+          />
+        </div>
+      </section>
 
       {readOnly ? (
         <div className="flex justify-end">
@@ -314,17 +352,7 @@ function TemplateEditor({
             Fechar
           </Button>
         </div>
-      ) : (
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onDone} disabled={saving}>
-          Cancelar
-        </Button>
-        <Button onClick={save} disabled={saving} className="gap-2">
-          <Check className="h-4 w-4" />
-          {saving ? "Salvando…" : "Salvar template"}
-        </Button>
-      </div>
-      )}
+      ) : null}
     </div>
   );
 }

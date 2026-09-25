@@ -3,6 +3,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Boxes, Leaf, Pencil, Plus, Share2, Store, Target, X, Check, Loader2 } from "lucide-react";
 import { Select } from "@recomenda/ui/forms/select";
@@ -14,10 +15,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@recomenda/ui/primitives/dialog";
 import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
-import { apiErrorCode, apiErrorMessage } from "@recomenda/api/api-error";
+import { apiErrorCode, apiErrorMessage, apiHttpStatus } from "@recomenda/api/api-error";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
 import { PurchaseListParamsRow } from "@/components/domain/purchase-list-params-row";
 import {
@@ -31,11 +34,11 @@ import {
   applyManualTotalSpent,
   usesManualListTotal,
 } from "@recomenda/domain/purchase-list/breakdown";
+import { clearLocalDraft } from "@recomenda/api-hooks/use-local-draft";
 import {
-  readLocalDraft,
-  clearLocalDraft,
-  useLocalDraft,
-} from "@recomenda/api-hooks/use-local-draft";
+  readVersionedLocalDraft,
+  writeVersionedLocalDraft,
+} from "@recomenda/api-hooks/versioned-local-draft";
 import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
 import { useLeaveBusyGuard } from "@/hooks/use-leave-busy-guard";
 import { CategoryDistributionPanel } from "@/components/domain/category-distribution-panel";
@@ -47,6 +50,20 @@ import {
   useFarmAggregatedShoppingList,
   useUpdatePurchaseList,
 } from "@recomenda/api-hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@recomenda/api-hooks/queryKeys";
+import {
+  getPurchaseListByCycle,
+  syncPurchaseListItems,
+  updatePurchaseList,
+} from "@recomenda/api/purchase-lists";
+import {
+  computePurchaseListItemsDelta,
+  purchaseListDeltaIsEmpty,
+  remapDraftKeysFromSyncItems,
+} from "@recomenda/domain/purchase-list/item-delta";
+import { usePurchaseListEditChannel } from "@/hooks/use-purchase-list-edit-channel";
+import { PurchaseListDraftRestoreDialog } from "@/components/domain/purchase-list-draft-restore-dialog";
 import { useProducerStock } from "@recomenda/api-hooks/producers";
 import type { ListItem } from "@recomenda/domain/purchase-list/list-item";
 import {
@@ -71,13 +88,31 @@ const fmtQty = (n: number) =>
 const fmtBrl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 
-/** Indicador do estado do autosave durante a edição da lista. */
+/** Autosave com save incremental (deltas) — debounce longo. `NEXT_PUBLIC_PURCHASE_LIST_AUTOSAVE=false` desliga. */
+const PURCHASE_LIST_AUTOSAVE_ENABLED =
+  process.env.NEXT_PUBLIC_PURCHASE_LIST_AUTOSAVE !== "false";
+const PURCHASE_LIST_AUTOSAVE_MS = 4000;
+
+function draftPayloadEquals(
+  a: ListItem[],
+  b: ListItem[],
+  listCrop?: string | null,
+): boolean {
+  return (
+    JSON.stringify(listItemsToPayload(a, listCrop)) ===
+    JSON.stringify(listItemsToPayload(b, listCrop))
+  );
+}
+
+/** Indicador do save manual durante a edição da lista. */
 function SaveStatus({
   state,
   savedAt,
+  dirty,
 }: {
   state: "idle" | "saving" | "saved" | "error";
   savedAt: Date | null;
+  dirty: boolean;
 }) {
   if (state === "saving") {
     return (
@@ -101,6 +136,13 @@ function SaveStatus({
     return (
       <span className="flex items-center gap-1.5 text-xs font-medium text-warning-strong">
         <X className="h-3.5 w-3.5" /> Não salvo
+      </span>
+    );
+  }
+  if (dirty) {
+    return (
+      <span className="text-xs font-medium text-muted-foreground">
+        Alterações não salvas — use Salvar
       </span>
     );
   }
@@ -192,12 +234,26 @@ export function FarmPurchaseListTab({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
-  const [leaveUi, setLeaveUi] = useState(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [leaveDialogMode, setLeaveDialogMode] = useState<"confirm" | "saving">("confirm");
+  const [leaveValidationError, setLeaveValidationError] = useState<string | null>(null);
+  const [peerTakeoverOpen, setPeerTakeoverOpen] = useState(false);
+  const pendingNavRef = useRef<string | null>(null);
+  const router = useRouter();
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [restoreItems, setRestoreItems] = useState<ListItem[] | null>(null);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [editBaseline, setEditBaseline] = useState<ListItem[]>([]);
+  const [editBaselineUpdatedAt, setEditBaselineUpdatedAt] = useState<string | null>(
+    null,
+  );
 
+  const queryClient = useQueryClient();
+  const { remotePeerEditing } = usePurchaseListEditChannel(list?.id, editing);
   const updateMutation = useUpdatePurchaseList(list?.id ?? "", { farmId });
   const cascadeRecommendationItemsRef = useRef(false);
+  const draftItemsRef = useRef(draftItems);
+  draftItemsRef.current = draftItems;
 
   const itemsFromList = useCallback(
     (source: PurchaseListDetail | null | undefined) =>
@@ -229,14 +285,14 @@ export function FarmPurchaseListTab({
     // falhado calado — servidor frio ou item incompleto.) Só oferece restaurar
     // quando o backup DIFERE do que está salvo no servidor — evita falso alarme.
     const backup = list
-      ? readLocalDraft<{ items: ListItem[] }>(`pl-edit:${list.id}`)
+      ? readVersionedLocalDraft<{ items: ListItem[] }>(`pl-edit:${list.id}`)
       : null;
     const serverItems = list ? itemsFromList(list) : [];
     const hasUnsaved =
-      !!backup?.items &&
-      backup.items.length > 0 &&
-      JSON.stringify(backup.items) !== JSON.stringify(serverItems);
-    setRestoreItems(hasUnsaved ? backup!.items : null);
+      !!backup?.data.items &&
+      backup.data.items.length > 0 &&
+      !draftPayloadEquals(backup.data.items, serverItems, list?.crop);
+    setRestoreItems(hasUnsaved ? backup!.data.items : null);
   }
 
   // Carrega a cotação e o preço da saca salvos desta lista no store — em efeito,
@@ -252,10 +308,95 @@ export function FarmPurchaseListTab({
     store.setSpacing(list?.spacing_m != null ? String(list.spacing_m) : "");
   }, [list?.id, list?.fx_rate_usd_brl, list?.grain_price_brl, list?.spacing_m]);
 
-  const startEditing = () => {
-    if (!list) return;
-    setDraftItems(itemsFromList(list));
+  const closeLeaveDialog = () => {
+    setLeaveDialogOpen(false);
+    setLeaveDialogMode("confirm");
+    pendingNavRef.current = null;
+  };
+
+  const discardEditsAndLeave = () => {
+    const dest = pendingNavRef.current;
+    pendingNavRef.current = null;
+    cancelEditing();
+    setLeaveDialogOpen(false);
+    setLeaveDialogMode("confirm");
+    if (dest) router.push(dest as Route);
+  };
+
+  const saveEditsAndLeave = async () => {
+    const validationError = validateItems(draftItemsRef.current);
+    if (validationError) {
+      setLeaveValidationError(validationError);
+      toast.error(validationError);
+      return;
+    }
+    const dest = pendingNavRef.current;
+    setLeaveDialogMode("saving");
+    setLeaveDialogOpen(true);
+    const ok = await saveItems({ silent: true, forLeave: true });
+    if (!ok) {
+      setLeaveDialogMode("confirm");
+      return;
+    }
+    pendingNavRef.current = null;
+    setLeaveDialogOpen(false);
+    setLeaveDialogMode("confirm");
+    setLeaveValidationError(null);
+    cancelEditing();
+    if (list?.cycle_id) {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.cyclePurchaseList(list.cycle_id),
+      });
+    }
+    if (dest) router.push(dest as Route);
+  };
+
+  /** Abre na hora com o que já está na tela; GET pesado só em background (If-Match / KPIs). */
+  const beginEditingSession = () => {
+    if (!list || editing) return;
+    const seedSnapshot = itemsFromList(list);
+    setDraftItems(seedSnapshot);
+    setEditBaseline(seedSnapshot);
+    setEditBaselineUpdatedAt(list.updated_at ?? null);
+    setSaveState("idle");
+    setSavedAt(null);
     setEditing(true);
+
+    const cycleId = list.cycle_id;
+    if (!cycleId) return;
+
+    void (async () => {
+      try {
+        const fresh = await queryClient.fetchQuery({
+          queryKey: queryKeys.cyclePurchaseList(cycleId),
+          queryFn: () => getPurchaseListByCycle(cycleId),
+          staleTime: 45_000,
+        });
+        if (!fresh) return;
+        applyListToCache(fresh);
+        if (!draftPayloadEquals(draftItemsRef.current, seedSnapshot, list.crop)) {
+          return;
+        }
+        const freshSeed = itemsFromList(fresh);
+        setEditBaselineUpdatedAt(fresh.updated_at ?? null);
+        if (!draftPayloadEquals(freshSeed, seedSnapshot, list.crop)) {
+          setDraftItems(freshSeed);
+          setEditBaseline(freshSeed);
+          toast.message("Lista atualizada com os dados mais recentes do servidor.");
+        }
+      } catch {
+        // Edição já aberta com o cache da visualização.
+      }
+    })();
+  };
+
+  const startEditing = () => {
+    if (!list || editing) return;
+    if (remotePeerEditing) {
+      setPeerTakeoverOpen(true);
+      return;
+    }
+    beginEditingSession();
   };
 
   const cancelEditing = () => {
@@ -267,10 +408,10 @@ export function FarmPurchaseListTab({
     setSaveState("idle");
   };
 
-  // Restaura alterações não salvas guardadas no navegador (abre em modo edição).
-  const restoreBackup = () => {
-    if (!restoreItems) return;
-    setDraftItems(restoreItems);
+  const applyRestoredDraft = (nextDraft: ListItem[]) => {
+    setDraftItems(nextDraft);
+    setEditBaseline(itemsFromList(list));
+    setEditBaselineUpdatedAt(list?.updated_at ?? null);
     setSaveState("idle");
     setEditing(true);
   };
@@ -286,14 +427,81 @@ export function FarmPurchaseListTab({
     saveWaitersRef.current = [];
     for (const waiter of waiters) waiter(ok);
   };
-  const saveItems = async (opts?: { silent?: boolean }): Promise<boolean> => {
+  const applyListToCache = useCallback(
+    (data: PurchaseListDetail) => {
+      if (data.cycle_id) {
+        queryClient.setQueryData(queryKeys.cyclePurchaseList(data.cycle_id), data);
+      }
+      if (data.producer_id) {
+        queryClient.setQueryData(
+          queryKeys.producerPurchaseLists(data.producer_id),
+          (old: unknown) => {
+            if (!Array.isArray(old)) return old;
+            return old.map((row: { id: string }) => (row.id === data.id ? data : row));
+          },
+        );
+      }
+      if (farmId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.farmPurchaseLists(farmId) });
+      }
+    },
+    [queryClient, farmId],
+  );
+
+  /** GET completo (FIFO, comprar, cost_summary) após sync leve. */
+  const enrichListFromServer = useCallback(
+    async (cycleId: string) => {
+      const fresh = await queryClient.fetchQuery({
+        queryKey: queryKeys.cyclePurchaseList(cycleId),
+        queryFn: () => getPurchaseListByCycle(cycleId),
+        staleTime: 0,
+      });
+      if (!fresh) return null;
+      applyListToCache(fresh);
+      return fresh;
+    },
+    [queryClient, applyListToCache],
+  );
+
+  const listParamsDirty = useCallback(() => {
+    if (!list) return false;
+    const {
+      fxRate: fxRaw,
+      grainPrice: grainRaw,
+      spacing: spacingRaw,
+    } = useCurrencyStore.getState();
+    const fx = fxRaw ? Number(fxRaw) : null;
+    const grain = grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL;
+    const spacing = spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M;
+    const serverFx = list.fx_rate_usd_brl != null ? Number(list.fx_rate_usd_brl) : null;
+    const serverGrain =
+      list.grain_price_brl != null ? Number(list.grain_price_brl) : DEFAULT_GRAIN_PRICE_BRL;
+    const serverSpacing =
+      list.spacing_m != null ? Number(list.spacing_m) : DEFAULT_SPACING_M;
+    return fx !== serverFx || grain !== serverGrain || spacing !== serverSpacing;
+  }, [list]);
+
+  const saveItems = async (opts?: {
+    silent?: boolean;
+    /** Saída da tela: não enriquece em background (evita “sujo” antes do redirect). */
+    forLeave?: boolean;
+  }): Promise<boolean> => {
     if (!list) return false;
     if (saveInFlightRef.current) return false;
-    const validationError = validateItems(draftItems);
+    const draftForSave = draftItemsRef.current;
+    const validationError = validateItems(draftForSave);
     if (validationError) {
       // Autosave não grita validação no meio da digitação; o Salvar manual sim.
       if (!opts?.silent) toast.error(validationError);
       return false;
+    }
+
+    const delta = computePurchaseListItemsDelta(editBaseline, draftForSave, list.crop);
+    const itemsDirty = !purchaseListDeltaIsEmpty(delta);
+    const paramsDirty = listParamsDirty();
+    if (!itemsDirty && !paramsDirty) {
+      setSaveState("saved");
+      return true;
     }
 
     try {
@@ -304,19 +512,81 @@ export function FarmPurchaseListTab({
         grainPrice: grainRaw,
         spacing: spacingRaw,
       } = useCurrencyStore.getState();
-      // NÃO envia `plots`: esta tela edita ITENS. Os talhões da lista vêm da
-      // cobertura da safra (ou do retrato gravado na criação) e não devem ser
-      // reescritos aqui — mandar uma lista vazia (cache velho) apagava os
-      // talhões no servidor e zerava a área, quebrando o cálculo dos defensivos.
-      await updateMutation.mutateAsync({
-        items: listItemsToPayload(draftItems, list.crop),
-        fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
-        grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
-        spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
-        cascade_recommendation_items: cascadeRecommendationItemsRef.current || undefined,
-      });
-      cascadeRecommendationItemsRef.current = false;
-      // Salvou de verdade no servidor: pode descartar o backup local.
+      let ifMatch = editBaselineUpdatedAt ?? list.updated_at ?? undefined;
+      const idempotencyKey =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `save-${Date.now()}`;
+
+      let updated: PurchaseListDetail = list;
+      let remappedAfterSync: ListItem[] | null = null;
+
+      if (itemsDirty) {
+        const syncResult = await syncPurchaseListItems(
+          list.id,
+          {
+            ...delta,
+            cascade_recommendation_items:
+              cascadeRecommendationItemsRef.current || undefined,
+            skip_heavy_sync: true,
+          },
+          { ifMatch, idempotencyKey },
+        );
+        ifMatch = syncResult.updated_at;
+        const remapped = remapDraftKeysFromSyncItems(
+          draftItemsRef.current,
+          syncResult.items,
+        );
+        remappedAfterSync = remapped;
+        setDraftItems(remapped);
+        setEditBaseline(remapped);
+        setEditBaselineUpdatedAt(syncResult.updated_at);
+        updated = { ...list, updated_at: syncResult.updated_at };
+      }
+
+      if (paramsDirty) {
+        updated = await updatePurchaseList(
+          list.id,
+          {
+            fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
+            grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+            spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
+          },
+          { ifMatch },
+        );
+        applyListToCache(updated);
+        const seeded = itemsFromList(updated);
+        setDraftItems(seeded);
+        setEditBaseline(seeded);
+        setEditBaselineUpdatedAt(updated.updated_at ?? null);
+      } else if (itemsDirty && list.cycle_id) {
+        queryClient.setQueryData(
+          queryKeys.cyclePurchaseList(list.cycle_id),
+          (old: PurchaseListDetail | null | undefined) =>
+            old ? { ...old, updated_at: updated.updated_at } : old,
+        );
+      }
+
+      if ((itemsDirty || paramsDirty) && list.cycle_id && !opts?.forLeave) {
+        const enrichGuardBaseline = remappedAfterSync;
+        void enrichListFromServer(list.cycle_id).then((fresh) => {
+          if (!fresh) return;
+          if (
+            enrichGuardBaseline &&
+            !draftPayloadEquals(
+              draftItemsRef.current,
+              enrichGuardBaseline,
+              list.crop,
+            )
+          ) {
+            return;
+          }
+          const seeded = itemsFromList(fresh);
+          setDraftItems(seeded);
+          setEditBaseline(seeded);
+          setEditBaselineUpdatedAt(fresh.updated_at ?? null);
+        });
+      }
       setSaveState("saved");
       setSavedAt(new Date());
       clearLocalDraft(editDraftKey);
@@ -331,6 +601,28 @@ export function FarmPurchaseListTab({
       // NÃO engole o erro: marca "não salvo" (o backup local continua guardado).
       setSaveState("error");
       const code = apiErrorCode(e);
+      if (code === "LIST_VERSION_CONFLICT") {
+        toast.error(
+          "A lista mudou em outro lugar ou em outra aba. Recarregamos os dados do servidor.",
+          { duration: 8000 },
+        );
+        if (list.cycle_id) {
+          try {
+            const fresh = await getPurchaseListByCycle(list.cycle_id);
+            if (fresh) {
+              applyListToCache(fresh);
+              const seeded = itemsFromList(fresh);
+              setDraftItems(seeded);
+              setEditBaseline(seeded);
+              setEditBaselineUpdatedAt(fresh.updated_at ?? null);
+            }
+          } catch {
+            // mantém draft local
+          }
+        }
+        notifySaveWaiters(false);
+        return false;
+      }
       if (
         code === "LIST_ITEM_REMOVAL_BLOCKED" ||
         code === "LIST_ITEM_REMOVAL_NEEDS_CONFIRM"
@@ -341,7 +633,12 @@ export function FarmPurchaseListTab({
         notifySaveWaiters(false);
         return false;
       }
-      if (!opts?.silent) {
+      if (apiHttpStatus(e) === 401) {
+        toast.error(
+          "Sessão expirada. Suas alterações continuam guardadas neste navegador — faça login e use Salvar.",
+          { duration: 8000 },
+        );
+      } else if (!opts?.silent) {
         toast.error(apiErrorMessage(e, "Não foi possível salvar a lista."));
       }
       notifySaveWaiters(false);
@@ -384,50 +681,129 @@ export function FarmPurchaseListTab({
   // chave local (`i-…`) enquanto os do servidor têm o id do banco, então comparar
   // `draftItems` com `viewItems` diretamente daria "sujo" para sempre — e o
   // autosave entraria em laço (salva → refetch → salva…).
-  const draftIsDirty = useMemo(
-    () =>
-      JSON.stringify(listItemsToPayload(draftItems, list?.crop)) !==
-      JSON.stringify(listItemsToPayload(viewItems, list?.crop)),
-    [draftItems, viewItems, list?.crop],
-  );
+  const fxRateStore = useCurrencyStore((state) => state.fxRate);
+  const grainPriceStore = useCurrencyStore((state) => state.grainPrice);
+  const spacingStore = useCurrencyStore((state) => state.spacing);
+
+  const draftIsDirty = useMemo(() => {
+    if (!editing) return false;
+    const itemsChanged = !draftPayloadEquals(draftItems, editBaseline, list?.crop);
+    if (itemsChanged) return true;
+    const fx = fxRateStore ? Number(fxRateStore) : null;
+    const grain = grainPriceStore ? Number(grainPriceStore) : DEFAULT_GRAIN_PRICE_BRL;
+    const spacing = spacingStore ? Number(spacingStore) : DEFAULT_SPACING_M;
+    const serverFx = list?.fx_rate_usd_brl != null ? Number(list.fx_rate_usd_brl) : null;
+    const serverGrain =
+      list?.grain_price_brl != null
+        ? Number(list.grain_price_brl)
+        : DEFAULT_GRAIN_PRICE_BRL;
+    const serverSpacing =
+      list?.spacing_m != null ? Number(list.spacing_m) : DEFAULT_SPACING_M;
+    return fx !== serverFx || grain !== serverGrain || spacing !== serverSpacing;
+  }, [
+    editing,
+    draftItems,
+    editBaseline,
+    viewItems,
+    list?.crop,
+    list?.fx_rate_usd_brl,
+    list?.grain_price_brl,
+    list?.spacing_m,
+    fxRateStore,
+    grainPriceStore,
+    spacingStore,
+  ]);
   const dirtyRef = useRef(false);
   const saveItemsRef = useRef(saveItems);
   dirtyRef.current = draftIsDirty;
   saveItemsRef.current = saveItems;
   useLeaveBusyGuard(
     {
-      isBusy: () => dirtyRef.current || saveInFlightRef.current,
-      flush: async () => {
+      isBusy: () =>
+        editing &&
+        (leaveDialogOpen ||
+          dirtyRef.current ||
+          saveInFlightRef.current ||
+          saveState === "saving"),
+      flush: async (destination?: string) => {
+        if (leaveDialogOpen) {
+          if (destination) pendingNavRef.current = destination;
+          return false;
+        }
+        pendingNavRef.current = destination ?? null;
         if (saveInFlightRef.current) {
-          return new Promise((resolve) => saveWaitersRef.current.push(resolve));
+          setLeaveDialogMode("saving");
+          setLeaveDialogOpen(true);
+          const ok = await new Promise<boolean>((resolve) => {
+            saveWaitersRef.current.push(resolve);
+          });
+          if (!ok) {
+            setLeaveValidationError(validateItems(draftItemsRef.current));
+            setLeaveDialogMode("confirm");
+            return false;
+          }
+          setLeaveDialogOpen(false);
+          setLeaveDialogMode("confirm");
+          pendingNavRef.current = null;
+          return true;
         }
-        if (dirtyRef.current) {
-          return saveItemsRef.current({ silent: true });
+        if (!dirtyRef.current) {
+          pendingNavRef.current = null;
+          return true;
         }
-        return true;
+        setLeaveValidationError(validateItems(draftItemsRef.current));
+        setLeaveDialogMode("confirm");
+        setLeaveDialogOpen(true);
+        return false;
       },
-      setLeaveUi,
+      setLeaveUi: () => {},
     },
-    Boolean(editing && (draftIsDirty || saveState === "saving" || leaveUi)),
+    Boolean(
+      editing && (leaveDialogOpen || draftIsDirty || saveState === "saving"),
+    ),
   );
   useEffect(() => {
+    if (!PURCHASE_LIST_AUTOSAVE_ENABLED) return;
     if (!editing || !list || draftItems.length === 0 || !draftIsDirty) return;
     if (saveInFlightRef.current || saveState === "saving") return;
     const timer = setTimeout(() => {
       if (validateItems(draftItems) === null) {
-        void saveItems({ silent: true });
+        const delta = computePurchaseListItemsDelta(
+          editBaseline,
+          draftItemsRef.current,
+          list.crop,
+        );
+        const appendOnly =
+          delta.append.length > 0 &&
+          delta.update.length === 0 &&
+          delta.remove.length === 0;
+        if (!appendOnly) {
+          void saveItems({ silent: true });
+        }
       }
-    }, 2500);
+    }, PURCHASE_LIST_AUTOSAVE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftItems, editing, list?.id, draftIsDirty, saveState]);
 
   // Backup local contínuo (400ms) enquanto edita — guarda QUALQUER estado, mesmo
   // inválido ou incompleto, então nada se perde se o autosave do servidor falhar.
-  useLocalDraft(editDraftKey, { items: draftItems }, editing && Boolean(list));
+  useEffect(() => {
+    if (!editing || !list) return;
+    const id = setTimeout(
+      () =>
+        writeVersionedLocalDraft(
+          editDraftKey,
+          { items: draftItems },
+          { listUpdatedAt: editBaselineUpdatedAt ?? list.updated_at ?? null },
+        ),
+      400,
+    );
+    return () => clearTimeout(id);
+  }, [editDraftKey, draftItems, editing, list, editBaselineUpdatedAt]);
 
   // Trava: editando e ainda não confirmado como salvo → avisa antes de sair.
-  useUnsavedChangesWarning(editing && saveState !== "saved");
+  useUnsavedChangesWarning(editing && draftIsDirty);
 
   const totalHa = list?.total_hectares ?? 0;
   const fxRate = useCurrencyStore((state) => state.fxRate);
@@ -521,18 +897,87 @@ export function FarmPurchaseListTab({
 
   return (
     <div className="flex flex-col gap-5">
-      <Dialog open={leaveUi}>
+      <Dialog
+        open={leaveDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && leaveDialogMode !== "saving") closeLeaveDialog();
+        }}
+      >
         <DialogContent
-          showCloseButton={false}
-          className="max-w-xs items-center py-10 text-center"
-          onPointerDownOutside={(event) => event.preventDefault()}
-          onEscapeKeyDown={(event) => event.preventDefault()}
+          showCloseButton={leaveDialogMode !== "saving"}
+          className="gap-0 p-0 sm:max-w-md"
+          onPointerDownOutside={(event) => {
+            if (leaveDialogMode === "saving") event.preventDefault();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (leaveDialogMode === "saving") event.preventDefault();
+          }}
         >
-          <Loader2 className="size-10 animate-spin text-primary" aria-hidden />
-          <DialogTitle>Salvando…</DialogTitle>
-          <DialogDescription>
-            Aguarde a lista gravar antes de sair desta tela.
-          </DialogDescription>
+          {leaveDialogMode === "saving" ? (
+            <DialogHeader className="items-center border-0 py-10 text-center">
+              <Loader2 className="mb-2 size-10 animate-spin text-primary" aria-hidden />
+              <DialogTitle>Salvando…</DialogTitle>
+              <DialogDescription>
+                Aguarde terminar antes de sair. Não feche esta aba.
+              </DialogDescription>
+            </DialogHeader>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Alterações não salvas</DialogTitle>
+                <DialogDescription>
+                  Você ainda está editando a lista. Escolha o que fazer antes de sair
+                  desta tela.
+                  {leaveValidationError ? (
+                    <span className="mt-2 block font-medium text-warning-strong">
+                      {leaveValidationError}
+                    </span>
+                  ) : null}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                <Button type="button" variant="outline" onClick={closeLeaveDialog}>
+                  Continuar editando
+                </Button>
+                <Button type="button" variant="outline" onClick={discardEditsAndLeave}>
+                  Descartar e sair
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void saveEditsAndLeave()}
+                  disabled={Boolean(leaveValidationError)}
+                >
+                  Salvar e sair
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={peerTakeoverOpen} onOpenChange={setPeerTakeoverOpen}>
+        <DialogContent className="gap-0 p-0 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Lista aberta em outra janela</DialogTitle>
+            <DialogDescription>
+              Esta lista já está em edição em outra aba deste navegador. Se editar nas
+              duas ao mesmo tempo, uma aba pode sobrescrever a outra.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setPeerTakeoverOpen(false)}>
+              Continuar só visualizando
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setPeerTakeoverOpen(false);
+                beginEditingSession();
+              }}
+            >
+              Editar nesta aba
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       {purchaseLists.length > 1 ? (
@@ -647,15 +1092,37 @@ export function FarmPurchaseListTab({
         />
       </PageHero>
 
+      {remotePeerEditing && !editing ? (
+        <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
+          Esta lista está em edição em outra aba do navegador. Abra só uma janela para
+          editar ou você pode sobrescrever alterações.
+        </div>
+      ) : null}
+      {remotePeerEditing && editing ? (
+        <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
+          Outra aba também está editando esta lista. Salve com cuidado para não
+          sobrescrever alterações.
+        </div>
+      ) : null}
+
       {restoreItems && !editing && !effectiveReadOnly ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
-          <span className="flex items-center gap-2">
-            Há alterações desta lista <strong>não salvas</strong> guardadas neste
-            navegador (o último salvamento pode ter falhado). Quer recuperá-las?
+          <span className="flex min-w-0 flex-col gap-1">
+            <span>
+              Há alterações <strong>não salvas no servidor</strong> guardadas só neste
+              navegador (localStorage). Isso <strong>não</strong> chama a API até você
+              Salvar — mas pode explicar produtos que “aparecem do nada” se você
+              recuperar um rascunho antigo.
+            </span>
           </span>
           <span className="flex shrink-0 items-center gap-2">
-            <Button size="sm" variant="clay" className="gap-1.5" onClick={restoreBackup}>
-              Recuperar
+            <Button
+              size="sm"
+              variant="clay"
+              className="gap-1.5"
+              onClick={() => setRestoreDialogOpen(true)}
+            >
+              Ver alterações
             </Button>
             <Button size="sm" variant="outline" onClick={discardBackup}>
               Descartar
@@ -664,11 +1131,25 @@ export function FarmPurchaseListTab({
         </div>
       ) : null}
 
+      {restoreItems && list ? (
+        <PurchaseListDraftRestoreDialog
+          open={restoreDialogOpen}
+          onOpenChange={setRestoreDialogOpen}
+          serverItems={viewItems}
+          backupItems={restoreItems}
+          listCrop={list.crop}
+          onConfirm={(draft) => {
+            applyRestoredDraft(draft);
+            setRestoreDialogOpen(false);
+          }}
+        />
+      ) : null}
+
       {saveState === "error" && editing ? (
         <div className="rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
-          Não foi possível salvar no servidor agora — suas alterações estão{" "}
-          <strong>guardadas neste navegador</strong>. Tente <strong>Salvar</strong>{" "}
-          de novo em alguns segundos (o servidor pode estar reativando).
+          Não foi possível salvar agora — suas alterações estão{" "}
+          <strong>guardadas neste navegador</strong>. Tente <strong>Salvar</strong> de
+          novo em alguns segundos.
         </div>
       ) : null}
 
@@ -718,7 +1199,7 @@ export function FarmPurchaseListTab({
             tabsActions={
               editing ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <SaveStatus state={saveState} savedAt={savedAt} />
+                  <SaveStatus state={saveState} savedAt={savedAt} dirty={draftIsDirty} />
                   <Button
                     variant="outline"
                     size="sm"
@@ -744,7 +1225,11 @@ export function FarmPurchaseListTab({
                   </Button>
                 </div>
               ) : !effectiveReadOnly ? (
-                <Button size="sm" className="gap-1.5" onClick={startEditing}>
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => startEditing()}
+                >
                   <Pencil className="h-4 w-4" />
                   Editar Lista de Compras
                 </Button>
@@ -759,6 +1244,13 @@ export function FarmPurchaseListTab({
             listId={list.id}
             onRemovalCascadeArmed={() => {
               cascadeRecommendationItemsRef.current = true;
+            }}
+            onItemsPersistedToServer={(next) => {
+              setEditBaseline(next);
+              setSaveState("saved");
+              if (list.cycle_id) {
+                void enrichListFromServer(list.cycle_id);
+              }
             }}
             />
         </div>

@@ -68,6 +68,8 @@ export interface PurchaseListInput {
   items: PurchaseListItemInput[];
   /** Confirma exclusão em cascata das recomendações pendentes dos itens removidos. */
   cascade_recommendation_items?: boolean;
+  /** Save rápido: não recalcula metas de todas as listas do produtor no servidor. */
+  skip_heavy_sync?: boolean;
 }
 
 export interface CostPlanCategoryBreakdown {
@@ -199,8 +201,65 @@ export async function getPurchaseListByCycle(cycleId: string) {
   return data;
 }
 
-export async function updatePurchaseList(id: string, payload: Partial<PurchaseListInput>) {
-  const { data } = await api.put<PurchaseListDetail>(`/purchase-lists/${id}`, payload);
+export type PurchaseListRequestOptions = {
+  ifMatch?: string | null;
+  idempotencyKey?: string;
+};
+
+export async function updatePurchaseList(
+  id: string,
+  payload: Partial<PurchaseListInput>,
+  options?: PurchaseListRequestOptions,
+) {
+  const headers: Record<string, string> = {};
+  if (options?.ifMatch) headers["If-Match"] = options.ifMatch;
+  if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+  const { data } = await api.put<PurchaseListDetail>(`/purchase-lists/${id}`, payload, {
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
+  });
+  return data;
+}
+
+export type PurchaseListItemsSyncInput = {
+  append: PurchaseListItemInput[];
+  update: Array<{ id: string; item: PurchaseListItemInput }>;
+  remove: Array<{
+    local_product_id: string;
+    stage: string;
+    out_of_program?: boolean;
+  }>;
+  cascade_recommendation_items?: boolean;
+  skip_heavy_sync?: boolean;
+};
+
+export type PurchaseListItemsSyncResult = {
+  id: string;
+  cycle_id: string | null;
+  producer_id: string | null;
+  updated_at: string;
+  enrichment_pending: true;
+  items: Array<{
+    id: string;
+    local_product_id: string;
+    stage: string;
+    out_of_program: boolean;
+  }>;
+};
+
+/** Save incremental de itens (sem replace-all). Resposta leve — use GET by-cycle para enriquecer. */
+export async function syncPurchaseListItems(
+  listId: string,
+  body: PurchaseListItemsSyncInput,
+  options?: PurchaseListRequestOptions,
+) {
+  const headers: Record<string, string> = {};
+  if (options?.ifMatch) headers["If-Match"] = options.ifMatch;
+  if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+  const { data } = await api.post<PurchaseListItemsSyncResult>(
+    `/purchase-lists/${listId}/items/sync`,
+    body,
+    { headers: Object.keys(headers).length > 0 ? headers : undefined },
+  );
   return data;
 }
 
@@ -220,7 +279,12 @@ export type ListItemRemovalPreview = {
 
 export async function removePurchaseListItems(
   listId: string,
-  items: Array<{ local_product_id: string; stage: string }>,
+  items: Array<{
+    local_product_id: string;
+    stage: string;
+    out_of_program?: boolean;
+  }>,
+  opts?: { skipHeavySync?: boolean },
 ) {
   const { data } = await api.post<{
     removed: Array<{
@@ -239,7 +303,10 @@ export async function removePurchaseListItems(
       stage_name: string;
       plot_count: number;
     }>;
-  }>(`/purchase-lists/${listId}/items/remove`, { items });
+  }>(`/purchase-lists/${listId}/items/remove`, {
+    items,
+    skip_heavy_sync: opts?.skipHeavySync === true,
+  });
   return data;
 }
 

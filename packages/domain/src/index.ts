@@ -90,6 +90,25 @@ export {
   validateListItems,
   applyStockPrefill,
 } from "./purchase-list/list-item";
+export {
+  computePurchaseListItemsDelta,
+  isNewPurchaseListRow,
+  purchaseListDeltaIsEmpty,
+  remapDraftKeysFromSyncItems,
+} from "./purchase-list/item-delta";
+export type {
+  PurchaseListItemsDelta,
+  PurchaseListItemRemoveKey,
+} from "./purchase-list/item-delta";
+export {
+  applyDraftRecoverySelection,
+  listDraftRecoveryAllRows,
+  listDraftRecoveryCandidates,
+} from "./purchase-list/draft-recovery";
+export type {
+  DraftRecoveryCandidate,
+  DraftRecoveryRow,
+} from "./purchase-list/draft-recovery";
 export type { ProducerStockPrefillEntry } from "./purchase-list/list-item";
 export type { PurchaseListMetrics } from "./purchase-list/breakdown";
 export {

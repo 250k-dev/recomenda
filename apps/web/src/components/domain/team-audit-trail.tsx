@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Download, Search } from "lucide-react";
+import { Download, Eye, Search } from "lucide-react";
+import type { TeamActivityRow } from "@recomenda/api/consultants";
+import {
+  TeamAuditActivityDetailsDialog,
+  hasPurchaseListAuditDetails,
+} from "@/components/domain/team-audit-activity-details-dialog";
 import { routes } from "@recomenda/config";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
@@ -107,6 +112,7 @@ export function TeamAuditTrail() {
   const [q, setQ] = useState("");
   const [qApplied, setQApplied] = useState("");
   const [offset, setOffset] = useState(0);
+  const [detailRow, setDetailRow] = useState<TeamActivityRow | null>(null);
 
   useEffect(() => {
     setActor(actorFromUrl);
@@ -380,8 +386,22 @@ export function TeamAuditTrail() {
                         </span>
                       ) : null}
                     </td>
-                    <td className="max-w-[280px] px-4 py-3 text-text-strong">
-                      {r.summary}
+                    <td className="max-w-[320px] px-4 py-3 text-text-strong">
+                      <div className="flex items-start gap-2">
+                        <span className="min-w-0 flex-1 leading-snug">{r.summary}</span>
+                        {hasPurchaseListAuditDetails(r) ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="shrink-0 text-muted-foreground hover:text-foreground"
+                            aria-label="Ver produtos alterados"
+                            onClick={() => setDetailRow(r)}
+                          >
+                            <Eye className="size-4" />
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {[r.producer_name, r.farm_name].filter(Boolean).join(" · ") ||
@@ -431,6 +451,13 @@ export function TeamAuditTrail() {
           </div>
         ) : null}
       </section>
+
+      <TeamAuditActivityDetailsDialog
+        row={detailRow}
+        onOpenChange={(open) => {
+          if (!open) setDetailRow(null);
+        }}
+      />
     </div>
   );
 }

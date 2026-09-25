@@ -113,6 +113,8 @@ type PurchaseListItemsEditorProps = {
   listId?: string | null;
   /** Marca o próximo PUT para cascatear exclusão nas recomendações pendentes. */
   onRemovalCascadeArmed?: () => void;
+  /** Itens já gravados no servidor (ex.: após remover linhas pela API). */
+  onItemsPersistedToServer?: (items: ListItem[]) => void;
 };
 
 /** Chave estável e única de item. A antiga (`Date.now()`+índice) colidia ao
@@ -255,6 +257,7 @@ export function PurchaseListItemsEditor({
   fullBleedTabs = true,
   listId,
   onRemovalCascadeArmed,
+  onItemsPersistedToServer,
 }: PurchaseListItemsEditorProps) {
   const canViewPrices = useCan("PRICE_VIEW");
   const queryClient = useQueryClient();
@@ -565,7 +568,9 @@ export function PurchaseListItemsEditor({
             local_product_id: it.productId,
             stage: it.stage || DEFAULT_ITEM_STAGE,
           }));
-        const res = await removePurchaseListItems(listId, payload);
+        const res = await removePurchaseListItems(listId, payload, {
+          skipHeavySync: true,
+        });
         const removedKeys = new Set(
           selected
             .filter((it) =>
@@ -578,7 +583,11 @@ export function PurchaseListItemsEditor({
             .map((it) => it.key),
         );
         for (const it of unsaved) removedKeys.add(it.key);
-        setItems((prev) => prev.filter((it) => !removedKeys.has(it.key)));
+        setItems((prev) => {
+          const next = prev.filter((it) => !removedKeys.has(it.key));
+          onItemsPersistedToServer?.(next);
+          return next;
+        });
         setSelectedKeys(new Set());
         onRemovalCascadeArmed?.();
         if (res.removed.length > 0) {
@@ -943,26 +952,8 @@ export function PurchaseListItemsEditor({
           // Tom da classe (as mesmas cores de Gastos por categoria), bem leve.
           isNew && "bg-primary-soft [&>td]:bg-transparent",
           selectedKeys.has(it.key) && "bg-primary/10 [&>td]:bg-transparent",
-          !readOnly && "cursor-pointer",
         )}
         style={rowHighlight ? undefined : { backgroundColor: catWash }}
-        onClick={
-          readOnly
-            ? undefined
-            : (event) => {
-                // Clicar na linha marca/desmarca o item, menos quando o clique
-                // caiu num controle da própria linha (input, select, botão…) —
-                // aí quem manda é o controle.
-                if (
-                  (event.target as HTMLElement).closest(
-                    "input, select, textarea, button, a, label, [role='combobox'], [contenteditable='true']",
-                  )
-                ) {
-                  return;
-                }
-                toggleSelected(it.key);
-              }
-        }
       >
         <td className="px-1.5 py-1.5 text-center">
           {readOnly ? null : (
@@ -1022,15 +1013,17 @@ export function PurchaseListItemsEditor({
           }
         >
           {readOnly ? (
-            <span className="block truncate text-sm font-medium text-foreground">
+            <span className="block min-w-0 truncate text-sm font-medium text-foreground">
               {it.productName || "—"}
             </span>
           ) : (
-            renderProductField(
-              it,
-              rowProducts,
-              cn("min-w-0", TABLE_SELECT_CLASS),
-            )
+            <div className="min-w-0">
+              {renderProductField(
+                it,
+                rowProducts,
+                cn("min-w-0", TABLE_SELECT_CLASS),
+              )}
+            </div>
           )}
         </td>
         {!seed ? (

@@ -47,6 +47,16 @@ export interface TeamMemberSummary {
 
 export type ActivitySeverity = "critical" | "attention" | "routine";
 
+export type PurchaseListAuditItemLine = {
+  kind: "added" | "removed";
+  product_name: string;
+  stage: string;
+};
+
+export type TeamActivityDetails = {
+  purchase_list_items?: PurchaseListAuditItemLine[];
+};
+
 /** Uma ação do membro na carteira ("quem fez o quê"). */
 export interface TeamActivityRow {
   id: string;
@@ -61,6 +71,7 @@ export interface TeamActivityRow {
   action: string;
   summary: string;
   created_at: string;
+  details?: TeamActivityDetails | null;
   category?: string;
   severity?: ActivitySeverity;
 }

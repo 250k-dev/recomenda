@@ -8,7 +8,8 @@ const SENTINEL = "__recomendaLeaveGuard";
 
 export type LeaveBusyController = {
   isBusy: () => boolean;
-  flush: () => Promise<boolean>;
+  /** `destination` = href interno ao sair por link; omitido em outros fluxos. */
+  flush: (destination?: string) => Promise<boolean>;
   setLeaveUi: (open: boolean) => void;
 };
 
@@ -20,9 +21,7 @@ export async function runLeaveBusy(proceed: () => void) {
     proceed();
     return;
   }
-  guard.setLeaveUi(true);
   const ok = await guard.flush();
-  guard.setLeaveUi(false);
   if (ok) proceed();
 }
 
@@ -88,9 +87,7 @@ export function useLeaveBusyGuard(controller: LeaveBusyController, enabled: bool
       event.preventDefault();
       event.stopPropagation();
       void (async () => {
-        controllerRef.current.setLeaveUi(true);
-        const ok = await controllerRef.current.flush();
-        controllerRef.current.setLeaveUi(false);
+        const ok = await controllerRef.current.flush(dest);
         if (ok) router.push(dest as Route);
       })();
     };
@@ -111,9 +108,7 @@ export function useLeaveBusyGuard(controller: LeaveBusyController, enabled: bool
       if (!controllerRef.current.isBusy()) return;
       window.history.pushState({ [SENTINEL]: true }, "", window.location.href);
       void (async () => {
-        controllerRef.current.setLeaveUi(true);
         const ok = await controllerRef.current.flush();
-        controllerRef.current.setLeaveUi(false);
         if (ok) {
           ignorePopRef.current = true;
           window.history.go(-2);
