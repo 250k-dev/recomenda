@@ -48,6 +48,8 @@ export type AgendaEvent = {
   isCenterDay: boolean;
   /** Data de plantio atual (só PLANTING). */
   plantingDate?: string | null;
+  /** Área a aplicar do talhão da safra (ha); null quando desconhecida. */
+  areaHa: number | null;
 };
 
 export type AgronomistAgendaResult = {
@@ -74,6 +76,11 @@ function ymdFromDate(d: Date): string {
 // Reexportado porque `month-calendar.tsx` já o importa daqui junto com os
 // hooks de agenda. A implementação é a de `@recomenda/utils`.
 export { localYmdToDate };
+
+function seasonAreaHa(season: AgendaSeasonRow): number | null {
+  const area = Number(season.area_ha);
+  return season.area_ha != null && Number.isFinite(area) && area > 0 ? area : null;
+}
 
 function recommendationTitle(r: AgendaApiPending): string {
   return r.name?.trim() || "Aplicação";
@@ -204,6 +211,7 @@ async function fetchAgendaEvents(
       producerName: season.producer_name?.trim() || "Produtor",
       plotName: season.plot_name?.trim() || "Talhão",
       seasonId: season.id,
+      areaHa: seasonAreaHa(season),
       isLate: false,
       pillLabel: hasPlanting ? "Plantio" : "Sem data",
       windowEndYmd: displayYmd,
@@ -260,6 +268,7 @@ async function fetchAgendaEvents(
       producerName: season.producer_name?.trim() || "Produtor",
       plotName: season.plot_name?.trim() || "Talhão",
       seasonId: season.id,
+      areaHa: seasonAreaHa(season),
       isLate,
       pillLabel: pillText,
       windowEndYmd: window.endYmd,
@@ -306,6 +315,29 @@ export function dedupeAgendaEvents(events: AgendaEvent[]): AgendaEvent[] {
     if (event.ymd === event.displayYmd) byRec.set(key, event);
   }
   return [...byRec.values()];
+}
+
+export type AgendaSummary = {
+  /** Etapas de aplicação (plantio fica de fora). */
+  applications: number;
+  /** Soma da área dos talhões de cada aplicação (ha). */
+  areaHa: number;
+  /** Alguma aplicação sem área conhecida — o total de ha está incompleto. */
+  hasUnknownArea: boolean;
+};
+
+/** Totais para "N aplicações · X ha para aplicar". Duas etapas no mesmo talhão somam duas vezes (duas passadas). */
+export function summarizeAgendaEvents(events: AgendaEvent[]): AgendaSummary {
+  let applications = 0;
+  let areaHa = 0;
+  let hasUnknownArea = false;
+  for (const event of events) {
+    if (event.kind !== "APPLICATION") continue;
+    applications += 1;
+    if (event.areaHa == null) hasUnknownArea = true;
+    else areaHa += event.areaHa;
+  }
+  return { applications, areaHa, hasUnknownArea };
 }
 
 export function useAgronomistAgenda(month: Date, producerId?: string) {

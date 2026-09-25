@@ -137,10 +137,10 @@ function PlotPlanCard({
   const clay = plan.highlighted;
 
   return (
-    <Reveal delay={delay}>
+    <Reveal delay={delay} className="h-full">
       <article
         className={cn(
-          "flex h-full flex-col rounded-3xl border bg-surface p-7 transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:shadow-lift sm:p-8",
+          "flex h-full min-w-0 flex-col rounded-3xl border bg-surface p-6 transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:shadow-lift",
           clay
             ? "border-clay-500/35 shadow-soft"
             : "border-line",
@@ -175,11 +175,11 @@ function PlotPlanCard({
         >
           {plan.plotRange}
         </p>
-        {plan.description ? (
-          <p className="mt-2 text-sm leading-relaxed text-muted">{plan.description}</p>
-        ) : null}
+        <p className="mt-2 min-h-11 text-sm leading-relaxed text-muted">
+          {plan.description ?? "\u00a0"}
+        </p>
 
-        <p className="mt-5 font-display text-3xl font-semibold tracking-tight text-ink">
+        <p className="mt-5 font-display text-[1.65rem] font-semibold tracking-tight text-ink xl:text-3xl">
           {price.amount}
         </p>
         <p className="mt-1 text-sm text-muted">{price.cadence}</p>
@@ -373,7 +373,7 @@ export function PlansView() {
       </section>
 
       <Section className="bg-cream pt-4 sm:pt-8">
-        <Container>
+        <div className="mx-auto w-full max-w-[92rem] px-5 sm:px-8">
           <Reveal>
             <div className="flex flex-col items-center gap-4 text-center">
               <BillingToggle mode={mode} onChange={setMode} />
@@ -384,7 +384,7 @@ export function PlansView() {
             </div>
           </Reveal>
 
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
             {showcase.plots.map((plan, i) => (
               <PlotPlanCard
                 key={plan.id}
@@ -425,7 +425,7 @@ export function PlansView() {
               }
             />
           </div>
-        </Container>
+        </div>
       </Section>
 
       <Section className="bg-cream pt-0">

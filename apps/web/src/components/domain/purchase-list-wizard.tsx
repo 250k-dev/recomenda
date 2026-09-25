@@ -21,10 +21,12 @@ import {
 } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
-  readLocalDraft,
   clearLocalDraft,
-  useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
+import {
+  readVersionedLocalDraft,
+  writeVersionedLocalDraft,
+} from "@recomenda/api-hooks/versioned-local-draft";
 import { Input } from "@recomenda/ui/primitives/input";
 import { Label } from "@recomenda/ui/primitives/label";
 import { PurchaseListItemsEditor } from "@/components/domain/purchase-list-items-editor";
@@ -229,7 +231,7 @@ export function PurchaseListWizard({
   // queda de internet). Some quando a lista é criada de verdade.
   const draftKey = `pl-draft:${cycleId ?? producerId ?? "new"}`;
   const savedDraft = useMemo(
-    () => readLocalDraft<WizardDraft>(draftKey),
+    () => readVersionedLocalDraft<WizardDraft>(draftKey)?.data ?? null,
     [draftKey],
   );
 
@@ -303,7 +305,11 @@ export function PurchaseListWizard({
 
   // Autosave silencioso: salva o progresso no fundo enquanto a lista não é criada.
   const draft: WizardDraft = { step, crop, listName, items, targets };
-  useLocalDraft(draftKey, draft, !saved);
+  useEffect(() => {
+    if (saved) return;
+    const id = setTimeout(() => writeVersionedLocalDraft(draftKey, draft), 400);
+    return () => clearTimeout(id);
+  }, [draftKey, draft, saved]);
 
   // Trava contra perder trabalho: avisa antes de fechar/recarregar/sair com itens
   // não salvos. O rascunho local acima restaura o progresso ao voltar.

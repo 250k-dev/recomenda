@@ -93,6 +93,8 @@ export type AgendaApiSeason = {
   farm_name: string | null;
   farm_id: string | null;
   producer_name: string | null;
+  /** Área plantada da safra, senão a do talhão (ha). Opcional: server antigo não envia. */
+  area_ha?: number | null;
 };
 
 export type AgendaApiPending = {

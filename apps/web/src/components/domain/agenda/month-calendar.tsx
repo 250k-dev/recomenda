@@ -38,7 +38,7 @@ import { Label } from "@recomenda/ui/primitives/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@recomenda/ui/primitives/popover";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
-import { useAgronomistAgenda, useBulkRegisterRecommendations, useProducers, localYmdToDate, dedupeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
+import { useAgronomistAgenda, useBulkRegisterRecommendations, useProducers, localYmdToDate, dedupeAgendaEvents, summarizeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
@@ -65,7 +65,25 @@ const GROUP_ACCENT_CLASSES = [
 
 type AgendaStatusFilter = "late" | "today" | "pending";
 
-type PanelMode = "day" | "month" | "filter";
+type ViewMode = "day" | "week" | "month";
+
+type PanelMode = ViewMode | "filter";
+
+const VIEW_MODE_OPTIONS: Array<{ value: ViewMode; label: string }> = [
+  { value: "day", label: "Dia" },
+  { value: "week", label: "Semana" },
+  { value: "month", label: "Mês" },
+];
+
+const fmtHa = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+
+/** "23 aplicações · 300 ha para aplicar" — só a contagem quando não há área. */
+function agendaSummaryText(events: AgendaEvent[]): string | null {
+  const { applications, areaHa } = summarizeAgendaEvents(events);
+  if (applications === 0) return null;
+  const count = `${applications} ${applications === 1 ? "aplicação" : "aplicações"}`;
+  return areaHa > 0 ? `${count} · ${fmtHa(areaHa)} ha para aplicar` : count;
+}
 
 const STATUS_FILTER_META: Record<
   AgendaStatusFilter,
@@ -188,6 +206,15 @@ export function MonthCalendar({
     return allEvents.filter((event) => event.ymd >= monthStart && event.ymd <= monthEnd);
   }, [allEvents, month]);
 
+  // Semana do dia selecionado, começando no domingo como o mini calendário.
+  const weekStart = startOfWeek(selectedDay, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(selectedDay, { weekStartsOn: 0 });
+  const weekStartYmd = format(weekStart, "yyyy-MM-dd");
+  const weekEndYmd = format(weekEnd, "yyyy-MM-dd");
+  const weekEvents = allEvents.filter(
+    (event) => event.ymd >= weekStartYmd && event.ymd <= weekEndYmd,
+  );
+
   /* eslint-disable react-hooks/set-state-in-effect -- dívida pré-existente (baseline desde A1): reseta o painel ao trocar de produtor. A forma canônica é `key={producerId}` no componente pai, mas mexer nisso é mudança de comportamento sem teste que a cubra. */
   useEffect(() => {
     didAutoFocus.current = false;
@@ -239,6 +266,20 @@ export function MonthCalendar({
   };
 
   const headerTitle = title ?? "Cronograma";
+
+  const panelEvents =
+    panelMode === "month"
+      ? monthEvents
+      : panelMode === "week"
+        ? weekEvents
+        : panelMode === "filter"
+          ? filteredEvents
+          : selectedEvents;
+  const panelSummary = agendaSummaryText(panelEvents);
+
+  const weekTitle = isSameMonth(weekStart, weekEnd)
+    ? `${format(weekStart, "d")} – ${format(weekEnd, "d 'de' MMMM", { locale: ptBR })}`
+    : `${format(weekStart, "d 'de' MMM", { locale: ptBR })} – ${format(weekEnd, "d 'de' MMM", { locale: ptBR })}`;
 
   return (
     <div
@@ -302,9 +343,11 @@ export function MonthCalendar({
             selectedDay={selectedDay}
             today={today}
             todayYmd={todayYmd}
+            highlightWeek={panelMode === "week" ? selectedDay : null}
             onSelectDay={(day) => {
               setSelectedDay(day);
-              setPanelMode("day");
+              // Semana continua em semana (troca a semana); os demais voltam para o dia.
+              if (panelMode !== "week") setPanelMode("day");
               setStatusFilter(null);
             }}
           />
@@ -362,17 +405,26 @@ export function MonthCalendar({
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {panelMode === "month"
                   ? "Mês inteiro"
-                  : panelMode === "filter" && statusFilter
+                  : panelMode === "week"
+                    ? "Semana"
+                    : panelMode === "filter" && statusFilter
                     ? STATUS_FILTER_META[statusFilter].panelTitle
                     : "Aplicações do dia"}
               </p>
               <p className="mt-1 text-lg font-bold capitalize tracking-tight text-foreground sm:text-xl">
                 {panelMode === "month"
-                  ? "Agrupado por cliente"
-                  : panelMode === "filter"
+                  ? format(month, "MMMM 'de' yyyy", { locale: ptBR })
+                  : panelMode === "week"
+                    ? weekTitle
+                    : panelMode === "filter"
                     ? STATUS_FILTER_META[statusFilter ?? "pending"].label
                     : format(selectedDay, "EEEE, d 'de' MMMM", { locale: ptBR })}
               </p>
+              {!isLoading && !isError && panelSummary ? (
+                <p className="mt-1 text-sm font-semibold tabular-nums text-primary-strong">
+                  {panelSummary}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -384,7 +436,7 @@ export function MonthCalendar({
                 />
               ) : null}
               <ViewModeToggle
-                mode={panelMode === "month" ? "month" : "day"}
+                mode={panelMode === "filter" ? "day" : panelMode}
                 onChange={(mode) => {
                   setPanelMode(mode);
                   if (mode === "day") setStatusFilter(null);
@@ -429,6 +481,19 @@ export function MonthCalendar({
               ) : (
                 <GroupedAgendaList
                   events={monthEvents}
+                  todayYmd={todayYmd}
+                  variant="month"
+                  selectable={selectionMode}
+                  selectedKeys={selectedKeys}
+                  onToggle={toggleSelected}
+                />
+              )
+            ) : panelMode === "week" ? (
+              weekEvents.length === 0 ? (
+                <EmptyAgendaState message="Nenhuma aplicação pendente nesta semana." />
+              ) : (
+                <GroupedAgendaList
+                  events={weekEvents}
                   todayYmd={todayYmd}
                   variant="month"
                   selectable={selectionMode}
@@ -519,6 +584,7 @@ function MiniMonthCalendar({
   selectedDay,
   today,
   todayYmd,
+  highlightWeek,
   onSelectDay,
 }: {
   month: Date;
@@ -527,8 +593,17 @@ function MiniMonthCalendar({
   selectedDay: Date;
   today: Date;
   todayYmd: string;
+  /** Modo semana: destaca a linha da semana deste dia. */
+  highlightWeek: Date | null;
   onSelectDay: (day: Date) => void;
 }) {
+  const weekStartYmd = highlightWeek
+    ? format(startOfWeek(highlightWeek, { weekStartsOn: 0 }), "yyyy-MM-dd")
+    : null;
+  const weekEndYmd = highlightWeek
+    ? format(endOfWeek(highlightWeek, { weekStartsOn: 0 }), "yyyy-MM-dd")
+    : null;
+
   return (
     <div className="rounded-xl border bg-background p-3 shadow-sm">
       <div className="mb-2 grid grid-cols-7 gap-0.5">
@@ -549,6 +624,8 @@ function MiniMonthCalendar({
           const isToday = isSameDay(day, today);
           const isSelected = isSameDay(day, selectedDay);
           const dotColor = getDayDotColor(dayMarkers, todayYmd, ymd);
+          const inHighlightedWeek =
+            weekStartYmd != null && weekEndYmd != null && ymd >= weekStartYmd && ymd <= weekEndYmd;
 
           return (
             <button
@@ -561,6 +638,7 @@ function MiniMonthCalendar({
                 "flex flex-col items-center rounded-md py-1.5 transition-colors",
                 !inMonth && "opacity-35",
                 inMonth && "hover:bg-muted/50",
+                inHighlightedWeek && "bg-primary/10 hover:bg-primary/15",
                 isSelected && "ring-2 ring-primary ring-offset-1 ring-offset-background",
               )}
             >
@@ -601,35 +679,27 @@ function ViewModeToggle({
   mode,
   onChange,
 }: {
-  mode: "day" | "month";
-  onChange: (mode: "day" | "month") => void;
+  mode: ViewMode;
+  onChange: (mode: ViewMode) => void;
 }) {
   return (
     <div className="flex rounded-lg border bg-muted/40 p-0.5">
-      <button
-        type="button"
-        onClick={() => onChange("day")}
-        className={cn(
-          "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
-          mode === "day"
-            ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        Dia
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("month")}
-        className={cn(
-          "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
-          mode === "month"
-            ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground",
-        )}
-      >
-        Mês
-      </button>
+      {VIEW_MODE_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          aria-pressed={mode === option.value}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+            mode === option.value
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -722,6 +792,7 @@ function GroupedAgendaList({
       {groups.map((group) => {
         const groupKey = `${group.farmName}|${group.producerName}`;
         const accentClass = groupAccentClass(groupKey);
+        const groupAreaHa = summarizeAgendaEvents(group.events).areaHa;
 
         return (
           <section key={groupKey}>
@@ -739,9 +810,16 @@ function GroupedAgendaList({
                   </span>
                 </p>
               </div>
-              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-muted/80 px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
-                {group.events.length}
-              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                {groupAreaHa > 0 ? (
+                  <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+                    {fmtHa(groupAreaHa)} ha
+                  </span>
+                ) : null}
+                <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-muted/80 px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+                  {group.events.length}
+                </span>
+              </div>
             </div>
             <ul className="flex flex-col gap-2">
               {group.events.map((event) => (
