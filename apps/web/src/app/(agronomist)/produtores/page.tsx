@@ -19,6 +19,7 @@ import { apiErrorMessage } from "@recomenda/api/api-error";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { ProducerAttentionBadge } from "@/components/domain/producer-attention-badge";
+import { StatusBadge } from "@/components/domain/status-badge";
 import { InviteProducerAccessDialog } from "@/components/domain/invite-producer-access-dialog";
 import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
@@ -35,6 +36,7 @@ import {
   RotateCcw,
   Trash2,
   Mail,
+  CircleCheck,
 } from "lucide-react";
 import { cn, deactivateOutlineButtonClass, formatCreatedBy } from "@recomenda/utils";
 import { useCan, usePrincipal } from "@recomenda/api-hooks/use-can";
@@ -471,7 +473,12 @@ function ProducerRow({
       </td>
       <td className="px-2 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
-          {canManage && tab === "active" && canInviteAccess ? (
+          {canManage && tab === "active" && canInviteAccess && producer.access_active ? (
+            <StatusBadge tone="success" icon={<CircleCheck className="size-3.5" />}>
+              Conta ativa
+            </StatusBadge>
+          ) : null}
+          {canManage && tab === "active" && canInviteAccess && !producer.access_active ? (
             <Button
               variant="ghost"
               size="sm"

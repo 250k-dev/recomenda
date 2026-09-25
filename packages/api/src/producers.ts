@@ -6,6 +6,8 @@ export interface Producer {
   name: string;
   email: string | null;
   phone?: string | null;
+  /** Produtor já definiu a própria senha pelo convite: não precisa de outro. */
+  access_active?: boolean;
   created_by_user_id?: string | null;
   /** Nome de quem cadastrou (nunca e-mail). */
   created_by_name?: string | null;
@@ -32,6 +34,8 @@ export interface AgronomistProducerListRow {
   email: string;
   is_active: boolean;
   account_status: AdminProducerAccountStatus;
+  /** Produtor já definiu a própria senha pelo convite: não precisa de outro. */
+  access_active?: boolean;
   /** Quem cadastrou o produtor (null = agrônomo / legado). Usado no gate de exclusão do Gestor. */
   created_by_user_id?: string | null;
   /** Nome de quem cadastrou (quando `created_by` é null, vem o agrônomo). */

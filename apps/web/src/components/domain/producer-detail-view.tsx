@@ -11,6 +11,7 @@ import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcr
 import { OnboardingPromptDialog } from "@/components/domain/onboarding-prompt-dialog";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
 import { PageHero, type PageHeroStat } from "@/components/domain/page-hero";
+import { StatusBadge } from "@/components/domain/status-badge";
 import { ProducerFarmTeamSection } from "@/components/domain/producer-farm-team-section";
 import { ProducerFarmsSection } from "@/components/domain/producer-farms-section";
 import { ProducerCyclesSection } from "@/components/domain/producer-cycles-section";
@@ -60,6 +61,7 @@ import {
   Mail,
   Boxes,
   History,
+  CircleCheck,
 } from "lucide-react";
 
 type ProducerPortfolioTab = "fazendas" | "safras";
@@ -280,7 +282,16 @@ export function ProducerDetailView({
         }
         actions={
           <>
-            {canInviteAccess ? (
+            {canInviteAccess && producer.access_active ? (
+              <StatusBadge
+                tone="success"
+                icon={<CircleCheck className="size-3.5" />}
+                className="h-9 self-center px-3 text-sm"
+              >
+                Conta ativa
+              </StatusBadge>
+            ) : null}
+            {canInviteAccess && !producer.access_active ? (
               <Button
                 variant="outline"
                 className="gap-2"
