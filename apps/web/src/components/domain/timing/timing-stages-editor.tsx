@@ -215,6 +215,12 @@ export function StageWindowDateFields({
   );
 }
 
+/**
+ * `program` (safra): o seletor mostra a lista de compra/estoque e o resto entra
+ * como "fora da programação". `full` (modelo): catálogo completo, sem esse selo.
+ */
+export type StageCatalogMode = "program" | "full";
+
 function StageProductsEditor({
   products,
   onChange,
@@ -222,6 +228,7 @@ function StageProductsEditor({
   crop,
   farmId,
   overBudgetProductIds,
+  catalogMode,
 }: {
   products: StageProductDraft[];
   onChange: (products: StageProductDraft[]) => void;
@@ -229,6 +236,7 @@ function StageProductsEditor({
   crop?: string;
   farmId?: string;
   overBudgetProductIds: Set<string>;
+  catalogMode: StageCatalogMode;
 }) {
   const { catalogProducts, inProgramProductIds, purchaseLists, isLoading } =
     usePurchaseListCatalogProducts(producerId, crop, farmId);
@@ -280,6 +288,19 @@ function StageProductsEditor({
     [catalogProducts, inProgramProductIds],
   );
 
+  // Modelo: ainda não pertence a nenhuma safra — o seletor abre no catálogo
+  // completo, sem "fora da programação" (ao aplicar numa safra, o que não estiver
+  // na lista entra nela sozinho como fora da programação). O que já está na lista
+  // ou no estoque do produtor aparece primeiro, como sugestão.
+  const fullCatalog = catalogMode === "full";
+  const suggestedFirstCatalog = useMemo(
+    () => [
+      ...listCatalog,
+      ...catalogProducts.filter((product) => !inProgramProductIds.has(product.optionValue)),
+    ],
+    [catalogProducts, inProgramProductIds, listCatalog],
+  );
+
   const updateProduct = (key: string, patch: Partial<StageProductDraft>) => {
     onChange(products.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   };
@@ -313,7 +334,7 @@ function StageProductsEditor({
         productName: name,
         unit: planned?.unit ?? unit ?? "L",
         dose: currentDose || (planned ? String(planned.dose) : currentDose),
-        outOfProgram: !inProgramProductIds.has(localId),
+        outOfProgram: !fullCatalog && !inProgramProductIds.has(localId),
       });
     };
     if (!product.globalId || !product.isGlobalOnly) {
@@ -348,9 +369,19 @@ function StageProductsEditor({
               </button>
             </TooltipTrigger>
             <TooltipContent sideOffset={6} className="max-w-xs text-left leading-relaxed">
-              O ideal é usar os insumos da lista de compra ou o que o produtor já tem em estoque.
-              Mas dá pra buscar qualquer produto do catálogo (global + local) ou cadastrar um novo —
-              itens fora da lista e sem estoque entram marcados como “fora da programação”.
+              {fullCatalog ? (
+                <>
+                  O modelo usa o catálogo completo (global + local). Os insumos da lista de compra
+                  ou do estoque do produtor aparecem primeiro. Ao aplicar o modelo numa safra, o
+                  que não estiver na lista entra nela como “fora da programação”.
+                </>
+              ) : (
+                <>
+                  O ideal é usar os insumos da lista de compra ou o que o produtor já tem em estoque.
+                  Mas dá pra buscar qualquer produto do catálogo (global + local) ou cadastrar um novo —
+                  itens fora da lista e sem estoque entram marcados como “fora da programação”.
+                </>
+              )}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -376,9 +407,10 @@ function StageProductsEditor({
       ) : (
         <div className="flex flex-col gap-2">
           {products.map((item, index) => {
-            const expanded = expandedKeys.has(item.key);
+            const expanded = fullCatalog || expandedKeys.has(item.key);
+            const outOfProgram = !fullCatalog && Boolean(item.outOfProgram);
             const rowProducts = productsForPurchaseListCategory(
-              expanded ? catalogProducts : listCatalog,
+              fullCatalog ? suggestedFirstCatalog : expanded ? catalogProducts : listCatalog,
               item.category,
               item.productId,
               item.productName,
@@ -395,7 +427,7 @@ function StageProductsEditor({
               className={cn(
                 "grid gap-2 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[auto_minmax(0,0.9fr)_minmax(0,1.1fr)_120px_88px_auto]",
                 ((item.productId && overBudgetProductIds.has(item.productId)) ||
-                  item.outOfProgram) &&
+                  outOfProgram) &&
                   "border-destructive/40 bg-destructive/5",
                 dragIndex === index && "opacity-60 ring-1 ring-primary/40",
               )}
@@ -525,13 +557,15 @@ function StageProductsEditor({
                       >
                         <Plus className="h-4 w-4 shrink-0" />
                         {query.trim()
-                          ? `Cadastrar "${query.trim()}" (fora da programação)`
+                          ? fullCatalog
+                            ? `Cadastrar "${query.trim()}"`
+                            : `Cadastrar "${query.trim()}" (fora da programação)`
                           : "Digite um nome para cadastrar"}
                       </button>
                     )
                   }
                 />
-                {item.outOfProgram ? (
+                {outOfProgram ? (
                   <span className="mt-1 inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive">
                     <CircleAlert className="h-3 w-3" />
                     Fora da programação
@@ -591,7 +625,7 @@ function StageProductsEditor({
               productId: created.id,
               productName: created.name,
               unit: created.dose_unit,
-              outOfProgram: true,
+              outOfProgram: !fullCatalog,
             });
           }
           setQuickCreate(null);
@@ -620,6 +654,8 @@ export function TimingStagesEditor({
   saveDisabled = false,
   showSaveButton = false,
   onMixOrder,
+  catalogMode = "program",
+  floatingActions = false,
 }: {
   stages: TimingStageField[];
   onChange: (key: string, patch: Partial<TimingStageField>) => void;
@@ -639,6 +675,10 @@ export function TimingStagesEditor({
   saveDisabled?: boolean;
   showSaveButton?: boolean;
   onMixOrder?: () => void;
+  catalogMode?: StageCatalogMode;
+  /** "Salvar" e "Adicionar etapa" numa barra fixa no rodapé da janela (padrão
+   *  do template de compras), em vez do topo. Só para telas sem rodapé próprio. */
+  floatingActions?: boolean;
 }) {
   const canTemplateCrud = useCan("TEMPLATE_CRUD");
   const { purchaseLists } = usePurchaseListCatalogProducts(producerId, crop, farmId);
@@ -657,7 +697,14 @@ export function TimingStagesEditor({
   );
 
   return (
-    <section className={cn("rounded-xl border bg-card p-5 shadow-sm", className)}>
+    <section
+      className={cn(
+        "rounded-xl border bg-card p-5 shadow-sm",
+        // Espaço para o fim da última etapa não ficar embaixo da barra fixa.
+        floatingActions && "mb-28 md:mb-20",
+        className,
+      )}
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">Etapas de aplicação</h3>
@@ -678,7 +725,7 @@ export function TimingStagesEditor({
               Ordem de mistura
             </Button>
           ) : null}
-          {showSaveButton && onSave ? (
+          {!floatingActions && showSaveButton && onSave ? (
             <Button
               type="button"
               size="sm"
@@ -689,7 +736,7 @@ export function TimingStagesEditor({
               {isSaving ? "Salvando…" : saveDisabled ? "Salvo ✓" : "Salvar"}
             </Button>
           ) : null}
-          {canTemplateCrud ? (
+          {!floatingActions && canTemplateCrud ? (
             <Button
               type="button"
               variant="outline"
@@ -820,6 +867,7 @@ export function TimingStagesEditor({
                   crop={crop}
                   farmId={farmId}
                   overBudgetProductIds={overBudgetProductIds}
+                  catalogMode={catalogMode}
                 />
               ) : null}
             </div>
@@ -829,7 +877,36 @@ export function TimingStagesEditor({
 
       {/* Lista longa: barra fixa no rodapé do viewport para adicionar etapa sem
           rolar de volta ao topo do editor. */}
-      {stages.length > 3 ? (
+      {floatingActions ? (
+        // Faixa fixa no rodapé da janela (mesmo padrão do template de compras):
+        // salvar e adicionar etapa ficam à mão em qualquer ponto do modelo.
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-[0_-6px_20px_-8px_rgb(0_0_0/0.25)] backdrop-blur">
+          <div className="mx-auto grid w-full max-w-[calc(var(--container-app)+2rem)] grid-cols-2 gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex md:max-w-[calc(var(--container-app)+4rem)] md:flex-wrap md:items-center md:justify-end md:px-8">
+            {canTemplateCrud ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2 md:w-auto"
+                disabled={isAdding || isSaving}
+                onClick={() => onAdd()}
+              >
+                <Plus className="h-4 w-4" />
+                {isAdding ? "Adicionando…" : "Adicionar etapa"}
+              </Button>
+            ) : null}
+            {showSaveButton && onSave ? (
+              <Button
+                type="button"
+                className={cn("w-full gap-2 md:w-auto", !canTemplateCrud && "col-span-2")}
+                disabled={isSaving || saveDisabled}
+                onClick={onSave}
+              >
+                {isSaving ? "Salvando…" : saveDisabled ? "Salvo ✓" : "Salvar"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : stages.length > 3 ? (
         <div className="sticky bottom-3 z-10 mt-4 flex justify-end">
           <div className="flex items-center gap-2 rounded-full border border-border bg-card/95 px-2 py-1.5 shadow-lg backdrop-blur">
             {showSaveButton && onSave ? (

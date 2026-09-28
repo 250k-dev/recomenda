@@ -196,7 +196,7 @@ function buildPlotSection(
 function buildFooter(agronomistName?: string | null): string {
   const lines: string[] = [];
   if (agronomistName) lines.push(`_Responsável técnico: ${agronomistName}_`);
-  lines.push("_Enviado pelo Recomenda 250K_");
+  lines.push("_Enviado pelo Recomenda_");
   return lines.join("\n");
 }
 
