@@ -507,14 +507,14 @@ export default function AdminGlobalCatalogPage() {
     if (row.entry_type === "GLOBAL_INACTIVE" && row.global_product_id) {
       deleteGlobalMutation.mutate(row.global_product_id, {
         onSuccess: () => toast.success("Produto excluído."),
-        onError: () => toast.error("Não foi possível excluir."),
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível excluir.")),
       });
       return;
     }
     if (row.entry_type === "CUSTOM_INACTIVE" && row.local_product_id) {
       deleteLocalMutation.mutate(row.local_product_id, {
         onSuccess: () => toast.success("Produto excluído."),
-        onError: () => toast.error("Não foi possível excluir."),
+        onError: (e) => toast.error(apiErrorMessage(e, "Não foi possível excluir.")),
       });
     }
   };
