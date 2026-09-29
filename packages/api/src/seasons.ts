@@ -139,6 +139,28 @@ export async function createSeason(payload: Record<string, unknown>) {
   return data;
 }
 
+export type PlantingPreviewChange = {
+  id: string;
+  name: string;
+  trigger_type: string;
+  /** Data prevista atual (YYYY-MM-DD). */
+  from: string;
+  /** Data depois de salvar o plantio (YYYY-MM-DD). */
+  to: string | null;
+};
+
+/**
+ * Prévia de salvar o plantio: etapas pendentes que já têm data e vão mudar.
+ * Mesma conta do recálculo real do servidor — não grava nada.
+ */
+export async function previewPlantingDate(seasonId: string, plantingDate: string) {
+  const { data } = await api.get<{ planting_date: string; changes: PlantingPreviewChange[] }>(
+    `/seasons/${seasonId}/planting-preview`,
+    { params: { planting_date: plantingDate } },
+  );
+  return data;
+}
+
 export async function updateSeason(
   id: string,
   payload: {

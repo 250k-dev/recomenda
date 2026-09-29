@@ -10,7 +10,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "start": "turbo start",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
     "typecheck": "turbo typecheck",
     "test:fronteiras": "node scripts/test-fronteiras.mjs",
     "check:ciclos": "node scripts/check-ciclos.mjs",
