@@ -35,7 +35,6 @@ import {
   useCycleAvailablePlots,
   useCyclePurchaseList,
   useApplyCycleBlock,
-  usePublishCycle,
   useTimingTemplate,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
@@ -46,13 +45,7 @@ import {
   createTimingStage,
   updateTimingTemplate,
 } from "@recomenda/api";
-import {
-  publishBlockedMessage,
-  publishBlockSummaryFromError,
-  type PublishBlockItem,
-} from "@recomenda/api/api-error";
-import { PublishBlockedDialog } from "@/components/domain/publish-blocked-dialog";
-import { routes } from "@recomenda/config";
+import { publishBlockedMessage } from "@recomenda/api/api-error";
 import type { CycleDetail } from "@recomenda/api/cycles";
 import {
   TimingStagesEditor,
@@ -607,19 +600,10 @@ function StepPlots({
   const { data: availablePlots, isLoading } = useCycleAvailablePlots(cycle.id);
   const { data: purchaseList } = useCyclePurchaseList(cycle.id);
   const applyBlock = useApplyCycleBlock(cycle.id);
-  const publishCycle = usePublishCycle(cycle.id);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [configs, setConfigs] = useState<Record<string, PlotConfig>>({});
   const [error, setError] = useState<string | null>(null);
   const [confirmOtherCycle, setConfirmOtherCycle] = useState(false);
-  // Publica a programação junto com o aplicar (como o wizard antigo fazia com o
-  // "Publicar agora") — sem isso as seasons ficam DRAFT e nada cai no cronograma.
-  // Publicar exige compras 100% — default off para não publicar sem querer.
-  const [publishNow, setPublishNow] = useState(false);
-  const [publishBlock, setPublishBlock] = useState<{
-    message: string;
-    items: PublishBlockItem[];
-  } | null>(null);
 
   const plots = availablePlots ?? [];
   const selectedPlots = plots.filter((p) => selected.has(p.id));
@@ -812,27 +796,6 @@ function StepPlots({
                 result.skipped.length === 1 ? "talhão já tinha" : "talhões já tinham"
               } este modelo e ${result.skipped.length === 1 ? "foi pulado" : "foram pulados"}.`,
             );
-          }
-          // Publica os rascunhos da safra na sequência (como o "Publicar agora"
-          // do fluxo antigo). Se falhar (ex.: quota do plano), o trabalho aplicado
-          // não se perde — dá para publicar depois pelo botão do hub.
-          if (publishNow && !cycle.backfill && result.applied.length > 0) {
-            publishCycle.mutate(undefined, {
-              onSuccess: () => {
-                toast.success(
-                  "Programação publicada — o cronograma já mostra as aplicações.",
-                );
-                onDone();
-              },
-              onError: (err: unknown) => {
-                const summary = publishBlockSummaryFromError(err);
-                toast.error(
-                  `Talhões aplicados, mas a publicação falhou: ${summary.message} Use o botão "Revisar e publicar" na safra.`,
-                );
-                setPublishBlock(summary);
-              },
-            });
-            return;
           }
           onDone();
         },
@@ -1127,23 +1090,10 @@ function StepPlots({
           safra só para fechar o rascunho deste arquivo.
         </p>
       ) : (
-      <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 shadow-sm">
-        <input
-          type="checkbox"
-          checked={publishNow}
-          onChange={(e) => setPublishNow(e.target.checked)}
-          className="mt-0.5 size-4 accent-primary"
-        />
-        <span>
-          <span className="text-sm font-semibold text-foreground">
-            Publicar programação ao aplicar
-          </span>
-          <span className="mt-0.5 block text-[13px] leading-relaxed text-muted-foreground">
-            Só funciona com a lista de compra 100% comprada. Caso contrário a
-            programação fica em rascunho — publique depois pelo botão da safra.
-          </span>
-        </span>
-      </label>
+      <p className="mt-6 rounded-xl border bg-card px-4 py-3 text-[13px] leading-relaxed text-muted-foreground">
+        A programação fica em rascunho. Para o produtor ver o cronograma,
+        publique pela safra, em <strong>Revisar e publicar</strong>.
+      </p>
       )}
 
       <div className="mt-4 flex items-center justify-between gap-3">
@@ -1154,16 +1104,14 @@ function StepPlots({
         <Button
           onClick={trySubmit}
           disabled={
-            applyBlock.isPending || publishCycle.isPending || selectedPlots.length === 0
+            applyBlock.isPending || selectedPlots.length === 0
           }
           className="gap-1.5"
         >
           <Leaf className="h-4 w-4" />
           {applyBlock.isPending
             ? "Aplicando..."
-            : publishCycle.isPending
-              ? "Publicando..."
-              : `Aplicar a ${selectedPlots.length} ${selectedPlots.length === 1 ? "talhão" : "talhões"}`}
+            : `Aplicar a ${selectedPlots.length} ${selectedPlots.length === 1 ? "talhão" : "talhões"}`}
         </Button>
       </div>
 
@@ -1178,22 +1126,6 @@ function StepPlots({
           setConfirmOtherCycle(false);
           submit();
         }}
-      />
-
-      <PublishBlockedDialog
-        open={publishBlock != null}
-        onOpenChange={(open) => {
-          if (!open) setPublishBlock(null);
-        }}
-        message={publishBlock?.message ?? ""}
-        items={publishBlock?.items ?? []}
-        listHref={
-          cycle.farm_id
-            ? routes.fazendas.safraListaDeCompra(cycle.farm_id, cycle.id, {
-                producer_id: cycle.producer_id,
-              })
-            : null
-        }
       />
     </div>
   );

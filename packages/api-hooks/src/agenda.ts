@@ -50,6 +50,8 @@ export type AgendaEvent = {
   plantingDate?: string | null;
   /** Área a aplicar do talhão da safra (ha); null quando desconhecida. */
   areaHa: number | null;
+  /** Data prevista atual da etapa (só APPLICATION); null em plantio. */
+  predictedYmd: string | null;
 };
 
 export type AgronomistAgendaResult = {
@@ -217,6 +219,7 @@ async function fetchAgendaEvents(
       windowEndYmd: displayYmd,
       isCenterDay: true,
       plantingDate: hasPlanting ? plantingYmd : null,
+      predictedYmd: null,
     };
 
     if (hasPlanting) {
@@ -273,6 +276,7 @@ async function fetchAgendaEvents(
       pillLabel: pillText,
       windowEndYmd: window.endYmd,
       isCenterDay: displayYmd === window.centerYmd,
+      predictedYmd: window.centerYmd,
     };
 
     if (!calendarMarkersByDay[displayYmd]) calendarMarkersByDay[displayYmd] = [];

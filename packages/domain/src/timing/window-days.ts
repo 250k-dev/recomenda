@@ -76,3 +76,26 @@ export function recommendationWindowSpanDays(
 ): number {
   return Math.max(windowEndDays - windowStartDays, 0);
 }
+
+/**
+ * Acima desta diferença (dias) entre a aplicação e a data prevista, o registro
+ * pede confirmação: o servidor desloca TODAS as etapas pendentes seguintes da
+ * safra pelo mesmo tanto, e um salto desse tamanho quase sempre é previsão
+ * errada (janela ou plantio), não atraso real de campo.
+ */
+export const SCHEDULE_SHIFT_WARN_DAYS = 30;
+
+/** Aplicação − previsão, em dias (positivo = aplicada depois). Null sem previsão. */
+export function scheduleShiftDays(
+  predictedYmd: string | null | undefined,
+  executedYmd: string,
+): number | null {
+  const predicted = String(predictedYmd ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(predicted)) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(executedYmd)) return null;
+  return differenceInCalendarDays(localYmdToDate(executedYmd), localYmdToDate(predicted));
+}
+
+export function isLargeScheduleShift(deltaDays: number | null): deltaDays is number {
+  return deltaDays !== null && Math.abs(deltaDays) > SCHEDULE_SHIFT_WARN_DAYS;
+}

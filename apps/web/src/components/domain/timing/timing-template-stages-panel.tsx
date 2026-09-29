@@ -31,7 +31,11 @@ import { MixFormulationOrderDialog } from "@/components/domain/season/season-mix
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { countProductsOffFormulationOrder } from "@recomenda/domain/recommendations/formulation-mix-order";
-import { recommendedYmdToWindow, todayLocalYmd, windowToRecommendedYmd } from "@recomenda/domain/timing/window-days";
+import {
+  dayOffsetToIsoDate,
+  recommendedYmdToWindow,
+  windowToRecommendedYmd,
+} from "@recomenda/domain/timing/window-days";
 import {
   readLocalDraft,
   clearLocalDraft,
@@ -350,7 +354,9 @@ export function TimingTemplateStagesPanel({
           order_index: nextOrderIndex,
           name: presetName ?? "",
           trigger_type: "POST_PLANTING",
-          ...recommendedYmdToWindow(todayLocalYmd()),
+          // Etapa nova começa no dia 0 do marco da fase. (Era "hoje", que no
+          // editor de modelos vira ~260 dias contados de 01/01.)
+          ...recommendedYmdToWindow(dayOffsetToIsoDate(0)),
           default_mix_template_id: null,
         },
         {

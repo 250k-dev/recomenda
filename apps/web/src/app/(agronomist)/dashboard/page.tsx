@@ -487,6 +487,7 @@ export default function DashboardPage() {
                         seasonId={ev.seasonId}
                         recommendationId={ev.recommendationId}
                         title={ev.applicationTitle}
+                        predictedDate={ev.predictedYmd}
                       />
                     )}
                     <Link

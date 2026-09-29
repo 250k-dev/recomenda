@@ -8,7 +8,6 @@ import {
   StageWindowDateFields,
   TIMING_TRIGGER_TYPES,
 } from "@/components/domain/timing/timing-stages-editor";
-import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 
 export function normalizeSeasonTriggerType(value?: string | null): string {
   if (value === "PRE_PLANTING" || value === "DAYS_AFTER_DESICCATION") {
@@ -34,7 +33,10 @@ export function recommendationToStageDraft(rec: {
   return {
     name: rec.name,
     trigger_type: normalizeSeasonTriggerType(rec.trigger_type),
-    recommended_date: rec.predicted_date_current?.slice(0, 10) || todayLocalYmd(),
+    // Sem data prevista (safra sem plantio) o campo fica vazio. Preencher com
+    // "hoje" fazia qualquer salvamento — até só renomear — gravar uma data
+    // falsa e, com ela, uma janela de ~260 dias.
+    recommended_date: rec.predicted_date_current?.slice(0, 10) ?? "",
     notes: rec.notes ?? "",
   };
 }

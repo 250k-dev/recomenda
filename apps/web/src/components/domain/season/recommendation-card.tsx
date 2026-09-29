@@ -39,8 +39,8 @@ import {
 } from "@recomenda/domain/catalog/purchase-list-catalog";
 import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import {
-  recommendedYmdToWindow,
-  todayLocalYmd,
+  isLargeScheduleShift,
+  scheduleShiftDays,
 } from "@recomenda/domain/timing/window-days";
 import { SEED_CATEGORIES, areaFactorOf, areaPercentFieldFromFactor } from "@recomenda/domain/purchase-list/list-item";
 import { displayRecStatus, fmtDate } from "@recomenda/domain/recommendations/format";
@@ -75,6 +75,10 @@ import {
 } from "@/components/domain/recommendation-stage-fields";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
+import {
+  ScheduleShiftConfirmDialog,
+  type ScheduleShift,
+} from "@/components/domain/schedule-shift-confirm-dialog";
 
 export type ListProductPlan = {
   dose: number;
@@ -1197,18 +1201,15 @@ export function RecommendationCard({
       toast.error("Informe o nome da etapa.");
       return;
     }
-    // Ao corrigir a data, recalcula a janela (centrada na nova data ± tolerância).
-    const win = recommendedYmdToWindow(
-      stageDraft.recommended_date || todayLocalYmd(),
-    );
+    // A janela em dias é recalculada no servidor a partir do PLANTIO da safra.
+    // (Antes ia daqui contada de 01/01 — âncora de preview dos modelos — e
+    // gravava janelas de ~265 dias.)
     patchMut.mutate(
       {
         id: rec.id,
         name: trimmed,
         trigger_type: stageDraft.trigger_type,
         predicted_date_current: stageDraft.recommended_date || null,
-        window_start_days: win.window_start_days,
-        window_end_days: win.window_end_days,
         notes: isPending ? stageDraft.notes.trim() || null : rec.notes,
       },
       {
@@ -1225,7 +1226,9 @@ export function RecommendationCard({
     });
   };
 
-  const handleApply = () => {
+  const [pendingShift, setPendingShift] = useState<ScheduleShift | null>(null);
+
+  const doApply = () => {
     applyMut.mutate(
       {
         id: rec.id,
@@ -1235,12 +1238,29 @@ export function RecommendationCard({
       {
         onSuccess: () => {
           toast.success("Etapa registrada como aplicada.");
+          setPendingShift(null);
           setRegistering(false);
         },
-        onError: (e: unknown) =>
-          toast.error(apiErrorMessage(e, "Não foi possível registrar.")),
+        onError: (e: unknown) => {
+          setPendingShift(null);
+          toast.error(apiErrorMessage(e, "Não foi possível registrar."));
+        },
       },
     );
+  };
+
+  const handleApply = () => {
+    const delta = scheduleShiftDays(rec.predicted_date_current, executedDate);
+    if (rec.predicted_date_current && isLargeScheduleShift(delta)) {
+      setPendingShift({
+        title: rec.name,
+        predictedYmd: rec.predicted_date_current.slice(0, 10),
+        executedYmd: executedDate,
+        deltaDays: delta,
+      });
+      return;
+    }
+    doApply();
   };
 
   const handleSkip = () => {
@@ -1384,6 +1404,7 @@ export function RecommendationCard({
                 seasonId={seasonId}
                 recommendationId={rec.id}
                 title={rec.name}
+                predictedDate={rec.predicted_date_current}
               />
             </div>
           ) : null}
@@ -1729,6 +1750,13 @@ export function RecommendationCard({
           </div>
         </div>
       )}
+
+      <ScheduleShiftConfirmDialog
+        shifts={pendingShift ? [pendingShift] : []}
+        loading={applyMut.isPending}
+        onCancel={() => setPendingShift(null)}
+        onConfirm={doApply}
+      />
 
       <ConfirmDialog
         open={deleteStageOpen}

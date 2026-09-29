@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, LayoutTemplate, Leaf, ListOrdered, Pencil, Plus, Send, Share2, Wheat } from "lucide-react";
+import { CalendarDays, LayoutTemplate, Leaf, ListOrdered, Pencil, Plus, Share2, Wheat } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
 import { TimelineCardsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
@@ -134,9 +134,6 @@ function ScheduleToolbar({
   applyTemplateTitle,
   onAddStage,
   producerId,
-  showPublish,
-  onPublish,
-  isPublishing,
 }: {
   showExport?: boolean;
   onExport?: () => void;
@@ -151,9 +148,6 @@ function ScheduleToolbar({
   applyTemplateTitle?: string;
   onAddStage: () => void;
   producerId?: string | null;
-  showPublish?: boolean;
-  onPublish?: () => void;
-  isPublishing?: boolean;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -232,17 +226,6 @@ function ScheduleToolbar({
           <Button size="sm" className={TOOLBAR_BTN} onClick={onHarvest}>
             <Wheat className="h-4 w-4 shrink-0" />
             Registrar colheita
-          </Button>
-        ) : null}
-        {showPublish && onPublish ? (
-          <Button
-            size="sm"
-            className={cn(TOOLBAR_BTN, "col-span-2 sm:col-span-1")}
-            onClick={onPublish}
-            disabled={isPublishing}
-          >
-            <Send className="h-4 w-4 shrink-0" />
-            {isPublishing ? "Publicando…" : "Publicar safra"}
           </Button>
         ) : null}
       </div>
@@ -339,8 +322,6 @@ export function SeasonRecommendationsView({
   crop,
   farmId,
   openRecommendationId,
-  onPublish,
-  isPublishing,
 }: {
   seasonId: string;
   title: string;
@@ -353,8 +334,6 @@ export function SeasonRecommendationsView({
   farmId?: string;
   /** Deep-link: abre e rola até a etapa correspondente. */
   openRecommendationId?: string | null;
-  onPublish?: () => void;
-  isPublishing?: boolean;
 }) {
   const { data: seasonLive } = useSeason(seasonId);
   const plantingDate = (() => {
@@ -583,9 +562,6 @@ export function SeasonRecommendationsView({
           applyTemplateTitle={applyTemplateTitle}
           onAddStage={() => setAddingStage(true)}
           producerId={producerId}
-          showPublish={seasonStatus === "DRAFT" && Boolean(onPublish)}
-          onPublish={onPublish}
-          isPublishing={isPublishing}
         />
         <ul className="flex flex-col gap-3">
           <PlantingDateBlock

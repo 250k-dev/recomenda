@@ -15,8 +15,16 @@ import {
   useApplyRecommendation,
   useSkipRecommendation,
 } from "@recomenda/api-hooks";
-import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
+import {
+  isLargeScheduleShift,
+  scheduleShiftDays,
+  todayLocalYmd,
+} from "@recomenda/domain/timing/window-days";
 import { apiErrorMessage } from "@recomenda/api/api-error";
+import {
+  ScheduleShiftConfirmDialog,
+  type ScheduleShift,
+} from "@/components/domain/schedule-shift-confirm-dialog";
 
 /**
  * Atalho "Registrar aplicação": abre um popover ancorado com o mesmo mini-form do
@@ -28,6 +36,7 @@ export function RecommendationRegisterPopover({
   seasonId,
   recommendationId,
   title,
+  predictedDate,
   defaultDate,
   align = "end",
   trigger,
@@ -36,6 +45,8 @@ export function RecommendationRegisterPopover({
   recommendationId: string;
   /** Nome da etapa, mostrado no cabeçalho do popover ("Registrar · Dessecação"). */
   title?: string;
+  /** Data prevista atual da etapa — aplicação muito longe dela pede confirmação. */
+  predictedDate?: string | null;
   /** Data pré-preenchida (padrão: hoje). */
   defaultDate?: string;
   align?: "start" | "center" | "end";
@@ -45,6 +56,7 @@ export function RecommendationRegisterPopover({
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(defaultDate ?? todayLocalYmd());
   const [notes, setNotes] = useState("");
+  const [pendingShift, setPendingShift] = useState<ScheduleShift | null>(null);
 
   const applyMut = useApplyRecommendation(seasonId);
   const skipMut = useSkipRecommendation(seasonId);
@@ -59,19 +71,36 @@ export function RecommendationRegisterPopover({
     }
   };
 
-  const handleApply = () => {
-    if (!date) return;
+  const doApply = () => {
     applyMut.mutate(
       { id: recommendationId, executed_date: date, notes: notes || undefined },
       {
         onSuccess: () => {
           toast.success("Etapa registrada como aplicada.");
+          setPendingShift(null);
           setOpen(false);
         },
-        onError: (e: unknown) =>
-          toast.error(apiErrorMessage(e, "Não foi possível registrar.")),
+        onError: (e: unknown) => {
+          setPendingShift(null);
+          toast.error(apiErrorMessage(e, "Não foi possível registrar."));
+        },
       },
     );
+  };
+
+  const handleApply = () => {
+    if (!date) return;
+    const delta = scheduleShiftDays(predictedDate, date);
+    if (predictedDate && isLargeScheduleShift(delta)) {
+      setPendingShift({
+        title: title ?? "Etapa",
+        predictedYmd: predictedDate.slice(0, 10),
+        executedYmd: date,
+        deltaDays: delta,
+      });
+      return;
+    }
+    doApply();
   };
 
   const handleSkip = () => {
@@ -88,73 +117,81 @@ export function RecommendationRegisterPopover({
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        {trigger ?? (
-          <Button
-            size="sm"
-            className="h-8 gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Zap className="h-3.5 w-3.5" />
-            Registrar
-          </Button>
-        )}
-      </PopoverTrigger>
-      <PopoverContent
-        align={align}
-        className="w-80"
-        // O card/linha em volta é clicável (navega/expande) — o popover não deve vazar.
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-          Registrar{title ? ` · ${title}` : ""}
-        </p>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-semibold text-primary">
-              Data de execução
-            </Label>
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="h-10 text-sm font-semibold border-primary/30 bg-card"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Observações (opcional)</Label>
-            <Input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ex: aplicado 10% a menos por chuva"
-              className="h-10 text-sm bg-card"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 pt-1">
+    <>
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          {trigger ?? (
             <Button
               size="sm"
-              onClick={handleApply}
-              disabled={isBusy || !date}
               className="h-8 gap-1.5"
+              onClick={(e) => e.stopPropagation()}
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              {applyMut.isPending ? "Salvando…" : "Marcar como aplicada"}
+              <Zap className="h-3.5 w-3.5" />
+              Registrar
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSkip}
-              disabled={isBusy}
-              className="h-8 gap-1.5 bg-card text-muted-foreground"
-            >
-              <SkipForward className="h-3.5 w-3.5" />
-              Pular
-            </Button>
+          )}
+        </PopoverTrigger>
+        <PopoverContent
+          align={align}
+          className="w-80"
+          // O card/linha em volta é clicável (navega/expande) — o popover não deve vazar.
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+            Registrar{title ? ` · ${title}` : ""}
+          </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs font-semibold text-primary">
+                Data de execução
+              </Label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-10 text-sm font-semibold border-primary/30 bg-card"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs">Observações (opcional)</Label>
+              <Input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ex: aplicado 10% a menos por chuva"
+                className="h-10 text-sm bg-card"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button
+                size="sm"
+                onClick={handleApply}
+                disabled={isBusy || !date}
+                className="h-8 gap-1.5"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {applyMut.isPending ? "Salvando…" : "Marcar como aplicada"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSkip}
+                disabled={isBusy}
+                className="h-8 gap-1.5 bg-card text-muted-foreground"
+              >
+                <SkipForward className="h-3.5 w-3.5" />
+                Pular
+              </Button>
+            </div>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+      <ScheduleShiftConfirmDialog
+        shifts={pendingShift ? [pendingShift] : []}
+        loading={applyMut.isPending}
+        onCancel={() => setPendingShift(null)}
+        onConfirm={doApply}
+      />
+    </>
   );
 }

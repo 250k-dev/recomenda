@@ -167,6 +167,10 @@ export function newTimingStageField(name = ""): TimingStageField {
   };
 }
 
+/** Acima disso o "Período" do modelo quase sempre é número errado (ex.: ~260
+ *  dias, sobra da data "hoje" contada de 01/01). Só avisa — não bloqueia. */
+const SUSPICIOUS_STAGE_DAYS = 150;
+
 export function StageWindowDateFields({
   recommendedDate,
   onRecommendedDateChange,
@@ -211,6 +215,12 @@ export function StageWindowDateFields({
         readOnly={readOnly}
         disabled={readOnly}
       />
+      {Math.abs(targetDay) > SUSPICIOUS_STAGE_DAYS ? (
+        <p className="text-xs font-medium text-warning-strong">
+          {targetDay} dias a partir do marco da fase é fora do comum para uma
+          safra. Confira se o número está certo.
+        </p>
+      ) : null}
     </Field>
   );
 }

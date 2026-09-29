@@ -41,6 +41,14 @@ import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
 import { useAgronomistAgenda, useBulkRegisterRecommendations, useProducers, localYmdToDate, dedupeAgendaEvents, summarizeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
 import { cn } from "@recomenda/utils";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
+import {
+  ScheduleShiftConfirmDialog,
+  type ScheduleShift,
+} from "@/components/domain/schedule-shift-confirm-dialog";
+import {
+  isLargeScheduleShift,
+  scheduleShiftDays,
+} from "@recomenda/domain/timing/window-days";
 import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
 
 /** Chave estável de seleção (uma por recomendação, dedupe entre dias). */
@@ -154,14 +162,34 @@ export function MonthCalendar({
     setSelected(new Map());
   };
 
-  const runBulk = (action: "apply" | "skip") => {
-    const items = [...selected.values()]
-      .filter((event) => isApplicationEvent(event))
-      .map((event) => ({
-        seasonId: event.seasonId,
-        recommendationId: event.recommendationId,
-      }));
+  // Etapas do lote registradas longe da previsão — aguardam confirmação.
+  const [bulkShifts, setBulkShifts] = useState<ScheduleShift[]>([]);
+
+  const runBulk = (action: "apply" | "skip", confirmedShift = false) => {
+    const events = [...selected.values()].filter((event) => isApplicationEvent(event));
+    const items = events.map((event) => ({
+      seasonId: event.seasonId,
+      recommendationId: event.recommendationId,
+    }));
     if (items.length === 0) return;
+    if (action === "apply" && !confirmedShift) {
+      const shifts = events.flatMap((event): ScheduleShift[] => {
+        const delta = scheduleShiftDays(event.predictedYmd, bulkDate);
+        if (!event.predictedYmd || !isLargeScheduleShift(delta)) return [];
+        return [
+          {
+            title: `${event.applicationTitle} · ${event.plotName}`,
+            predictedYmd: event.predictedYmd,
+            executedYmd: bulkDate,
+            deltaDays: delta,
+          },
+        ];
+      });
+      if (shifts.length > 0) {
+        setBulkShifts(shifts);
+        return;
+      }
+    }
     bulkMut.mutate(
       { action, date: bulkDate, items },
       {
@@ -173,9 +201,13 @@ export function MonthCalendar({
           } else {
             toast.warning(`${ok} registradas · ${failed} falharam.`);
           }
+          setBulkShifts([]);
           exitSelectionMode();
         },
-        onError: () => toast.error("Não foi possível registrar as aplicações."),
+        onError: () => {
+          setBulkShifts([]);
+          toast.error("Não foi possível registrar as aplicações.");
+        },
       },
     );
   };
@@ -573,6 +605,12 @@ export function MonthCalendar({
           </div>
         ) : null}
       </main>
+      <ScheduleShiftConfirmDialog
+        shifts={bulkShifts}
+        loading={bulkMut.isPending}
+        onCancel={() => setBulkShifts([])}
+        onConfirm={() => runBulk("apply", true)}
+      />
     </div>
   );
 }
@@ -1227,6 +1265,7 @@ function AgendaEventCard({
             seasonId={event.seasonId}
             recommendationId={event.recommendationId}
             title={event.applicationTitle}
+            predictedDate={event.predictedYmd}
           />
         </div>
       </div>
