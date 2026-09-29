@@ -71,7 +71,10 @@ export interface Recommendation {
   predicted_date_current: string | null;
   predicted_date_original: string | null;
   executed_date: string | null;
+  /** Instruções do agrônomo para a etapa ("Comentários" no export). */
   notes: string | null;
+  /** Observação de quem registrou/pulou. Opcional: server antigo não envia. */
+  execution_notes?: string | null;
   source_timing_template_id?: string | null;
   window_start_days: number;
   window_end_days: number;

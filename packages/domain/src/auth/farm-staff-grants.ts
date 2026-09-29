@@ -1,5 +1,5 @@
 import type { AccessLevel } from "@recomenda/api/auth-types";
-import type { Permission } from "./permissions";
+import type { Permission } from "./permission";
 
 export const FARM_STAFF_GRANT_KEYS = [
   "applications",

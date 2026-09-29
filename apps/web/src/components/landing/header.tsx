@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { nav, links } from "./content";
 import { Button, Container, Wordmark, cn } from "./primitives";
@@ -39,9 +40,9 @@ export function Header() {
       )}
     >
       <Container className="flex h-16 items-center justify-between gap-4 sm:h-[4.5rem]">
-        <a href="/" aria-label="Recomenda — início" className="shrink-0">
+        <Link href="/" aria-label="Recomenda — início" className="shrink-0">
           <Wordmark />
-        </a>
+        </Link>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Principal">
           {nav.map((item) => (

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Calculator, MapPin, ShoppingCart, Sprout, Wheat } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Card, CardContent } from "@recomenda/ui/primitives/card";

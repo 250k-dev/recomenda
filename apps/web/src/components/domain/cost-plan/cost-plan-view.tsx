@@ -89,7 +89,6 @@ interface EditableItem {
 
 export function CostPlanView({
   seasonId,
-  crop,
   farmId,
   producerId,
   producerName,

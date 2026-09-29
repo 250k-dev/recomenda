@@ -37,7 +37,7 @@ function initials(name: string | null) {
   return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }
 
-function riskLabel(tags: string[], _lastAt: string | null): {
+function riskLabel(tags: string[]): {
   text: string;
   tone: "critical" | "attention" | "ok";
 } {
@@ -336,7 +336,7 @@ export function TeamAuditHome({ canManage, onInvite, pendingInvitesSlot }: Props
 }
 
 function MemberRow({ member }: { member: TeamOverviewMember }) {
-  const risk = riskLabel(member.risk_tags, member.last_activity_at);
+  const risk = riskLabel(member.risk_tags);
   const farmStaff = isFarmStaffLevel(member.access_level);
   const href = routes.equipe.membro(member.user_id);
   const linkLabel = farmStaff

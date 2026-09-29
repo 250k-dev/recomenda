@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Logo250K } from "@/assets/logo-250K";
 import { links, nav } from "./content";
 import { Container, Wordmark } from "./primitives";
@@ -38,9 +39,9 @@ export function Footer() {
       <Container className="py-16">
         <div className="grid gap-12 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div className="max-w-xs">
-            <a href="/" aria-label="Recomenda — início">
+            <Link href="/" aria-label="Recomenda — início">
               <Wordmark tone="light" />
-            </a>
+            </Link>
             <p className="mt-4 text-sm leading-relaxed text-brand-100/65">
               A recomendação agrícola no tempo certo, do plantio à colheita. Para
               agrônomos, equipes e produtores.

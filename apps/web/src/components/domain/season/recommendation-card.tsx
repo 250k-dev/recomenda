@@ -1172,7 +1172,8 @@ export function RecommendationCard({
       ? rec.executed_date.slice(0, 10)
       : new Date().toISOString().slice(0, 10),
   );
-  const [execNotes, setExecNotes] = useState(rec.notes ?? "");
+  // Observação da execução — separada das instruções da etapa (`rec.notes`).
+  const [execNotes, setExecNotes] = useState(rec.execution_notes ?? "");
 
   const patchMut = usePatchRecommendation(seasonId);
   const deleteMut = useDeleteRecommendationItem(seasonId);
@@ -1648,9 +1649,9 @@ export function RecommendationCard({
                       em {fmtDate(rec.executed_date)}
                     </span>
                   ) : null}
-                  {rec.notes ? (
+                  {rec.execution_notes ? (
                     <span className="text-sm text-muted-foreground">
-                      · {rec.notes}
+                      · {rec.execution_notes}
                     </span>
                   ) : null}
                 </div>

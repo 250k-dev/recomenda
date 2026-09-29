@@ -170,6 +170,7 @@ export function MonthCalendar({
     const items = events.map((event) => ({
       seasonId: event.seasonId,
       recommendationId: event.recommendationId,
+      predictedYmd: event.predictedYmd,
     }));
     if (items.length === 0) return;
     if (action === "apply" && !confirmedShift) {

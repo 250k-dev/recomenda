@@ -822,7 +822,7 @@ function fieldSheetTable(sheet: FieldSheet, multiFarm: boolean): string {
   </table>`;
 }
 
-function fieldSheetPages(data: SeasonNotebookData, _pageBreak: boolean): string {
+function fieldSheetPages(data: SeasonNotebookData): string {
   const sheets =
     data.fieldSheets.length > 0
       ? data.fieldSheets.filter((sheet) => sheet.rows.length > 0)
@@ -923,7 +923,7 @@ export function buildSeasonNotebookHtml(
       case "schedule":
         return schedulePages(data, options, pageBreak);
       case "field-sheet":
-        return fieldSheetPages(data, pageBreak);
+        return fieldSheetPages(data);
       case "notes":
         return notesPages(data, resolveNotesPages(options.notesPages));
     }

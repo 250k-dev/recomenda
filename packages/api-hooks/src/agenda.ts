@@ -386,7 +386,12 @@ export type BulkRegisterInput = {
   /** Data de execução (só usada em "apply"). */
   date: string;
   notes?: string;
-  items: Array<{ seasonId: string; recommendationId: string }>;
+  items: Array<{
+    seasonId: string;
+    recommendationId: string;
+    /** Data prevista — ordena o registro dentro da safra. */
+    predictedYmd?: string | null;
+  }>;
 };
 
 export type BulkRegisterResult = {
@@ -397,8 +402,10 @@ export type BulkRegisterResult = {
 
 /**
  * Registro em massa do cronograma: aplica (ou pula) várias etapas com uma data só.
- * Não há endpoint batch no server — resolve item a item com `Promise.allSettled`,
- * tolera falha parcial e invalida a agenda + as timelines das safras afetadas.
+ * Não há endpoint batch no server — resolve item a item, UM DE CADA VEZ, na
+ * ordem da safra e da data prevista. Em paralelo, cada registro arrastava as
+ * etapas seguintes ao mesmo tempo que os outros e o resultado dependia de quem
+ * terminava primeiro. Tolera falha parcial e invalida a agenda + as timelines.
  */
 export function useBulkRegisterRecommendations() {
   const queryClient = useQueryClient();
@@ -409,20 +416,30 @@ export function useBulkRegisterRecommendations() {
       notes,
       items,
     }: BulkRegisterInput): Promise<BulkRegisterResult> => {
-      const results = await Promise.allSettled(
-        items.map((it) =>
-          action === "apply"
-            ? applyRecommendation(it.recommendationId, {
-                executed_date: date,
-                notes,
-              })
-            : skipRecommendation(it.recommendationId, notes),
-        ),
+      const ordered = [...items].sort(
+        (a, b) =>
+          a.seasonId.localeCompare(b.seasonId) ||
+          (a.predictedYmd ?? "").localeCompare(b.predictedYmd ?? ""),
       );
-      const ok = results.filter((r) => r.status === "fulfilled").length;
+      let ok = 0;
+      for (const it of ordered) {
+        try {
+          if (action === "apply") {
+            await applyRecommendation(it.recommendationId, {
+              executed_date: date,
+              notes,
+            });
+          } else {
+            await skipRecommendation(it.recommendationId, notes);
+          }
+          ok += 1;
+        } catch {
+          // Segue nas demais: falha parcial é reportada no resultado.
+        }
+      }
       return {
         ok,
-        failed: results.length - ok,
+        failed: ordered.length - ok,
         seasonIds: [...new Set(items.map((it) => it.seasonId))],
       };
     },
