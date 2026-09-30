@@ -22,6 +22,8 @@ export const queryKeys = {
   producer: (id: string) => ["producer", id],
   producerFarms: (producerId: string) => ["producer-farms", producerId],
   producerStock: (producerId: string) => ["producer-stock", producerId],
+  // Filha de producerStock: invalidar o estoque também atualiza as abas por safra.
+  producerStockByCycle: (producerId: string) => ["producer-stock", producerId, "by-cycle"],
   producerStockMovements: (producerId: string) =>
     ["producer-stock-movements", producerId] as const,
   producerCycleHistory: (producerId: string, cycleId: string) =>

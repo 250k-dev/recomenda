@@ -163,6 +163,52 @@ export async function getProducerFarms(producerId: string) {
   return data;
 }
 
+export type StockByCycleItem = {
+  local_product_id: string;
+  product_name: string;
+  category: string | null;
+  dose_unit: string | null;
+  /** Sem permissão de preço o servidor omite o campo. */
+  price_brl?: number | null;
+  /** Do galpão, o que ficou reservado para esta safra (ordem de criação da lista). */
+  in_stock_for_cycle: number;
+  /** Necessário − já aplicado. */
+  required_remaining: number;
+  applied: number;
+  /** Mesma conta da coluna "Comprar" da lista de compra. */
+  to_buy: number;
+};
+
+export type StockByCycle = {
+  cycles: Array<{
+    cycle_id: string;
+    cycle_name: string;
+    crops: string[];
+    farm_names: string[];
+    list_id: string;
+    list_name: string;
+    list_created_at: string;
+    /** Tem estoque reservado — só essas ganham aba. */
+    has_stock: boolean;
+    items: StockByCycleItem[];
+  }>;
+  /** O que sobra no galpão, sem safra. */
+  unallocated: Array<{
+    local_product_id: string;
+    product_name: string;
+    category: string | null;
+    dose_unit: string | null;
+    price_brl?: number | null;
+    quantity: number;
+  }>;
+};
+
+/** Estoque dividido por safra + sobra. Soma das safras + sobra = galpão. */
+export async function getProducerStockByCycle(producerId: string) {
+  const { data } = await api.get<StockByCycle>(`/producers/${producerId}/stock/by-cycle`);
+  return data;
+}
+
 export async function getProducerStock(producerId: string) {
   const { data } = await api.get<ProducerStock[]>(`/producers/${producerId}/stock`);
   return data;

@@ -11,6 +11,7 @@ import {
   setProducerActive,
   getProducerFarms,
   getProducerStock,
+  getProducerStockByCycle,
   getProducerStockMovements,
   adjustProducerStock,
   deleteProducerStock,
@@ -110,6 +111,15 @@ export function useProducerStock(producerId: string) {
   return useQuery({
     queryKey: queryKeys.producerStock(producerId),
     queryFn: () => getProducerStock(producerId),
+    enabled: Boolean(producerId),
+  });
+}
+
+/** Estoque por safra (abas) + sobra sem safra. */
+export function useProducerStockByCycle(producerId: string) {
+  return useQuery({
+    queryKey: queryKeys.producerStockByCycle(producerId),
+    queryFn: () => getProducerStockByCycle(producerId),
     enabled: Boolean(producerId),
   });
 }
