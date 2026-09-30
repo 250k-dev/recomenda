@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { stockShortageSummaryFromError, type PublishBlockItem } from "@recomenda/api/api-error";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addDays,
@@ -391,6 +392,8 @@ export type BulkRegisterInput = {
     recommendationId: string;
     /** Data prevista — ordena o registro dentro da safra. */
     predictedYmd?: string | null;
+    /** "Etapa · talhão" — contexto do que faltou no galpão. */
+    label?: string;
   }>;
 };
 
@@ -398,6 +401,8 @@ export type BulkRegisterResult = {
   ok: number;
   failed: number;
   seasonIds: string[];
+  /** Produtos que faltaram no galpão, por etapa (registro recusado). */
+  shortages: PublishBlockItem[];
 };
 
 /**
@@ -422,6 +427,7 @@ export function useBulkRegisterRecommendations() {
           (a.predictedYmd ?? "").localeCompare(b.predictedYmd ?? ""),
       );
       let ok = 0;
+      const shortages: PublishBlockItem[] = [];
       for (const it of ordered) {
         try {
           if (action === "apply") {
@@ -433,12 +439,23 @@ export function useBulkRegisterRecommendations() {
             await skipRecommendation(it.recommendationId, notes);
           }
           ok += 1;
-        } catch {
+        } catch (error) {
           // Segue nas demais: falha parcial é reportada no resultado.
+          const missing = stockShortageSummaryFromError(error);
+          if (missing) {
+            for (const item of missing.items) {
+              shortages.push({
+                ...item,
+                id: `${it.recommendationId}:${item.id}`,
+                detail: it.label ? `${it.label} · ${item.detail}` : item.detail,
+              });
+            }
+          }
         }
       }
       return {
         ok,
+        shortages,
         failed: ordered.length - ok,
         seasonIds: [...new Set(items.map((it) => it.seasonId))],
       };

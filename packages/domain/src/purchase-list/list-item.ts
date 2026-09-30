@@ -48,6 +48,8 @@ export type ListItem = {
   areaPercent?: string;
   /** Observação de onde é aplicado (ex.: "áreas sujas"). Não entra em cálculo. */
   areaNote?: string;
+  /** Item "fora da programação": talhões e quantidades das etapas (só leitura). */
+  executionPlots?: Array<{ plot_name: string; farm_name: string | null; hectares: number; quantity: number }>;
 };
 
 /** Fração (0..1) da área em que o item é aplicado. Default: área toda. */

@@ -31,7 +31,11 @@ import {
   useUpdateRecommendationItem,
   useUpdateSeasonVarieties,
 } from "@recomenda/api-hooks";
-import { apiErrorMessage } from "@recomenda/api/api-error";
+import {
+  apiErrorMessage,
+  stockShortageSummaryFromError,
+  type PublishBlockSummary,
+} from "@recomenda/api/api-error";
 import {
   productsForPurchaseListCategory,
   purchaseListProductLabel,
@@ -75,6 +79,8 @@ import {
 } from "@/components/domain/recommendation-stage-fields";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
+import { useExecutionImpactGuard } from "@/components/domain/season/execution-impact-guard";
+import { StockShortageDialog } from "@/components/domain/stock-shortage-dialog";
 import {
   ScheduleShiftConfirmDialog,
   type ScheduleShift,
@@ -230,6 +236,7 @@ function ProductRow({
   );
   const [areaNote, setAreaNote] = useState(item.area_note ?? "");
   const updateMut = useUpdateRecommendationItem(seasonId);
+  const impact = useExecutionImpactGuard();
 
   const startEditing = () => {
     setDose(String(item.dose_per_hectare));
@@ -242,21 +249,33 @@ function ProductRow({
   const handleSave = () => {
     const parsed = parseFloat(dose.replace(",", "."));
     if (!parsed || parsed <= 0) return;
-    updateMut.mutate(
+    const areaFactor = areaFactorOf({ areaPercent });
+    // Aumentar dose/área depois de publicada pode gerar compra: avisa antes.
+    void impact.guard(
       {
-        id: item.id,
+        recommendation_id: item.recommendation_id,
+        local_product_id: item.local_product_id,
         dose_per_hectare: parsed,
-        dose_unit: unit,
-        area_factor: areaFactorOf({ areaPercent }),
-        area_note: areaNote.trim() || null,
+        area_factor: areaFactor,
+        replace_item_id: item.id,
       },
-      {
-        onSuccess: () => {
-          toast.success("Produto atualizado.");
-          setEditing(false);
-        },
-        onError: () => toast.error("Não foi possível atualizar o produto."),
-      },
+      () =>
+        updateMut.mutate(
+          {
+            id: item.id,
+            dose_per_hectare: parsed,
+            dose_unit: unit,
+            area_factor: areaFactor,
+            area_note: areaNote.trim() || null,
+          },
+          {
+            onSuccess: () => {
+              toast.success("Produto atualizado.");
+              setEditing(false);
+            },
+            onError: () => toast.error("Não foi possível atualizar o produto."),
+          },
+        ),
     );
   };
 
@@ -394,7 +413,7 @@ function ProductRow({
               size="sm"
               className="h-9 flex-1 gap-1.5 sm:flex-none"
               onClick={handleSave}
-              disabled={updateMut.isPending}
+              disabled={updateMut.isPending || impact.checking}
             >
               <Save className="h-3.5 w-3.5" />
               Salvar
@@ -456,6 +475,7 @@ function ProductRow({
           </div>
         </div>
       )}
+      {impact.dialog}
     </div>
   );
 }
@@ -491,6 +511,7 @@ function AddProductRow({
   const [resolving, setResolving] = useState(false);
   const createMut = useCreateRecommendationItem(seasonId);
   const cloneGlobal = useCloneGlobalProduct();
+  const impact = useExecutionImpactGuard();
 
   // Por padrão a lista de compra e o estoque do produtor; ao expandir, o catálogo
   // completo (global + local). Produtos fora da lista e sem estoque entram
@@ -573,22 +594,33 @@ function AddProductRow({
       toast.error("Informe a dose por hectare.");
       return;
     }
-    createMut.mutate(
+    const areaFactor = areaFactorOf({ areaPercent });
+    // Produto novo depois de publicada pode gerar compra: avisa antes.
+    void impact.guard(
       {
         recommendation_id: recommendationId,
         local_product_id: localId,
         dose_per_hectare: doseVal,
-        dose_unit: unit,
-        area_factor: areaFactorOf({ areaPercent }),
-        area_note: areaNote.trim() || null,
+        area_factor: areaFactor,
       },
-      {
-        onSuccess: () => {
-          toast.success("Produto adicionado.");
-          onClose();
-        },
-        onError: () => toast.error("Não foi possível adicionar o produto."),
-      },
+      () =>
+        createMut.mutate(
+          {
+            recommendation_id: recommendationId,
+            local_product_id: localId,
+            dose_per_hectare: doseVal,
+            dose_unit: unit,
+            area_factor: areaFactor,
+            area_note: areaNote.trim() || null,
+          },
+          {
+            onSuccess: () => {
+              toast.success("Produto adicionado.");
+              onClose();
+            },
+            onError: () => toast.error("Não foi possível adicionar o produto."),
+          },
+        ),
     );
   };
 
@@ -720,7 +752,7 @@ function AddProductRow({
             <Button
               size="sm"
               onClick={handleAdd}
-              disabled={!category || !productId || !dose || createMut.isPending}
+              disabled={!category || !productId || !dose || createMut.isPending || impact.checking}
               className="h-8 gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -732,6 +764,7 @@ function AddProductRow({
           </div>
         </div>
       </div>
+      {impact.dialog}
     </div>
   );
 }
@@ -1228,6 +1261,7 @@ export function RecommendationCard({
   };
 
   const [pendingShift, setPendingShift] = useState<ScheduleShift | null>(null);
+  const [shortage, setShortage] = useState<PublishBlockSummary | null>(null);
 
   const doApply = () => {
     applyMut.mutate(
@@ -1244,6 +1278,11 @@ export function RecommendationCard({
         },
         onError: (e: unknown) => {
           setPendingShift(null);
+          const missing = stockShortageSummaryFromError(e);
+          if (missing) {
+            setShortage(missing);
+            return;
+          }
           toast.error(apiErrorMessage(e, "Não foi possível registrar."));
         },
       },
@@ -1758,6 +1797,7 @@ export function RecommendationCard({
         onCancel={() => setPendingShift(null)}
         onConfirm={doApply}
       />
+      <StockShortageDialog summary={shortage} onClose={() => setShortage(null)} />
 
       <ConfirmDialog
         open={deleteStageOpen}

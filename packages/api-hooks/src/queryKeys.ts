@@ -67,6 +67,7 @@ export const queryKeys = {
   purchaseListQuotes: (listId: string) => ["purchase-list-quotes", listId] as const,
   purchaseListQuoteTrash: (listId: string) => ["purchase-list-quote-trash", listId] as const,
   purchaseListProgress: (listId: string) => ["purchase-list-progress", listId] as const,
+  purchaseListPlanSurplus: (listId: string) => ["purchase-list-plan-surplus", listId] as const,
   stockOrigins: (producerId: string, localProductId: string) =>
     ["stock-origins", producerId, localProductId] as const,
   stockHistory: (producerId: string, q?: string) =>

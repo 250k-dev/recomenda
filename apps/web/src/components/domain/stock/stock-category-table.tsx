@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@recomenda/ui/primitives/input";
+import { PaginationBar } from "@recomenda/ui/patterns/pagination-bar";
 import { CATEGORY_COLORS } from "@recomenda/domain/cost-plan/categories";
 import { cn, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import {
@@ -44,6 +45,10 @@ export function categoryLabel(category: string | null): string {
 
 const FIXED = ["category", "product"] as const;
 
+// Mesma paginação da lista de compra.
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 50;
+
 /**
  * Tabela do estoque no padrão da lista de compra: linha tingida pela cor da
  * categoria (as mesmas de "Gastos por categoria"), bolinha + rótulo, busca e
@@ -61,7 +66,14 @@ export function StockCategoryTable<T extends StockTableRow>({
   searchPlaceholder?: string;
 }) {
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<TableView<string>>({ sort: null, filters: {} });
+  const [view, setViewState] = useState<TableView<string>>({ sort: null, filters: {} });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  // Busca, filtro ou ordenação novos voltam para a primeira página.
+  const setView = (update: (v: TableView<string>) => TableView<string>) => {
+    setViewState(update);
+    setPage(1);
+  };
 
   const accessors = useMemo(() => {
     const map: Record<string, ColumnAccessor<T>> = {
@@ -89,6 +101,10 @@ export function StockCategoryTable<T extends StockTableRow>({
       : rows;
     return applyTableView(searched, view, accessors);
   }, [rows, search, view, accessors]);
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const pageRows = visible.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const header = (id: string, label: string, align: "left" | "right" | "center" = "left") => {
     const accessor = accessors[id];
@@ -141,7 +157,10 @@ export function StockCategoryTable<T extends StockTableRow>({
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
           placeholder={searchPlaceholder}
           className="h-9 pl-9 text-sm"
           aria-label="Buscar produto"
@@ -171,7 +190,7 @@ export function StockCategoryTable<T extends StockTableRow>({
                       className="ml-1 font-medium text-primary hover:underline"
                       onClick={() => {
                         setSearch("");
-                        setView({ sort: null, filters: {} });
+                        setView(() => ({ sort: null, filters: {} }));
                       }}
                     >
                       · limpar filtros
@@ -180,7 +199,7 @@ export function StockCategoryTable<T extends StockTableRow>({
                 </td>
               </tr>
             ) : (
-              visible.map((row, index) => {
+              pageRows.map((row, index) => {
                 const color =
                   CATEGORY_COLORS[row.category ?? "OTHER"] ?? CATEGORY_COLORS.OTHER;
                 const wash = `color-mix(in srgb, ${color} ${index % 2 === 0 ? 10 : 16}%, var(--color-card))`;
@@ -243,6 +262,21 @@ export function StockCategoryTable<T extends StockTableRow>({
           ) : null}
         </table>
       </div>
+
+      {visible.length > PAGE_SIZE_OPTIONS[0] ? (
+        <PaginationBar
+          className="border-0 bg-transparent px-0 pb-0"
+          page={safePage}
+          pageSize={pageSize}
+          total={visible.length}
+          onPageChange={setPage}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

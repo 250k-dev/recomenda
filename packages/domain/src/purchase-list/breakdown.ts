@@ -47,6 +47,7 @@ export function detailItemToListItem(
         ? String(Number((it.area_factor * 100).toFixed(4)))
         : "",
     areaNote: it.area_note ?? "",
+    executionPlots: it.execution_plots ?? undefined,
   };
 }
 

@@ -66,7 +66,8 @@ export function useCyclePage() {
     listaDeCompra: routes.fazendas.safraListaDeCompra(farmId, cycleId, ctx),
     cotacoes: routes.fazendas.safraCotacoes(farmId, cycleId, ctx),
     planoDeCusto: routes.fazendas.safraPlanoDeCusto(farmId, cycleId, ctx),
-    estoque: routes.fazendas.estoque(farmId, ctx),
+    // Estoque aberto da safra (lista de compra): o caminho volta para a lista.
+    estoque: routes.fazendas.estoque(farmId, { ...ctx, cycle_id: cycleId, from: "lista" }),
     novaListaDeCompra: routes.fazendas.novaListaDeCompra(farmId, {
       cycle_id: cycleId,
       producer_id: producerId,

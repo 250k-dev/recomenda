@@ -19,6 +19,9 @@ export type RouteContext = {
   /** Abre a etapa correspondente no cronograma da safra. */
   recommendation_id?: string | null;
   onboarding?: string | null;
+  /** De onde a tela foi aberta (ex.: estoque aberto do produtor ou da lista) —
+   *  decide o caminho de navegação e o "Voltar". */
+  from?: string | null;
 };
 
 /**

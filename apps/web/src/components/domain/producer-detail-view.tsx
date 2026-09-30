@@ -308,6 +308,7 @@ export function ProducerDetailView({
                     <Link
                       href={routes.fazendas.estoque(farmsList[0].id, {
                         producer_id: producerId,
+                        from: "produtor",
                       })}
                     >
                       <Boxes className="size-4" />

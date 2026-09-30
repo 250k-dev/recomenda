@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { AlertTriangle, ListFilter, Plus, Sprout, Trash2 } from "lucide-react";
+import { AlertTriangle, Info, ListFilter, Plus, Sprout, Trash2 } from "lucide-react";
 import { useCurrencyStore } from "@/stores/currency";
 import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
@@ -1212,7 +1212,29 @@ export function PurchaseListItemsEditor({
             </td>
             {/* Observação de área — informativa, aparece no PDF do produtor. */}
             <td className="px-1.5 py-1.5">
-              {readOnly ? (
+              {it.executionPlots && it.executionPlots.length > 0 ? (
+                // Item "fora da programação": a observação é do sistema (uso
+                // nas etapas); o balão diz em quais talhões.
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex max-w-full cursor-help items-center gap-1 text-sm text-muted-foreground">
+                      <Info className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{it.areaNote || "Uso nas etapas"}</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    sideOffset={6}
+                    className="max-w-xs whitespace-normal text-left leading-relaxed"
+                  >
+                    <ExecutionPlotsSummary
+                      plots={it.executionPlots}
+                      unit={it.unit}
+                      beyondPlan={Boolean(it.areaNote?.startsWith("Além do programado"))}
+                      fmt={fmt}
+                    />
+                  </TooltipContent>
+                </Tooltip>
+              ) : readOnly ? (
                 <span className="block truncate text-sm text-muted-foreground">
                   {it.areaNote || "—"}
                 </span>
@@ -2069,6 +2091,70 @@ export function PurchaseListItemsEditor({
         cancelLabel="Cancelar"
         onConfirm={confirmRemoval}
       />
+    </div>
+  );
+}
+
+const EXECUTION_PLOTS_SHOWN = 5;
+
+/**
+ * Balão do item "fora da programação": resumo (talhões · ha), a fazenda uma
+ * vez só quando é a mesma, os talhões que mais usam e o resto somado — lista
+ * longa (20+ talhões) não vira um balão do tamanho da tela.
+ */
+function ExecutionPlotsSummary({
+  plots,
+  unit,
+  beyondPlan,
+  fmt,
+}: {
+  plots: NonNullable<ListItem["executionPlots"]>;
+  unit: string;
+  beyondPlan: boolean;
+  fmt: (n: number) => string;
+}) {
+  const farms = new Set(plots.map((p) => p.farm_name ?? ""));
+  const singleFarm = farms.size === 1 ? [...farms][0] : null;
+  const totalHa = plots.reduce((s, p) => s + p.hectares, 0);
+  const shown = plots.slice(0, EXECUTION_PLOTS_SHOWN);
+  const rest = plots.slice(EXECUTION_PLOTS_SHOWN);
+  const restQty = rest.reduce((s, p) => s + p.quantity, 0);
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="font-semibold">
+        Uso nas etapas · {plots.length} {plots.length === 1 ? "talhão" : "talhões"} ·{" "}
+        {fmt(totalHa)} ha
+      </p>
+      {singleFarm ? <p className="opacity-80">{singleFarm}</p> : null}
+      <ul className="flex flex-col">
+        {shown.map((plot) => (
+          <li
+            key={`${plot.farm_name ?? ""}-${plot.plot_name}`}
+            className="flex justify-between gap-3 tabular-nums"
+          >
+            <span className="min-w-0 truncate">
+              {plot.plot_name}
+              {!singleFarm && plot.farm_name ? ` · ${plot.farm_name}` : ""}
+            </span>
+            <span className="shrink-0">
+              {fmt(plot.quantity)} {unit}
+            </span>
+          </li>
+        ))}
+        {rest.length > 0 ? (
+          <li className="flex justify-between gap-3 tabular-nums opacity-80">
+            <span>
+              + {rest.length} {rest.length === 1 ? "talhão" : "talhões"}
+            </span>
+            <span className="shrink-0">
+              {fmt(restQty)} {unit}
+            </span>
+          </li>
+        ) : null}
+      </ul>
+      {beyondPlan ? (
+        <p className="opacity-80">A lista pede só o que passa do programado.</p>
+      ) : null}
     </div>
   );
 }

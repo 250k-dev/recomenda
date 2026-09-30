@@ -10,6 +10,8 @@ import {
   updatePurchaseList,
   getProducerPurchaseLists,
   getFarmPurchaseLists,
+  getPlanSurplus,
+  adjustPlanToUsage,
 } from "@recomenda/api/purchase-lists";
 import { queryKeys } from "./queryKeys";
 
@@ -104,3 +106,31 @@ export function useDeletePurchaseListTemplate() {
   });
 }
 
+
+/** Produtos programados bem acima do uso nas etapas. */
+export function usePlanSurplus(listId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.purchaseListPlanSurplus(listId),
+    queryFn: () => getPlanSurplus(listId),
+    enabled: Boolean(listId) && enabled,
+  });
+}
+
+/** "Ajustar ao uso": o excesso deixa de ser reservado e sai do "falta comprar". */
+export function useAdjustPlanToUsage(listId: string, opts: { cycleId?: string; producerId?: string | null }) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (localProductId: string) => adjustPlanToUsage(listId, localProductId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListPlanSurplus(listId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListProgress(listId) });
+      if (opts.cycleId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.cyclePurchaseList(opts.cycleId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.cycle(opts.cycleId) });
+      }
+      if (opts.producerId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(opts.producerId) });
+      }
+    },
+  });
+}

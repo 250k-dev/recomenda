@@ -321,7 +321,8 @@ export function ProducerStockSection({
             ]}
           />
         ) : null}
-        {render(kind === "seed" ? seeds : doses)}
+        {/* key por aba + tipo: trocar volta a busca, filtros e página ao início. */}
+        <div key={`${tab}:${kind}`}>{render(kind === "seed" ? seeds : doses)}</div>
       </div>
     );
   }

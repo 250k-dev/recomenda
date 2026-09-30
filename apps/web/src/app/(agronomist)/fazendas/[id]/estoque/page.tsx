@@ -8,6 +8,7 @@ import { Button } from "@recomenda/ui/primitives/button";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { ProducerStockSection } from "@/components/domain/producer-stock-section";
 import {
+  useCycle,
   useFarm,
   useProducer,
   useResolvedFarmProducerId,
@@ -20,23 +21,56 @@ export default function FarmStockPage() {
   const farmId = params.id;
   const searchParams = useSearchParams();
   const producerId = searchParams.get("producer_id");
+  // O estoque é do produtor; o caminho mostra de onde a tela foi aberta.
+  const from = searchParams.get("from");
+  const cycleId = searchParams.get("cycle_id") ?? "";
 
   const { data: farm } = useFarm(farmId);
   const { data: producer } = useProducer(producerId ?? "");
+  const { data: cycle } = useCycle(from === "lista" ? cycleId : "");
   const resolvedProducerId = useResolvedFarmProducerId(farmId, producerId);
 
   const farmHref = routes.fazendas.detalhe(farmId, {
     producer_id: producerId,
   });
 
+  const producerCrumb: BreadcrumbItem[] =
+    producerId && producer
+      ? [{ label: producer.name, href: routes.produtores.detalhe(producerId) }]
+      : [];
+  const listHref =
+    from === "lista" && cycleId
+      ? routes.fazendas.safraListaDeCompra(farmId, cycleId, { producer_id: producerId })
+      : null;
+
+  const middle: BreadcrumbItem[] =
+    from === "produtor"
+      ? []
+      : listHref
+        ? [
+            {
+              label: cycle?.name ?? "Safra",
+              href: routes.fazendas.safra(farmId, cycleId, { producer_id: producerId }),
+            },
+            { label: "Lista de compra", href: listHref },
+          ]
+        : farm
+          ? [{ label: farm.name, href: farmHref }]
+          : [];
+
   const breadcrumbs: BreadcrumbItem[] = [
     { label: "Produtores", href: routes.produtores.lista },
-    ...(producerId && producer
-      ? [{ label: producer.name, href: routes.produtores.detalhe(producerId) }]
-      : []),
-    ...(farm ? [{ label: farm.name, href: farmHref }] : []),
+    ...producerCrumb,
+    ...middle,
     { label: "Estoque" },
   ];
+
+  const back =
+    from === "produtor" && producerId
+      ? { href: routes.produtores.detalhe(producerId), label: "Voltar ao produtor" }
+      : listHref
+        ? { href: listHref, label: "Voltar à lista de compra" }
+        : { href: farmHref, label: "Voltar às safras" };
 
   return (
     <>
@@ -49,9 +83,9 @@ export default function FarmStockPage() {
           size="sm"
           className="gap-1.5 text-muted-foreground"
         >
-          <Link href={farmHref}>
+          <Link href={back.href}>
             <ArrowLeft className="size-4" />
-            Voltar às safras
+            {back.label}
           </Link>
         </Button>
       </div>

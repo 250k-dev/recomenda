@@ -1,5 +1,13 @@
 import { api } from "./http/axios";
 
+/** Uso de um produto extra num talhão (balão da coluna Obs. área). */
+export type ExecutionPlot = {
+  plot_name: string;
+  farm_name: string | null;
+  hectares: number;
+  quantity: number;
+};
+
 export interface PurchaseListItemInput {
   local_product_id: string;
   /** Cultura do item numa lista de safra multi-cultura (null = comum). */
@@ -139,6 +147,8 @@ export interface PurchaseListDetail {
     supplier: string | null;
     area_factor: number;
     area_note: string | null;
+    /** Só item "fora da programação": talhões onde as etapas usam o produto. */
+    execution_plots?: ExecutionPlot[];
     price_usd: number | null;
     price_brl_fixed: number | null;
     cost_per_ha_mode: "DOSE_PRICE" | "TOTAL_OVER_AREA";
@@ -354,5 +364,50 @@ export async function importPurchaseListTemplate(
     `/purchase-lists/${templateId}/import-template`,
     payload,
   );
+  return data;
+}
+
+/** Produto programado bem acima do que as etapas usam (reservado à toa). */
+export type PlanSurplusItem = {
+  local_product_id: string;
+  product_name: string;
+  unit: string;
+  planned: number;
+  used: number;
+  surplus: number;
+};
+
+export async function getPlanSurplus(listId: string) {
+  const { data } = await api.get<PlanSurplusItem[]>(`/purchase-lists/${listId}/plan-surplus`);
+  return data;
+}
+
+/** Reduz o programado do produto até o uso nas etapas. */
+export async function adjustPlanToUsage(listId: string, localProductId: string) {
+  const { data } = await api.post<PurchaseListDetail>(`/purchase-lists/${listId}/adjust-to-usage`, {
+    local_product_id: localProductId,
+  });
+  return data;
+}
+
+export type ExecutionImpact = {
+  /** Vale avisar: safra publicada e a mudança gera compra. */
+  warn: boolean;
+  product_name: string;
+  unit: string;
+  added: number;
+  free_stock: number;
+  to_buy: number;
+};
+
+/** Impacto de colocar/trocar um produto numa etapa (aviso pós-publicação). */
+export async function getExecutionImpact(payload: {
+  recommendation_id: string;
+  local_product_id: string;
+  dose_per_hectare: number;
+  area_factor?: number | null;
+  replace_item_id?: string | null;
+}) {
+  const { data } = await api.post<ExecutionImpact>(`/purchase-lists/execution-impact`, payload);
   return data;
 }

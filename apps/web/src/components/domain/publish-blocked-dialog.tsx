@@ -23,12 +23,19 @@ export function PublishBlockedDialog({
   message,
   items,
   listHref,
+  title = "Não foi possível publicar",
+  itemsLabel = (count: number) => (count === 1 ? "1 item impedindo" : `${count} itens impedindo`),
+  linkLabel = "Ir à lista de compra",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   message: string;
   items: PublishBlockItem[];
   listHref?: Route | null;
+  /** Reuso fora da publicação (ex.: registro sem estoque). */
+  title?: string;
+  itemsLabel?: (count: number) => string;
+  linkLabel?: string;
 }) {
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -48,16 +55,14 @@ export function PublishBlockedDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Não foi possível publicar</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{message}</DialogDescription>
         </DialogHeader>
 
         {items.length > 0 ? (
           <div className="px-6 pb-1">
             <p className="mb-2 pt-4 text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
-              {items.length === 1
-                ? "1 item impedindo"
-                : `${items.length} itens impedindo`}
+              {itemsLabel(items.length)}
             </p>
             <ul className="max-h-64 space-y-2 overflow-y-auto overscroll-contain pr-1">
               {pageItems.map((item) => (
@@ -113,7 +118,7 @@ export function PublishBlockedDialog({
           {listHref ? (
             <Button asChild>
               <Link href={listHref} onClick={() => onOpenChange(false)}>
-                Ir à lista de compra
+                {linkLabel}
               </Link>
             </Button>
           ) : null}

@@ -45,6 +45,8 @@ import {
   ScheduleShiftConfirmDialog,
   type ScheduleShift,
 } from "@/components/domain/schedule-shift-confirm-dialog";
+import { StockShortageDialog } from "@/components/domain/stock-shortage-dialog";
+import type { PublishBlockItem } from "@recomenda/api/api-error";
 import {
   isLargeScheduleShift,
   scheduleShiftDays,
@@ -164,6 +166,8 @@ export function MonthCalendar({
 
   // Etapas do lote registradas longe da previsão — aguardam confirmação.
   const [bulkShifts, setBulkShifts] = useState<ScheduleShift[]>([]);
+  // Etapas do lote recusadas por falta no galpão — o que faltou de cada uma.
+  const [bulkShortage, setBulkShortage] = useState<PublishBlockItem[] | null>(null);
 
   const runBulk = (action: "apply" | "skip", confirmedShift = false) => {
     const events = [...selected.values()].filter((event) => isApplicationEvent(event));
@@ -171,6 +175,7 @@ export function MonthCalendar({
       seasonId: event.seasonId,
       recommendationId: event.recommendationId,
       predictedYmd: event.predictedYmd,
+      label: `${event.applicationTitle} · ${event.plotName}`,
     }));
     if (items.length === 0) return;
     if (action === "apply" && !confirmedShift) {
@@ -194,7 +199,8 @@ export function MonthCalendar({
     bulkMut.mutate(
       { action, date: bulkDate, items },
       {
-        onSuccess: ({ ok, failed }) => {
+        onSuccess: ({ ok, failed, shortages }) => {
+          if (shortages.length > 0) setBulkShortage(shortages);
           if (failed === 0) {
             toast.success(
               `${ok} ${ok === 1 ? "aplicação registrada" : "aplicações registradas"}.`,
@@ -606,6 +612,18 @@ export function MonthCalendar({
           </div>
         ) : null}
       </main>
+      <StockShortageDialog
+        summary={
+          bulkShortage
+            ? {
+                message:
+                  "Algumas etapas não foram registradas porque falta produto no galpão. Registre a compra do que falta (ou ajuste o estoque) e registre de novo.",
+                items: bulkShortage,
+              }
+            : null
+        }
+        onClose={() => setBulkShortage(null)}
+      />
       <ScheduleShiftConfirmDialog
         shifts={bulkShifts}
         loading={bulkMut.isPending}

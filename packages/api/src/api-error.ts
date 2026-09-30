@@ -167,3 +167,32 @@ export function publishBlockSummaryFromError(
 
   return { message, items: [] };
 }
+
+/**
+ * Registro de aplicação recusado por falta de produto no galpão
+ * (`INSUFFICIENT_STOCK`): um item por produto com precisa · tem · falta.
+ * Null quando o erro é outro — aí vale o toast de sempre.
+ */
+export function stockShortageSummaryFromError(error: unknown): PublishBlockSummary | null {
+  if (apiErrorCode(error) !== "INSUFFICIENT_STOCK") return null;
+  const details = apiErrorDetails(error);
+  const rows = Array.isArray(details) ? details : [];
+  const items = rows.flatMap((row, index) => {
+    if (!isRecord(row)) return [];
+    const required = Number(row.required) || 0;
+    const available = Math.max(0, Number(row.available) || 0);
+    const missing = Math.max(0, required - available);
+    return [
+      {
+        id: String(row.product_id ?? index),
+        name: String(row.product_name ?? "").trim() || "Produto",
+        detail: `precisa ${fmtQty(required)} · no galpão ${fmtQty(available)} · falta ${fmtQty(missing)}`,
+      },
+    ];
+  });
+  return {
+    message:
+      "Não há produto suficiente no galpão para esta aplicação. Registre a compra do que falta (ou ajuste o estoque) e tente de novo.",
+    items,
+  };
+}

@@ -20,7 +20,12 @@ import {
   scheduleShiftDays,
   todayLocalYmd,
 } from "@recomenda/domain/timing/window-days";
-import { apiErrorMessage } from "@recomenda/api/api-error";
+import {
+  apiErrorMessage,
+  stockShortageSummaryFromError,
+  type PublishBlockSummary,
+} from "@recomenda/api/api-error";
+import { StockShortageDialog } from "@/components/domain/stock-shortage-dialog";
 import {
   ScheduleShiftConfirmDialog,
   type ScheduleShift,
@@ -57,6 +62,7 @@ export function RecommendationRegisterPopover({
   const [date, setDate] = useState(defaultDate ?? todayLocalYmd());
   const [notes, setNotes] = useState("");
   const [pendingShift, setPendingShift] = useState<ScheduleShift | null>(null);
+  const [shortage, setShortage] = useState<PublishBlockSummary | null>(null);
 
   const applyMut = useApplyRecommendation(seasonId);
   const skipMut = useSkipRecommendation(seasonId);
@@ -82,6 +88,12 @@ export function RecommendationRegisterPopover({
         },
         onError: (e: unknown) => {
           setPendingShift(null);
+          const missing = stockShortageSummaryFromError(e);
+          if (missing) {
+            setOpen(false);
+            setShortage(missing);
+            return;
+          }
           toast.error(apiErrorMessage(e, "Não foi possível registrar."));
         },
       },
@@ -192,6 +204,7 @@ export function RecommendationRegisterPopover({
         onCancel={() => setPendingShift(null)}
         onConfirm={doApply}
       />
+      <StockShortageDialog summary={shortage} onClose={() => setShortage(null)} />
     </>
   );
 }

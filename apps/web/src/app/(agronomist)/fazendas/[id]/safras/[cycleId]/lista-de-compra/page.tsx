@@ -7,6 +7,7 @@ import { Plus, ShoppingCart } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { FarmPurchaseListTab } from "@/components/domain/farm-purchase-list-tab";
+import { PlanSurplusNotice } from "@/components/domain/purchase-list/plan-surplus-notice";
 import {
   CyclePageShell,
   useCyclePage,
@@ -95,6 +96,15 @@ export default function CyclePurchaseListPage() {
           }
         />
       ) : (
+        <>
+        {purchaseList && purchaseList.status === "active" ? (
+          <PlanSurplusNotice
+            listId={purchaseList.id}
+            cycleId={page.cycleId}
+            producerId={producerId || null}
+            canEdit={canListCrud}
+          />
+        ) : null}
         <FarmPurchaseListTab
           farmId={farmId}
           list={purchaseList ?? null}
@@ -108,6 +118,7 @@ export default function CyclePurchaseListPage() {
           stockHref={page.hrefs.estoque}
           quotesHref={page.hrefs.cotacoes}
         />
+        </>
       )}
     </CyclePageShell>
   );
