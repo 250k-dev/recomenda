@@ -1,5 +1,5 @@
 import type { Recommendation, RecommendationItem } from "@recomenda/api";
-import { DOSE_UNIT_SHORT_LABELS } from "@recomenda/utils";
+import { DOSE_UNIT_SHORT_LABELS, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
 import { displayRecStatus, fmtDate, recommendationStatusLabel } from "./format";
 import {
   formulationShortLabel,
@@ -156,10 +156,79 @@ function hasAnyPrice(list: RecommendationShareData[], showPrices?: boolean): boo
   return list.some((data) => docCostPerHa(data, data.unitPriceByProduct) != null);
 }
 
+function categoryLabel(category: string | null | undefined): string {
+  if (!category) return EM_DASH;
+  return escapeHtml(
+    (PRODUCT_CATEGORY_LABELS as Record<string, string>)[category] ?? category,
+  );
+}
+
+/**
+ * Hectares tratados pelo item. No talhão, sai da própria quantidade da etapa
+ * (já com o recorte de % da área), para Volume = Dose × ha tratado bater
+ * sempre; no modelo, é a área dos talhões do modelo × % da área.
+ */
+function treatedHa(item: RecommendationItem, opts: RenderOpts): number {
+  const factor =
+    item.area_factor != null && item.area_factor > 0 ? Math.min(item.area_factor, 1) : 1;
+  if (opts.notebook?.modelAreaHa != null) return opts.notebook.modelAreaHa * factor;
+  if (item.dose_per_hectare > 0 && item.total_quantity > 0) {
+    return item.total_quantity / item.dose_per_hectare;
+  }
+  return (opts.plotAreaHa ?? 0) * factor;
+}
+
+/** Caderno: Fórmula · Produto · Segmento · Dose · Volume · ha tratado. */
+function notebookProductRowsHtml(rec: Recommendation, opts: RenderOpts): string {
+  const categories = opts.notebook?.categoryByProduct ?? {};
+  const rows = sortRecommendationItemsByMixOrder(rec.items)
+    .map((item) => {
+      const cost = itemCostPerHa(item, opts.prices);
+      const ha = treatedHa(item, opts);
+      const volume =
+        opts.notebook?.modelAreaHa != null ? item.dose_per_hectare * ha : item.total_quantity;
+      return `
+        <tr>
+          <td class="form nb-form">${escapeHtml(itemFormulationShort(item))}</td>
+          <td>${escapeHtml(item.product_name)}${
+            item.is_substitution ? `<span class="sub"> (substituído)</span>` : ""
+          }</td>
+          <td class="firm">${categoryLabel(categories[item.local_product_id])}</td>
+          <td class="num">${fmtNum(item.dose_per_hectare, 3)} ${escapeHtml(doseUnitLabel(item.dose_unit))}</td>
+          <td class="num">${fmtQty(volume, item.dose_unit)}</td>
+          <td class="num">${ha > 0 ? `${fmtMeasure(ha)} ha` : EM_DASH}</td>
+          ${opts.money ? `<td class="num">${cost == null ? EM_DASH : fmtBrl(cost)}</td>` : ""}
+        </tr>`;
+    })
+    .join("");
+
+  const total = stageCostPerHa(rec, opts.prices);
+  const foot =
+    opts.money && total != null
+      ? `<tfoot><tr>
+           <td class="form"></td><td>Total da etapa</td>
+           <td></td><td class="num"></td><td class="num"></td><td class="num"></td>
+           <td class="num">${fmtBrl(total)}</td>
+         </tr></tfoot>`
+      : "";
+
+  return `
+    <table class="products">
+      <thead>
+        <tr><th class="form nb-form">Fórmula</th><th>Produto</th><th>Segmento</th><th class="num">Dose/ha</th><th class="num">Volume</th><th class="num">ha tratado</th>${
+          opts.money ? `<th class="num">Custo/ha</th>` : ""
+        }</tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      ${foot}
+    </table>`;
+}
+
 function productRowsHtml(rec: Recommendation, opts: RenderOpts): string {
   if (rec.items.length === 0) {
     return `<p class="empty">Nenhum produto vinculado a esta etapa.</p>`;
   }
+  if (opts.notebook) return notebookProductRowsHtml(rec, opts);
   const showQuantity = opts.quantity !== false;
   const rows = sortRecommendationItemsByMixOrder(rec.items)
     .map((item) => {
@@ -345,6 +414,18 @@ interface RenderOpts {
   quantity?: boolean;
   /** Status, previsto e aplicado — execução do talhão, não do modelo. */
   stageMeta?: boolean;
+  /** Área do talhão (fallback do ha tratado quando a etapa não tem quantidade). */
+  plotAreaHa?: number;
+  /** Tabela no formato do Caderno de Safra (sem Empresa/Registro, sem data de emissão). */
+  notebook?: NotebookTableOptions | null;
+}
+
+/** Tabela de produtos do Caderno de Safra. */
+export interface NotebookTableOptions {
+  /** Categoria (HERBICIDE, FUNGICIDE…) por produto — coluna Segmento. */
+  categoryByProduct: Record<string, string>;
+  /** Modelo: área somada dos talhões do modelo (o modelo não tem talhão). */
+  modelAreaHa?: number | null;
 }
 
 /** CSS específico da recomendação (etapas/produtos/status/ficha). O genérico
@@ -369,6 +450,7 @@ export const REC_CSS = `
   .products .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .products .firm { font-size: 10px; color: #4a4a42; max-width: 10rem; }
   .products .form { width: 3.2rem; text-align: center; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; color: #6b6b62; white-space: nowrap; }
+  .products .form.nb-form { width: 3.9rem; }
   .sub { font-size: 10px; color: #9a5a16; }
   .notes { margin: 10px 0 0 32px; font-size: 11px; color: #4a4a42; font-style: italic; }
   .empty { font-size: 11px; color: #7a7a70; margin: 0 0 0 32px; }
@@ -422,7 +504,11 @@ function buildDocBody(
       <span class="summary-value">${data.done}/${data.total} aplicadas (${progressPct}%)</span>
     </div>`);
 
-  const stageOpts: RenderOpts = { ...opts, prices: data.unitPriceByProduct };
+  const stageOpts: RenderOpts = {
+    ...opts,
+    prices: data.unitPriceByProduct,
+    plotAreaHa: plotAreaHa(data),
+  };
   const stages =
     data.recommendations.length > 0
       ? data.recommendations
@@ -434,7 +520,10 @@ function buildDocBody(
   // passa de uma página, e a 2ª saía sem dizer de quem era.
   return sheetHtml({
     pageBreak,
-    header: headerHtml(emittedAt, data.plotName ? `Talhão ${data.plotName}` : null),
+    header: headerHtml(
+      opts.notebook ? null : emittedAt,
+      data.plotName ? `Talhão ${data.plotName}` : null,
+    ),
     body: `
     <div class="title-block">
       <p class="kicker">Recomendação agronômica</p>
@@ -652,13 +741,19 @@ export interface ModelPrintData {
   recommendations: Recommendation[];
   producerName?: string | null;
   agronomistName?: string | null;
+  /** Área somada dos talhões do modelo — Volume e ha tratado no caderno. */
+  areaHa?: number | null;
 }
 
 /**
  * Folhas do modelo: cronograma (etapa, produtos, dose/ha, observação).
  * Sem ficha, plantio, status, datas e quantidade total — isso é do talhão.
  */
-export function buildModelPages(models: ModelPrintData[], pageBreak = false): string {
+export function buildModelPages(
+  models: ModelPrintData[],
+  pageBreak = false,
+  options: { notebook?: NotebookTableOptions | null } = {},
+): string {
   const kicker =
     models.length > 1 ? "Modelos aplicados na safra" : "Modelo aplicado na safra";
   return models
@@ -671,6 +766,9 @@ export function buildModelPages(models: ModelPrintData[], pageBreak = false): st
         registry,
         quantity: false,
         stageMeta: false,
+        notebook: options.notebook
+          ? { ...options.notebook, modelAreaHa: model.areaHa ?? 0 }
+          : null,
       };
       const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
       const tags: string[] = [];
@@ -684,7 +782,7 @@ export function buildModelPages(models: ModelPrintData[], pageBreak = false): st
 
       return sheetHtml({
         pageBreak: pageBreak || index > 0,
-        header: headerHtml(emittedAt, model.name),
+        header: headerHtml(options.notebook ? null : emittedAt, model.name),
         footer: footerHtml(model.agronomistName),
         body: `
         <div class="title-block">
@@ -712,11 +810,12 @@ export function buildModelPages(models: ModelPrintData[], pageBreak = false): st
  */
 export function buildRecommendationPages(
   list: RecommendationShareData[],
-  options: PrintOptions = {},
+  options: PrintOptions & { notebook?: NotebookTableOptions | null } = {},
 ): string {
   const opts: RenderOpts = {
     money: hasAnyPrice(list, options.showPrices),
     registry: hasRegistryData(list),
+    notebook: options.notebook ?? null,
   };
   return list.map((data) => buildDocBody(data, true, opts)).join("");
 }

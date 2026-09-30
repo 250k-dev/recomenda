@@ -322,7 +322,7 @@ export function CostPlanView({
       "Unidade",
       "Nº aplicações",
       "Estoque",
-      "Qtde final",
+      "Falta comprar",
       "US$ un.",
       "R$ un.",
       "R$/ha",

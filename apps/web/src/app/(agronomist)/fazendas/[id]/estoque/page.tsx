@@ -1,10 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
-import { Button } from "@recomenda/ui/primitives/button";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { ProducerStockSection } from "@/components/domain/producer-stock-section";
 import {
@@ -65,30 +62,9 @@ export default function FarmStockPage() {
     { label: "Estoque" },
   ];
 
-  const back =
-    from === "produtor" && producerId
-      ? { href: routes.produtores.detalhe(producerId), label: "Voltar ao produtor" }
-      : listHref
-        ? { href: listHref, label: "Voltar à lista de compra" }
-        : { href: farmHref, label: "Voltar às safras" };
-
   return (
     <>
       <BreadcrumbBack items={breadcrumbs} />
-
-      <div className="mb-4">
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 text-muted-foreground"
-        >
-          <Link href={back.href}>
-            <ArrowLeft className="size-4" />
-            {back.label}
-          </Link>
-        </Button>
-      </div>
 
       {resolvedProducerId ? (
         <ProducerStockSection

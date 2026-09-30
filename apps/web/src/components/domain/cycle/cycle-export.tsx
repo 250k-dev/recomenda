@@ -438,6 +438,15 @@ export function CycleExportButton({
         unitByProduct.set(item.local_product_id, item.dose_unit);
       }
     }
+    // Segmento (Herbicida, Fungicida…) das etapas: a lista de compra da safra
+    // tem todo produto usado nas etapas (inclusive fora da programação).
+    const productCategories: Record<string, string> = {};
+    for (const item of stock ?? []) {
+      if (item.category) productCategories[item.local_product_id] = item.category;
+    }
+    for (const item of purchaseList?.items ?? []) {
+      if (item.category) productCategories[item.local_product_id] = item.category;
+    }
     const modelsForNotebook = models.map((model) => ({
       ...model,
       recommendations: withPurchaseListUnits(model.recommendations, unitByProduct),
@@ -460,6 +469,7 @@ export function CycleExportButton({
         ),
       })),
       fieldSheets: fieldSheetsFrom(models, seasons),
+      productCategories,
       note: cycle.backfill
         ? "Arquivo de safra: o estoque do galpão de hoje não entra neste caderno."
         : null,
@@ -472,6 +482,7 @@ export function CycleExportButton({
     producerName,
     purchaseList,
     seasons,
+    stock,
     stockItems,
   ]);
 

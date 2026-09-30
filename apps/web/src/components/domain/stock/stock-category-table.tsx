@@ -59,11 +59,14 @@ export function StockCategoryTable<T extends StockTableRow>({
   columns,
   emptyText,
   searchPlaceholder = "Buscar produto…",
+  toolbar,
 }: {
   rows: T[];
   columns: StockTableColumn<T>[];
   emptyText: string;
   searchPlaceholder?: string;
+  /** À esquerda da busca, na mesma linha (ex.: Defensivos | Sementes). */
+  toolbar?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [view, setViewState] = useState<TableView<string>>({ sort: null, filters: {} });
@@ -153,18 +156,21 @@ export function StockCategoryTable<T extends StockTableRow>({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative max-w-xs">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          placeholder={searchPlaceholder}
-          className="h-9 pl-9 text-sm"
-          aria-label="Buscar produto"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">{toolbar}</div>
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder={searchPlaceholder}
+            className="h-9 pl-9 text-sm"
+            aria-label="Buscar produto"
+          />
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">

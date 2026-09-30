@@ -104,10 +104,12 @@ export function htmlShell(title: string, body: string, extraCss = ""): string {
  * nome da seção — só vale a pena onde o cabeçalho se repete página a página
  * (Caderno de Safra), para o leitor saber onde está no meio de uma tabela longa.
  */
-export function headerHtml(emittedAt: string, context?: string | null): string {
-  const right = context
-    ? `${escapeHtml(context)} · Emitido em ${escapeHtml(emittedAt)}`
-    : `Emitido em ${escapeHtml(emittedAt)}`;
+/** `emittedAt` nulo: sem "Emitido em" (o Caderno de Safra não leva data). */
+export function headerHtml(emittedAt: string | null, context?: string | null): string {
+  const parts: string[] = [];
+  if (context) parts.push(escapeHtml(context));
+  if (emittedAt) parts.push(`Emitido em ${escapeHtml(emittedAt)}`);
+  const right = parts.join(" · ");
   return `
     <header class="header">
       <div class="brand">${LOGO_SVG}<span class="brand-name">Recomenda</span></div>

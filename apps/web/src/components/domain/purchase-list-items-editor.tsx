@@ -178,10 +178,10 @@ const COL = {
   /** Form., Dose, Un., Nº apl., % área, Ciclo. Quem pede os 100 é o select
    *  de unidade em edição ("Dose" + seta). */
   xs: 100,
-  /** Volume, Qtde final, Preço US$, Valor. Cabe "QTDE FINAL" e "R$ 12.345,67". */
+  /** Volume, Preço US$, Valor. Cabe "R$ 12.345,67". */
   sm: 112,
-  /** Total, Total US$, Semente/metro, População final, Volume BAG's, Área
-   *  plantado, Obs. área. Cabe "POPULAÇÃO FINAL" e o total do rodapé em
+  /** Falta comprar, Total, Total US$, Semente/metro, População final, Volume
+   *  BAG's, Área plantado, Obs. área. Cabe "POPULAÇÃO FINAL" e o total do rodapé em
    *  negrito, "R$ 15.522.769,62". */
   md: 148,
   /** Estoque disponível — o título mais longo da tabela. */
@@ -384,7 +384,7 @@ export function PurchaseListItemsEditor({
   );
 
   // Item 14: tem estoque, mas não o bastante — o que falta vira compra. Marca
-  // a linha (⚠ na qtde final), a aba e o rodapé da tabela.
+  // a linha (⚠ no falta comprar), a aba e o rodapé da tabela.
   const exceedsStockOf = (it: ListItem) =>
     Number(it.stock || 0) > 0 && (toBuyByKey.get(it.key) ?? 0) > 0;
 
@@ -893,7 +893,7 @@ export function PurchaseListItemsEditor({
     },
   };
 
-  // Colunas de resumo à direita (Qtde final, Total, Total US$ e o espaçador da
+  // Colunas de resumo à direita (Falta comprar, Total, Total US$ e o espaçador da
   // ponta): laranja claro do tema no cabeçalho e nas linhas, para se
   // destacarem. Translúcido, para a zebra das linhas continuar aparecendo.
   const summaryCellClass =
@@ -1394,7 +1394,7 @@ export function PurchaseListItemsEditor({
   };
 
   // Cabeçalho das colunas compartilhadas (à direita) — igual para sementes e
-  // defensivos. As de resumo (Qtde final → Total US$) ganham o laranja.
+  // defensivos. As de resumo (Falta comprar → Total US$) ganham o laranja.
   const renderSharedHeaderCells = (band: Band) => (
     <>
       {renderHeaderCell(band, "stock", "Estoque disponível")}
@@ -1404,7 +1404,7 @@ export function PurchaseListItemsEditor({
       {canViewPrices
         ? renderHeaderCell(band, "priceBrl", "Valor")
         : null}
-      {renderHeaderCell(band, "toBuy", "Qtde final", summaryHeaderClass)}
+      {renderHeaderCell(band, "toBuy", "Falta comprar", summaryHeaderClass)}
       {canViewPrices
         ? renderHeaderCell(band, "totalBrl", "Total", summaryHeaderClass)
         : null}
@@ -1483,7 +1483,7 @@ export function PurchaseListItemsEditor({
       ...(canViewPrices
         ? [{ width: COL.sm }, { width: COL.sm }] // Preço US$, Valor
         : []),
-      { width: COL.sm }, // Qtde final
+      { width: COL.md }, // Falta comprar
       ...(canViewPrices
         ? [{ width: COL.md }, { width: COL.md }] // Total, Total US$
         : []),

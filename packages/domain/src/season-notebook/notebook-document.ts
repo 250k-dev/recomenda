@@ -27,12 +27,7 @@ import {
   PURCHASE_LIST_CSS,
   purchaseListSectionHtml,
 } from "../purchase-list/purchase-list-print-document";
-import {
-  displayRecStatus,
-  fmtDate,
-  isDesiccationRec,
-  recommendationStatusLabel,
-} from "../recommendations/format";
+import { isDesiccationRec } from "../recommendations/format";
 import {
   buildModelPages,
   buildRecommendationPages,
@@ -243,6 +238,8 @@ export interface SeasonNotebookData {
   fieldSheets: FieldSheet[];
   /** Aviso da capa (ex.: safra histórica, estoque é retrato do galpão hoje). */
   note?: string | null;
+  /** Categoria de cada produto (HERBICIDE…) — coluna Segmento das etapas. */
+  productCategories?: Record<string, string> | null;
 }
 
 export interface NotebookOptions {
@@ -328,14 +325,6 @@ function byPlotName(a: string, b: string): number {
   return a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" });
 }
 
-const STATUS_CLASS: Record<string, string> = {
-  PENDING: "is-pending",
-  OVERDUE: "is-overdue",
-  APPLIED_ON_TIME: "is-done",
-  APPLIED_LATE: "is-late",
-  SKIPPED: "is-skipped",
-};
-
 // ---- CSS ---------------------------------------------------------------
 
 /**
@@ -381,13 +370,23 @@ const NOTEBOOK_CSS = `
   .nb-toc li::before { content: counter(nb-toc); flex: 0 0 auto; width: 20px; font-size: 11px; font-weight: 700; color: #2f6d3f; font-variant-numeric: tabular-nums; }
   .nb-toc-label { font-size: 13px; font-weight: 600; color: #20201c; }
   .nb-toc-desc { font-size: 11px; color: #7a7a70; }
-  .nb-plot { margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
+  /* Talhão curto fica inteiro na folha. Talhão longo (muitas etapas) pode
+     continuar na seguinte: se fosse indivisível e não coubesse no espaço sob o
+     título, o navegador o jogava inteiro para a próxima e deixava a folha em
+     branco. Mesmo quebrando, o nome não fica órfão e a linha não se parte. */
+  .nb-plot { margin-bottom: 14px; }
+  .nb-plot.nb-keep { break-inside: avoid; page-break-inside: avoid; }
+  .nb-plot .data-table thead { display: table-header-group; }
+  .nb-plot .data-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .nb-plot-head { break-after: avoid; page-break-after: avoid; }
   .nb-plot-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 4px; border-bottom: 2px solid #2f6d3f; }
   .nb-plot-name { font-size: 13px; font-weight: 700; color: #20201c; }
   .nb-plot-meta { font-size: 11px; color: #6b6b62; }
   .nb-plot-meta .nb-sep { color: #c9c7bc; }
   .data-table .nb-idx { width: 1.8rem; text-align: right; color: #7a7a70; font-variant-numeric: tabular-nums; }
   .nb-products { font-size: 10px; color: #4a4a42; }
+  /* Previsto e Situação: o produtor preenche à mão no caderno impresso. */
+  .data-table .nb-write { width: 26mm; }
   .nb-note-meta { display: flex; gap: 28px; margin: 18px 0 10px; font-size: 11px; color: #6b6b62; }
   .nb-lines { margin-top: 6px; }
   .nb-lines div { height: 8mm; border-bottom: 1px solid #dedcd2; }
@@ -417,12 +416,12 @@ function page(opts: {
   agronomistName?: string | null;
   pageBreak: boolean;
 }): string {
-  const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
   // O kicker vai para o cabeçalho, que se repete: numa lista de compra de três
-  // páginas, a 2ª e a 3ª continuam dizendo "Lista de compra".
+  // páginas, a 2ª e a 3ª continuam dizendo "Lista de compra". Sem "Emitido em":
+  // o caderno é encadernado e usado a safra toda.
   return sheetHtml({
     pageBreak: opts.pageBreak,
-    header: headerHtml(emittedAt, opts.kicker),
+    header: headerHtml(null, opts.kicker),
     footer: footerHtml(opts.agronomistName),
     body: `
     <div class="title-block">
@@ -561,6 +560,7 @@ function purchaseListPage(
     body: purchaseListSectionHtml(list, {
       showPrices: options.showPrices,
       groupByCategory: true,
+      showRequired: true,
     }),
     agronomistName: data.agronomistName,
     pageBreak,
@@ -572,7 +572,12 @@ function stockPage(
   options: NotebookOptions,
   pageBreak: boolean,
 ): string {
-  const items = data.stockItems ?? [];
+  // Categorias de A a Z e, dentro delas, produtos de A a Z.
+  const label = (item: StockExportItem) => item.category_label || item.category || "";
+  const items = [...(data.stockItems ?? [])].sort(
+    (a, b) =>
+      byPlotName(label(a), label(b)) || byPlotName(a.product_name, b.product_name),
+  );
   return page({
     kicker: "Estoque",
     title: data.producerName ? `Estoque · ${data.producerName}` : "Estoque do produtor",
@@ -590,6 +595,32 @@ function stockPage(
   });
 }
 
+function notebookTable(data: SeasonNotebookData) {
+  return { categoryByProduct: data.productCategories ?? {} };
+}
+
+const plotKey = (farm: string | null | undefined, plot: string): string =>
+  `${(farm ?? "").trim().toLocaleLowerCase("pt-BR")}\0${plot.trim().toLocaleLowerCase("pt-BR")}`;
+
+/** Área dos talhões de um modelo — base do Volume e ha tratado do modelo. */
+function modelAreaHa(data: SeasonNotebookData, model: NotebookModelBlock): number {
+  const areaByPlot = new Map(
+    data.plots.map((plot) => [plotKey(plot.farmName, plot.plotName), plot.areaHa ?? 0]),
+  );
+  // Sem fazenda no modelo: casa só pelo nome do talhão.
+  const areaByName = new Map(
+    data.plots.map((plot) => [plotKey(null, plot.plotName), plot.areaHa ?? 0]),
+  );
+  return model.plots.reduce(
+    (sum, plot) =>
+      sum +
+      (areaByPlot.get(plotKey(plot.farmName, plot.plotName)) ??
+        areaByName.get(plotKey(null, plot.plotName)) ??
+        0),
+    0,
+  );
+}
+
 function modelsPage(data: SeasonNotebookData, pageBreak: boolean): string {
   const printable = data.models.filter((model) => model.recommendations.length > 0);
   return buildModelPages(
@@ -598,8 +629,10 @@ function modelsPage(data: SeasonNotebookData, pageBreak: boolean): string {
       recommendations: model.recommendations,
       producerName: data.producerName,
       agronomistName: data.agronomistName,
+      areaHa: modelAreaHa(data, model),
     })),
     pageBreak,
+    { notebook: notebookTable(data) },
   );
 }
 
@@ -654,6 +687,9 @@ function plotsPage(data: SeasonNotebookData, pageBreak: boolean): string {
   });
 }
 
+/** Até quantas etapas o bloco do talhão fica inteiro numa folha (~meia página). */
+const KEEP_PLOT_MAX_STAGES = 12;
+
 /** Resumo do cronograma: uma tabela compacta por talhão, sem doses. */
 function schedulePages(
   data: SeasonNotebookData,
@@ -673,21 +709,20 @@ function schedulePages(
 
       const rows = item.recommendations
         .map((rec, index) => {
-          const statusClass = STATUS_CLASS[displayRecStatus(rec)] ?? "is-pending";
           const products = rec.items.map((p) => p.product_name).join(", ");
           return `
             <tr>
               <td class="nb-idx">${index + 1}</td>
               <td>${escapeHtml(rec.name)}</td>
-              <td class="num">${rec.predicted_date_current ? escapeHtml(fmtDate(rec.predicted_date_current)) : EM_DASH}</td>
-              <td><span class="status ${statusClass}">${escapeHtml(recommendationStatusLabel(rec))}</span></td>
+              <td class="nb-write"></td>
+              <td class="nb-write"></td>
               <td class="nb-products">${products ? escapeHtml(products) : EM_DASH}</td>
             </tr>`;
         })
         .join("");
 
       return `
-        <div class="nb-plot">
+        <div class="nb-plot${item.recommendations.length <= KEEP_PLOT_MAX_STAGES ? " nb-keep" : ""}">
           <div class="nb-plot-head">
             <span class="nb-plot-name">${escapeHtml(item.plotName ?? item.title)}</span>
             <span class="nb-plot-meta">${meta.join(' <span class="nb-sep">·</span> ')}</span>
@@ -697,8 +732,8 @@ function schedulePages(
               <tr>
                 <th class="nb-idx">#</th>
                 <th>Etapa</th>
-                <th class="num">Previsto</th>
-                <th>Situação</th>
+                <th class="nb-write">Previsto</th>
+                <th class="nb-write">Situação</th>
                 <th>Produtos</th>
               </tr>
             </thead>
@@ -727,7 +762,10 @@ function schedulePages(
   // virar uma página em branco no começo do caderno.
   return (
     summary +
-    buildRecommendationPages(schedule, { showPrices: options.showPrices })
+    buildRecommendationPages(schedule, {
+      showPrices: options.showPrices,
+      notebook: notebookTable(data),
+    })
   );
 }
 
@@ -852,7 +890,6 @@ function fieldSheetPages(data: SeasonNotebookData): string {
       const farms = new Set(
         sheet.rows.map((row) => row.farmName).filter((name): name is string => Boolean(name)),
       );
-      const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
       const title = sheet.modelName ?? data.cycleName;
       const tags = data.producerName ? [`Produtor: ${data.producerName}`] : [];
       return sheetHtml({
@@ -860,7 +897,7 @@ function fieldSheetPages(data: SeasonNotebookData): string {
         // Entre duas grades o nome não muda, então a quebra é explícita.
         pageBreak: index > 0,
         docClass: "nb-field-doc",
-        header: headerHtml(emittedAt, "Acompanhamento"),
+        header: headerHtml(null, "Acompanhamento"),
         footer: footerHtml(data.agronomistName),
         body: `
         <div class="title-block">

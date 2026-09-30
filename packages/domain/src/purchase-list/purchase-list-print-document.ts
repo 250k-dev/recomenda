@@ -5,7 +5,6 @@
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
 import { DOSE_UNIT_SHORT_LABELS } from "@recomenda/utils";
 import { CATEGORY_LABELS } from "../cost-plan/categories";
-import { CATEGORY_ORDER } from "../cost-plan/calculate";
 import { SEED_CATEGORIES, seedQuantityUnitLabel } from "./list-item";
 import {
   escapeHtml,
@@ -30,10 +29,8 @@ const unitLabel = (unit: string): string =>
 
 const isSeedCategory = (category: string) => SEED_CATEGORIES.includes(category);
 
-function categoryRank(code: string): number {
-  const index = (CATEGORY_ORDER as readonly string[]).indexOf(code);
-  return index === -1 ? CATEGORY_ORDER.length : index;
-}
+const byName = (a: string, b: string): number =>
+  a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" });
 
 /** Dose/ha; sementes sem dose usam travessão. */
 function formatDose(it: PurchaseListItem): string {
@@ -43,12 +40,17 @@ function formatDose(it: PurchaseListItem): string {
   return `${fmtQty(it.dose_per_hectare)} ${unitLabel(it.dose_unit)}/ha`;
 }
 
-/** Volume a comprar (quantity_to_buy) com unidade adequada. */
-function formatVolume(it: PurchaseListItem): string {
+/** Quantidade com a unidade do item (bags/sacos em semente). */
+function formatQuantity(it: PurchaseListItem, value: number): string {
   const unit = isSeedCategory(it.category)
     ? seedQuantityUnitLabel(it.category)
     : unitLabel(it.dose_unit);
-  return `${fmtQty(it.quantity_to_buy)} ${unit}`;
+  return `${fmtQty(Number(value) || 0)} ${unit}`;
+}
+
+/** Volume a comprar (quantity_to_buy) com unidade adequada. */
+function formatVolume(it: PurchaseListItem): string {
+  return formatQuantity(it, it.quantity_to_buy);
 }
 
 /** CSS próprio da lista (o genérico vem do CORE_CSS). Exportado para documentos
@@ -61,8 +63,13 @@ export const PURCHASE_LIST_CSS = `
 /** Suprime colunas de dinheiro mesmo quando o payload traz preço. */
 export interface PurchaseListSectionOptions {
   showPrices?: boolean;
-  /** Agrupa os produtos pela categoria, na ordem do plano. */
+  /** Agrupa os produtos pela categoria: categorias de A a Z, produtos de A a Z. */
   groupByCategory?: boolean;
+  /**
+   * Duas colunas como na tela: Volume (necessidade da safra) e Falta comprar
+   * (volume − aplicado − estoque). Sem ela, uma coluna só com o que falta comprar.
+   */
+  showRequired?: boolean;
 }
 
 export interface PurchaseListPrintContext {
@@ -129,11 +136,12 @@ function itemsTableHtml(
   const items = grouped
     ? [...list.items].sort(
         (a, b) =>
-          categoryRank(a.category) - categoryRank(b.category) ||
-          a.product_name.localeCompare(b.product_name, "pt-BR"),
+          byName(categoryLabel(a.category), categoryLabel(b.category)) ||
+          byName(a.product_name, b.product_name),
       )
     : list.items;
-  const dataCols = (grouped ? 3 : 4) + (showPrices ? 2 : 0);
+  const showRequired = opts.showRequired === true;
+  const dataCols = (grouped ? 3 : 4) + (showRequired ? 1 : 0) + (showPrices ? 2 : 0);
   let lastCategory = "";
   const rows = items
     .map((it) => {
@@ -164,6 +172,11 @@ function itemsTableHtml(
           <td>${escapeHtml(it.product_name)}${areaLine}</td>
           ${grouped ? "" : `<td>${escapeHtml(categoryLabel(it.category))}</td>`}
           <td class="num">${dose === "—" ? "&mdash;" : escapeHtml(dose)}</td>
+          ${
+            showRequired
+              ? `<td class="num">${escapeHtml(formatQuantity(it, it.required_quantity))}</td>`
+              : ""
+          }
           <td class="num">${escapeHtml(volume)}</td>
           ${priceCells}
         </tr>`;
@@ -187,7 +200,11 @@ function itemsTableHtml(
           <th>Produto</th>
           ${grouped ? "" : `<th>Categoria</th>`}
           <th class="num">Dose</th>
-          <th class="num">Volume</th>
+          ${
+            showRequired
+              ? `<th class="num">Volume</th><th class="num">Falta comprar</th>`
+              : `<th class="num">Volume</th>`
+          }
           ${showPrices ? `<th class="num">Custo unit.</th><th class="num">Total</th>` : ""}
         </tr>
       </thead>

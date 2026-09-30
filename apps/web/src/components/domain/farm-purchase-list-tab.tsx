@@ -173,6 +173,8 @@ export type FarmPurchaseListTabProps = {
   stockHref?: Route;
   /** Página de cotações das lojas (compartilhar link e comparar preços). */
   quotesHref?: Route;
+  /** Aviso logo acima das abas da tabela (ex.: produtos acima do uso). */
+  itemsNotice?: ReactNode;
 };
 
 export function FarmPurchaseListTab({
@@ -188,6 +190,7 @@ export function FarmPurchaseListTab({
   readOnly = false,
   stockHref,
   quotesHref,
+  itemsNotice,
 }: FarmPurchaseListTabProps) {
   const canListCrud = useCan("LIST_CRUD");
   const canQuoteCrud = useCan("QUOTE_CRUD");
@@ -1194,6 +1197,7 @@ export function FarmPurchaseListTab({
 
       {hasItems || editing ? (
         <div className="space-y-4">
+          {itemsNotice}
           <PurchaseListItemsEditor
             hideParams
             tabsActions={

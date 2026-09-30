@@ -301,30 +301,26 @@ export function ProducerStockSection({
   /** Divide em Sementes | Defensivos e fertilizantes, igual à lista de compra. */
   function renderKindSplit<R extends { category: string | null }>(
     rows: R[],
-    render: (rows: R[]) => ReactNode,
+    render: (rows: R[], toolbar: ReactNode) => ReactNode,
   ) {
     const seeds = rows.filter((r) => isSeedCategory(r.category));
     const doses = rows.filter((r) => !isSeedCategory(r.category));
     const kind: KindTab =
       kindTab ?? (doses.length > 0 || seeds.length === 0 ? "dose" : "seed");
     const both = seeds.length > 0 && doses.length > 0;
-    return (
-      <div className="flex flex-col gap-3">
-        {both ? (
-          <SegmentedTabs
-            variant="pill"
-            value={kind}
-            onValueChange={setKindTab}
-            items={[
-              { value: "dose", label: "Defensivos e fertilizantes", badgeCount: doses.length },
-              { value: "seed", label: "Sementes", badgeCount: seeds.length },
-            ]}
-          />
-        ) : null}
-        {/* key por aba + tipo: trocar volta a busca, filtros e página ao início. */}
-        <div key={`${tab}:${kind}`}>{render(kind === "seed" ? seeds : doses)}</div>
-      </div>
-    );
+    const toolbar = both ? (
+      <SegmentedTabs
+        variant="pill"
+        value={kind}
+        onValueChange={setKindTab}
+        items={[
+          { value: "dose", label: "Defensivos e fertilizantes", badgeCount: doses.length },
+          { value: "seed", label: "Sementes", badgeCount: seeds.length },
+        ]}
+      />
+    ) : null;
+    // key por aba + tipo: trocar volta a busca, filtros e página ao início.
+    return <div key={`${tab}:${kind}`}>{render(kind === "seed" ? seeds : doses, toolbar)}</div>;
   }
 
   type GalpaoRow = (typeof enrichedRows)[number];
@@ -539,6 +535,27 @@ export function ProducerStockSection({
         icon={<Boxes className="size-6" />}
         eyebrow="Estoque do produtor"
         title={title}
+        actions={
+          <>
+            <Button type="button" variant="outline" onClick={() => setHistoryOpen(true)}>
+              <History className="h-4 w-4" />
+              Histórico
+            </Button>
+            <Button
+              type="button"
+              className={EXPORT_ACTION_CLASS}
+              onClick={() => setExportOpen(true)}
+              disabled={enrichedRows.length === 0}
+            >
+              <Download className="h-4 w-4" />
+              Exportar
+            </Button>
+            <Button type="button" variant="clay" onClick={() => setFormOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Adicionar ao estoque
+            </Button>
+          </>
+        }
         stats={[
           {
             label: "Produtos",
@@ -560,48 +577,9 @@ export function ProducerStockSection({
         ]}
       />
 
-      <section className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Itens em estoque</h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setHistoryOpen(true)}
-            >
-              <History className="h-4 w-4" />
-              Histórico
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className={`gap-1.5 ${EXPORT_ACTION_CLASS}`}
-              onClick={() => setExportOpen(true)}
-              disabled={enrichedRows.length === 0}
-            >
-              <Download className="h-4 w-4" />
-              Exportar
-            </Button>
-            {!formOpen ? (
-              <Button
-                type="button"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setFormOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Adicionar ao estoque
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
+      <section className="mb-6">
         {formOpen ? (
-          <div className="mb-5 rounded-xl border border-border bg-surface-2/60 p-4">
+          <div className="mb-5 rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {productId && enrichedRows.some((r) => r.local_product_id === productId)
@@ -611,7 +589,7 @@ export function ProducerStockSection({
               <button
                 type="button"
                 onClick={resetForm}
-                className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
+                className="rounded-md p-1 text-muted-foreground hover:bg-hover hover:text-foreground"
                 aria-label="Fechar formulário"
               >
                 <X className="h-4 w-4" />
@@ -690,37 +668,33 @@ export function ProducerStockSection({
         ) : (
           <div className="flex flex-col gap-4">
             <SegmentedTabs value={tab} onValueChange={selectTab} items={tabItems} />
-            {tab === "galpao" || tab === "sobra" ? (
-              <p className="-mt-1 text-xs text-muted-foreground">
-                {tab === "galpao"
-                  ? "Estoque físico do produtor. Comprometido é o que já está reservado para as safras; livre é o que sobra."
-                  : "O que sobra no galpão e nenhuma safra ativa vai usar — inclui a sobra de safra colhida ou arquivada."}
-              </p>
-            ) : null}
             {activeCycle && !activeCycle.has_stock ? (
               <div className="rounded-lg border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-strong">
                 Nenhum estoque para esta safra ainda.
               </div>
             ) : null}
             {tab === "galpao"
-              ? renderKindSplit(enrichedRows, (rows) => (
+              ? renderKindSplit(enrichedRows, (rows, toolbar) => (
                   <StockCategoryTable
                     rows={rows}
+                    toolbar={toolbar}
                     columns={galpaoColumns}
                     emptyText="Nenhum produto nesta categoria."
                   />
                 ))
               : tab === "sobra"
-                ? renderKindSplit(leftoverRows, (rows) => (
+                ? renderKindSplit(leftoverRows, (rows, toolbar) => (
                     <StockCategoryTable
                       rows={rows}
+                      toolbar={toolbar}
                       columns={leftoverColumns}
                       emptyText="Todo o estoque está reservado para as safras."
                     />
                   ))
-                : renderKindSplit(cycleRows, (rows) => (
+                : renderKindSplit(cycleRows, (rows, toolbar) => (
                     <StockCategoryTable
                       rows={rows}
+                      toolbar={toolbar}
                       columns={cycleColumns}
                       emptyText="Nenhum produto desta safra nesta categoria."
                     />
