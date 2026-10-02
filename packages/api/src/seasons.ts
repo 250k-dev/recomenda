@@ -297,6 +297,10 @@ export async function applyRecommendation(
     executed_date: string;
     notes?: string;
     allow_stock_shortfall?: boolean;
+    /** "Registrar sem cotar": lança só o que falta no galpão e registra. */
+    register_missing_without_quote?: boolean;
+    /** Valor gasto (R$) no que foi lançado — soma no gasto da lista. */
+    manual_total_spent_brl?: number;
   },
 ) {
   const { data } = await api.post(`/recommendations/${id}/apply`, payload);

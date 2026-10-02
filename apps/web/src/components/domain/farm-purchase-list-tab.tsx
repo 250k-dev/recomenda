@@ -1298,6 +1298,7 @@ export function FarmPurchaseListTab({
             crops={list.cycle_crops ?? null}
             stockByProductId={stockByProductId}
             listId={list.id}
+            removedProducts={list.removed_products ?? []}
             onRemovalCascadeArmed={() => {
               cascadeRecommendationItemsRef.current = true;
             }}

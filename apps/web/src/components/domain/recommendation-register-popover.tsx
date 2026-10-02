@@ -15,6 +15,7 @@ import {
   useApplyRecommendation,
   useSkipRecommendation,
 } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import {
   isLargeScheduleShift,
   scheduleShiftDays,
@@ -77,13 +78,29 @@ export function RecommendationRegisterPopover({
     }
   };
 
-  const doApply = () => {
+  const canRegisterPurchase = useCan("QUOTE_CRUD");
+  const doApply = (withoutQuote?: { manualTotal: number | null }) => {
     applyMut.mutate(
-      { id: recommendationId, executed_date: date, notes: notes || undefined },
+      {
+        id: recommendationId,
+        executed_date: date,
+        notes: notes || undefined,
+        ...(withoutQuote
+          ? {
+              register_missing_without_quote: true,
+              manual_total_spent_brl: withoutQuote.manualTotal ?? undefined,
+            }
+          : {}),
+      },
       {
         onSuccess: () => {
-          toast.success("Etapa registrada como aplicada.");
+          toast.success(
+            withoutQuote
+              ? "Falta lançada no estoque e etapa registrada."
+              : "Etapa registrada como aplicada.",
+          );
           setPendingShift(null);
+          setShortage(null);
           setOpen(false);
         },
         onError: (e: unknown) => {
@@ -202,9 +219,16 @@ export function RecommendationRegisterPopover({
         shifts={pendingShift ? [pendingShift] : []}
         loading={applyMut.isPending}
         onCancel={() => setPendingShift(null)}
-        onConfirm={doApply}
+        onConfirm={() => doApply()}
       />
-      <StockShortageDialog summary={shortage} onClose={() => setShortage(null)} />
+      <StockShortageDialog
+        summary={shortage}
+        onClose={() => setShortage(null)}
+        registering={applyMut.isPending}
+        onRegisterWithoutQuote={
+          canRegisterPurchase ? (manualTotal) => doApply({ manualTotal }) : undefined
+        }
+      />
     </>
   );
 }

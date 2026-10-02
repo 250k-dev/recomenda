@@ -177,6 +177,9 @@ export type StockByCycleItem = {
   applied: number;
   /** Mesma conta da coluna "Comprar" da lista de compra. */
   to_buy: number;
+  /** Removido da lista depois de aplicado: linha travada, só aplicado e custo. */
+  removed?: boolean;
+  applied_total_brl?: number | null;
 };
 
 export type StockByCycle = {
@@ -221,7 +224,9 @@ export type StockMovementType =
   | "PURCHASE"
   | "APPLICATION_DEBIT"
   | "MANUAL_ADJUSTMENT"
-  | "SUBSTITUTION_REVERSAL";
+  | "SUBSTITUTION_REVERSAL"
+  /** Devolução: produto removido da lista da safra saiu do galpão. */
+  | "RETURN";
 
 export interface ProducerStockMovement {
   id: string;

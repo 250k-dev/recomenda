@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -26,6 +26,9 @@ export function PublishBlockedDialog({
   title = "Não foi possível publicar",
   itemsLabel = (count: number) => (count === 1 ? "1 item impedindo" : `${count} itens impedindo`),
   linkLabel = "Ir à lista de compra",
+  children,
+  actions,
+  hideClose = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,6 +39,12 @@ export function PublishBlockedDialog({
   title?: string;
   itemsLabel?: (count: number) => string;
   linkLabel?: string;
+  /** Conteúdo extra abaixo da lista (ex.: passo de confirmação de uma ação). */
+  children?: ReactNode;
+  /** Botões extras no rodapé, à direita do "Fechar". */
+  actions?: ReactNode;
+  /** Esconde o "Fechar" (quando o passo atual tem o próprio "Voltar"). */
+  hideClose?: boolean;
 }) {
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -111,10 +120,15 @@ export function PublishBlockedDialog({
           </div>
         ) : null}
 
+        {children}
+
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Fechar
-          </Button>
+          {hideClose ? null : (
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Fechar
+            </Button>
+          )}
+          {actions}
           {listHref ? (
             <Button asChild>
               <Link href={listHref} onClick={() => onOpenChange(false)}>

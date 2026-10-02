@@ -222,7 +222,14 @@ export function ProducerStockSection({
     tab.startsWith("cycle:") ? cycleTabs.find((c) => `cycle:${c.cycle_id}` === tab) ?? null : null;
 
   const cycleRows: CycleRow[] = useMemo(
-    () => (activeCycle?.items ?? []).map((it) => ({ ...it, key: it.local_product_id })),
+    () =>
+      (activeCycle?.items ?? []).map((it) => ({
+        ...it,
+        key: it.local_product_id,
+        // Removido da lista depois de aplicado: travado, só o aplicado (contabilidade).
+        locked: Boolean(it.removed),
+        lockedNote: it.removed ? "Removido da lista" : undefined,
+      })),
     [activeCycle],
   );
   const leftoverRows: LeftoverRow[] = useMemo(
@@ -441,7 +448,8 @@ export function ProducerStockSection({
   ];
 
   const cycleValue = (r: CycleRow) =>
-    r.price_brl != null ? r.price_brl * r.in_stock_for_cycle : null;
+    r.removed ? null : r.price_brl != null ? r.price_brl * r.in_stock_for_cycle : null;
+  const dash = <span className="text-muted-foreground">—</span>;
   const cycleColumns: StockTableColumn<CycleRow>[] = [
     {
       id: "in_stock",
@@ -461,7 +469,7 @@ export function ProducerStockSection({
       label: "Necessário",
       align: "right",
       accessor: { kind: "range", get: (r) => r.required_remaining },
-      render: (r) => withUnit(r.required_remaining, r.dose_unit),
+      render: (r) => (r.removed ? dash : withUnit(r.required_remaining, r.dose_unit)),
     },
     {
       id: "applied",
@@ -469,7 +477,16 @@ export function ProducerStockSection({
       align: "right",
       accessor: { kind: "range", get: (r) => r.applied },
       render: (r) =>
-        r.applied > 0 ? withUnit(r.applied, r.dose_unit) : <span className="text-muted-foreground">—</span>,
+        r.applied > 0 ? (
+          <>
+            {withUnit(r.applied, r.dose_unit)}
+            {r.removed && r.applied_total_brl != null ? (
+              <span className="block text-[11px]">{fmtBrl(r.applied_total_brl)}</span>
+            ) : null}
+          </>
+        ) : (
+          dash
+        ),
     },
     {
       id: "to_buy",
@@ -477,7 +494,9 @@ export function ProducerStockSection({
       align: "right",
       accessor: { kind: "range", get: (r) => r.to_buy },
       render: (r) =>
-        r.to_buy > 0 ? (
+        r.removed ? (
+          dash
+        ) : r.to_buy > 0 ? (
           <span className="font-semibold text-warning-strong">{withUnit(r.to_buy, r.dose_unit)}</span>
         ) : (
           <span className="text-success-strong">Coberto</span>

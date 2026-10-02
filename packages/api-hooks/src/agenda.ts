@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { stockShortageSummaryFromError, type PublishBlockItem } from "@recomenda/api/api-error";
+import {
+  fmtShortageQty,
+  stockShortageRowsFromError,
+  type PublishBlockItem,
+} from "@recomenda/api/api-error";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addDays,
@@ -387,6 +391,8 @@ export type BulkRegisterInput = {
   /** Data de execução (só usada em "apply"). */
   date: string;
   notes?: string;
+  /** "Registrar sem cotar": lança só o que falta de cada etapa e registra. */
+  registerMissingWithoutQuote?: boolean;
   items: Array<{
     seasonId: string;
     recommendationId: string;
@@ -403,6 +409,8 @@ export type BulkRegisterResult = {
   seasonIds: string[];
   /** Produtos que faltaram no galpão, por etapa (registro recusado). */
   shortages: PublishBlockItem[];
+  /** Etapas recusadas por falta no galpão — o "Registrar sem cotar" refaz só elas. */
+  shortItems: BulkRegisterInput["items"];
 };
 
 /**
@@ -419,6 +427,7 @@ export function useBulkRegisterRecommendations() {
       action,
       date,
       notes,
+      registerMissingWithoutQuote,
       items,
     }: BulkRegisterInput): Promise<BulkRegisterResult> => {
       const ordered = [...items].sort(
@@ -428,12 +437,14 @@ export function useBulkRegisterRecommendations() {
       );
       let ok = 0;
       const shortages: PublishBlockItem[] = [];
+      const shortItems: BulkRegisterInput["items"] = [];
       for (const it of ordered) {
         try {
           if (action === "apply") {
             await applyRecommendation(it.recommendationId, {
               executed_date: date,
               notes,
+              ...(registerMissingWithoutQuote ? { register_missing_without_quote: true } : {}),
             });
           } else {
             await skipRecommendation(it.recommendationId, notes);
@@ -441,13 +452,15 @@ export function useBulkRegisterRecommendations() {
           ok += 1;
         } catch (error) {
           // Segue nas demais: falha parcial é reportada no resultado.
-          const missing = stockShortageSummaryFromError(error);
+          // Uma linha por produto: "Etapa · talhão · falta X" (curto no lote).
+          const missing = stockShortageRowsFromError(error);
           if (missing) {
-            for (const item of missing.items) {
+            shortItems.push(it);
+            for (const row of missing) {
               shortages.push({
-                ...item,
-                id: `${it.recommendationId}:${item.id}`,
-                detail: it.label ? `${it.label} · ${item.detail}` : item.detail,
+                id: `${it.recommendationId}:${row.id}`,
+                name: row.name,
+                detail: [it.label, `falta ${fmtShortageQty(row.missing)}`].filter(Boolean).join(" · "),
               });
             }
           }
@@ -456,6 +469,7 @@ export function useBulkRegisterRecommendations() {
       return {
         ok,
         shortages,
+        shortItems,
         failed: ordered.length - ok,
         seasonIds: [...new Set(items.map((it) => it.seasonId))],
       };

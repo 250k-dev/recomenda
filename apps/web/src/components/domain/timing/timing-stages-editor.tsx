@@ -299,10 +299,9 @@ function StageProductsEditor({
     [catalogProducts, inProgramProductIds],
   );
 
-  // Modelo: ainda não pertence a nenhuma safra — o seletor abre no catálogo
-  // completo, sem "fora da programação" (ao aplicar numa safra, o que não estiver
-  // na lista entra nela sozinho como fora da programação). O que já está na lista
-  // ou no estoque do produtor aparece primeiro, como sugestão.
+  // Modo "full" (catálogo completo, sem "fora da programação"): hoje sem uso.
+  // O modelo de recomendação voltou a "program" em 02/10 — o catálogo completo
+  // confundia o cliente. Mantido para um eventual retorno.
   const fullCatalog = catalogMode === "full";
   const suggestedFirstCatalog = useMemo(
     () => [
@@ -419,7 +418,14 @@ function StageProductsEditor({
         <div className="flex flex-col gap-2">
           {products.map((item, index) => {
             const expanded = fullCatalog || expandedKeys.has(item.key);
-            const outOfProgram = !fullCatalog && Boolean(item.outOfProgram);
+            // O selo não é gravado: ao reabrir o modelo, recalcula contra a
+            // lista/estoque (antes sumia e o produto parecia "da programação").
+            const outOfProgram =
+              !fullCatalog &&
+              (Boolean(item.outOfProgram) ||
+                (!isLoading &&
+                  Boolean(item.productId) &&
+                  !inProgramProductIds.has(item.productId)));
             const rowProducts = productsForPurchaseListCategory(
               fullCatalog ? suggestedFirstCatalog : expanded ? catalogProducts : listCatalog,
               item.category,

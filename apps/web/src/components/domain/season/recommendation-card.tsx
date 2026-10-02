@@ -60,6 +60,7 @@ import {
 import {
   sortRecommendationItemsByMixOrder,
 } from "@recomenda/domain/recommendations/mix-order";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import {
   AlertTriangle,
   CalendarDays,
@@ -1242,6 +1243,8 @@ export function RecommendationCard({
   const [execNotes, setExecNotes] = useState(rec.execution_notes ?? "");
 
   const patchMut = usePatchRecommendation(seasonId);
+  // "Registrar sem cotar" lança compra: mesma permissão do registro sem cotação da lista.
+  const canRegisterPurchase = useCan("QUOTE_CRUD");
   const deleteMut = useDeleteRecommendationItem(seasonId);
   const deleteStageMut = useDeleteRecommendation(seasonId);
   const [deleteStageOpen, setDeleteStageOpen] = useState(false);
@@ -1289,24 +1292,36 @@ export function RecommendationCard({
   const handleDeleteItem = (itemId: string) => {
     deleteMut.mutate(itemId, {
       onSuccess: () => toast.success("Produto removido."),
-      onError: () => toast.error("Não foi possível remover o produto."),
+      onError: (e: unknown) =>
+        toast.error(apiErrorMessage(e, "Não foi possível remover o produto.")),
     });
   };
 
   const [pendingShift, setPendingShift] = useState<ScheduleShift | null>(null);
   const [shortage, setShortage] = useState<PublishBlockSummary | null>(null);
 
-  const doApply = () => {
+  const doApply = (withoutQuote?: { manualTotal: number | null }) => {
     applyMut.mutate(
       {
         id: rec.id,
         executed_date: executedDate,
         notes: execNotes || undefined,
+        ...(withoutQuote
+          ? {
+              register_missing_without_quote: true,
+              manual_total_spent_brl: withoutQuote.manualTotal ?? undefined,
+            }
+          : {}),
       },
       {
         onSuccess: () => {
-          toast.success("Etapa registrada como aplicada.");
+          toast.success(
+            withoutQuote
+              ? "Falta lançada no estoque e etapa registrada."
+              : "Etapa registrada como aplicada.",
+          );
           setPendingShift(null);
+          setShortage(null);
           setRegistering(false);
         },
         onError: (e: unknown) => {
@@ -1568,7 +1583,7 @@ export function RecommendationCard({
                     item={item}
                     seasonId={seasonId}
                     onDelete={handleDeleteItem}
-                    canDelete={canEditStructure}
+                    canDelete={canEditStructure && !isDone}
                     canReorder={canEditStructure}
                     mixPosition={index + 1}
                     isDragging={dragIndex === index}
@@ -1613,7 +1628,7 @@ export function RecommendationCard({
                       item={item}
                       seasonId={seasonId}
                       onDelete={handleDeleteItem}
-                      canDelete={canEditStructure}
+                      canDelete={canEditStructure && !isDone}
                       canEdit={canEditStructure}
                     />
                   ))}
@@ -1828,9 +1843,16 @@ export function RecommendationCard({
         shifts={pendingShift ? [pendingShift] : []}
         loading={applyMut.isPending}
         onCancel={() => setPendingShift(null)}
-        onConfirm={doApply}
+        onConfirm={() => doApply()}
       />
-      <StockShortageDialog summary={shortage} onClose={() => setShortage(null)} />
+      <StockShortageDialog
+        summary={shortage}
+        onClose={() => setShortage(null)}
+        registering={applyMut.isPending}
+        onRegisterWithoutQuote={
+          canRegisterPurchase ? (manualTotal) => doApply({ manualTotal }) : undefined
+        }
+      />
 
       <ConfirmDialog
         open={deleteStageOpen}

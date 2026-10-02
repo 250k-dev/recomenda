@@ -21,6 +21,10 @@ export type StockTableRow = {
   key: string;
   product_name: string;
   category: string | null;
+  /** Linha travada em vermelho (ex.: removido da lista depois de aplicado). */
+  locked?: boolean;
+  /** Texto curto ao lado do produto na linha travada. */
+  lockedNote?: string;
 };
 
 export type StockTableColumn<T> = {
@@ -208,9 +212,15 @@ export function StockCategoryTable<T extends StockTableRow>({
               pageRows.map((row, index) => {
                 const color =
                   CATEGORY_COLORS[row.category ?? "OTHER"] ?? CATEGORY_COLORS.OTHER;
-                const wash = `color-mix(in srgb, ${color} ${index % 2 === 0 ? 10 : 16}%, var(--color-card))`;
+                const wash = row.locked
+                  ? "color-mix(in srgb, var(--color-destructive) 9%, var(--color-card))"
+                  : `color-mix(in srgb, ${color} ${index % 2 === 0 ? 10 : 16}%, var(--color-card))`;
                 return (
-                  <tr key={row.key} className="[&>td]:h-[48px]" style={{ backgroundColor: wash }}>
+                  <tr
+                    key={row.key}
+                    className={cn("[&>td]:h-[48px]", row.locked && "text-destructive")}
+                    style={{ backgroundColor: wash }}
+                  >
                     <td className="px-3 py-1.5">
                       <span className="flex min-w-0 items-center gap-2">
                         <span
@@ -223,8 +233,18 @@ export function StockCategoryTable<T extends StockTableRow>({
                         </span>
                       </span>
                     </td>
-                    <td className="px-3 py-1.5 font-medium text-foreground">
+                    <td
+                      className={cn(
+                        "px-3 py-1.5 font-medium",
+                        row.locked ? "text-destructive" : "text-foreground",
+                      )}
+                    >
                       {row.product_name}
+                      {row.lockedNote ? (
+                        <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                          {row.lockedNote}
+                        </span>
+                      ) : null}
                     </td>
                     {columns.map((c) => (
                       <td

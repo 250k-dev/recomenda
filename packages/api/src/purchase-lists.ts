@@ -173,6 +173,12 @@ export interface PurchaseListDetail {
     cost_per_ha_brl: number;
   }>;
   cost_summary?: CostPlanSummary;
+  /**
+   * Aba "Removidos": produtos tirados da lista que já tinham sido aplicados.
+   * Só informativo — fora de `items` e do `cost_summary`. Opcional: servidor
+   * antigo não envia.
+   */
+  removed_products?: RemovedListProduct[];
 }
 
 export async function createPurchaseList(payload: PurchaseListInput) {
@@ -292,6 +298,50 @@ export type ListItemRemovalPreview = {
     plot_name: string;
   }>;
 };
+
+/** Produto removido da lista que já tinha sido aplicado (aba "Removidos"). */
+export interface RemovedListProduct {
+  local_product_id: string;
+  product_name: string;
+  category: string | null;
+  dose_unit: string;
+  applied_quantity: number;
+  /** Sem permissão de preço o servidor omite. */
+  unit_price_brl?: number | null;
+  total_brl?: number | null;
+  removed_at: string;
+}
+
+/** Prévia de "Remover produto" (produto inteiro na safra). */
+export interface ProductRemovalPreview {
+  local_product_id: string;
+  product_name: string;
+  dose_unit: string;
+  list_rows: number;
+  purchased_qty: number;
+  /** Etapas pendentes que perdem o produto, com os talhões. */
+  pending_stages: Array<{ stage_name: string; plots: string[] }>;
+  applied: { quantity: number; stages: number; total_brl?: number | null };
+  /** Reserva da safra no galpão que sai como devolução. */
+  stock_return: { quantity: number; total_brl?: number | null };
+  unit_price_brl?: number | null;
+}
+
+export async function getProductRemovalPreview(listId: string, localProductIds: string[]) {
+  const { data } = await api.get<ProductRemovalPreview[]>(
+    `/purchase-lists/${listId}/product-removal-preview`,
+    { params: { local_product_ids: localProductIds.join(",") } },
+  );
+  return data;
+}
+
+export async function removeListProducts(listId: string, localProductIds: string[]) {
+  const { data } = await api.post<{ removed: ProductRemovalPreview[] }>(
+    `/purchase-lists/${listId}/products/remove`,
+    { local_product_ids: localProductIds },
+  );
+  return data;
+}
 
 export async function removePurchaseListItems(
   listId: string,

@@ -173,26 +173,49 @@ export function publishBlockSummaryFromError(
  * (`INSUFFICIENT_STOCK`): um item por produto com precisa · tem · falta.
  * Null quando o erro é outro — aí vale o toast de sempre.
  */
-export function stockShortageSummaryFromError(error: unknown): PublishBlockSummary | null {
+export type StockShortageRow = {
+  id: string;
+  name: string;
+  required: number;
+  available: number;
+  missing: number;
+};
+
+/** Faltas de `INSUFFICIENT_STOCK` com os números (não só o texto). */
+export function stockShortageRowsFromError(error: unknown): StockShortageRow[] | null {
   if (apiErrorCode(error) !== "INSUFFICIENT_STOCK") return null;
   const details = apiErrorDetails(error);
   const rows = Array.isArray(details) ? details : [];
-  const items = rows.flatMap((row, index) => {
+  return rows.flatMap((row, index) => {
     if (!isRecord(row)) return [];
     const required = Number(row.required) || 0;
     const available = Math.max(0, Number(row.available) || 0);
-    const missing = Math.max(0, required - available);
     return [
       {
         id: String(row.product_id ?? index),
         name: String(row.product_name ?? "").trim() || "Produto",
-        detail: `precisa ${fmtQty(required)} · no galpão ${fmtQty(available)} · falta ${fmtQty(missing)}`,
+        required,
+        available,
+        missing: Math.max(0, required - available),
       },
     ];
   });
+}
+
+export function fmtShortageQty(value: number): string {
+  return fmtQty(value);
+}
+
+export function stockShortageSummaryFromError(error: unknown): PublishBlockSummary | null {
+  const rows = stockShortageRowsFromError(error);
+  if (!rows) return null;
   return {
     message:
       "Não há produto suficiente no galpão para esta aplicação. Registre a compra do que falta (ou ajuste o estoque) e tente de novo.",
-    items,
+    items: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      detail: `precisa ${fmtQty(row.required)} · no galpão ${fmtQty(row.available)} · falta ${fmtQty(row.missing)}`,
+    })),
   };
 }

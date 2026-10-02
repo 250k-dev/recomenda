@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { AlertTriangle, Info, ListFilter, Plus, Sprout, Trash2 } from "lucide-react";
+import { AlertTriangle, CircleAlert, Info, ListFilter, Lock, Plus, Sprout, Trash2 } from "lucide-react";
 import { useCurrencyStore } from "@/stores/currency";
 import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
@@ -20,6 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCan } from "@recomenda/api-hooks/use-can";
 import {
   cn,
+  DOSE_UNIT_SHORT_LABELS,
   GLOBAL_PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_LABELS,
 } from "@recomenda/utils";
@@ -51,8 +52,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@recomenda/ui/primitives/tooltip";
+import { ProductRemovalDialog } from "@/components/domain/product-removal-dialog";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
-import { removePurchaseListItems } from "@recomenda/api/purchase-lists";
+import {
+  removePurchaseListItems,
+  type RemovedListProduct,
+} from "@recomenda/api/purchase-lists";
 import {
   areaFactorOf,
   areaFromBags,
@@ -119,6 +124,8 @@ type PurchaseListItemsEditorProps = {
   onRemovalCascadeArmed?: () => void;
   /** Itens já gravados no servidor (ex.: após remover linhas pela API). */
   onItemsPersistedToServer?: (items: ListItem[]) => void;
+  /** Aba "Removidos": tirados da lista depois de aplicados (só informativo). */
+  removedProducts?: RemovedListProduct[];
 };
 
 /** Chave estável e única de item. A antiga (`Date.now()`+índice) colidia ao
@@ -141,7 +148,7 @@ function seedQuantityUnitAbbrev(category: string): string {
     : "B";
 }
 
-type BandId = "seed" | "dose" | "out";
+type BandId = "seed" | "dose" | "out" | "removed";
 
 /** Colunas que ordenam e filtram. As de semente e as de defensivo dividem as
  *  compartilhadas (estoque em diante). */
@@ -264,6 +271,7 @@ export function PurchaseListItemsEditor({
   listId,
   onRemovalCascadeArmed,
   onItemsPersistedToServer,
+  removedProducts = [],
 }: PurchaseListItemsEditorProps) {
   const canViewPrices = useCan("PRICE_VIEW");
   const queryClient = useQueryClient();
@@ -284,6 +292,8 @@ export function PurchaseListItemsEditor({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [removalBusy, setRemovalBusy] = useState(false);
+  // Lista salva: a remoção passa pela prévia (compra, estoque e aplicação).
+  const [productRemovalOpen, setProductRemovalOpen] = useState(false);
 
   // Cultura(s) da lista: as da safra, quando há; senão a da lista ("ANY" =
   // todas). Define quais categorias de semente aparecem no seletor (a antiga
@@ -586,6 +596,34 @@ export function PurchaseListItemsEditor({
       else next.add(key);
       return next;
     });
+  };
+
+  /** Depois do ProductRemovalDialog: tira da tela o que saiu no servidor. */
+  const applyServerRemoval = (result: {
+    wholeProductIds: Set<string>;
+    rows: Array<{ productId: string; stage: string }>;
+  }) => {
+    const removedKeys = new Set(
+      items
+        .filter(
+          (it) =>
+            (it.productId && result.wholeProductIds.has(it.productId)) ||
+            (selectedKeys.has(it.key) && !it.productId) ||
+            result.rows.some(
+              (r) => r.productId === it.productId && r.stage === (it.stage || DEFAULT_ITEM_STAGE),
+            ),
+        )
+        .map((it) => it.key),
+    );
+    setItems((prev) => {
+      const next = prev.filter((it) => !removedKeys.has(it.key));
+      onItemsPersistedToServer?.(next);
+      return next;
+    });
+    setSelectedKeys(new Set());
+    if (result.rows.length > 0) onRemovalCascadeArmed?.();
+    void queryClient.invalidateQueries({ queryKey: ["cycle-purchase-list"] });
+    void queryClient.invalidateQueries({ queryKey: ["cycle-cost-plan"] });
   };
 
   const confirmRemoval = () => {
@@ -1870,8 +1908,12 @@ export function PurchaseListItemsEditor({
       out: false,
       items: items.filter((it) => !isSeedItem(it) && !it.outOfProgram),
     },
+    // Tirados da lista depois de aplicados: só o aplicado e o custo, travado.
+    { id: "removed", tab: "Removidos", seed: false, out: true, items: [] },
   ];
-  const bands = bandDefs.filter((b) => b.items.length > 0);
+  const bands = bandDefs.filter(
+    (b) => b.items.length > 0 || (b.id === "removed" && removedProducts.length > 0),
+  );
   const activeBand = bands.find((b) => b.id === bandTab) ?? bands[0];
   const showTabsRow = Boolean(tabsActions) || bands.length > 1;
   useEffect(() => {
@@ -2046,7 +2088,9 @@ export function PurchaseListItemsEditor({
           </div>
         </>
       ) : null}
-      {items.length === 0 ? (
+      {activeBand?.id === "removed" ? (
+        <RemovedProductsTable products={removedProducts} showPrices={canViewPrices} />
+      ) : items.length === 0 ? (
         <div className="rounded-xl border bg-card px-3 py-10 text-center text-sm text-muted-foreground shadow-sm">
           Nenhum produto adicionado. Use o botão abaixo para incluir insumos.
         </div>
@@ -2078,7 +2122,11 @@ export function PurchaseListItemsEditor({
               <Button
                 type="button"
                 variant="destructive"
-                onClick={() => setConfirmOpen(true)}
+                onClick={() => {
+                  const hasSaved = items.some((it) => selectedKeys.has(it.key) && it.productId);
+                  if (listId && hasSaved) setProductRemovalOpen(true);
+                  else setConfirmOpen(true);
+                }}
                 disabled={removalBusy}
                 className="col-span-2 w-full gap-2 border-transparent bg-danger-strong text-white hover:bg-danger-strong/90 md:mr-auto md:w-auto"
               >
@@ -2137,6 +2185,22 @@ export function PurchaseListItemsEditor({
           setQuickCreate(null);
         }}
       />
+      {listId ? (
+        <ProductRemovalDialog
+          open={productRemovalOpen}
+          onOpenChange={setProductRemovalOpen}
+          listId={listId}
+          rows={items
+            .filter((it) => selectedKeys.has(it.key) && it.productId)
+            .map((it) => ({
+              key: it.key,
+              productId: it.productId,
+              productName: it.productName,
+              stage: it.stage || DEFAULT_ITEM_STAGE,
+            }))}
+          onRemoved={applyServerRemoval}
+        />
+      ) : null}
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -2167,6 +2231,74 @@ export function PurchaseListItemsEditor({
         cancelLabel="Cancelar"
         onConfirm={confirmRemoval}
       />
+    </div>
+  );
+}
+
+/**
+ * Aba "Removidos": produtos tirados da lista que já tinham sido aplicados.
+ * Vermelho informativo e travado — não entra no custo nem na compra da lista;
+ * fica só para a contabilidade do que já foi para o campo.
+ */
+function RemovedProductsTable({
+  products,
+  showPrices,
+}: {
+  products: RemovedListProduct[];
+  showPrices: boolean;
+}) {
+  const qty = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+  const brl = (n: number) =>
+    n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+  const unit = (u: string) => (DOSE_UNIT_SHORT_LABELS as Record<string, string>)[u] ?? u;
+  const total = products.reduce((sum, p) => sum + (p.total_brl ?? 0), 0);
+  return (
+    <div className="overflow-hidden rounded-xl border border-destructive/30 bg-destructive/5 shadow-sm">
+      <p className="flex items-start gap-2 border-b border-destructive/20 px-4 py-2.5 text-[13px] text-destructive">
+        <CircleAlert className="mt-0.5 size-4 shrink-0" />
+        Removidos da lista depois de aplicados. Só o que já foi para o campo, para não perder a
+        contabilidade — não entram no custo nem na compra. Se o produto voltar à lista ou a uma
+        etapa, sai daqui.
+      </p>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-destructive/80">
+            <th className="px-4 py-2">Produto</th>
+            <th className="px-4 py-2 text-right">Aplicado</th>
+            {showPrices ? <th className="px-4 py-2 text-right">Custo</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((p) => (
+            <tr key={p.local_product_id} className="border-t border-destructive/15 text-destructive">
+              <td className="px-4 py-2 font-medium">
+                <span className="inline-flex items-center gap-1.5">
+                  <Lock className="size-3.5 opacity-70" />
+                  {p.product_name}
+                </span>
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums">
+                {qty(p.applied_quantity)} {unit(p.dose_unit)}
+              </td>
+              {showPrices ? (
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {p.total_brl != null ? brl(p.total_brl) : "—"}
+                </td>
+              ) : null}
+            </tr>
+          ))}
+        </tbody>
+        {showPrices && products.length > 1 ? (
+          <tfoot>
+            <tr className="border-t border-destructive/30 font-semibold text-destructive">
+              <td className="px-4 py-2" colSpan={2}>
+                Total aplicado dos removidos
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums">{brl(total)}</td>
+            </tr>
+          </tfoot>
+        ) : null}
+      </table>
     </div>
   );
 }

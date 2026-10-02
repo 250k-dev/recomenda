@@ -38,7 +38,8 @@ import { Label } from "@recomenda/ui/primitives/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@recomenda/ui/primitives/popover";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { activeAgronomistProducerAccounts } from "@recomenda/api/producers";
-import { useAgronomistAgenda, useBulkRegisterRecommendations, useProducers, localYmdToDate, dedupeAgendaEvents, summarizeAgendaEvents, type AgendaEvent } from "@recomenda/api-hooks";
+import { useAgronomistAgenda, useBulkRegisterRecommendations, useProducers, localYmdToDate, dedupeAgendaEvents, summarizeAgendaEvents, type AgendaEvent, type BulkRegisterInput } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { cn } from "@recomenda/utils";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import {
@@ -168,6 +169,42 @@ export function MonthCalendar({
   const [bulkShifts, setBulkShifts] = useState<ScheduleShift[]>([]);
   // Etapas do lote recusadas por falta no galpão — o que faltou de cada uma.
   const [bulkShortage, setBulkShortage] = useState<PublishBlockItem[] | null>(null);
+  // Etapas recusadas e a data usada — o "Registrar sem cotar" refaz só elas.
+  const [bulkShortRetry, setBulkShortRetry] = useState<{
+    date: string;
+    items: BulkRegisterInput["items"];
+  } | null>(null);
+  const canRegisterPurchase = useCan("QUOTE_CRUD");
+
+  const retryShortWithoutQuote = () => {
+    if (!bulkShortRetry) return;
+    bulkMut.mutate(
+      {
+        action: "apply",
+        date: bulkShortRetry.date,
+        items: bulkShortRetry.items,
+        registerMissingWithoutQuote: true,
+      },
+      {
+        onSuccess: ({ ok, failed, shortages, shortItems }) => {
+          if (failed === 0) {
+            toast.success(
+              `Falta lançada no estoque · ${ok} ${ok === 1 ? "etapa registrada" : "etapas registradas"}.`,
+            );
+            setBulkShortage(null);
+            setBulkShortRetry(null);
+            return;
+          }
+          toast.warning(`${ok} registradas · ${failed} falharam.`);
+          setBulkShortage(shortages.length ? shortages : null);
+          setBulkShortRetry(
+            shortItems.length ? { date: bulkShortRetry.date, items: shortItems } : null,
+          );
+        },
+        onError: () => toast.error("Não foi possível registrar as aplicações."),
+      },
+    );
+  };
 
   const runBulk = (action: "apply" | "skip", confirmedShift = false) => {
     const events = [...selected.values()].filter((event) => isApplicationEvent(event));
@@ -199,8 +236,13 @@ export function MonthCalendar({
     bulkMut.mutate(
       { action, date: bulkDate, items },
       {
-        onSuccess: ({ ok, failed, shortages }) => {
-          if (shortages.length > 0) setBulkShortage(shortages);
+        onSuccess: ({ ok, failed, shortages, shortItems }) => {
+          if (shortages.length > 0) {
+            setBulkShortage(shortages);
+            setBulkShortRetry(
+              action === "apply" && shortItems.length ? { date: bulkDate, items: shortItems } : null,
+            );
+          }
           if (failed === 0) {
             toast.success(
               `${ok} ${ok === 1 ? "aplicação registrada" : "aplicações registradas"}.`,
@@ -616,13 +658,24 @@ export function MonthCalendar({
         summary={
           bulkShortage
             ? {
-                message:
-                  "Algumas etapas não foram registradas porque falta produto no galpão. Registre a compra do que falta (ou ajuste o estoque) e registre de novo.",
+                message: `${bulkShortRetry?.items.length ?? 0} ${
+                  (bulkShortRetry?.items.length ?? 0) === 1 ? "etapa não foi registrada" : "etapas não foram registradas"
+                } por falta de produto no galpão.`,
                 items: bulkShortage,
               }
             : null
         }
-        onClose={() => setBulkShortage(null)}
+        onClose={() => {
+          setBulkShortage(null);
+          setBulkShortRetry(null);
+        }}
+        askTotal={false}
+        confirmText="Lança no estoque só o que falta de cada etapa (compra sem cotação, na lista da safra) e registra estas etapas."
+        registering={bulkMut.isPending}
+        registerLabel={`Registrar sem cotar (${bulkShortRetry?.items.length ?? 0})`}
+        onRegisterWithoutQuote={
+          canRegisterPurchase && bulkShortRetry ? () => retryShortWithoutQuote() : undefined
+        }
       />
       <ScheduleShiftConfirmDialog
         shifts={bulkShifts}

@@ -67,6 +67,12 @@ export function invalidateAfterRecommendationExecution(
   void queryClient.invalidateQueries({ queryKey: ["producer-stock"] });
   // O servidor grava uma notificação para o agrônomo.
   void queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+  // O aplicado entra na lista (falta comprar) e o "Registrar sem cotar" lança
+  // compra — lista, plano de custo e o "aguardando compra" da safra mudam.
+  invalidatePurchaseListsAfterRecommendationChange(queryClient);
+  void queryClient.invalidateQueries({ queryKey: ["cycle"] });
+  void queryClient.invalidateQueries({ queryKey: ["farm-cycles"] });
+  void queryClient.invalidateQueries({ queryKey: ["producer-cycles"] });
 }
 
 export function useSeasons() {
@@ -345,15 +351,15 @@ export function useApplyRecommendation(seasonId: string) {
   return useMutation({
     mutationFn: ({
       id,
-      executed_date,
-      notes,
-      allow_stock_shortfall,
+      ...payload
     }: {
       id: string;
       executed_date: string;
       notes?: string;
       allow_stock_shortfall?: boolean;
-    }) => applyRecommendation(id, { executed_date, notes, allow_stock_shortfall }),
+      register_missing_without_quote?: boolean;
+      manual_total_spent_brl?: number;
+    }) => applyRecommendation(id, payload),
     onSuccess: () => {
       invalidateAfterRecommendationExecution(queryClient, seasonId);
     },
@@ -420,6 +426,8 @@ export function useDeleteRecommendationItem(seasonId: string) {
     mutationFn: deleteRecommendationItem,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      // Tirar produto da etapa recalcula o "Fora da programação" da lista.
+      invalidatePurchaseListsAfterRecommendationChange(queryClient);
     },
   });
 }

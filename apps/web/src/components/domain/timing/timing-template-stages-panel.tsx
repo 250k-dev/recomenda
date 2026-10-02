@@ -415,7 +415,6 @@ export function TimingTemplateStagesPanel({
       isAdding={createStage.isPending}
       showSaveButton
       floatingActions
-      catalogMode="full"
       isSaving={isSaving}
       saveDisabled={!isDirty}
       onSave={() => void saveAll()}

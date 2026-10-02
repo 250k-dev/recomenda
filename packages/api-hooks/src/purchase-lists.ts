@@ -12,6 +12,8 @@ import {
   getFarmPurchaseLists,
   getPlanSurplus,
   adjustPlanToUsage,
+  getProductRemovalPreview,
+  removeListProducts,
 } from "@recomenda/api/purchase-lists";
 import { queryKeys } from "./queryKeys";
 
@@ -131,6 +133,48 @@ export function useAdjustPlanToUsage(listId: string, opts: { cycleId?: string; p
       if (opts.producerId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(opts.producerId) });
       }
+    },
+  });
+}
+
+/** Prévia de "Remover produto" — só busca com o diálogo aberto. */
+export function useProductRemovalPreview(listId: string, productIds: string[], enabled: boolean) {
+  return useQuery({
+    queryKey: ["product-removal-preview", listId, [...productIds].sort().join(",")],
+    queryFn: () => getProductRemovalPreview(listId, productIds),
+    enabled: Boolean(listId) && productIds.length > 0 && enabled,
+    // Estoque e etapas mudam a cada registro: a prévia nunca vem do cache.
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+/**
+ * Remove o produto inteiro da lista da safra: sai das etapas pendentes, o
+ * estoque reservado volta como devolução e o já aplicado vai para "Removidos".
+ */
+export function useRemoveListProducts(listId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (productIds: string[]) => removeListProducts(listId, productIds),
+    onSuccess: () => {
+      for (const key of [
+        "cycle-purchase-list",
+        "farm-purchase-lists",
+        "producer-purchase-lists",
+        "cycle-cost-plan",
+        "season-cost-plan",
+        "producer-stock",
+        "season-timeline",
+        "agronomist-agenda",
+        "cycle",
+        "farm-cycles",
+        "producer-cycles",
+      ]) {
+        void queryClient.invalidateQueries({ queryKey: [key] });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListProgress(listId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.purchaseListPlanSurplus(listId) });
     },
   });
 }
