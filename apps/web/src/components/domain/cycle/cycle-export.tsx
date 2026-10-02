@@ -337,6 +337,9 @@ export function CycleExportButton({
             spacingM: purchaseList?.spacing_m ?? null,
             cycleDays: season.cycle_days,
             desiccationDate: season.desiccation_date,
+            crop: season.crop,
+            tankCapacityL:
+              cycle.farms.find((f) => f.id === season.farm_id)?.tank_capacity_l ?? null,
           },
           unitPriceByProduct: unitPrices,
         },

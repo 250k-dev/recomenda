@@ -1,5 +1,8 @@
 {
   "extends": "@recomenda/tsconfig/base.json",
   "compilerOptions": { "rootDir": "src", "noEmit": true },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  // Testes rodam com `node --test` direto no .ts (import com extensão .ts),
+  // fora do typecheck do pacote.
+  "exclude": ["src/**/*.test.ts"]
 }

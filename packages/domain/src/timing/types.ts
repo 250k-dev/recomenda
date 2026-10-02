@@ -15,4 +15,6 @@ export type StageProductDraft = {
   mixItemId?: string;
   /** Produto fora da lista de compra (fora da programação). */
   outOfProgram?: boolean;
+  /** Alvo/observação na receita de aplicação. */
+  target?: string;
 };

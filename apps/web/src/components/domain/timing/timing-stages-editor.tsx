@@ -32,6 +32,12 @@ import {
   isoDateToDayOffset,
 } from "@recomenda/domain/timing/window-days";
 import type { StageProductDraft } from "@recomenda/domain/timing/types";
+import { suggestPhenologicalStage } from "@recomenda/domain/recommendations/phenology";
+import {
+  ApplicationDataFields,
+  emptyApplicationData,
+  type ApplicationDataDraft,
+} from "@/components/domain/application-data-fields";
 import {
   findPurchaseListOverages,
   formatDosePerHa,
@@ -142,6 +148,9 @@ export type TimingStageField = {
   trigger_type: string;
   recommended_date: string;
   notes: string;
+  /** Receita de aplicação (vazão, horário, ponta, estádio). Opcional: rascunho
+   *  local salvo antes deste campo existir não o tem. */
+  application?: ApplicationDataDraft;
   products: StageProductDraft[];
 };
 
@@ -163,6 +172,7 @@ export function newTimingStageField(name = ""): TimingStageField {
     trigger_type: "POST_PLANTING",
     recommended_date: dayOffsetToIsoDate(0),
     notes: "",
+    application: emptyApplicationData(),
     products: [],
   };
 }
@@ -625,6 +635,16 @@ function StageProductsEditor({
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
+              <div className="sm:col-span-full">
+                <Input
+                  value={item.target ?? ""}
+                  onChange={(e) => updateProduct(item.key, { target: e.target.value })}
+                  placeholder="Alvo / observação na receita (ex.: Gramíneas — capim-amargoso)"
+                  aria-label="Alvo do produto"
+                  maxLength={240}
+                  className="h-8 text-xs"
+                />
+              </div>
             </div>
           );
           })}
@@ -875,6 +895,27 @@ export function TimingStagesEditor({
                     />
                   </Field>
                 </div>
+              </div>
+              <div className="mt-3 rounded-lg border border-dashed border-border p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Dados da aplicação (receita)
+                </p>
+                <ApplicationDataFields
+                  value={stage.application ?? emptyApplicationData()}
+                  onChange={(patch) =>
+                    onChange(stage.key, {
+                      application: { ...(stage.application ?? emptyApplicationData()), ...patch },
+                    })
+                  }
+                  stageSuggestion={
+                    suggestPhenologicalStage(
+                      crop,
+                      stage.trigger_type,
+                      isoDateToDayOffset(stage.recommended_date),
+                      isoDateToDayOffset(stage.recommended_date),
+                    ).stage
+                  }
+                />
               </div>
               {showProducts ? (
                 <StageProductsEditor

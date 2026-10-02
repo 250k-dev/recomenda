@@ -11,6 +11,8 @@ export interface MixTemplateItem {
   category?: string | null;
   order_index?: number;
   equivalence_group?: string | null;
+  /** Alvo/observação do produto (vai para a etapa ao publicar). */
+  target?: string | null;
 }
 
 export interface TimingStage {
@@ -23,6 +25,14 @@ export interface TimingStage {
   window_end_days: number;
   default_mix_template_id?: string | null;
   notes?: string | null;
+  /** Receita de aplicação: vazão (L/ha). Calda e tanques são calculados. */
+  spray_volume_l_ha?: number | null;
+  /** Horário recomendado (texto livre). */
+  application_time?: string | null;
+  /** Ponta de pulverização (texto livre). */
+  nozzle?: string | null;
+  /** Estádio fenológico; vazio = sugerido pelos dias da etapa. */
+  phenological_stage?: string | null;
   /** Produtos do mix da etapa, já no GET do modelo (evita N+1 e cache separado). */
   mix_items?: MixTemplateItem[];
 }
@@ -179,7 +189,12 @@ export async function deleteMixTemplateItem(id: string) {
  */
 export async function replaceMixTemplateItems(
   templateId: string,
-  items: Array<{ local_product_id: string; dose_per_hectare: number; dose_unit?: string }>,
+  items: Array<{
+    local_product_id: string;
+    dose_per_hectare: number;
+    dose_unit?: string;
+    target?: string | null;
+  }>,
 ) {
   const { data } = await api.put<MixTemplate & { items: MixTemplateItem[] }>(
     `/mix_templates/${templateId}/items`,

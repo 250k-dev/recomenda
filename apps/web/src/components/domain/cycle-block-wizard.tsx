@@ -53,6 +53,7 @@ import {
   type TimingStageField,
 } from "@/components/domain/timing/timing-stages-editor";
 import { recommendedYmdToWindow } from "@recomenda/domain/timing/window-days";
+import { stageRecipePayload } from "@/components/domain/application-data-fields";
 import {
   Field,
   FieldError,
@@ -346,6 +347,7 @@ function StepModel({
               local_product_id: product.productId,
               dose_per_hectare: Number(product.dose.replace(",", ".")),
               dose_unit: product.unit,
+              target: product.target?.trim() || null,
             })),
           );
           defaultMixTemplateId = mix.id;
@@ -362,6 +364,7 @@ function StepModel({
           window_end_days,
           default_mix_template_id: defaultMixTemplateId,
           notes: stage.notes.trim() || null,
+          ...stageRecipePayload(stage.application),
         });
       }
 

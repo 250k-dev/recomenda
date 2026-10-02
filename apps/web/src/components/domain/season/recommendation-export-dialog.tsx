@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Copy, FileDown } from "lucide-react";
+import { Check, Copy, FileDown, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
@@ -16,6 +16,10 @@ import {
   type RecommendationShareData,
 } from "@recomenda/domain/recommendations/share-message";
 import { printRecommendation } from "@recomenda/domain/recommendations/print-document";
+import {
+  countApplicationRecipes,
+  printApplicationRecipes,
+} from "@recomenda/domain/recommendations/recipe-document";
 import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
 import {
   readPricePreference,
@@ -104,6 +108,19 @@ export function RecommendationExportDialog({
         printRecommendation(filteredData, {
           showPrices: canChoosePrices && showPrices,
         }),
+      250,
+    );
+  };
+
+  const recipeCount = countApplicationRecipes([filteredData]);
+  const handlePrintRecipes = () => {
+    onOpenChange(false);
+    window.setTimeout(
+      () =>
+        printApplicationRecipes(
+          [filteredData],
+          `Receitas de aplicação - ${data.plotName ?? data.title}`,
+        ),
       250,
     );
   };
@@ -264,18 +281,32 @@ export function RecommendationExportDialog({
               </h3>
             </div>
             <p className="mb-3 text-[13px] text-muted-foreground">
-              Gera um documento com as etapas selecionadas. Na janela de impressão,
-              escolha <strong>Salvar como PDF</strong>.
+              <strong>Baixar PDF</strong> gera o relatório do talhão com as etapas
+              selecionadas; <strong>Receitas de aplicação</strong> gera uma folha por
+              etapa para o operador. Na janela de impressão, escolha{" "}
+              <strong>Salvar como PDF</strong>.
             </p>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={handlePrint}
-              disabled={!hasSelection}
-            >
-              <FileDown className="h-4 w-4" />
-              Baixar PDF
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={handlePrint}
+                disabled={!hasSelection}
+              >
+                <FileDown className="h-4 w-4" />
+                Baixar PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={handlePrintRecipes}
+                disabled={recipeCount === 0}
+                title="Uma folha por etapa, para o operador levar a campo."
+              >
+                <Printer className="h-4 w-4" />
+                Receitas de aplicação{recipeCount ? ` (${recipeCount})` : ""}
+              </Button>
+            </div>
             <p className="mt-3 text-xs text-muted-foreground">
               Dica: após baixar, anexe o PDF na conversa do WhatsApp para enviar o
               documento junto com a mensagem.

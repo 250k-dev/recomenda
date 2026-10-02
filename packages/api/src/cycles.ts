@@ -9,6 +9,8 @@ export interface CycleFarmRow {
   name: string;
   /** Localização livre da fazenda — vai para a ficha do talhão nos documentos. */
   location?: string | null;
+  /** Tanque do pulverizador (L) — padrão das receitas de aplicação. */
+  tank_capacity_l?: number | null;
   area_hectares_sum: number;
 }
 

@@ -56,6 +56,7 @@ import {
   useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
 import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
+import { stageRecipePayload } from "@/components/domain/application-data-fields";
 
 export type SeasonWizardProps = {
   producerId: string;
@@ -391,6 +392,7 @@ function StepCronogram({
               local_product_id: product.productId,
               dose_per_hectare: Number(product.dose.replace(",", ".")),
               dose_unit: product.unit,
+              target: product.target?.trim() || null,
             })),
           );
           defaultMixTemplateId = mix.id;
@@ -407,6 +409,7 @@ function StepCronogram({
           window_end_days,
           default_mix_template_id: defaultMixTemplateId,
           notes: stage.notes.trim() || null,
+          ...stageRecipePayload(stage.application),
         });
       }
       onNext(template.id);

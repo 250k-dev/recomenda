@@ -41,6 +41,7 @@ import {
   RegisterHarvestDialog,
 } from "@/components/domain/season/register-harvest-dialog";
 import { fmtDate } from "@recomenda/domain/recommendations/format";
+import { printApplicationRecipes } from "@recomenda/domain/recommendations/recipe-document";
 import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { routes } from "@recomenda/config";
 import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
@@ -442,6 +443,8 @@ export function SeasonRecommendationsView({
       spacingM: cyclePurchaseList?.spacing_m ?? null,
       cycleDays: row?.cycle_days ?? null,
       desiccationDate: row?.desiccation_date ?? seasonLive?.desiccation_date ?? null,
+      crop: crop ?? row?.crop ?? null,
+      tankCapacityL: farm?.tank_capacity_l ?? null,
     };
   }, [crop, cycle, cyclePurchaseList, seasonId, seasonLive]);
 
@@ -744,6 +747,16 @@ export function SeasonRecommendationsView({
             listPlanByProductId={listPlanByProductId}
             listPlanByProductStage={listPlanByProductStage}
             listReady={listReady}
+            recipe={{
+              areaHa: exportSpec.plantedAreaHa ?? exportSpec.areaHa ?? null,
+              farmTankCapacityL: exportSpec.tankCapacityL,
+              crop: exportSpec.crop,
+              onPrint: (stage) =>
+                printApplicationRecipes(
+                  [{ ...shareData, recommendations: [stage] }],
+                  `Receita - ${stage.name} - ${plotName ?? ""}`,
+                ),
+            }}
           />
         ))}
       </ul>

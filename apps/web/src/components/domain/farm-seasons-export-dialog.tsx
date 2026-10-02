@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Copy, FileDown } from "lucide-react";
+import { Check, Copy, FileDown, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
@@ -19,6 +19,10 @@ import {
   printRecommendations,
   type DocumentCover,
 } from "@recomenda/domain/recommendations/print-document";
+import {
+  countApplicationRecipes,
+  printApplicationRecipes,
+} from "@recomenda/domain/recommendations/recipe-document";
 import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
 import type {
   NotebookSectionId,
@@ -235,6 +239,21 @@ export function FarmSeasonsExportDialog({
           selectedItems.map((i) => i.data),
           `Recomendações - ${farmName ?? ""}`,
           { showPrices: canChoosePrices && showPrices, cover },
+        ),
+      250,
+    );
+  };
+
+  // Receita de aplicação: uma folha por etapa × talhão selecionado (para o
+  // operador). "Etapa X em todos os talhões" = escolher a etapa pelo nome.
+  const recipeCount = countApplicationRecipes(selectedItems.map((i) => i.data));
+  const handlePrintRecipes = () => {
+    onOpenChange(false);
+    window.setTimeout(
+      () =>
+        printApplicationRecipes(
+          selectedItems.map((i) => i.data),
+          `Receitas de aplicação - ${farmName ?? ""}`,
         ),
       250,
     );
@@ -569,6 +588,16 @@ export function FarmSeasonsExportDialog({
               >
                 <FileDown className="h-4 w-4" />
                 Baixar PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={handlePrintRecipes}
+                disabled={recipeCount === 0}
+                title="Uma folha por etapa e talhão, para o operador levar a campo."
+              >
+                <Printer className="h-4 w-4" />
+                Receitas de aplicação{recipeCount ? ` (${recipeCount})` : ""}
               </Button>
             </div>
           </section>

@@ -60,10 +60,13 @@ export function useDeleteFarm(producerId?: string) {
 export function useUpdateFarm(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { name?: string; location?: string }) => updateFarm(id, payload),
+    mutationFn: (payload: { name?: string; location?: string; tank_capacity_l?: number | null }) =>
+      updateFarm(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.farm(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.farms });
+      // O tanque da fazenda entra nas receitas pelo detalhe da safra.
+      queryClient.invalidateQueries({ queryKey: ["cycle"] });
     },
   });
 }

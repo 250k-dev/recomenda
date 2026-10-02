@@ -61,6 +61,8 @@ export interface RecommendationItem {
   formulation_key?: string | null;
   /** Categoria do produto (semente de feijão é em kg, igual a insumo). */
   category?: string | null;
+  /** Alvo/observação do produto na receita de aplicação. */
+  target?: string | null;
 }
 
 export interface Recommendation {
@@ -80,6 +82,16 @@ export interface Recommendation {
   source_timing_template_id?: string | null;
   window_start_days: number;
   window_end_days: number;
+  /** Receita de aplicação: vazão (L/ha). Calda e tanques são calculados. */
+  spray_volume_l_ha?: number | null;
+  /** Horário recomendado (texto livre). */
+  application_time?: string | null;
+  /** Ponta de pulverização (texto livre). */
+  nozzle?: string | null;
+  /** Estádio fenológico; vazio = sugerido pelos dias da etapa. */
+  phenological_stage?: string | null;
+  /** Tanque (L) desta etapa; null = o da fazenda. */
+  tank_capacity_l?: number | null;
   items: RecommendationItem[];
 }
 
@@ -280,6 +292,11 @@ export async function patchRecommendation(
     window_start_days?: number;
     window_end_days?: number;
     notes?: string | null;
+    spray_volume_l_ha?: number | null;
+    tank_capacity_l?: number | null;
+    application_time?: string | null;
+    nozzle?: string | null;
+    phenological_stage?: string | null;
   },
 ) {
   const { data } = await api.patch(`/recommendations/${id}`, payload);
@@ -338,6 +355,7 @@ export async function updateRecommendationItem(
     mix_order_override?: number | null;
     area_factor?: number;
     area_note?: string | null;
+    target?: string | null;
   },
 ) {
   const { data } = await api.patch(`/recommendation_items/${id}`, payload);

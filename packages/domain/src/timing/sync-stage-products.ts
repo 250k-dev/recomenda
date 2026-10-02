@@ -43,6 +43,7 @@ export function mapMixItemsToStageProducts(
       productName: item.product_name ?? product?.name ?? "",
       dose: String(item.dose_per_hectare),
       unit: item.dose_unit ?? product?.dose_unit ?? "L",
+      target: item.target ?? "",
     };
   });
 }
@@ -51,6 +52,7 @@ export type MixItemInput = {
   local_product_id: string;
   dose_per_hectare: number;
   dose_unit: string;
+  target: string | null;
 };
 
 /** O que a etapa precisa que aconteça no servidor. Decidir isto é lógica de
@@ -120,6 +122,7 @@ export function planStageProducts({
       local_product_id: product.productId,
       dose_per_hectare: parseDose(product.dose),
       dose_unit: product.unit,
+      target: product.target?.trim() || null,
     });
   }
 

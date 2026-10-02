@@ -5,6 +5,8 @@ export interface Farm {
   id: string;
   name: string;
   location?: string;
+  /** Tanque do pulverizador (L), decimal vindo do banco como string. */
+  tank_capacity_l?: string | number | null;
   created_by_user_id?: string | null;
   created_by_name?: string | null;
 }
@@ -60,7 +62,10 @@ export async function deleteFarm(id: string) {
   await api.delete(`/farms/${id}`);
 }
 
-export async function updateFarm(id: string, payload: { name?: string; location?: string }) {
+export async function updateFarm(
+  id: string,
+  payload: { name?: string; location?: string; tank_capacity_l?: number | null },
+) {
   const { data } = await api.patch<Farm>(`/farms/${id}`, payload);
   return data;
 }

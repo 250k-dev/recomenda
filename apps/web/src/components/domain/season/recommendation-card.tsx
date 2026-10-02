@@ -61,6 +61,15 @@ import {
   sortRecommendationItemsByMixOrder,
 } from "@recomenda/domain/recommendations/mix-order";
 import { useCan } from "@recomenda/api-hooks/use-can";
+import { suggestPhenologicalStage } from "@recomenda/domain/recommendations/phenology";
+import {
+  ApplicationDataFields,
+  applicationDraftFrom,
+  applicationDraftKey,
+  draftNumber,
+  draftText,
+  type ApplicationDataDraft,
+} from "@/components/domain/application-data-fields";
 import {
   AlertTriangle,
   CalendarDays,
@@ -73,6 +82,7 @@ import {
   GripVertical,
   Pencil,
   Plus,
+  Printer,
   Save,
   SkipForward,
   Sprout,
@@ -259,6 +269,7 @@ function ProductRow({
     areaPercentFieldFromFactor(item.area_factor),
   );
   const [areaNote, setAreaNote] = useState(item.area_note ?? "");
+  const [target, setTarget] = useState(item.target ?? "");
   const updateMut = useUpdateRecommendationItem(seasonId);
   const impact = useExecutionImpactGuard();
 
@@ -267,6 +278,7 @@ function ProductRow({
     setUnit(item.dose_unit ?? "L");
     setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
     setAreaNote(item.area_note ?? "");
+    setTarget(item.target ?? "");
     setEditing(true);
   };
 
@@ -291,6 +303,7 @@ function ProductRow({
             dose_unit: unit,
             area_factor: areaFactor,
             area_note: areaNote.trim() || null,
+            target: target.trim() || null,
           },
           {
             onSuccess: () => {
@@ -432,6 +445,19 @@ function ProductRow({
               aria-label="Observação de área"
             />
           </label>
+          <label className="grid gap-1">
+            <span className="text-[11px] font-medium text-muted-foreground">
+              Alvo / observação (receita)
+            </span>
+            <Input
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="Ex.: Gramíneas — capim-amargoso"
+              maxLength={240}
+              className="h-9 min-w-0 w-full text-sm"
+              aria-label="Alvo do produto"
+            />
+          </label>
           <div className="flex gap-2 pt-0.5">
             <Button
               size="sm"
@@ -452,6 +478,7 @@ function ProductRow({
                 setUnit(item.dose_unit ?? "L");
                 setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
                 setAreaNote(item.area_note ?? "");
+                setTarget(item.target ?? "");
               }}
             >
               Cancelar
@@ -476,6 +503,7 @@ function ProductRow({
               <> · {Math.round(item.area_factor * 100)}% da área</>
             ) : null}
             {item.area_note ? <> · {item.area_note}</> : null}
+            {item.target ? <> · Alvo: {item.target}</> : null}
           </span>
           <div className="flex shrink-0 items-center justify-end">
             <Button
@@ -1131,6 +1159,7 @@ export function RecommendationCard({
   listPlanByProductId,
   listPlanByProductStage,
   listReady,
+  recipe,
 }: {
   rec: Recommendation;
   index: number;
@@ -1150,6 +1179,13 @@ export function RecommendationCard({
   listPlanByProductId: Map<string, ListProductPlan>;
   listPlanByProductStage: Map<string, ListProductPlan>;
   listReady: boolean;
+  /** Receita de aplicação: área e tanque para a calculadora e o imprimir. */
+  recipe?: {
+    areaHa: number | null;
+    farmTankCapacityL?: number | null;
+    crop?: string | null;
+    onPrint: (rec: Recommendation) => void;
+  };
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [addingProduct, setAddingProduct] = useState(false);
@@ -1246,6 +1282,41 @@ export function RecommendationCard({
   // "Registrar sem cotar" lança compra: mesma permissão do registro sem cotação da lista.
   const canRegisterPurchase = useCan("QUOTE_CRUD");
   const deleteMut = useDeleteRecommendationItem(seasonId);
+
+  // Dados da receita (vazão, tanque, horário, ponta, estádio): rascunho local,
+  // ressincronizado quando o servidor muda (ajuste em render, sem efeito).
+  const serverApplication = applicationDraftFrom(rec);
+  const serverApplicationKey = applicationDraftKey(serverApplication);
+  const [appDraft, setAppDraft] = useState<ApplicationDataDraft>(serverApplication);
+  const [appSyncedKey, setAppSyncedKey] = useState(serverApplicationKey);
+  if (serverApplicationKey !== appSyncedKey) {
+    setAppSyncedKey(serverApplicationKey);
+    setAppDraft(serverApplication);
+  }
+  const appDirty = applicationDraftKey(appDraft) !== serverApplicationKey;
+  const stageSuggestion = suggestPhenologicalStage(
+    recipe?.crop,
+    rec.trigger_type,
+    rec.window_start_days,
+    rec.window_end_days,
+  ).stage;
+
+  const handleSaveApplication = () => {
+    patchMut.mutate(
+      {
+        id: rec.id,
+        spray_volume_l_ha: draftNumber(appDraft.sprayVolume),
+        tank_capacity_l: draftNumber(appDraft.tankCapacity),
+        application_time: draftText(appDraft.applicationTime),
+        nozzle: draftText(appDraft.nozzle),
+        phenological_stage: draftText(appDraft.phenologicalStage),
+      },
+      {
+        onSuccess: () => toast.success("Dados da aplicação salvos."),
+        onError: () => toast.error("Não foi possível salvar os dados da aplicação."),
+      },
+    );
+  };
   const deleteStageMut = useDeleteRecommendation(seasonId);
   const [deleteStageOpen, setDeleteStageOpen] = useState(false);
   const applyMut = useApplyRecommendation(seasonId);
@@ -1553,6 +1624,51 @@ export function RecommendationCard({
                 Etapas aplicadas ou puladas não podem ter nome e data alterados.
               </p>
             )}
+          </div>
+
+          <div className="p-4 border shadow-sm rounded-xl border-border bg-card">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-foreground">
+                Dados da aplicação
+              </p>
+              {recipe ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5"
+                  onClick={() => recipe.onPrint(rec)}
+                  disabled={appDirty}
+                  title={
+                    appDirty
+                      ? "Salve os dados da aplicação antes de imprimir."
+                      : "Uma folha com esta etapa para o operador levar a campo."
+                  }
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Imprimir receita
+                </Button>
+              ) : null}
+            </div>
+            <ApplicationDataFields
+              value={appDraft}
+              onChange={(patch) => setAppDraft((prev) => ({ ...prev, ...patch }))}
+              areaHa={recipe?.areaHa}
+              farmTankCapacityL={recipe?.farmTankCapacityL}
+              showTank
+              stageSuggestion={stageSuggestion}
+              readOnly={!canEditStructure}
+            />
+            {canEditStructure ? (
+              <Button
+                size="sm"
+                onClick={handleSaveApplication}
+                disabled={isBusy || !appDirty}
+                className="mt-3 h-8 gap-1.5"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Salvar dados da aplicação
+              </Button>
+            ) : null}
           </div>
 
           <div className="min-w-0 overflow-hidden rounded-xl border bg-card p-3 shadow-sm sm:p-4">

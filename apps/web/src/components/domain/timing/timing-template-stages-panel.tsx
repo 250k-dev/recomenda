@@ -42,6 +42,11 @@ import {
   useLocalDraft,
 } from "@recomenda/api-hooks/use-local-draft";
 import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
+import {
+  applicationDraftFrom,
+  applicationDraftKey,
+  stageRecipePayload,
+} from "@/components/domain/application-data-fields";
 
 type TimingTemplateStagesPanelProps = {
   template: TimingTemplate & { stages: TimingStage[] };
@@ -58,7 +63,10 @@ function serverFingerprint(stages: TimingStage[]): string {
   return stages
     .map((stage) => {
       const items = (stage.mix_items ?? [])
-        .map((item) => `${item.local_product_id}:${item.dose_per_hectare}:${item.dose_unit ?? ""}`)
+        .map(
+          (item) =>
+            `${item.local_product_id}:${item.dose_per_hectare}:${item.dose_unit ?? ""}:${item.target ?? ""}`,
+        )
         .join(",");
       return [
         stage.id,
@@ -67,6 +75,7 @@ function serverFingerprint(stages: TimingStage[]): string {
         stage.window_start_days,
         stage.window_end_days,
         stage.notes ?? "",
+        applicationDraftKey(applicationDraftFrom(stage)),
         stage.default_mix_template_id ?? "",
         items,
       ].join(":");
@@ -217,6 +226,7 @@ export function TimingTemplateStagesPanel({
           stage.window_end_days,
         ),
         notes: stage.notes ?? "",
+        application: applicationDraftFrom(stage),
         products: hydratedProducts,
       };
     });
@@ -285,6 +295,7 @@ export function TimingTemplateStagesPanel({
           window_start_days,
           window_end_days,
           notes: trimmedNotes.length > 0 ? trimmedNotes : null,
+          ...stageRecipePayload(editorStage.application),
         });
 
         // Decidir (puro, em domain) e executar (transporte) são passos separados
