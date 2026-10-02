@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { useProducer, useProducerCycles, useProducerFarms, useCan } from "@recomenda/api-hooks";
 import type { CycleSummary } from "@recomenda/api/cycles";
 import { routes } from "@recomenda/config";
-import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
+import { CYCLE_STATUS_LABELS, labelStatus, cropsLabel } from "@recomenda/utils";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
@@ -52,7 +52,7 @@ function fmtClosed(cycle: CycleSummary): string {
 }
 
 function cycleCrops(cycle: CycleSummary): string {
-  return cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + ");
+  return cropsLabel(cycle.crops);
 }
 
 function farmsLabel(cycle: CycleSummary): string {

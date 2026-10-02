@@ -8,7 +8,11 @@
  * cima.
  */
 import type { PurchaseListItemInput } from "@recomenda/api/purchase-lists";
-import { seedQuantityFromPopulation } from "../cost-plan/calculate";
+import {
+  beanSeedsPerKg,
+  DEFAULT_BEAN_PMS_G,
+  seedQuantityFromPopulation,
+} from "../cost-plan/calculate";
 
 /** Item da lista de compra (estado de formulário). */
 export type ListItem = {
@@ -31,6 +35,8 @@ export type ListItem = {
   priceUsd: string;
   /** Variedade/Híbrido: semente por metro (input; população é derivada). */
   seedsPerMeter?: string;
+  /** Cultivar de feijão: PMS — peso de mil sementes (g). Vazio = 250 g. */
+  thousandSeedWeight?: string;
   /** Variedade/Híbrido: ciclo do cultivar em dias (referência). */
   cycleDays?: string;
   /** Variedade/Híbrido: população final em plantas/ha — DERIVADA de
@@ -84,7 +90,16 @@ export function populationFromSeeds(seedsPerMeter: number, spacingM: number): nu
 }
 
 /** Categorias tratadas como semente (cálculo por população, não por dose). */
-export const SEED_CATEGORIES = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO"];
+export const SEED_CATEGORIES = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO", "CULTIVAR_FEIJAO"];
+
+/** Semente vendida por kg (feijão): a quantidade não precisa ser inteira. */
+export const isKgSeedCategory = (category: string) => category === "CULTIVAR_FEIJAO";
+
+/** PMS (g) da linha; vazio/inválido = padrão de 250 g. */
+export function pmsOf(it: Pick<ListItem, "thousandSeedWeight">): number {
+  const n = Number(String(it.thousandSeedWeight ?? "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_BEAN_PMS_G;
+}
 
 /** Itens de Variedade/Híbrido (semente) calculam por população, não por dose. */
 export const isSeedItem = (it: ListItem) => SEED_CATEGORIES.includes(it.category);
@@ -93,13 +108,16 @@ export const isSeedItem = (it: ListItem) => SEED_CATEGORIES.includes(it.category
 export function seedQuantityUnitLabel(category: string): string {
   if (category === "CULTIVAR_SOJA") return "Big Bag (BR)";
   if (category === "HIBRIDO_MILHO") return "sacos";
+  if (category === "CULTIVAR_FEIJAO") return "kg";
   return "pl";
 }
 
-/** Sementes por unidade: Big Bag BR de soja = 5.000.000; saco de milho = 60.000. */
-export function seedsPerUnit(category: string): number {
+/** Sementes por unidade: Big Bag BR de soja = 5.000.000; saco de milho = 60.000;
+ *  kg de feijão = 1.000.000 ÷ PMS (g). */
+export function seedsPerUnit(category: string, pmsG?: number | null): number {
   if (category === "CULTIVAR_SOJA") return 5_000_000;
   if (category === "HIBRIDO_MILHO") return 60_000;
+  if (category === "CULTIVAR_FEIJAO") return beanSeedsPerKg(pmsG);
   return 1;
 }
 
@@ -112,9 +130,10 @@ export function areaFromBags(
   bags: number,
   populationPerHa: number,
   category: string,
+  pmsG?: number | null,
 ): number {
   if (bags <= 0 || populationPerHa <= 0) return 0;
-  return (bags * seedsPerUnit(category)) / populationPerHa;
+  return (bags * seedsPerUnit(category, pmsG)) / populationPerHa;
 }
 
 /** Os 4 números do planejamento de semente (auto-calculados). */
@@ -123,7 +142,7 @@ export function seedPlanOutputs(it: ListItem, totalHa: number) {
   const seedingArea = Number(it.seedingArea || 0) || totalHa;
   const totalSeeds = populationPerHa * seedingArea; // qtd de sementes
   const units = listItemQuantity(it, totalHa); // Big Bags (BR) / sacos
-  const perUnit = seedsPerUnit(it.category);
+  const perUnit = seedsPerUnit(it.category, pmsOf(it));
   // Hectares atendidos pelas unidades efetivas (confere com a área quando exato).
   const hectaresServed = populationPerHa > 0 ? (units * perUnit) / populationPerHa : 0;
   return { populationPerHa, totalSeeds, units, hectaresServed };
@@ -137,7 +156,7 @@ export function seedPlanOutputs(it: ListItem, totalHa: number) {
 export function listItemRequired(it: ListItem, totalHa: number): number {
   if (isSeedItem(it)) {
     const populationBase = Number(it.thousandPlants || 0) * Number(it.seedingArea || 0);
-    return seedQuantityFromPopulation(populationBase, it.category);
+    return seedQuantityFromPopulation(populationBase, it.category, pmsOf(it));
   }
   if (hasVolumeOverride(it)) return Number(it.volumeOverride) || 0;
   const nApps = parseNApplications(it.nApps);
@@ -222,7 +241,8 @@ export function listItemsToBuyByKey(
 function deriveItemCrop(it: ListItem, listCrop?: string): string | null {
   if (it.category === "CULTIVAR_SOJA") return "SOYBEAN";
   if (it.category === "HIBRIDO_MILHO") return "CORN";
-  if (listCrop === "SOYBEAN" || listCrop === "CORN") return listCrop;
+  if (it.category === "CULTIVAR_FEIJAO") return "BEAN";
+  if (listCrop && listCrop !== "ANY") return listCrop;
   return null;
 }
 
@@ -250,6 +270,7 @@ export function listItemToPayload(it: ListItem, listCrop?: string): PurchaseList
     calc_rule: seed ? "SEED_POPULATION" : null,
     thousand_plants_per_ha: seed ? Number(it.thousandPlants) || 0 : null,
     seeds_per_meter: seed ? Number(it.seedsPerMeter) || 0 : null,
+    thousand_seed_weight_g: isKgSeedCategory(it.category) ? pmsOf(it) : null,
     cycle_days: seed && it.cycleDays ? Number(it.cycleDays) || null : null,
     seeding_area_ha: seed ? Number(it.seedingArea) || 0 : null,
     bags_override: hasBagsOverride(it) ? Number(it.bagsOverride) : null,
@@ -273,9 +294,15 @@ export function validateListItems(items: ListItem[]): string | null {
       // Lista antiga: aceita área plantada gravada antes de o bag virar manual.
       const isUnsavedRow = it.key.startsWith("i-");
       if (!Number(it.bagsOverride) && (isUnsavedRow || !Number(it.seedingArea)))
-        return "Informe o volume de bags/sacos nas variedades/híbridos.";
-      // Bag/saco é unidade física fechada: não existe meio bag.
-      if (it.bagsOverride && !Number.isInteger(Number(it.bagsOverride)))
+        return isKgSeedCategory(it.category)
+          ? "Informe a quantidade (kg) nas cultivares de feijão."
+          : "Informe o volume de bags/sacos nas variedades/híbridos.";
+      // Bag/saco é unidade física fechada: não existe meio bag. Feijão é em kg.
+      if (
+        !isKgSeedCategory(it.category) &&
+        it.bagsOverride &&
+        !Number.isInteger(Number(it.bagsOverride))
+      )
         return "O volume de bags/sacos deve ser um número inteiro.";
     } else if (!Number(it.dose)) {
       return "Informe a dose/ha em todos os itens.";

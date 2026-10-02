@@ -31,6 +31,8 @@ export interface PurchaseListItemInput {
   thousand_plants_per_ha?: number | null;
   /** Variedade/Híbrido: semente por metro (input da planilha). */
   seeds_per_meter?: number | null;
+  /** Cultivar de feijão: PMS (g). */
+  thousand_seed_weight_g?: number | null;
   /** Variedade/Híbrido: ciclo do cultivar em dias (referência). */
   cycle_days?: number | null;
   /** Variedade/Híbrido: área a ser semeada (ha). */
@@ -104,6 +106,8 @@ export interface PurchaseListDetail {
   status?: "draft" | "active";
   season_id: string | null;
   cycle_id?: string | null;
+  /** Culturas da safra da lista (null = lista sem safra). */
+  cycle_crops?: string[] | null;
   crop: string | null;
   name: string;
   variety: string | null;
@@ -156,6 +160,8 @@ export interface PurchaseListDetail {
     calc_rule: "STANDARD" | "SEED_POPULATION" | "SEED_BAGS" | null;
     thousand_plants_per_ha: number | null;
     seeds_per_meter: number | null;
+    /** Cultivar de feijão: PMS (g). */
+    thousand_seed_weight_g: number | null;
     cycle_days: number | null;
     seeding_area_ha: number | null;
     bags_override: number | null;

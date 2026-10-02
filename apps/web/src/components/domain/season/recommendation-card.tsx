@@ -46,7 +46,12 @@ import {
   isLargeScheduleShift,
   scheduleShiftDays,
 } from "@recomenda/domain/timing/window-days";
-import { SEED_CATEGORIES, areaFactorOf, areaPercentFieldFromFactor } from "@recomenda/domain/purchase-list/list-item";
+import {
+  SEED_CATEGORIES,
+  areaFactorOf,
+  areaPercentFieldFromFactor,
+  seedsPerUnit,
+} from "@recomenda/domain/purchase-list/list-item";
 import { displayRecStatus, fmtDate } from "@recomenda/domain/recommendations/format";
 import {
   formulationShortLabel,
@@ -92,6 +97,24 @@ export type ListProductPlan = {
   areaFactor: number;
   areaNote: string | null;
 };
+
+
+/** Unidade da dose de semente na etapa: milho em sacos, feijão em kg, soja em bags. */
+function seedDoseUnitFor(category: string | null | undefined): string {
+  if (category === "HIBRIDO_MILHO") return "SACA";
+  if (category === "CULTIVAR_FEIJAO") return "KG";
+  return "BAG";
+}
+
+/** Sementes por unidade da dose: feijão pelo PMS; senão pela unidade (saca/bag). */
+function seedsPerDoseUnit(
+  category: string | null | undefined,
+  unit: string,
+  pmsG: number | null,
+): number {
+  if (category === "CULTIVAR_FEIJAO") return seedsPerUnit("CULTIVAR_FEIJAO", pmsG);
+  return unit === "SACA" ? 60000 : 5000000;
+}
 
 function stageKey(name: string): string {
   return name
@@ -644,10 +667,7 @@ function AddProductRow({
               placeholder="Selecione…"
               filterLabel="Categoria"
               options={GLOBAL_PRODUCT_CATEGORIES.filter(
-                (item) =>
-                  item !== "SEED" &&
-                  item !== "CULTIVAR_SOJA" &&
-                  item !== "HIBRIDO_MILHO",
+                (item) => !SEED_CATEGORIES.includes(item),
               ).map((item) => ({
                 value: item,
                 label: PRODUCT_CATEGORY_LABELS[item],
@@ -788,8 +808,15 @@ function SeedRow({
   const updateItem = useUpdateRecommendationItem(seasonId);
   const updateVars = useUpdateSeasonVarieties(seasonId);
   const [editing, setEditing] = useState(false);
-  const seedsPerUnit = item.dose_unit === "SACA" ? 60000 : 5000000;
-  const currentPop = Number(item.dose_per_hectare) * seedsPerUnit;
+  const currentListSeed = (purchaseList?.items ?? []).find(
+    (it) => it.local_product_id === item.local_product_id,
+  );
+  const perUnitSeeds = seedsPerDoseUnit(
+    item.category ?? currentListSeed?.category ?? null,
+    item.dose_unit,
+    currentListSeed?.thousand_seed_weight_g ?? null,
+  );
+  const currentPop = Number(item.dose_per_hectare) * perUnitSeeds;
   const [productId, setProductId] = useState(item.local_product_id);
   const [population, setPopulation] = useState(String(Math.round(currentPop)));
 
@@ -856,12 +883,12 @@ function SeedRow({
     const selected =
       listSeeds.find((s) => s.local_product_id === productId) ??
       listSeeds.find((s) => s.product_name === item.product_name);
-    const unit = selected
-      ? selected.category === "HIBRIDO_MILHO"
-        ? "SACA"
-        : "BAG"
-      : item.dose_unit;
-    const perUnit = unit === "SACA" ? 60000 : 5000000;
+    const unit = selected ? seedDoseUnitFor(selected.category) : item.dose_unit;
+    const perUnit = seedsPerDoseUnit(
+      selected?.category ?? item.category ?? null,
+      unit,
+      selected?.thousand_seed_weight_g ?? currentListSeed?.thousand_seed_weight_g ?? null,
+    );
     const productName = selected?.product_name ?? item.product_name;
     updateItem.mutate(
       {
@@ -888,7 +915,8 @@ function SeedRow({
     );
   };
 
-  const unitLabel = item.dose_unit === "SACA" ? "sacos" : "Big Bags";
+  const unitLabel =
+    item.dose_unit === "SACA" ? "sacos" : item.dose_unit === "KG" ? "kg" : "Big Bags";
 
   if (editing) {
     return (
@@ -1007,9 +1035,12 @@ function AddSeedRow({
 
   const handleAdd = () => {
     if (!selected) return toast.error("Selecione a semente.");
-    const seedsPerUnit =
-      selected.category === "HIBRIDO_MILHO" ? 60000 : 5000000;
-    const unit = selected.category === "HIBRIDO_MILHO" ? "SACA" : "BAG";
+    const unit = seedDoseUnitFor(selected.category);
+    const perUnitSeeds = seedsPerDoseUnit(
+      selected.category,
+      unit,
+      selected.thousand_seed_weight_g ?? null,
+    );
     const pop =
       plotPop && plotPop > 0
         ? plotPop
@@ -1018,7 +1049,7 @@ function AddSeedRow({
       {
         recommendation_id: recommendationId,
         local_product_id: selected.local_product_id,
-        dose_per_hectare: seedsPerUnit > 0 ? pop / seedsPerUnit : 0,
+        dose_per_hectare: perUnitSeeds > 0 ? pop / perUnitSeeds : 0,
         dose_unit: unit,
       },
       {
@@ -1128,7 +1159,9 @@ export function RecommendationCard({
 
   // Semente é um item da etapa com unidade Big Bag/Saca (separada dos produtos).
   const isSeedRow = (it: RecommendationItem) =>
-    it.dose_unit === "BAG" || it.dose_unit === "SACA";
+    it.dose_unit === "BAG" ||
+    it.dose_unit === "SACA" ||
+    it.category === "CULTIVAR_FEIJAO";
   const serverProductItems = useMemo(
     () =>
       sortRecommendationItemsByMixOrder(

@@ -41,7 +41,7 @@ import type { StockByCycle } from "@recomenda/api/producers";
 import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { StockExportData } from "@recomenda/domain/stock/stock-export";
-import { CROP_LABELS, PRODUCT_CATEGORY_LABELS } from "@recomenda/utils";
+import { PRODUCT_CATEGORY_LABELS, cropLabel } from "@recomenda/utils";
 
 const fmtQty = (n: number) =>
   n.toLocaleString("pt-BR", {
@@ -178,11 +178,23 @@ export function ProducerStockSection({
     for (const c of cycleTabs) nameCount.set(c.cycle_name, (nameCount.get(c.cycle_name) ?? 0) + 1);
     return [
       { value: "galpao" as StockTab, label: "Galpão" },
-      ...cycleTabs.map((c) => {
-        const name =
+      ...cycleTabs.map((c, index) => {
+        const baseName =
           (nameCount.get(c.cycle_name) ?? 0) > 1
-            ? `${c.cycle_name} · ${c.crops.map((crop) => CROP_LABELS[crop] ?? crop).join(", ")}`
+            ? `${c.cycle_name} · ${c.crops.map((crop) => cropLabel(crop)).join(", ")}`
             : c.cycle_name;
+        // Com mais de uma safra, a aba mostra a posição na fila do galpão
+        // (a 1ª fica com o estoque antes das outras).
+        const position = c.queue_position ?? index + 1;
+        const name =
+          cycleTabs.length > 1 ? (
+            <span className="inline-flex items-center gap-1.5" title={`${position}ª da fila do estoque`}>
+              <span className="tabular-nums text-muted-foreground">{position}ª</span>
+              {baseName}
+            </span>
+          ) : (
+            baseName
+          );
         return {
           value: `cycle:${c.cycle_id}` as StockTab,
           label: c.has_stock ? (

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { AlertTriangle, Target } from "lucide-react";
-import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
+import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL, grainPricesToNumbers } from "@/stores/currency";
 import { computePurchaseListMetrics } from "@recomenda/domain/purchase-list/breakdown";
 import { CATEGORY_ORDER } from "@recomenda/domain/cost-plan/calculate";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@recomenda/domain/cost-plan/categories";
@@ -75,9 +75,10 @@ export function CategoryMetaProgress({
   const grainPrice = useCurrencyStore((s) => s.grainPrice);
   const fx = Number(fxRate) || 0;
   const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
+  const cropPricesRaw = useCurrencyStore((s) => s.grainPrices);
   const metrics = useMemo(
-    () => computePurchaseListMetrics(items, totalHa, fx, saca),
-    [items, totalHa, fx, saca],
+    () => computePurchaseListMetrics(items, totalHa, fx, saca, grainPricesToNumbers(cropPricesRaw)),
+    [items, totalHa, fx, saca, cropPricesRaw],
   );
 
   // Meta única em sc/ha — compara com o KPI "Custo (sc/ha)".

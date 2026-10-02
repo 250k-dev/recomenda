@@ -47,6 +47,11 @@ export { formatCreatedBy } from "./created-by";
 
 export {
   CROP_LABELS,
+  CROP_OPTIONS,
+  cropFromSelection,
+  cropLabel,
+  cropsLabel,
+  type CycleCrop,
   CYCLE_STATUS_LABELS,
   PURCHASE_LIST_STATUS_LABELS,
   STATUS_LABELS,

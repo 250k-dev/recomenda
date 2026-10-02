@@ -34,6 +34,8 @@ export function detailItemToListItem(
     price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
     priceUsd: it.price_usd != null ? String(it.price_usd) : "",
     seedsPerMeter: it.seeds_per_meter != null ? String(it.seeds_per_meter) : "",
+    thousandSeedWeight:
+      it.thousand_seed_weight_g != null ? String(it.thousand_seed_weight_g) : "",
     cycleDays: it.cycle_days != null ? String(it.cycle_days) : "",
     thousandPlants:
       it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
@@ -79,17 +81,39 @@ export interface PurchaseListMetrics {
   categoryBreakdown: CategoryBreakdown[];
 }
 
+/** Cultura da semente pela categoria (null = insumo comum às culturas). */
+function seedCropOf(category: string): string | null {
+  if (category === "CULTIVAR_SOJA") return "SOYBEAN";
+  if (category === "HIBRIDO_MILHO") return "CORN";
+  if (category === "CULTIVAR_FEIJAO") return "BEAN";
+  return null;
+}
+
+/**
+ * `cropPrices`: preço da saca por cultura (safra com mais de uma). A semente de
+ * cada cultura converte em sacas pelo preço dela; insumo comum usa `grainPrice`
+ * (a cultura principal da safra).
+ */
 export function computePurchaseListMetrics(
   items: ListItem[],
   totalHa: number,
   fxRate: number,
   grainPrice: number,
+  cropPrices?: Record<string, number> | null,
 ): PurchaseListMetrics {
   let totalProductsValue = 0;
   let totalSeedsValue = 0;
   let seedVolume = 0;
   let pricedCount = 0;
+  let totalSacks = 0;
   const categoryTotals = new Map<string, number>();
+  const categorySacks = new Map<string, number>();
+  const mainPrice = grainPrice > 0 ? grainPrice : 0;
+  const priceOf = (it: ListItem): number => {
+    const crop = seedCropOf(it.category);
+    const own = crop ? Number(cropPrices?.[crop] ?? 0) : 0;
+    return own > 0 ? own : mainPrice;
+  };
 
   const toBuyByKey = listItemsToBuyByKey(items, totalHa);
   for (const it of items) {
@@ -110,10 +134,13 @@ export function computePurchaseListMetrics(
     }
     const cat = it.category || "OTHER";
     categoryTotals.set(cat, (categoryTotals.get(cat) ?? 0) + lineTotal);
+    const itemPrice = priceOf(it);
+    const itemSacks = itemPrice > 0 ? lineTotal / itemPrice : 0;
+    totalSacks += itemSacks;
+    categorySacks.set(cat, (categorySacks.get(cat) ?? 0) + itemSacks);
   }
 
   const totalValue = totalProductsValue + totalSeedsValue;
-  const gp = grainPrice > 0 ? grainPrice : 0;
 
   const categoryBreakdown: CategoryBreakdown[] = [...categoryTotals.keys()]
     .sort((a, b) => {
@@ -127,7 +154,7 @@ export function computePurchaseListMetrics(
         category: cat,
         total_brl: total,
         share_pct: totalValue > 0 ? (total / totalValue) * 100 : 0,
-        sacks_per_ha: gp > 0 && totalHa > 0 ? total / gp / totalHa : 0,
+        sacks_per_ha: totalHa > 0 ? (categorySacks.get(cat) ?? 0) / totalHa : 0,
       };
     });
 
@@ -137,8 +164,8 @@ export function computePurchaseListMetrics(
     totalValue,
     seedVolume,
     seedSacksPerHa: totalHa > 0 ? seedVolume / totalHa : 0,
-    totalSacks: gp > 0 ? totalValue / gp : 0,
-    costSacksPerHa: gp > 0 && totalHa > 0 ? totalValue / gp / totalHa : 0,
+    totalSacks,
+    costSacksPerHa: totalHa > 0 ? totalSacks / totalHa : 0,
     productsCount: items.length,
     categoriesCount: categoryTotals.size,
     pricedCount,

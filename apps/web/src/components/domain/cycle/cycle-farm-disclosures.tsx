@@ -32,16 +32,20 @@ import { apiErrorMessage } from "@recomenda/api/api-error";
 import type { CycleDetail, CycleSeasonRow } from "@recomenda/api/cycles";
 import {
   cn,
-  CROP_LABELS,
   STATUS_LABELS,
   STATUS_VARIANTS,
   labelStatus,
+  cropLabel,
 } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { AddCycleFarmDialog } from "@/components/domain/cycle/cycle-farms-section";
 import { ReassignSeasonPlotDialog } from "@/components/domain/cycle/reassign-season-plot-dialog";
 import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
 import { BulkApplyTemplateDialog } from "@/components/domain/cycle/bulk-apply-template-dialog";
+import {
+  AddCyclePlotsDialog,
+  CyclePendingPlotRows,
+} from "@/components/domain/cycle/cycle-plots-panel";
 import {
   fmtBags,
   RegisterHarvestDialog,
@@ -72,7 +76,7 @@ function seasonDisplayName(season: CycleSeasonRow): string {
     .filter(Boolean);
   const varietyLabel =
     varietyNames.length > 0 ? varietyNames.join(" + ") : (season.variety ?? "");
-  return `${CROP_LABELS[season.crop] ?? season.crop}${
+  return `${cropLabel(season.crop)}${
     varietyLabel ? ` — ${varietyLabel}` : ""
   }`;
 }
@@ -161,6 +165,7 @@ export function CycleFarmDisclosures({
   producerId,
   seasons,
   onAddPlot,
+  onProgramPlots,
   onArchiveSeason,
   archivePending,
 }: {
@@ -168,6 +173,8 @@ export function CycleFarmDisclosures({
   producerId: string;
   seasons: CycleSeasonRow[];
   onAddPlot: () => void;
+  /** Abre a programação com estes talhões da safra já marcados. */
+  onProgramPlots?: (plotIds: string[]) => void;
   onArchiveSeason: (payload: { id: string; name: string }) => void;
   archivePending?: boolean;
 }) {
@@ -188,7 +195,12 @@ export function CycleFarmDisclosures({
     name: string;
   } | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const [openFarms, setOpenFarms] = useState<Set<string>>(new Set());
+  // Poucas fazendas: já abertas, com os talhões da safra à vista.
+  const [openFarms, setOpenFarms] = useState<Set<string>>(
+    () => new Set((cycle.farms ?? []).length <= 3 ? cycle.farms.map((f) => f.id) : []),
+  );
+  const [addPlotsFarmId, setAddPlotsFarmId] = useState<string | null>(null);
+  const editableCycle = canManage && cycle.status === "ACTIVE";
   const [editingCrop, setEditingCrop] = useState<CycleSeasonRow | null>(null);
   const [harvesting, setHarvesting] = useState<CycleSeasonRow | null>(null);
   const [reassigning, setReassigning] = useState<{
@@ -368,14 +380,27 @@ export function CycleFarmDisclosures({
               (sum, s) => sum + (s.planted_area_ha ?? s.plot_area_ha),
               0,
             );
-            const plotsCount = repByPlot.size;
+            // Talhões da safra nesta fazenda (escolhidos na criação + programados).
+            const farmCyclePlots = (cycle.plots ?? []).filter(
+              (p) => p.farm_id === group.farmId,
+            );
+            const query = plotFilter.trim().toLocaleLowerCase("pt-BR");
+            const pendingPlots = farmCyclePlots.filter(
+              (p) =>
+                !p.programmed &&
+                (!query || p.plot_name.toLocaleLowerCase("pt-BR").includes(query)),
+            );
+            const plotsCount = cycle.plots ? farmCyclePlots.length : repByPlot.size;
+            const farmAreaHa = cycle.plots
+              ? farmCyclePlots.reduce((sum, p) => sum + p.area_ha, 0)
+              : areaHa;
             const cropBadge = group.seasons[0]
               ? seasonDisplayName(group.seasons[0])
               : null;
             const meta = [
               group.location,
               `${plotsCount} ${plotsCount === 1 ? "talhão" : "talhões"}`,
-              `${fmtHa(areaHa > 0 ? areaHa : group.cadastralHa)} ha`,
+              `${fmtHa(cycle.plots ? farmAreaHa : areaHa > 0 ? areaHa : group.cadastralHa)} ha`,
             ]
               .filter(Boolean)
               .join(" · ");
@@ -445,13 +470,14 @@ export function CycleFarmDisclosures({
                     ) : null}
                   </button>
 
-                  {canAddPlotToFarm ? (
+                  {editableCycle && canAddPlotToFarm ? (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="hidden shrink-0 gap-1 sm:inline-flex"
-                      onClick={onAddPlot}
+                      title="Incluir talhões desta fazenda na safra"
+                      onClick={() => setAddPlotsFarmId(group.farmId)}
                     >
                       <Plus className="size-3.5" />
                       Talhão
@@ -491,23 +517,30 @@ export function CycleFarmDisclosures({
 
                 {open ? (
                   <div className="border-t border-border">
-                    {group.seasons.length === 0 ? (
+                    {group.seasons.length === 0 && pendingPlots.length > 0 ? (
+                      <CyclePendingPlotRows
+                        cycle={cycle}
+                        rows={pendingPlots}
+                        canEdit={canManage}
+                        onProgram={(ids) => (onProgramPlots ? onProgramPlots(ids) : onAddPlot())}
+                      />
+                    ) : group.seasons.length === 0 ? (
                       <div className="px-4 py-8 text-center">
                         <p className="text-sm text-muted-foreground">
                           {plotFilter.trim()
                             ? "Nenhum talhão corresponde ao filtro nesta fazenda."
                             : canAddPlotToFarm
-                              ? "Nenhum talhão programado nesta fazenda."
-                              : "Nenhum talhão disponível para programar nesta fazenda."}
+                              ? "Nenhum talhão desta fazenda na safra."
+                              : "Nenhum talhão disponível nesta fazenda."}
                         </p>
-                        {!plotFilter.trim() && canAddPlotToFarm ? (
+                        {!plotFilter.trim() && canAddPlotToFarm && editableCycle ? (
                           <Button
                             size="sm"
                             className="mt-3 gap-1.5"
-                            onClick={onAddPlot}
+                            onClick={() => setAddPlotsFarmId(group.farmId)}
                           >
                             <Plus className="size-4" />
-                            Adicionar talhão
+                            Adicionar talhões
                           </Button>
                         ) : null}
                       </div>
@@ -837,6 +870,21 @@ export function CycleFarmDisclosures({
                         </div>
                       </>
                     )}
+                    {/* Fazenda já em andamento com talhões da safra ainda sem
+                        programação: aparecem embaixo dos programados. */}
+                    {group.seasons.length > 0 && pendingPlots.length > 0 ? (
+                      <div className="border-t border-border">
+                        <p className="bg-surface-2 px-5 py-2 text-[11px] font-semibold tracking-[0.06em] text-muted-foreground uppercase">
+                          Na safra, ainda sem programação
+                        </p>
+                        <CyclePendingPlotRows
+                          cycle={cycle}
+                          rows={pendingPlots}
+                          canEdit={canManage}
+                          onProgram={(ids) => (onProgramPlots ? onProgramPlots(ids) : onAddPlot())}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -844,6 +892,16 @@ export function CycleFarmDisclosures({
           })}
         </div>
       )}
+
+      <AddCyclePlotsDialog
+        cycle={cycle}
+        producerId={producerId}
+        farmId={addPlotsFarmId}
+        open={addPlotsFarmId != null}
+        onOpenChange={(open) => {
+          if (!open) setAddPlotsFarmId(null);
+        }}
+      />
 
       <EditSeasonCropDialog
         open={!!editingCrop}

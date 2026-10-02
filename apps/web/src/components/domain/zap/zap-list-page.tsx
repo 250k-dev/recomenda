@@ -128,6 +128,7 @@ function ZapListReady({ token, initial }: { token: string; initial: ZapListDto }
       if (id === "SEED") return false;
       if (id === "CULTIVAR_SOJA") return crop === "SOYBEAN" || crop === "ANY";
       if (id === "HIBRIDO_MILHO") return crop === "CORN" || crop === "ANY";
+      if (id === "CULTIVAR_FEIJAO") return crop === "BEAN" || crop === "ANY";
       return true;
     }).map((id) => [id, PRODUCT_CATEGORY_LABELS[id]] as const);
   }, [data.list.crop]);

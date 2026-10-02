@@ -23,7 +23,7 @@ import type {
 } from "./zap-types";
 
 type WizardStep = "place" | "cronogram" | "plots" | "review";
-type Crop = "SOYBEAN" | "CORN";
+type Crop = "SOYBEAN" | "CORN" | "BEAN";
 type CronogramMode = "template" | "custom";
 
 type PlotSchedule = {
@@ -419,6 +419,7 @@ function ZapSeasonWizard({
               >
                 <NativeSelectOption value="SOYBEAN">Soja</NativeSelectOption>
                 <NativeSelectOption value="CORN">Milho</NativeSelectOption>
+                <NativeSelectOption value="BEAN">Feijão</NativeSelectOption>
               </NativeSelect>
             </div>
             <div className="grid grid-cols-2 gap-2">

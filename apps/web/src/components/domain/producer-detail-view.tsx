@@ -137,13 +137,16 @@ export function ProducerDetailView({
         producer_id: producerId,
       });
     },
-    onSuccess: () => {
+    onSuccess: (farm) => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.producerFarms(producerId),
       });
-      toast.success("Fazenda cadastrada.");
+      toast.success("Fazenda cadastrada. Agora cadastre os talhões dela.");
       setNewFarmOpen(false);
       resetNewFarmForm();
+      // Fazenda nova não tem talhão: leva direto para a ficha dela, onde se
+      // cadastram os talhões.
+      router.push(routes.fazendas.detalhe(farm.id, { producer_id: producerId }));
     },
     onError: () => toast.error("Não foi possível cadastrar a fazenda."),
   });

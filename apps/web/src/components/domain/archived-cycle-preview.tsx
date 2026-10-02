@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArchiveRestore, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCyclePurchaseList, useProducerCycleHistory } from "@recomenda/api-hooks";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
@@ -75,12 +75,15 @@ export function ArchivedCyclePreview({
   producerId,
   cycleId,
   cycleName,
+  onRestore,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   producerId: string;
   cycleId: string | null;
   cycleName: string;
+  /** Abre "Recuperar safra" (só na tela de safras arquivadas). */
+  onRestore?: () => void;
 }) {
   const enabled = open && Boolean(cycleId);
   const history = useProducerCycleHistory(producerId, cycleId ?? "", enabled);
@@ -124,6 +127,14 @@ export function ArchivedCyclePreview({
           <DialogDescription>
             Prévia somente leitura do que estava nesta safra.
           </DialogDescription>
+          {onRestore ? (
+            <div className="pt-2">
+              <Button type="button" size="sm" className="gap-1.5" onClick={onRestore}>
+                <ArchiveRestore className="size-4" />
+                Recuperar safra
+              </Button>
+            </div>
+          ) : null}
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 pb-6">
           <section className="space-y-2">

@@ -27,6 +27,8 @@ export interface CostItemInput {
   population_base?: number | null;
   /** Semente: bags/sacos ajustados à mão (sobrepõe o cálculo por população). */
   bags_override?: number | null;
+  /** Cultivar de feijão: PMS (g) — converte população em kg. */
+  thousand_seed_weight_g?: number | null;
   volume_override?: number | null;
 }
 
@@ -68,6 +70,7 @@ export const CATEGORY_ORDER = [
   "SEED",
   "CULTIVAR_SOJA",
   "HIBRIDO_MILHO",
+  "CULTIVAR_FEIJAO",
   "FERTILIZER",
   "HERBICIDE",
   "FUNGICIDE",
@@ -79,17 +82,34 @@ export const CATEGORY_ORDER = [
   "OTHER",
 ];
 
+/** PMS padrão da semente de feijão (g) quando a linha não informa. */
+export const DEFAULT_BEAN_PMS_G = 250;
+
+/** Sementes por kg de feijão: 1.000.000 ÷ PMS (g). */
+export function beanSeedsPerKg(pmsG?: number | null): number {
+  const pms = pmsG != null && pmsG > 0 ? pmsG : DEFAULT_BEAN_PMS_G;
+  return 1_000_000 / pms;
+}
+
 /**
  * Converte a população de sementes na quantidade final conforme a categoria.
  * `populationBase` = população por hectare (nº de sementes) × área semeada.
  * Cultivar de soja: bag de 5.000.000 sementes. Híbrido de milho: saca de 60.000.
+ * Cultivar de feijão: kg, pelo PMS (peso de mil sementes).
  *   bags  = (área × pop/ha) / 5.000.000
  *   sacos = (área × pop/ha) / 60.000
+ *   kg    = (área × pop/ha) × PMS / 1.000.000
  * SEED genérico (legado) mantém a quantidade na própria população.
+ * Espelho de `recomenda-server/.../cost-plan.calculator.ts` — mudar os dois.
  */
-export function seedQuantityFromPopulation(populationBase: number, category: string): number {
+export function seedQuantityFromPopulation(
+  populationBase: number,
+  category: string,
+  pmsG?: number | null,
+): number {
   if (category === "CULTIVAR_SOJA") return populationBase / 5_000_000;
   if (category === "HIBRIDO_MILHO") return populationBase / 60_000;
+  if (category === "CULTIVAR_FEIJAO") return populationBase / beanSeedsPerKg(pmsG);
   return populationBase;
 }
 
@@ -109,7 +129,11 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
     G =
       item.bags_override != null
         ? item.bags_override
-        : seedQuantityFromPopulation(item.population_base ?? 0, item.category);
+        : seedQuantityFromPopulation(
+            item.population_base ?? 0,
+            item.category,
+            item.thousand_seed_weight_g,
+          );
     if (item.deduct_stock) G = G - stock;
   } else if (item.calc_rule === "SEED_BAGS") {
     G = (item.population_base ?? 0) * 25;

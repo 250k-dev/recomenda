@@ -27,6 +27,9 @@ import {
   useCurrencyStore,
   DEFAULT_GRAIN_PRICE_BRL,
   DEFAULT_SPACING_M,
+  grainPricesFromList,
+  grainPricesPayload,
+  grainPricesToNumbers,
 } from "@/stores/currency";
 import {
   computePurchaseListMetrics,
@@ -308,8 +311,19 @@ export function FarmPurchaseListTab({
     store.setGrainPrice(
       list?.grain_price_brl != null ? String(list.grain_price_brl) : "",
     );
+    store.setGrainPrices(
+      grainPricesFromList(list?.grain_prices_brl, list?.cycle_crops?.[0] ?? list?.crop),
+    );
     store.setSpacing(list?.spacing_m != null ? String(list.spacing_m) : "");
-  }, [list?.id, list?.fx_rate_usd_brl, list?.grain_price_brl, list?.spacing_m]);
+  }, [
+    list?.id,
+    list?.fx_rate_usd_brl,
+    list?.grain_price_brl,
+    list?.grain_prices_brl,
+    list?.cycle_crops,
+    list?.crop,
+    list?.spacing_m,
+  ]);
 
   const closeLeaveDialog = () => {
     setLeaveDialogOpen(false);
@@ -466,6 +480,20 @@ export function FarmPurchaseListTab({
     [queryClient, applyListToCache],
   );
 
+  // Cultura principal da safra (preço `grain_price_brl`); as demais vão em
+  // `grain_prices_brl`.
+  const mainGrainCrop = list?.cycle_crops?.[0] ?? list?.crop ?? null;
+  const extraGrainPricesChanged = useCallback(
+    (extras: Record<string, string>) => {
+      const server = grainPricesFromList(list?.grain_prices_brl, mainGrainCrop);
+      const a = grainPricesToNumbers(extras);
+      const b = grainPricesToNumbers(server);
+      const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+      return [...keys].some((k) => (a[k] ?? 0) !== (b[k] ?? 0));
+    },
+    [list?.grain_prices_brl, mainGrainCrop],
+  );
+
   const listParamsDirty = useCallback(() => {
     if (!list) return false;
     const {
@@ -481,8 +509,13 @@ export function FarmPurchaseListTab({
       list.grain_price_brl != null ? Number(list.grain_price_brl) : DEFAULT_GRAIN_PRICE_BRL;
     const serverSpacing =
       list.spacing_m != null ? Number(list.spacing_m) : DEFAULT_SPACING_M;
-    return fx !== serverFx || grain !== serverGrain || spacing !== serverSpacing;
-  }, [list]);
+    return (
+      fx !== serverFx ||
+      grain !== serverGrain ||
+      spacing !== serverSpacing ||
+      extraGrainPricesChanged(useCurrencyStore.getState().grainPrices)
+    );
+  }, [list, extraGrainPricesChanged]);
 
   const saveItems = async (opts?: {
     silent?: boolean;
@@ -553,6 +586,11 @@ export function FarmPurchaseListTab({
           {
             fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
             grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+            grain_prices_brl: grainPricesPayload(
+              mainGrainCrop,
+              grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+              useCurrencyStore.getState().grainPrices,
+            ),
             spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
           },
           { ifMatch },
@@ -686,6 +724,7 @@ export function FarmPurchaseListTab({
   // autosave entraria em laço (salva → refetch → salva…).
   const fxRateStore = useCurrencyStore((state) => state.fxRate);
   const grainPriceStore = useCurrencyStore((state) => state.grainPrice);
+  const grainPricesStore = useCurrencyStore((state) => state.grainPrices);
   const spacingStore = useCurrencyStore((state) => state.spacing);
 
   const draftIsDirty = useMemo(() => {
@@ -702,8 +741,15 @@ export function FarmPurchaseListTab({
         : DEFAULT_GRAIN_PRICE_BRL;
     const serverSpacing =
       list?.spacing_m != null ? Number(list.spacing_m) : DEFAULT_SPACING_M;
-    return fx !== serverFx || grain !== serverGrain || spacing !== serverSpacing;
+    return (
+      fx !== serverFx ||
+      grain !== serverGrain ||
+      spacing !== serverSpacing ||
+      extraGrainPricesChanged(grainPricesStore)
+    );
   }, [
+    grainPricesStore,
+    extraGrainPricesChanged,
     editing,
     draftItems,
     editBaseline,
@@ -814,12 +860,15 @@ export function FarmPurchaseListTab({
   const grainPrice = useCurrencyStore((state) => state.grainPrice);
   const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
 
+  const cropPricesStore = useCurrencyStore((state) => state.grainPrices);
+  const cropPrices = useMemo(() => grainPricesToNumbers(cropPricesStore), [cropPricesStore]);
   const kpis = useMemo(() => {
     const base = computePurchaseListMetrics(
       editing ? draftItems : viewItems,
       totalHa,
       fx,
       saca,
+      cropPrices,
     );
     return applyManualTotalSpent(
       base,
@@ -827,7 +876,7 @@ export function FarmPurchaseListTab({
       saca,
       totalHa,
     );
-  }, [editing, draftItems, viewItems, totalHa, fx, saca, list?.manual_total_spent_brl]);
+  }, [editing, draftItems, viewItems, totalHa, fx, saca, cropPrices, list?.manual_total_spent_brl]);
   const manualTotalLabel = usesManualListTotal(
     kpis,
     list?.manual_total_spent_brl,
@@ -1092,6 +1141,8 @@ export function FarmPurchaseListTab({
           readOnly={!editing}
           variant="plain"
           inverted
+          grainCrop={list.cycle_crops?.[0] ?? list.crop ?? null}
+          grainCrops={list.cycle_crops ?? null}
         />
       </PageHero>
 
@@ -1243,7 +1294,8 @@ export function FarmPurchaseListTab({
             setItems={setDraftItems}
             readOnly={!editing}
             totalHa={totalHa}
-            crop={list.crop as "SOYBEAN" | "CORN" | "ANY"}
+            crop={list.crop as React.ComponentProps<typeof PurchaseListItemsEditor>["crop"]}
+            crops={list.cycle_crops ?? null}
             stockByProductId={stockByProductId}
             listId={list.id}
             onRemovalCascadeArmed={() => {

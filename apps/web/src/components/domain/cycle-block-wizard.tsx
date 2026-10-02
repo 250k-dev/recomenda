@@ -18,7 +18,7 @@ import {
   Wheat,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn, CROP_LABELS } from "@recomenda/utils";
+import { cn, CROP_LABELS, cropLabel } from "@recomenda/utils";
 import {
   readLocalDraft,
   clearLocalDraft,
@@ -110,11 +110,14 @@ export function CycleBlockWizard({
   producerId,
   onDone,
   onCancel,
+  initialPlotIds,
 }: {
   cycle: CycleDetail;
   producerId: string;
   onDone: () => void;
   onCancel: () => void;
+  /** Talhões já marcados no passo 2 (ex.: "Programar" num talhão da safra). */
+  initialPlotIds?: string[];
 }) {
   // Rascunho local: restaura o progresso da programação (modelo/etapas) ao voltar
   // ou recarregar. Some quando o bloco é aplicado (onDone).
@@ -209,6 +212,7 @@ export function CycleBlockWizard({
           timingTemplateId={resolvedTemplateId}
           onBack={() => setStep(1)}
           onDone={handleDone}
+          initialPlotIds={initialPlotIds}
         />
       )}
     </div>
@@ -268,7 +272,7 @@ function StepModel({
 
   const cropOptions = cycle.crops.map((value) => ({
     value,
-    label: CROP_LABELS[value] ?? value,
+    label: cropLabel(value),
     icon: value === "CORN" ? Wheat : Sprout,
   }));
 
@@ -473,7 +477,7 @@ function StepModel({
               </div>
             ) : cropTemplates.length === 0 ? (
               <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                Nenhum modelo de {CROP_LABELS[crop] ?? crop} salvo. Use &quot;Montar um
+                Nenhum modelo de {cropLabel(crop)} salvo. Use &quot;Montar um
                 aqui&quot; para criar o primeiro.
               </div>
             ) : (
@@ -513,7 +517,7 @@ function StepModel({
                 <Input
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder={`Ex: Dessecação — ${CROP_LABELS[crop] ?? crop}`}
+                  placeholder={`Ex: Dessecação — ${cropLabel(crop)}`}
                 />
               </Field>
 
@@ -590,12 +594,14 @@ function StepPlots({
   timingTemplateId,
   onBack,
   onDone,
+  initialPlotIds,
 }: {
   cycle: CycleDetail;
   crop: string;
   timingTemplateId: string;
   onBack: () => void;
   onDone: () => void;
+  initialPlotIds?: string[];
 }) {
   const { data: availablePlots, isLoading } = useCycleAvailablePlots(cycle.id);
   const { data: purchaseList } = useCyclePurchaseList(cycle.id);
@@ -604,25 +610,53 @@ function StepPlots({
   const [configs, setConfigs] = useState<Record<string, PlotConfig>>({});
   const [error, setError] = useState<string | null>(null);
   const [confirmOtherCycle, setConfirmOtherCycle] = useState(false);
+  const [showOutside, setShowOutside] = useState(false);
 
-  const plots = availablePlots ?? [];
+  /** Área do talhão NA SAFRA (ex.: 40 dos 100 ha), senão a cadastral. */
+  const plotArea = (p: { cycle_area_ha?: number | null; area_hectares: number }) =>
+    p.cycle_area_ha != null && p.cycle_area_ha > 0 ? p.cycle_area_ha : p.area_hectares;
+
+  const plots = useMemo(() => availablePlots ?? [], [availablePlots]);
+  // Talhões escolhidos para a safra primeiro; os demais das fazendas ficam
+  // recolhidos (se programados, entram na safra).
+  const outsidePlots = plots.filter((p) => p.in_cycle === false);
+  const visiblePlots = useMemo(
+    () => (showOutside ? plots : plots.filter((p) => p.in_cycle !== false)),
+    [plots, showOutside],
+  );
   const selectedPlots = plots.filter((p) => selected.has(p.id));
+
+  // Pré-seleção vinda de "Programar" num talhão da safra.
+  const [seededInitial, setSeededInitial] = useState(false);
+  if (!seededInitial && availablePlots && initialPlotIds?.length) {
+    setSeededInitial(true);
+    const ids = initialPlotIds.filter((id) => plots.some((p) => p.id === id));
+    if (ids.length > 0) {
+      setSelected(new Set(ids));
+      const cfg: Record<string, PlotConfig> = {};
+      for (const id of ids) {
+        const plot = plots.find((p) => p.id === id);
+        if (plot) cfg[id] = emptyConfig(plotArea(plot));
+      }
+      setConfigs(cfg);
+    }
+  }
+
   // Agrupa os talhões por fazenda (safra multi-fazenda) preservando a ordem
   // alfabética que já vem do backend dentro de cada grupo.
   const plotGroups = useMemo(() => {
-    const list = availablePlots ?? [];
-    const map = new Map<string, { farmId: string; farmName: string; plots: typeof list }>();
-    for (const plot of list) {
+    const map = new Map<string, { farmId: string; farmName: string; plots: typeof visiblePlots }>();
+    for (const plot of visiblePlots) {
       const group = map.get(plot.farm_id);
       if (group) group.plots.push(plot);
       else map.set(plot.farm_id, { farmId: plot.farm_id, farmName: plot.farm_name, plots: [plot] });
     }
     return [...map.values()];
-  }, [availablePlots]);
+  }, [visiblePlots]);
   const showFarmHeaders = plotGroups.length > 1;
   const totalHa = selectedPlots.reduce((s, p) => {
     const planted = sumPlantedArea(configs[p.id]);
-    return s + (planted > 0 ? planted : p.area_hectares);
+    return s + (planted > 0 ? planted : plotArea(p));
   }, 0);
 
   /** Variedades da lista de compra da safra (sementes da cultura do bloco). */
@@ -826,7 +860,7 @@ function StepPlots({
         </span>
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {cycle.name} · {CROP_LABELS[crop] ?? crop}
+            {cycle.name} · {cropLabel(crop)}
           </p>
           <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
             Talhões deste modelo
@@ -848,11 +882,20 @@ function StepPlots({
           Todos os talhões das fazendas desta safra já foram programados.
           Cadastre novos talhões nas fazendas para ampliá-la.
         </div>
+      ) : visiblePlots.length === 0 ? (
+        <div className="space-y-3 rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+          <p>Todos os talhões desta safra já receberam este modelo.</p>
+          {outsidePlots.length > 0 ? (
+            <Button variant="outline" size="sm" onClick={() => setShowOutside(true)}>
+              Mostrar outros talhões das fazendas ({outsidePlots.length})
+            </Button>
+          ) : null}
+        </div>
       ) : (
         <div className="space-y-6">
           {plotGroups.map((group) => {
             const groupHa = group.plots.reduce(
-              (sum, p) => sum + (Number(p.area_hectares) || 0),
+              (sum, p) => sum + (Number(plotArea(p)) || 0),
               0,
             );
             return (
@@ -887,7 +930,7 @@ function StepPlots({
                   >
                     <button
                       type="button"
-                      onClick={() => toggle(plot.id, plot.area_hectares)}
+                      onClick={() => toggle(plot.id, plotArea(plot))}
                       className="flex w-full items-center gap-3 p-4 text-left"
                     >
                       <span
@@ -909,10 +952,15 @@ function StepPlots({
                               já está na {plot.other_cycle_name ?? "outra safra"}
                             </Badge>
                           ) : null}
+                          {plot.in_cycle === false ? (
+                            <Badge variant="neutral">fora da safra — entra ao programar</Badge>
+                          ) : null}
                         </span>
                       </span>
                       <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                        {fmt(plot.area_hectares)} ha
+                        {plot.cycle_area_ha != null && plot.cycle_area_ha > 0
+                          ? `${fmt(plot.cycle_area_ha)} de ${fmt(plot.area_hectares)} ha`
+                          : `${fmt(plot.area_hectares)} ha`}
                       </span>
                     </button>
 
@@ -935,7 +983,7 @@ function StepPlots({
                                       : "text-xs tabular-nums text-muted-foreground"
                                   }
                                 >
-                                  {fmt(planted)} de {fmt(plot.area_hectares)} ha
+                                  {fmt(planted)} de {fmt(plotArea(plot))} ha
                                 </span>
                               );
                             })()}
@@ -1078,6 +1126,17 @@ function StepPlots({
             </div>
             );
           })}
+          {outsidePlots.length > 0 ? (
+            <button
+              type="button"
+              className="text-sm font-medium text-primary-strong hover:underline"
+              onClick={() => setShowOutside((v) => !v)}
+            >
+              {showOutside
+                ? "Esconder talhões fora da safra"
+                : `Mostrar outros talhões das fazendas (${outsidePlots.length})`}
+            </button>
+          ) : null}
         </div>
       )}
 

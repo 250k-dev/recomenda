@@ -15,7 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 
-import { cn, CROP_LABELS, deactivateOutlineButtonClass } from "@recomenda/utils";
+import { cn, CROP_LABELS, CROP_OPTIONS, deactivateOutlineButtonClass } from "@recomenda/utils";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
@@ -45,7 +45,7 @@ import { apiErrorMessage } from "@recomenda/api/api-error";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
-  crop: z.enum(["SOYBEAN", "CORN"]),
+  crop: z.enum(["SOYBEAN", "CORN", "BEAN"]),
 });
 
 type CreateFormValues = z.infer<typeof createSchema>;
@@ -257,10 +257,7 @@ export function ProducerTimingTemplatesPanel({
                 {...form.register("crop")}
                 value={form.watch("crop") ?? ""}
                 filterLabel="Cultura"
-                options={[
-                  { value: "SOYBEAN", label: "Soja" },
-                  { value: "CORN", label: "Milho" },
-                ]}
+                options={CROP_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
               />
             </div>
             <div className="flex gap-2 pt-2">

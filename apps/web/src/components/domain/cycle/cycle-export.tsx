@@ -31,10 +31,10 @@ import {
   type FarmExportItem,
 } from "@/components/domain/farm-seasons-export-dialog";
 import {
-  CROP_LABELS,
   PRODUCT_CATEGORY_LABELS,
   STATUS_LABELS,
   labelStatus,
+  cropLabel as cropLabelOf,
 } from "@recomenda/utils";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
@@ -299,7 +299,7 @@ export function CycleExportButton({
       ) as Recommendation[];
       if (recommendations.length === 0) return acc;
 
-      const cropLabel = CROP_LABELS[season.crop] ?? season.crop;
+      const cropLabel = cropLabelOf(season.crop);
       const title = season.variety
         ? `${cropLabel} — ${season.variety}`
         : cropLabel;
@@ -358,7 +358,7 @@ export function CycleExportButton({
     const areaHa = seasons.reduce((sum, s) => sum + (s.plot_area_ha ?? 0), 0);
     const farms = new Set(seasons.map((s) => s.farm_id ?? cycle.farm_id));
     const crops = cycle.crops
-      .map((crop) => CROP_LABELS[crop] ?? crop)
+      .map((crop) => cropLabelOf(crop))
       .join(" e ");
     const stats: DocumentCover["stats"] = [];
     if (farms.size > 1) stats.push({ label: "Fazendas", value: String(farms.size) });
@@ -456,7 +456,7 @@ export function CycleExportButton({
       producerName,
       agronomistName: me?.name ?? null,
       farmNames: farmNames.length ? farmNames : cycle.farms.map((f) => f.name),
-      cropLabels: cycle.crops.map((crop) => CROP_LABELS[crop] ?? crop),
+      cropLabels: cycle.crops.map((crop) => cropLabelOf(crop)),
       plots: notebookPlots,
       models: modelsForNotebook,
       purchaseList: purchaseList ?? null,

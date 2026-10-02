@@ -16,7 +16,11 @@ import {
 import type { ZapCatalogItem } from "./zap-types";
 
 const TIMING_CATEGORIES = GLOBAL_PRODUCT_CATEGORIES.filter(
-  (id) => id !== "SEED" && id !== "CULTIVAR_SOJA" && id !== "HIBRIDO_MILHO",
+  (id) =>
+    id !== "SEED" &&
+    id !== "CULTIVAR_SOJA" &&
+    id !== "HIBRIDO_MILHO" &&
+    id !== "CULTIVAR_FEIJAO",
 );
 
 export type ZapDraftProduct = {

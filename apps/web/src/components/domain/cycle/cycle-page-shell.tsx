@@ -33,7 +33,7 @@ import {
 } from "@recomenda/api/api-error";
 import { PublishBlockedDialog } from "@/components/domain/publish-blocked-dialog";
 import type { CycleSeasonRow } from "@recomenda/api/cycles";
-import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
+import { CYCLE_STATUS_LABELS, labelStatus, cropsLabel } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { CycleExportButton } from "@/components/domain/cycle/cycle-export";
 import { HistoricalCycleFlag } from "@/components/domain/historical-cycle-flag";
@@ -180,7 +180,7 @@ export function CyclePageShell({
   const heroStats: PageHeroStat[] = [
     {
       label: "Culturas",
-      value: cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "),
+      value: cropsLabel(cycle.crops),
     },
     // Multi-fazenda: as fazendas já aparecem na seção abaixo — evita chips no hero.
     ...(!isMultiFarm && farm?.name

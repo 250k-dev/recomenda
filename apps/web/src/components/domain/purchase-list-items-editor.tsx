@@ -58,10 +58,12 @@ import {
   areaFromBags,
   doseFromCommercialVolume,
   hasVolumeOverride,
+  isKgSeedCategory,
   isSeedItem,
   listItemQuantity,
   listItemsToBuyByKey,
   parseNApplications,
+  pmsOf,
   populationFromSeeds,
   seedQuantityUnitLabel,
   treatedHectaresOf,
@@ -86,8 +88,10 @@ type PurchaseListItemsEditorProps = {
   items: ListItem[];
   setItems: React.Dispatch<React.SetStateAction<ListItem[]>>;
   totalHa: number;
-  /** Cultura(s) da lista — "ANY" = soja e milho. Filtra as categorias de semente. */
+  /** Cultura(s) da lista — "ANY" = todas. Filtra as categorias de semente. */
   crop?: PurchaseListCrop | "ANY" | null;
+  /** Culturas da safra da lista — quando há, valem mais que `crop` para as sementes. */
+  crops?: string[] | null;
   /** Estoque do produtor por produto (local_product_id → quantidade) — auto-preenche. */
   stockByProductId?: Record<
     string,
@@ -131,6 +135,7 @@ function toProductOptionValue(item: ListItem): string {
 }
 
 function seedQuantityUnitAbbrev(category: string): string {
+  if (isKgSeedCategory(category)) return "kg";
   return seedQuantityUnitLabel(category).toLowerCase().startsWith("s")
     ? "S"
     : "B";
@@ -248,6 +253,7 @@ export function PurchaseListItemsEditor({
   setItems,
   totalHa,
   crop,
+  crops,
   stockByProductId,
   className,
   readOnly = false,
@@ -279,23 +285,28 @@ export function PurchaseListItemsEditor({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [removalBusy, setRemovalBusy] = useState(false);
 
-  // Cultura(s) da lista: "ANY" = soja e milho. Define quais categorias de
-  // semente aparecem no seletor (a antiga "Variedade/Híbrido" foi removida).
-  const selectedCrops: PurchaseListCrop[] =
-    crop === "ANY"
-      ? ["SOYBEAN", "CORN"]
-      : crop === "SOYBEAN" || crop === "CORN"
-        ? [crop]
-        : [];
+  // Cultura(s) da lista: as da safra, quando há; senão a da lista ("ANY" =
+  // todas). Define quais categorias de semente aparecem no seletor (a antiga
+  // "Variedade/Híbrido" foi removida). "Outra cultura" não tem categoria de
+  // semente própria: a semente entra como produto comum (dose/ha).
+  const selectedCrops: string[] =
+    crops && crops.length > 0
+      ? crops
+      : crop === "ANY"
+        ? ["SOYBEAN", "CORN", "BEAN"]
+        : crop
+          ? [crop]
+          : [];
   // Categorias de semente disponiveis conforme a(s) cultura(s) selecionada(s).
   const seedCategories = GLOBAL_PRODUCT_CATEGORIES.filter(
     (c) =>
       (c === "CULTIVAR_SOJA" && selectedCrops.includes("SOYBEAN")) ||
-      (c === "HIBRIDO_MILHO" && selectedCrops.includes("CORN")),
+      (c === "HIBRIDO_MILHO" && selectedCrops.includes("CORN")) ||
+      (c === "CULTIVAR_FEIJAO" && selectedCrops.includes("BEAN")),
   );
   // Demais categorias (defensivos, fertilizante, etc.) — sem sementes.
   const nonSeedCategories = GLOBAL_PRODUCT_CATEGORIES.filter(
-    (c) => c !== "SEED" && c !== "CULTIVAR_SOJA" && c !== "HIBRIDO_MILHO",
+    (c) => !SEED_CATEGORIES.includes(c),
   );
   // Para o catálogo legado de SEED por cultura; "ANY" não restringe.
   const listCrop: PurchaseListCrop | null =
@@ -502,8 +513,13 @@ export function PurchaseListItemsEditor({
   };
 
   // Área derivada (ha), formatada com 2 casas ("" quando não há bags/população).
-  const areaString = (bags: number, pop: number, category: string): string => {
-    const area = areaFromBags(bags, pop, category);
+  const areaString = (
+    bags: number,
+    pop: number,
+    category: string,
+    pmsG?: number,
+  ): string => {
+    const area = areaFromBags(bags, pop, category, pmsG);
     return area > 0 ? String(Math.round(area * 100) / 100) : "";
   };
 
@@ -520,6 +536,7 @@ export function PurchaseListItemsEditor({
         Number(item?.bagsOverride || 0),
         pop,
         item?.category ?? "",
+        item ? pmsOf(item) : undefined,
       ),
     });
   };
@@ -527,13 +544,38 @@ export function PurchaseListItemsEditor({
   // Volume de bags/sacos é digitado à mão pelo agrônomo (o produtor diz "faço
   // com 10 bags"). NÃO calcula sozinho — ao informar, a área plantada recalcula.
   // Bag é unidade fechada: só inteiros (decimais digitados/colados são cortados).
+  // Feijão é em kg: aceita decimal.
   const setBags = (key: string, value: string) => {
     const item = items.find((i) => i.key === key);
     const pop = Number(item?.thousandPlants || 0);
-    const whole = value.replace(/[.,].*$/, "").replace(/\D/g, "");
+    const kg = isKgSeedCategory(item?.category ?? "");
+    const clean = kg
+      ? value.replace(",", ".").replace(/[^\d.]/g, "")
+      : value.replace(/[.,].*$/, "").replace(/\D/g, "");
     updateItem(key, {
-      bagsOverride: whole === "" ? undefined : whole,
-      seedingArea: areaString(Number(whole || 0), pop, item?.category ?? ""),
+      bagsOverride: clean === "" ? undefined : clean,
+      seedingArea: areaString(
+        Number(clean || 0),
+        pop,
+        item?.category ?? "",
+        item ? pmsOf(item) : undefined,
+      ),
+    });
+  };
+
+  // PMS (feijão): muda as sementes por kg, então a área plantada recalcula.
+  const setPms = (key: string, value: string) => {
+    const item = items.find((i) => i.key === key);
+    if (!item) return;
+    const next = { ...item, thousandSeedWeight: value };
+    updateItem(key, {
+      thousandSeedWeight: value,
+      seedingArea: areaString(
+        Number(item.bagsOverride || 0),
+        Number(item.thousandPlants || 0),
+        item.category,
+        pmsOf(next),
+      ),
     });
   };
 
@@ -635,6 +677,7 @@ export function PurchaseListItemsEditor({
           Number(it.bagsOverride || 0),
           pop,
           it.category,
+          pmsOf(it),
         );
         return {
           ...it,
@@ -683,6 +726,7 @@ export function PurchaseListItemsEditor({
       // Unidade padrão por categoria (item editável).
       if (category === "CULTIVAR_SOJA") patch.unit = "BAG";
       else if (category === "HIBRIDO_MILHO") patch.unit = "SACA";
+      else if (category === "CULTIVAR_FEIJAO") patch.unit = "KG";
       else if (category === "FERTILIZER") patch.unit = "T_HA";
     }
     updateItem(key, patch);
@@ -719,6 +763,7 @@ export function PurchaseListItemsEditor({
     const unitForSelection = (productUnit: string): string => {
       if (category === "CULTIVAR_SOJA") return "BAG";
       if (category === "HIBRIDO_MILHO") return "SACA";
+      if (category === "CULTIVAR_FEIJAO") return "KG";
       if (category === "FERTILIZER") return "T_HA";
       return productUnit;
     };
@@ -795,7 +840,7 @@ export function PurchaseListItemsEditor({
     const productOptions = rowProducts.map((product) => ({
       value: product.optionValue,
       label: purchaseListProductLabel(product),
-      keywords: `${product.name} ${product.crop === "SOYBEAN" ? "soja" : product.crop === "CORN" ? "milho" : ""}`,
+      keywords: `${product.name} ${product.crop === "SOYBEAN" ? "soja" : product.crop === "CORN" ? "milho" : product.crop === "BEAN" ? "feijao feijão" : ""}`,
     }));
 
     return (
@@ -1093,16 +1138,45 @@ export function PurchaseListItemsEditor({
                   {`${fmt(required)} ${seedQuantityUnitAbbrev(it.category)}`}
                 </span>
               ) : (
-                <Input
-                  type="number"
-                  step="1"
-                  min="0"
-                  placeholder={seedQuantityUnitAbbrev(it.category)}
-                  value={it.bagsOverride ?? ""}
-                  onChange={(e) => setBags(it.key, e.target.value)}
-                  className={TABLE_INPUT_CLASS}
-                />
+                <span className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    step={isKgSeedCategory(it.category) ? "0.01" : "1"}
+                    min="0"
+                    placeholder={seedQuantityUnitAbbrev(it.category)}
+                    value={it.bagsOverride ?? ""}
+                    onChange={(e) => setBags(it.key, e.target.value)}
+                    className={TABLE_INPUT_CLASS}
+                  />
+                  {/* Feijão é em kg: a unidade fica visível com o campo preenchido. */}
+                  {isKgSeedCategory(it.category) ? (
+                    <span className="text-xs text-muted-foreground">kg</span>
+                  ) : null}
+                </span>
               )}
+              {isKgSeedCategory(it.category) ? (
+                <label
+                  className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"
+                  title="PMS: peso de mil sementes. Sementes por kg = 1.000.000 ÷ PMS."
+                >
+                  PMS
+                  {readOnly ? (
+                    <span className="tabular-nums">{fmt(pmsOf(it))}</span>
+                  ) : (
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      placeholder="250"
+                      value={it.thousandSeedWeight ?? ""}
+                      onChange={(e) => setPms(it.key, e.target.value)}
+                      className="h-6 w-16 px-1.5 text-right text-[11px] tabular-nums"
+                      aria-label="PMS (g)"
+                    />
+                  )}
+                  g
+                </label>
+              ) : null}
             </td>
             {/* Área plantado (ha) — derivada dos bags ÷ população */}
             <td className="px-1.5 py-1.5">
@@ -1538,7 +1612,7 @@ export function PurchaseListItemsEditor({
                     {renderHeaderCell(band, "seedsPerMeter", "Semente/metro")}
                     {renderHeaderCell(band, "cycle", "Ciclo")}
                     {renderHeaderCell(band, "population", "População final")}
-                    {renderHeaderCell(band, "bags", "Volume BAG's")}
+                    {renderHeaderCell(band, "bags", "Volume (bag/saco/kg)")}
                     {renderHeaderCell(band, "seedArea", "Área plantado")}
                   </>
                 ) : (
@@ -1888,6 +1962,8 @@ export function PurchaseListItemsEditor({
           totalHa={totalHa}
           readOnly={readOnly}
           className="mb-3"
+          grainCrop={crops?.[0] ?? crop ?? null}
+          grainCrops={crops ?? null}
         />
       )}
 

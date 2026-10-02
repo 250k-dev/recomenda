@@ -19,6 +19,7 @@ import {
   Loader2,
   Settings2,
 } from "lucide-react";
+import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
   clearLocalDraft,
@@ -34,6 +35,8 @@ import {
   useCurrencyStore,
   DEFAULT_GRAIN_PRICE_BRL,
   DEFAULT_SPACING_M,
+  grainPricesFromList,
+  grainPricesPayload,
 } from "@/stores/currency";
 import {
   CategoryMetaProgress,
@@ -47,6 +50,7 @@ import {
   type PurchaseListInput,
 } from "@recomenda/api";
 import { detailItemToListItem } from "@recomenda/domain/purchase-list/breakdown";
+import { printPurchaseList } from "@recomenda/domain/purchase-list/purchase-list-print-document";
 import { applyStockPrefill } from "@recomenda/domain/purchase-list/list-item";
 import { useUnsavedChangesWarning } from "@recomenda/api-hooks/use-unsaved-changes-warning";
 import {
@@ -55,7 +59,7 @@ import {
 } from "@recomenda/api-hooks";
 import { useProducerStock } from "@recomenda/api-hooks/producers";
 import { SavePurchaseListTemplateButton } from "@/components/domain/save-purchase-list-template-dialog";
-import { CROP_LABELS, cn } from "@recomenda/utils";
+import { CROP_LABELS, cn, cropFromSelection, cropLabel } from "@recomenda/utils";
 import {
   FieldError,
   StepFooter,
@@ -78,6 +82,8 @@ export type PurchaseListWizardProps = {
   farmName?: string;
   /** Safra da fazenda dona da lista (fluxo novo: uma lista única por safra). */
   cycleId?: string | null;
+  /** Culturas da safra — a lista herda delas (sem escolher de novo). */
+  cycleCrops?: string[] | null;
   /** Rascunho salvo no servidor a ser retomado (reabre o wizard preenchido). */
   draftList?: PurchaseListDetail | null;
   onComplete: () => void;
@@ -90,7 +96,7 @@ const WIZARD_STEPS = 3;
 /** Progresso do wizard persistido localmente (rascunho). */
 type WizardDraft = {
   step: number;
-  crop: "SOYBEAN" | "CORN" | "ANY";
+  crop: string;
   listName: string;
   items: ListItem[];
   targets: Record<string, number>;
@@ -186,6 +192,8 @@ function buildListPayload(opts: {
   plots: WizardPlot[];
   status: "draft" | "active";
   cascadeRecommendationItems?: boolean;
+  /** Cultura principal da safra (dona do `grain_price_brl`). */
+  mainCrop?: string | null;
 }): PurchaseListInput {
   const {
     fxRate: fxRaw,
@@ -203,6 +211,11 @@ function buildListPayload(opts: {
     season_id: null,
     fx_rate_usd_brl: fxRaw ? Number(fxRaw) : null,
     grain_price_brl: grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+    grain_prices_brl: grainPricesPayload(
+      opts.mainCrop,
+      grainRaw ? Number(grainRaw) : DEFAULT_GRAIN_PRICE_BRL,
+      useCurrencyStore.getState().grainPrices,
+    ),
     spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
     category_targets: cleanedTargets,
     status: opts.status,
@@ -223,6 +236,7 @@ export function PurchaseListWizard({
   plots,
   farmName,
   cycleId,
+  cycleCrops,
   draftList,
   onComplete,
   onCancel,
@@ -240,9 +254,12 @@ export function PurchaseListWizard({
   // salvar de verdade) é o estado mais fresco — tem prioridade sobre o rascunho do
   // servidor, senão reabrir um rascunho poderia descartar o que ainda não subiu.
   const [step, setStep] = useState(savedDraft?.step ?? (draftList ? 2 : 1));
-  const [crop, setCrop] = useState<"SOYBEAN" | "CORN" | "ANY">(
-    savedDraft?.crop ?? (draftList?.crop as "SOYBEAN" | "CORN" | "ANY") ?? "SOYBEAN",
+  // Lista de safra: a cultura vem da safra (1 cultura = ela; 2+ = "ANY").
+  const cycleCrop = cycleCrops?.length ? cropFromSelection(cycleCrops) : null;
+  const [cropState, setCrop] = useState<string>(
+    savedDraft?.crop ?? draftList?.crop ?? "SOYBEAN",
   );
+  const crop = cycleCrop ?? cropState;
   const [listName, setListName] = useState(
     savedDraft?.listName ?? draftList?.name ?? "",
   );
@@ -291,14 +308,21 @@ export function PurchaseListWizard({
   }, [stockByProductId]);
 
   // Ao retomar um rascunho, carrega dólar/saca/espaçamento salvos nele na store.
+  // Lista nova: zera os preços extras por cultura (podem ser de outra lista).
   useEffect(() => {
-    if (!draftList) return;
+    if (!draftList) {
+      useCurrencyStore.getState().setGrainPrices({});
+      return;
+    }
     const store = useCurrencyStore.getState();
     if (draftList.fx_rate_usd_brl != null) {
       store.setFxRate(String(draftList.fx_rate_usd_brl));
     }
     store.setGrainPrice(
       draftList.grain_price_brl != null ? String(draftList.grain_price_brl) : "",
+    );
+    store.setGrainPrices(
+      grainPricesFromList(draftList.grain_prices_brl, cycleCrops?.[0] ?? draftList.crop),
     );
     store.setSpacing(draftList.spacing_m != null ? String(draftList.spacing_m) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -353,6 +377,7 @@ export function PurchaseListWizard({
       const payload = buildListPayload({
         producerId,
         crop,
+        mainCrop: cycleCrops?.[0] ?? crop,
         cycleId: cycleId ?? null,
         listName: listName.trim() || "Rascunho de lista",
         items,
@@ -414,7 +439,8 @@ export function PurchaseListWizard({
       {step === 2 && (
         <StepList
           crop={crop}
-          setCrop={(v) => setCrop(v as "SOYBEAN" | "CORN" | "ANY")}
+          setCrop={setCrop}
+          cycleCrops={cycleCrops ?? null}
           listName={listName}
           setListName={setListName}
           items={items}
@@ -440,6 +466,7 @@ export function PurchaseListWizard({
           producerName={producerName}
           plots={plots}
           crop={crop}
+          mainGrainCrop={cycleCrops?.[0] ?? crop}
           cycleId={cycleId ?? null}
           listName={listName}
           items={items}
@@ -462,6 +489,7 @@ export function PurchaseListWizard({
 function StepList({
   crop,
   setCrop,
+  cycleCrops,
   listName,
   setListName,
   items,
@@ -480,6 +508,7 @@ function StepList({
 }: {
   crop: string;
   setCrop: (v: string) => void;
+  cycleCrops: string[] | null;
   listName: string;
   setListName: (v: string) => void;
   items: ListItem[];
@@ -503,7 +532,17 @@ function StepList({
   const [importedTemplateName, setImportedTemplateName] = useState<
     string | null
   >(null);
-  const { data: templates } = usePurchaseListTemplates();
+  const { data: allTemplates } = usePurchaseListTemplates();
+  // Lista de safra: só modelos das culturas dela (ou de todas as culturas).
+  const templates = useMemo(
+    () =>
+      cycleCrops && cycleCrops.length > 0
+        ? (allTemplates ?? []).filter(
+            (t) => !t.crop || t.crop === "ANY" || cycleCrops.includes(t.crop),
+          )
+        : allTemplates,
+    [allTemplates, cycleCrops],
+  );
 
   const importTemplate = (tpl: PurchaseListDetail) => {
     const replacing = items.length > 0 && importedTemplateId !== tpl.id;
@@ -605,35 +644,45 @@ function StepList({
             <Label className="text-sm font-medium text-muted-foreground">
               Cultura(s)
             </Label>
-            <div className="flex gap-2">
-              {(["SOYBEAN", "CORN"] as const).map((c) => {
-                const on = crop === c || crop === "ANY";
-                return (
-                  <Button
-                    key={c}
-                    type="button"
-                    variant={on ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      const sojaOn = crop === "SOYBEAN" || crop === "ANY";
-                      const milhoOn = crop === "CORN" || crop === "ANY";
-                      const nextSoja = c === "SOYBEAN" ? !sojaOn : sojaOn;
-                      const nextMilho = c === "CORN" ? !milhoOn : milhoOn;
-                      if (!nextSoja && !nextMilho) return; // mantém ao menos 1
-                      setCrop(
-                        nextSoja && nextMilho ? "ANY" : nextSoja ? "SOYBEAN" : "CORN",
-                      );
-                    }}
-                  >
-                    {CROP_LABELS[c]}
-                  </Button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Selecione 1 ou 2 culturas. As categorias de variedade (cultivar de soja /
-              híbrido de milho) aparecem conforme a escolha.
-            </p>
+            {cycleCrops && cycleCrops.length > 0 ? (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {cycleCrops.map((c) => (
+                    <Badge key={c} variant="neutral" className="px-2.5 py-1 text-sm">
+                      {cropLabel(c)}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Culturas da safra. As categorias de semente aparecem conforme
+                  elas; semente de outra cultura entra como produto comum (dose/ha).
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {(["SOYBEAN", "CORN", "BEAN", "ANY"] as const).map((c) => {
+                    const on = crop === c;
+                    return (
+                      <Button
+                        key={c}
+                        type="button"
+                        variant={on ? "default" : "outline"}
+                        size="sm"
+                        aria-pressed={on}
+                        onClick={() => setCrop(c)}
+                      >
+                        {CROP_LABELS[c]}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  As categorias de semente (cultivar de soja, híbrido de milho,
+                  cultivar de feijão) aparecem conforme a escolha.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -648,8 +697,10 @@ function StepList({
               {importedTemplateId && importedTemplateName
                 ? `Usando “${importedTemplateName}”. Selecione outro abaixo para trocar (substitui os produtos atuais).`
                 : templates && templates.length > 0
-                  ? "Importe um modelo pronto e ajuste o que precisar. Quantidades usam os hectares das fazendas da safra."
-                  : "Você ainda não tem templates. Crie um para reaproveitar listas em outras safras."}
+                  ? "Importe um modelo pronto e ajuste o que precisar. Quantidades usam os hectares dos talhões da safra."
+                  : cycleCrops && cycleCrops.length > 0 && (allTemplates?.length ?? 0) > 0
+                    ? "Nenhum template das culturas desta safra. Crie um em Templates de compra."
+                    : "Você ainda não tem templates. Crie um para reaproveitar listas em outras safras."}
             </p>
           </div>
           <Button asChild type="button" variant="outline" size="sm" className="gap-1.5">
@@ -739,7 +790,8 @@ function StepList({
             items={items}
             setItems={setItems}
             totalHa={totalHa}
-            crop={crop as "SOYBEAN" | "CORN" | "ANY"}
+            crop={crop as React.ComponentProps<typeof PurchaseListItemsEditor>["crop"]}
+            crops={cycleCrops}
             stockByProductId={stockByProductId}
             listId={listId}
             onRemovalCascadeArmed={onRemovalCascadeArmed}
@@ -907,6 +959,7 @@ function StepReview({
   producerName,
   plots,
   crop,
+  mainGrainCrop,
   cycleId,
   listName,
   items,
@@ -925,6 +978,7 @@ function StepReview({
   producerName: string;
   plots: WizardPlot[];
   crop: string;
+  mainGrainCrop: string | null;
   cycleId: string | null;
   listName: string;
   items: ListItem[];
@@ -943,6 +997,7 @@ function StepReview({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [savedList, setSavedList] = useState<PurchaseListDetail | null>(null);
   const queryClient = useQueryClient();
 
   // Marca a lista como salva e atualiza os caches — usado tanto no sucesso quanto
@@ -972,6 +1027,7 @@ function StepReview({
       const payload = buildListPayload({
         producerId,
         crop,
+        mainCrop: mainGrainCrop ?? crop,
         cycleId,
         listName,
         items,
@@ -991,7 +1047,10 @@ function StepReview({
         throw e;
       }
     },
-    onSuccess: (list) => handleSaved(list.id),
+    onSuccess: (list) => {
+      setSavedList(list);
+      handleSaved(list.id);
+    },
     onError: (e: unknown) => setError(apiErrorMessage(e, "Não foi possível salvar a lista.")),
   });
 
@@ -1012,7 +1071,14 @@ function StepReview({
           <strong className="text-foreground">{producerName}</strong> foi salva.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-          <Button variant="outline" onClick={() => window.print()}>
+          {/* Mesmo documento do "Exportar → Imprimir" da lista de compra. */}
+          <Button
+            variant="outline"
+            disabled={!savedList}
+            onClick={() => {
+              if (savedList) printPurchaseList(savedList);
+            }}
+          >
             Imprimir
           </Button>
           <Button onClick={onComplete}>{successRedirectLabel}</Button>
@@ -1053,7 +1119,7 @@ function StepReview({
               {listName || "—"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {CROP_LABELS[crop as keyof typeof CROP_LABELS] ?? crop} ·{" "}
+              {cropLabel(crop)} ·{" "}
               {items.length} {items.length === 1 ? "produto" : "produtos"}
             </p>
           </div>

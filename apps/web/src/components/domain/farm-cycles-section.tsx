@@ -25,19 +25,24 @@ import {
   useCreateCycle,
   useFarmCycles,
   useProducerFarms,
+  useProducerPlotCycleUsage,
 } from "@recomenda/api-hooks";
+import { apiErrorMessage } from "@recomenda/api/api-error";
+import {
+  CyclePlotPicker,
+  defaultPlotSelection,
+  plotSelectionToInput,
+  plotUsageMap,
+  type PlotSelection,
+} from "@/components/domain/cycle/cycle-plot-picker";
 import type { CycleSummary } from "@recomenda/api/cycles";
 import {
   cn,
-  CROP_LABELS,
+  CROP_OPTIONS,
+  cropsLabel,
   CYCLE_STATUS_LABELS,
   labelStatus,
 } from "@recomenda/utils";
-
-const CROP_CHOICES = [
-  { value: "SOYBEAN", label: "Soja" },
-  { value: "CORN", label: "Milho" },
-];
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -51,8 +56,25 @@ function cycleHref(
   });
 }
 
-/** Diálogo "Nova safra": passo leve (nome + culturas) — a lista de compra e a
- *  programação são montadas depois, dentro da safra. */
+/** Caixa de seleção no estilo dos cards do diálogo. */
+function CheckBox({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={cn(
+        "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-md transition-colors",
+        checked
+          ? "bg-primary text-primary-foreground"
+          : "border border-border bg-surface text-transparent",
+      )}
+    >
+      {checked ? <Check className="h-3.5 w-3.5" /> : null}
+    </span>
+  );
+}
+
+/** Diálogo "Nova safra" em 2 passos: (1) destino, nome e culturas; (2) fazendas
+ *  e talhões da safra (com área parcial). A lista de compra e a programação são
+ *  montadas depois, dentro da safra, e cobrem só esses talhões. */
 export function NewCycleDialog({
   open,
   onOpenChange,
@@ -71,6 +93,7 @@ export function NewCycleDialog({
 }) {
   const router = useRouter();
   const currentYear = new Date().getFullYear();
+  const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState(
     `Safra ${currentYear}/${String(currentYear + 1).slice(-2)}`,
   );
@@ -82,9 +105,19 @@ export function NewCycleDialog({
   const [selectedFarms, setSelectedFarms] = useState<Set<string>>(
     new Set(farmId ? [farmId] : []),
   );
+  const [plotSelection, setPlotSelection] = useState<PlotSelection>(new Map());
+  const [plotsSeeded, setPlotsSeeded] = useState(false);
   const createCycle = useCreateCycle(farmId);
   const { data: producerFarms } = useProducerFarms(producerId);
-  const farms = producerFarms ?? [];
+  const usageQuery = useProducerPlotCycleUsage(producerId, open);
+  const farms = useMemo(() => producerFarms ?? [], [producerFarms]);
+  const isHistorical = destination === "historical";
+
+  // Talhão → safras ativas em que já está (arquivo de safra antiga não disputa talhão).
+  const usage = useMemo(
+    () => (isHistorical ? plotUsageMap([]) : plotUsageMap(usageQuery.data)),
+    [usageQuery.data, isHistorical],
+  );
 
   // Onboarding / reabertura: realinha a seleção quando o dialog abre (ou muda a fazenda).
   const openSeed = open ? `${farmId}:${defaultDestination}` : null;
@@ -92,11 +125,19 @@ export function NewCycleDialog({
   if (openSeed !== prevOpenSeed) {
     setPrevOpenSeed(openSeed);
     if (openSeed) {
+      setStep(1);
       setSelectedFarms(new Set(farmId ? [farmId] : []));
       setDestination(defaultDestination);
       setClosedAt("");
+      setPlotSelection(new Map());
+      setPlotsSeeded(false);
     }
   }
+
+  const pickerFarms = useMemo(
+    () => farms.filter((f) => selectedFarms.has(f.id)),
+    [farms, selectedFarms],
+  );
 
   const toggleCrop = (value: string) => {
     setCrops((prev) => {
@@ -108,27 +149,31 @@ export function NewCycleDialog({
   };
 
   const toggleFarm = (id: string) => {
-    setSelectedFarms((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        // Sempre precisa sobrar ao menos uma fazenda selecionada.
-        if (next.size > 1) next.delete(id);
-      } else {
-        next.add(id);
+    const farm = farms.find((f) => f.id === id);
+    const next = new Set(selectedFarms);
+    if (next.has(id)) {
+      // Sempre precisa sobrar ao menos uma fazenda selecionada.
+      if (next.size <= 1) return;
+      next.delete(id);
+      // Sai a fazenda, saem os talhões dela.
+      if (farm) {
+        const nextPlots = new Map(plotSelection);
+        for (const plot of farm.plots) nextPlots.delete(plot.id);
+        setPlotSelection(nextPlots);
       }
-      return next;
-    });
+    } else {
+      next.add(id);
+      // Entra a fazenda: marca os talhões dela que não estão em outra safra.
+      if (farm) {
+        setPlotSelection(
+          new Map([...plotSelection, ...defaultPlotSelection([farm], usage)]),
+        );
+      }
+    }
+    setSelectedFarms(next);
   };
 
-  const selectedFarmsArea = farms
-    .filter((f) => selectedFarms.has(f.id))
-    .reduce(
-      (sum, f) =>
-        sum + f.plots.reduce((s, p) => s + Number(p.area_hectares || 0), 0),
-      0,
-    );
-
-  const submit = () => {
+  const goToPlots = () => {
     if (!name.trim()) {
       toast.error("Dê um nome à safra.");
       return;
@@ -137,13 +182,27 @@ export function NewCycleDialog({
       toast.error("Selecione pelo menos uma cultura.");
       return;
     }
+    if (isHistorical && !closedAt) {
+      toast.error("Informe a data de encerramento da safra antiga.");
+      return;
+    }
+    if (!plotsSeeded) {
+      setPlotSelection(defaultPlotSelection(pickerFarms, usage));
+      setPlotsSeeded(true);
+    }
+    setStep(2);
+  };
+
+  const hasAnyPlot = pickerFarms.some((f) => f.plots.length > 0);
+
+  const submit = () => {
     if (selectedFarms.size === 0) {
       toast.error("Selecione pelo menos uma fazenda.");
       return;
     }
-    const isHistorical = destination === "historical";
-    if (isHistorical && !closedAt) {
-      toast.error("Informe a data de encerramento da safra antiga.");
+    const plots = plotSelectionToInput(plotSelection, pickerFarms);
+    if (hasAnyPlot && plots.length === 0) {
+      toast.error("Selecione pelo menos um talhão da safra.");
       return;
     }
     createCycle.mutate(
@@ -152,6 +211,7 @@ export function NewCycleDialog({
         name: name.trim(),
         crops: [...crops],
         farm_ids: [...selectedFarms],
+        plots,
         ...(isHistorical
           ? { backfill: true, closed_at: closedAt }
           : {}),
@@ -175,197 +235,220 @@ export function NewCycleDialog({
           );
           onCreated?.(cycle.id);
         },
-        onError: () => toast.error("Não foi possível criar a safra."),
+        onError: (error) =>
+          toast.error(apiErrorMessage(error, "Não foi possível criar a safra.")),
       },
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[min(92vh,820px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex flex-wrap items-center gap-2">
             Nova safra
-            {destination === "historical" ? <HistoricalCycleFlag /> : null}
+            {isHistorical ? <HistoricalCycleFlag /> : null}
           </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            Passo {step} de 2 · {step === 1 ? "Nome e culturas" : "Fazendas e talhões"}
+          </p>
         </DialogHeader>
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-foreground">
-              Destino
-            </label>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {(
-                [
-                  {
-                    id: "current" as const,
-                    title: "Safra atual",
-                    hint: "Entra na operação e no galpão de hoje.",
-                  },
-                  {
-                    id: "historical" as const,
-                    title: "Já encerrada",
-                    hint: "Arquivo no histórico. Não altera o estoque vivo.",
-                  },
-                ] as const
-              ).map((opt) => {
-                const checked = destination === opt.id;
-                return (
-                  <label
-                    key={opt.id}
-                    className={cn(
-                      "cursor-pointer rounded-lg border px-3 py-2.5",
-                      checked
-                        ? "border-primary bg-primary-soft/40"
-                        : "border-border hover:bg-hover/40",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="cycle-destination"
-                      checked={checked}
-                      onChange={() => setDestination(opt.id)}
-                      className="sr-only"
-                    />
-                    <span className="block text-sm font-semibold">
-                      {opt.title}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {opt.hint}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          {destination === "historical" ? (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground">
-                Encerrada em
-              </label>
-              <Input
-                type="date"
-                value={closedAt}
-                onChange={(e) => setClosedAt(e.target.value)}
-              />
-            </div>
-          ) : null}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-foreground">
-              Nome da safra
-            </label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={`Ex: Safra ${currentYear}/${String(currentYear + 1).slice(-2)}`}
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-foreground">
-              Culturas da safra
-            </label>
-            <p className="mb-2 text-xs text-muted-foreground">
-              A safra pode ter mais de uma cultura — cada talhão recebe uma
-              delas.
-            </p>
-            <div className="flex flex-col gap-2">
-              {CROP_CHOICES.map((crop) => {
-                const checked = crops.has(crop.value);
-                return (
-                  <label
-                    key={crop.value}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-hover/40"
-                  >
-                    <span
-                      className={cn(
-                        "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-md transition-colors",
-                        checked
-                          ? "bg-primary text-primary-foreground"
-                          : "border border-border bg-surface text-transparent",
-                      )}
-                    >
-                      {checked ? <Check className="h-3.5 w-3.5" /> : null}
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleCrop(crop.value)}
-                      className="sr-only"
-                    />
-                    <Leaf className="size-4 text-primary-strong" />
-                    {crop.label}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          {farms.length > 1 ? (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground">
-                Fazendas da safra
-              </label>
-              <p className="mb-2 text-xs text-muted-foreground">
-                Uma safra pode reunir talhões de mais de uma fazenda do mesmo
-                produtor.
-              </p>
-              <div className="flex max-h-48 flex-col gap-2 overflow-y-auto">
-                {farms.map((farm) => {
-                  const checked = selectedFarms.has(farm.id);
-                  const farmArea = farm.plots.reduce(
-                    (s, p) => s + Number(p.area_hectares || 0),
-                    0,
-                  );
-                  return (
-                    <label
-                      key={farm.id}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-hover/40"
-                    >
-                      <span
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-2 pt-1">
+          {step === 1 ? (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Destino
+                </label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(
+                    [
+                      {
+                        id: "current" as const,
+                        title: "Safra atual",
+                        hint: "Entra na operação e no galpão de hoje.",
+                      },
+                      {
+                        id: "historical" as const,
+                        title: "Já encerrada",
+                        hint: "Arquivo no histórico. Não altera o estoque vivo.",
+                      },
+                    ] as const
+                  ).map((opt) => {
+                    const checked = destination === opt.id;
+                    return (
+                      <label
+                        key={opt.id}
                         className={cn(
-                          "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-md transition-colors",
+                          "cursor-pointer rounded-lg border px-3 py-2.5",
                           checked
-                            ? "bg-primary text-primary-foreground"
-                            : "border border-border bg-surface text-transparent",
+                            ? "border-primary bg-primary-soft/40"
+                            : "border-border hover:bg-hover/40",
                         )}
                       >
-                        {checked ? <Check className="h-3.5 w-3.5" /> : null}
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleFarm(farm.id)}
-                        className="sr-only"
-                      />
-                      <span className="min-w-0 flex-1 truncate">
-                        {farm.name}
-                      </span>
-                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {fmtHa(farmArea)} ha
-                      </span>
-                    </label>
-                  );
-                })}
+                        <input
+                          type="radio"
+                          name="cycle-destination"
+                          checked={checked}
+                          onChange={() => setDestination(opt.id)}
+                          className="sr-only"
+                        />
+                        <span className="block text-sm font-semibold">
+                          {opt.title}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {opt.hint}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {selectedFarms.size}{" "}
-                {selectedFarms.size === 1 ? "fazenda" : "fazendas"} ·{" "}
-                {fmtHa(selectedFarmsArea)} ha
-              </p>
-            </div>
-          ) : null}
-          <div className="flex gap-2 pt-1">
-            <Button
-              className="flex-1"
-              onClick={submit}
-              disabled={createCycle.isPending}
-            >
-              {createCycle.isPending ? "Criando..." : "Criar safra"}
-            </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-          </div>
+              {isHistorical ? (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground">
+                    Encerrada em
+                  </label>
+                  <Input
+                    type="date"
+                    value={closedAt}
+                    onChange={(e) => setClosedAt(e.target.value)}
+                  />
+                </div>
+              ) : null}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Nome da safra
+                </label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={`Ex: Safra ${currentYear}/${String(currentYear + 1).slice(-2)}`}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Culturas da safra
+                </label>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  A safra pode ter mais de uma cultura — cada talhão recebe uma
+                  delas.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {CROP_OPTIONS.map((crop) => {
+                    const checked = crops.has(crop.value);
+                    return (
+                      <label
+                        key={crop.value}
+                        className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-hover/40"
+                      >
+                        <CheckBox checked={checked} />
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCrop(crop.value)}
+                          className="sr-only"
+                        />
+                        <Leaf className="size-4 text-primary-strong" />
+                        {crop.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  {farms.length > 1 ? "Fazendas da safra" : "Fazenda da safra"}
+                </label>
+                {farms.length > 1 ? (
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Uma safra pode reunir talhões de mais de uma fazenda do mesmo
+                    produtor.
+                  </p>
+                ) : null}
+                <div className="flex max-h-40 flex-col gap-2 overflow-y-auto">
+                  {farms.map((farm) => {
+                    const checked = selectedFarms.has(farm.id);
+                    const farmArea = farm.plots.reduce(
+                      (s, p) => s + Number(p.area_hectares || 0),
+                      0,
+                    );
+                    return (
+                      <label
+                        key={farm.id}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm",
+                          farms.length > 1 ? "cursor-pointer hover:bg-hover/40" : "",
+                        )}
+                      >
+                        <CheckBox checked={checked} />
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={farms.length <= 1}
+                          onChange={() => toggleFarm(farm.id)}
+                          className="sr-only"
+                        />
+                        <span className="min-w-0 flex-1 truncate">{farm.name}</span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {fmtHa(farmArea)} ha
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  Talhões da safra
+                </label>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  A lista de compra e a programação desta safra cobrem só os
+                  talhões marcados. Separou talhões para outra cultura? Crie
+                  uma safra para eles.
+                </p>
+                <CyclePlotPicker
+                  farms={pickerFarms}
+                  selection={plotSelection}
+                  onChange={setPlotSelection}
+                  usage={usage}
+                />
+              </div>
+            </>
+          )}
+        </div>
+        <div className="flex shrink-0 gap-2 border-t border-border px-6 py-4">
+          {step === 1 ? (
+            <>
+              <Button
+                className="flex-1"
+                onClick={goToPlots}
+                disabled={usageQuery.isLoading}
+              >
+                Escolher talhões
+              </Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setStep(1)}>
+                Voltar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={submit}
+                disabled={createCycle.isPending}
+              >
+                {createCycle.isPending ? "Criando..." : "Criar safra"}
+              </Button>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -508,9 +591,7 @@ export function FarmCyclesSection({
                         </span>
                         <span className="mt-0.5 block truncate text-sm text-muted-foreground">
                           {[
-                            cycle.crops
-                              .map((c) => CROP_LABELS[c] ?? c)
-                              .join(" + "),
+                            cropsLabel(cycle.crops),
                             cycle.is_planning
                               ? "sem talhões programados"
                               : `${cycle.plots_count} ${cycle.plots_count === 1 ? "talhão" : "talhões"}`,

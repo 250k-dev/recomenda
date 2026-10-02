@@ -3,18 +3,19 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Archive, Leaf } from "lucide-react";
+import { Archive, ArchiveRestore, Leaf } from "lucide-react";
 
 import { routes } from "@recomenda/config";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { useProducer, useProducerCycles } from "@recomenda/api-hooks";
 import type { CycleSummary } from "@recomenda/api/cycles";
-import { CROP_LABELS } from "@recomenda/utils";
+import { cropsLabel } from "@recomenda/utils";
 import { Badge } from "@recomenda/ui/primitives/badge";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Card, CardContent } from "@recomenda/ui/primitives/card";
 import { ArchivedCyclePreview } from "@/components/domain/archived-cycle-preview";
+import { RestoreCycleDialog } from "@/components/domain/cycle/restore-cycle-dialog";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 
 const fmtHa = (n: number) =>
@@ -34,7 +35,7 @@ const fmtDate = (iso: string) => {
 function cycleSubtitle(cycle: CycleSummary): string {
   const farmCount = cycle.farms?.length ?? 1;
   return [
-    cycle.crops.map((c) => CROP_LABELS[c] ?? c).join(" + "),
+    cropsLabel(cycle.crops),
     farmCount > 1 ? `${farmCount} fazendas` : (cycle.farms?.[0]?.name ?? null),
     cycle.plots_count > 0
       ? `${cycle.plots_count} ${cycle.plots_count === 1 ? "talhão" : "talhões"}`
@@ -58,6 +59,8 @@ export default function ProducerArchivedSeasonsPage() {
   );
   const [previewId, setPreviewId] = useState<string | null>(null);
   const preview = archived.find((cycle) => cycle.id === previewId) ?? null;
+  const [restoreId, setRestoreId] = useState<string | null>(null);
+  const restoring = archived.find((cycle) => cycle.id === restoreId) ?? null;
 
   const producerHref = routes.produtores.detalhe(producerId);
 
@@ -82,7 +85,7 @@ export default function ProducerArchivedSeasonsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Safras removidas da carteira{producer ? ` de ${producer.name}` : ""}.
-            Ficam guardadas aqui como histórico.
+            Ficam guardadas aqui como histórico e podem ser recuperadas.
           </p>
         </div>
       </section>
@@ -141,6 +144,18 @@ export default function ProducerArchivedSeasonsPage() {
                       </span>
                     ) : null}
                   </button>
+                  <div className="flex justify-end border-t border-border px-4 py-2.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setRestoreId(cycle.id)}
+                    >
+                      <ArchiveRestore className="size-4" />
+                      Recuperar
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -155,6 +170,23 @@ export default function ProducerArchivedSeasonsPage() {
         producerId={producerId}
         cycleId={preview?.id ?? null}
         cycleName={preview?.name ?? "Safra arquivada"}
+        onRestore={
+          preview
+            ? () => {
+                setRestoreId(preview.id);
+                setPreviewId(null);
+              }
+            : undefined
+        }
+      />
+      <RestoreCycleDialog
+        open={restoring != null}
+        onOpenChange={(open) => {
+          if (!open) setRestoreId(null);
+        }}
+        producerId={producerId}
+        cycleId={restoring?.id ?? null}
+        cycleName={restoring?.name ?? "Safra arquivada"}
       />
     </div>
   );

@@ -92,6 +92,10 @@ export interface CycleDetail {
   agronomist_id: string;
   name: string;
   crops: string[];
+  /** Talhões da safra (escolhidos na criação + programados). */
+  plots?: CyclePlotRow[];
+  /** Área total que a safra cobre — a mesma da lista de compra. */
+  plots_area_ha?: number;
   status: "ACTIVE" | "HARVESTED" | "ARCHIVED";
   created_at: string;
   closed_at?: string | null;
@@ -118,6 +122,42 @@ export interface CycleAvailablePlot {
   other_cycle_name: string | null;
   farm_id: string;
   farm_name: string;
+  /** Escolhido para a safra (os demais entram nela ao serem programados). */
+  in_cycle?: boolean;
+  /** Área do talhão na safra (null = cadastral). */
+  cycle_area_ha?: number | null;
+}
+
+/** Talhão da safra: escolhido na criação e/ou programado. */
+export interface CyclePlotRow {
+  plot_id: string;
+  plot_name: string;
+  farm_id: string;
+  farm_name: string;
+  /** Área cadastral do talhão. */
+  plot_area_ha: number;
+  /** Área do talhão na safra (null = cadastral). */
+  cycle_area_ha: number | null;
+  /** Área que entra na lista de compra (plantada > safra > cadastral). */
+  area_ha: number;
+  programmed: boolean;
+  in_cycle: boolean;
+}
+
+/** Talhão escolhido para a safra. `area_ha` vazio = área cadastral. */
+export interface CyclePlotInput {
+  plot_id: string;
+  area_ha?: number | null;
+}
+
+/** Talhão → safras ativas em que ele já está e quanto de área cada uma usa. */
+export interface PlotCycleUsage {
+  plot_id: string;
+  plot_area_ha: number;
+  used_ha: number;
+  /** Área do talhão ainda sem safra (0 = ocupado por inteiro). */
+  free_ha: number;
+  cycles: Array<{ id: string; name: string; area_ha: number }>;
 }
 
 export interface CycleCostPlanPlotRow {
@@ -218,6 +258,8 @@ export async function createCycle(
     crops: string[];
     /** Fazendas participantes da safra. Vazio/ausente = só a fazenda da URL. */
     farm_ids?: string[];
+    /** Talhões da safra (com área parcial opcional). */
+    plots?: CyclePlotInput[];
     backfill?: boolean;
     closed_at?: string;
   },
@@ -307,11 +349,87 @@ export async function deleteCycle(id: string) {
   return data;
 }
 
+export type CycleRestorePosition = "first" | "last";
+
+export interface CycleRestorePreviewLine {
+  local_product_id: string;
+  product_name: string;
+  dose_unit: string | null;
+  required: number;
+  in_stock: number;
+}
+
+export interface CycleRestorePreviewLoss {
+  local_product_id: string;
+  product_name: string;
+  dose_unit: string | null;
+  list_id: string;
+  cycle_name: string;
+  before: number;
+  after: number;
+  lost: number;
+}
+
+export interface CycleRestoreSimulation {
+  received: CycleRestorePreviewLine[];
+  losses: CycleRestorePreviewLoss[];
+}
+
+/** Prévia de "Recuperar safra": impacto no galpão de cada posição na fila. */
+export interface CycleRestorePreview {
+  /** Há outras safras disputando o galpão — o agrônomo escolhe a posição. */
+  has_queue: boolean;
+  reserves_stock: boolean;
+  /** Como a safra volta: ativa, colhida ou arquivo de safra antiga. */
+  restores_as: "active" | "harvested" | "historical";
+  first: CycleRestoreSimulation;
+  last: CycleRestoreSimulation;
+  plots_in_other_cycles: Array<{ plot_id: string; plot_name: string; cycle_name: string }>;
+}
+
+export async function getCycleRestorePreview(id: string) {
+  const { data } = await api.get<CycleRestorePreview>(`/cycles/${id}/restore-preview`);
+  return data;
+}
+
+/** Recupera a safra arquivada na posição escolhida da fila do galpão. */
+export async function restoreCycle(id: string, position: CycleRestorePosition) {
+  const { data } = await api.post<CycleDetail>(`/cycles/${id}/restore`, { position });
+  return data;
+}
+
 /** Vincula uma fazenda a mais à safra (multi-fazenda). */
-export async function addCycleFarm(cycleId: string, farmId: string) {
+export async function addCycleFarm(cycleId: string, farmId: string, plots?: CyclePlotInput[]) {
   const { data } = await api.post<CycleDetail>(`/cycles/${cycleId}/farms`, {
     farm_id: farmId,
+    ...(plots ? { plots } : {}),
   });
+  return data;
+}
+
+/** Inclui talhões na safra (ou atualiza a área dos que já estão). */
+export async function addCyclePlots(cycleId: string, plots: CyclePlotInput[]) {
+  const { data } = await api.post<CycleDetail>(`/cycles/${cycleId}/plots`, { plots });
+  return data;
+}
+
+/** Área do talhão na safra. `null` volta para a área cadastral. */
+export async function updateCyclePlotArea(cycleId: string, plotId: string, areaHa: number | null) {
+  const { data } = await api.patch<CycleDetail>(`/cycles/${cycleId}/plots/${plotId}`, {
+    area_ha: areaHa,
+  });
+  return data;
+}
+
+/** Tira o talhão da safra. Falha com `PLOT_HAS_SEASON` se ele tiver programação. */
+export async function removeCyclePlot(cycleId: string, plotId: string) {
+  const { data } = await api.delete<CycleDetail>(`/cycles/${cycleId}/plots/${plotId}`);
+  return data;
+}
+
+/** Em quais safras ativas cada talhão do produtor já está. */
+export async function getProducerPlotCycleUsage(producerId: string) {
+  const { data } = await api.get<PlotCycleUsage[]>(`/producers/${producerId}/cycle-plot-usage`);
   return data;
 }
 

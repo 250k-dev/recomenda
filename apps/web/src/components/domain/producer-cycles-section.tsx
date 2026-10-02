@@ -21,7 +21,7 @@ import {
   useProducerCycles,
 } from "@recomenda/api-hooks";
 import type { CycleSummary } from "@recomenda/api/cycles";
-import { CROP_LABELS, CYCLE_STATUS_LABELS, labelStatus } from "@recomenda/utils";
+import { CYCLE_STATUS_LABELS, labelStatus, cropsLabel } from "@recomenda/utils";
 import { routes } from "@recomenda/config";
 import { extractError } from "@/components/domain/season/_shared";
 
@@ -197,9 +197,7 @@ export function ProducerCyclesSection({
                         </span>
                         <span className="mt-0.5 block truncate text-sm text-muted-foreground">
                           {[
-                            cycle.crops
-                              .map((c) => CROP_LABELS[c] ?? c)
-                              .join(" + "),
+                            cropsLabel(cycle.crops),
                             farmCount > 1
                               ? `${farmCount} fazendas`
                               : (cycle.farms?.[0]?.name ?? null),

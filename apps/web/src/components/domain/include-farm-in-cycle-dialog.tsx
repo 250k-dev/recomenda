@@ -7,8 +7,13 @@ import { Check, Leaf, Plus, Sprout } from "lucide-react";
 import { toast } from "sonner";
 import { routes } from "@recomenda/config";
 import { apiErrorMessage } from "@recomenda/api/api-error";
-import { addCycleFarm } from "@recomenda/api/cycles";
-import { queryKeys, useProducerCycles } from "@recomenda/api-hooks";
+import { addCycleFarm, type CyclePlotInput } from "@recomenda/api/cycles";
+import {
+  queryKeys,
+  useProducerCycles,
+  useProducerFarms,
+  useProducerPlotCycleUsage,
+} from "@recomenda/api-hooks";
 import { Button } from "@recomenda/ui/primitives/button";
 import {
   Dialog,
@@ -17,13 +22,20 @@ import {
   DialogTitle,
 } from "@recomenda/ui/primitives/dialog";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
-import { cn, CROP_LABELS } from "@recomenda/utils";
+import { cn, cropsLabel } from "@recomenda/utils";
 import { NewCycleDialog } from "@/components/domain/farm-cycles-section";
+import {
+  CyclePlotPicker,
+  defaultPlotSelection,
+  plotSelectionToInput,
+  plotUsageMap,
+  type PlotSelection,
+} from "@/components/domain/cycle/cycle-plot-picker";
 
 const fmtHa = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
-type Mode = "choose" | "existing" | "create";
+type Mode = "choose" | "existing" | "plots" | "create";
 
 /**
  * Fluxo do botão "Incluir em safra" no card da fazenda:
@@ -48,7 +60,18 @@ export function IncludeFarmInCycleDialog({
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<Mode>("choose");
   const [pendingCycleId, setPendingCycleId] = useState<string | null>(null);
+  const [targetCycleId, setTargetCycleId] = useState<string | null>(null);
+  const [plotSelection, setPlotSelection] = useState<PlotSelection>(new Map());
   const { data: producerCycles, isLoading } = useProducerCycles(producerId);
+  const { data: producerFarms } = useProducerFarms(producerId);
+  const usageQuery = useProducerPlotCycleUsage(producerId, open);
+  const farm = useMemo(
+    () => (producerFarms ?? []).find((f) => f.id === farmId) ?? null,
+    [producerFarms, farmId],
+  );
+  const pickerFarms = useMemo(() => (farm ? [farm] : []), [farm]);
+  const usage = useMemo(() => plotUsageMap(usageQuery.data), [usageQuery.data]);
+  const targetCycle = (producerCycles ?? []).find((c) => c.id === targetCycleId) ?? null;
 
   const eligibleCycles = useMemo(() => {
     return (producerCycles ?? []).filter((cycle) => {
@@ -61,8 +84,8 @@ export function IncludeFarmInCycleDialog({
   }, [producerCycles, farmId]);
 
   const includeMutation = useMutation({
-    mutationFn: ({ cycleId }: { cycleId: string }) =>
-      addCycleFarm(cycleId, farmId),
+    mutationFn: ({ cycleId, plots }: { cycleId: string; plots: CyclePlotInput[] }) =>
+      addCycleFarm(cycleId, farmId, plots),
     onSuccess: (cycle) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.cycle(cycle.id) });
       queryClient.invalidateQueries({
@@ -79,6 +102,10 @@ export function IncludeFarmInCycleDialog({
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.producerFarms(producerId),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.producerStock(producerId) });
+      queryClient.invalidateQueries({
+        queryKey: ["producer-plot-cycle-usage", producerId],
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.farmCycles(farmId) });
       for (const farm of cycle.farms) {
@@ -114,6 +141,26 @@ export function IncludeFarmInCycleDialog({
   const reset = () => {
     setMode("choose");
     setPendingCycleId(null);
+    setTargetCycleId(null);
+    setPlotSelection(new Map());
+  };
+
+  /** Escolheu a safra: passa para os talhões desta fazenda que entram nela. */
+  const pickCycle = (cycleId: string) => {
+    setTargetCycleId(cycleId);
+    setPlotSelection(defaultPlotSelection(pickerFarms, usage));
+    setMode("plots");
+  };
+
+  const confirmInclude = () => {
+    if (!targetCycleId) return;
+    const plots = plotSelectionToInput(plotSelection, pickerFarms);
+    if ((farm?.plots.length ?? 0) > 0 && plots.length === 0) {
+      toast.error("Selecione pelo menos um talhão desta fazenda.");
+      return;
+    }
+    setPendingCycleId(targetCycleId);
+    includeMutation.mutate({ cycleId: targetCycleId, plots });
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -148,12 +195,47 @@ export function IncludeFarmInCycleDialog({
           <DialogTitle>
             {mode === "choose"
               ? `Incluir “${farmName}” em uma safra`
-              : "Escolher safra existente"}
+              : mode === "plots"
+                ? `Talhões de “${farmName}” na ${targetCycle?.name ?? "safra"}`
+                : "Escolher safra existente"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 px-6 py-5">
-          {mode === "choose" ? (
+          {mode === "plots" ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Marque os talhões desta fazenda que entram na safra. A área da
+                lista de compra é recalculada com eles.
+              </p>
+              <CyclePlotPicker
+                farms={pickerFarms}
+                selection={plotSelection}
+                onChange={setPlotSelection}
+                usage={usage}
+              />
+              <div className="flex justify-between gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMode("existing")}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={includeMutation.isPending}
+                  onClick={confirmInclude}
+                >
+                  <Check className="size-3.5" />
+                  {includeMutation.isPending ? "Incluindo…" : "Incluir na safra"}
+                </Button>
+              </div>
+            </>
+          ) : mode === "choose" ? (
             <>
               <p className="text-sm text-muted-foreground">
                 A fazenda pode entrar numa safra que já existe (os hectares entram
@@ -238,9 +320,7 @@ export function IncludeFarmInCycleDialog({
                             {cycle.name}
                           </span>
                           <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                            {cycle.crops
-                              .map((c) => CROP_LABELS[c] ?? c)
-                              .join(" + ")}
+                            {cropsLabel(cycle.crops)}
                             {" · "}
                             {farmsCount}{" "}
                             {farmsCount === 1 ? "fazenda" : "fazendas"}
@@ -252,10 +332,7 @@ export function IncludeFarmInCycleDialog({
                           variant="outline"
                           className="shrink-0 gap-1.5"
                           disabled={includeMutation.isPending}
-                          onClick={() => {
-                            setPendingCycleId(cycle.id);
-                            includeMutation.mutate({ cycleId: cycle.id });
-                          }}
+                          onClick={() => pickCycle(cycle.id)}
                         >
                           {pending ? (
                             "Incluindo…"

@@ -112,7 +112,7 @@ export type ZapReorderDto = {
   stages: Array<{ id: string; name: string }>;
 };
 
-export const SEED_CATEGORIES = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO"];
+export const SEED_CATEGORIES = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO", "CULTIVAR_FEIJAO"];
 
 export function isSeedCategory(category: string): boolean {
   return SEED_CATEGORIES.includes(category);

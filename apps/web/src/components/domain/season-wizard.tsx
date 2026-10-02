@@ -68,7 +68,7 @@ export type SeasonWizardProps = {
   onCancel: () => void;
 };
 
-type Crop = "SOYBEAN" | "CORN";
+type Crop = "SOYBEAN" | "CORN" | "BEAN";
 type CronogramMode = "template" | "custom";
 
 const WIZARD_STEPS = 3;
@@ -420,6 +420,7 @@ function StepCronogram({
   const cropOptions: Array<{ value: Crop; label: string; icon: typeof Sprout }> = [
     { value: "SOYBEAN", label: "Soja", icon: Sprout },
     { value: "CORN", label: "Milho", icon: Wheat },
+    { value: "BEAN", label: "Feijão", icon: Sprout },
   ];
 
   return (

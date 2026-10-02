@@ -44,7 +44,7 @@ import {
   RefreshCw,
   ChevronDown,
 } from "lucide-react";
-import { cn } from "@recomenda/utils";
+import { cn, CROP_LABELS } from "@recomenda/utils";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", {
@@ -80,6 +80,9 @@ interface EditableItem {
   area_note: string | null;
   thousand_plants_per_ha: number | null;
   seeds_per_meter: number | null;
+  thousand_seed_weight_g: number | null;
+  /** Cultura do item (lista multi-cultura); null = comum. */
+  crop: string | null;
   cycle_days: number | null;
   seeding_area_ha: number | null;
   bags_override: number | null;
@@ -155,6 +158,8 @@ export function CostPlanView({
         area_note: it.area_note ?? null,
         thousand_plants_per_ha: it.thousand_plants_per_ha ?? null,
         seeds_per_meter: it.seeds_per_meter ?? null,
+        thousand_seed_weight_g: it.thousand_seed_weight_g ?? null,
+        crop: it.crop ?? null,
         cycle_days: it.cycle_days ?? null,
         seeding_area_ha: it.seeding_area_ha ?? null,
         bags_override: it.bags_override ?? null,
@@ -186,6 +191,7 @@ export function CostPlanView({
       deduct_stock: it.deduct_stock,
       calc_rule: it.calc_rule,
       bags_override: it.bags_override,
+      thousand_seed_weight_g: it.thousand_seed_weight_g,
       volume_override: it.volume_override,
     }));
     return calculateSummary(inputs, {
@@ -221,6 +227,8 @@ export function CostPlanView({
         area_note: it.area_note,
         thousand_plants_per_ha: it.thousand_plants_per_ha,
         seeds_per_meter: it.seeds_per_meter,
+        thousand_seed_weight_g: it.thousand_seed_weight_g,
+        crop: it.crop,
         cycle_days: it.cycle_days,
         seeding_area_ha: it.seeding_area_ha,
         bags_override: it.bags_override,
@@ -303,6 +311,8 @@ export function CostPlanView({
         area_note: null,
         thousand_plants_per_ha: null,
         seeds_per_meter: null,
+        thousand_seed_weight_g: null,
+        crop: null,
         cycle_days: null,
         seeding_area_ha: null,
         bags_override: null,
@@ -629,7 +639,7 @@ function PlanHeader({
   onAddProduct: (productId: string) => void;
   onExport: () => void;
 }) {
-  const cropLabel = crop === "CORN" ? "Milho" : "Soja";
+  const cropLabel = crop === "ANY" ? "" : (CROP_LABELS[crop] ?? "");
   const title =
     producerName && farmName ? `${producerName} · ${farmName}` : producerName ?? planTitle;
   const updatedLabel = updatedAt
@@ -768,6 +778,17 @@ function DuplicateButton({ purchaseListId }: { purchaseListId: string }) {
 }
 
 function CropToggle({ crop }: { crop: string }) {
+  // Feijão / outra cultura: um selo só com a cultura (o par soja × milho não se aplica).
+  if (crop !== "SOYBEAN" && crop !== "CORN" && crop !== "ANY") {
+    return (
+      <div className="flex rounded-full border bg-card p-0.5 text-xs font-medium">
+        <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-primary">
+          <span className="h-2 w-2 rounded-full bg-primary" />
+          {CROP_LABELS[crop] ?? crop}
+        </span>
+      </div>
+    );
+  }
   const isSoy = crop === "SOYBEAN";
   return (
     <div className="flex rounded-full border bg-card p-0.5 text-xs font-medium">
@@ -820,7 +841,9 @@ function ParamsBar({
     setFetching(true);
     try {
       const q = await getCommodities();
-      const saca = crop === "CORN" ? q.milho_brl_saca : q.soja_brl_saca;
+      // Só soja e milho têm cotação automática; feijão/outra ficam à mão.
+      const saca =
+        crop === "CORN" ? q.milho_brl_saca : crop === "SOYBEAN" || crop === "ANY" ? q.soja_brl_saca : null;
       if (q.usd_brl != null) setFxRate(String(q.usd_brl));
       if (saca != null) setGrainPrice(String(saca));
       onCommit();
@@ -853,7 +876,7 @@ function ParamsBar({
           placeholder="5,50"
         />
         <ParamField
-          label={`Saca de ${crop === "CORN" ? "milho" : "soja"}`}
+          label={`Saca de ${(crop === "ANY" ? "soja" : (CROP_LABELS[crop] ?? "grão")).toLowerCase()}`}
           value={grainPrice}
           onChange={setGrainPrice}
           onBlur={onCommit}

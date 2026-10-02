@@ -18,13 +18,14 @@ import {
 import type { CycleHistoryPlot } from "@recomenda/api/cycles";
 import { routes } from "@recomenda/config";
 import {
-  CROP_LABELS,
   CYCLE_STATUS_LABELS,
   PRODUCT_CATEGORY_LABELS,
   STATUS_LABELS,
   cn,
   labelStatus,
   localYmdToDate,
+  cropLabel as cropLabelOf,
+  cropsLabel,
 } from "@recomenda/utils";
 import { BreadcrumbBack } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
@@ -262,7 +263,7 @@ export function ProducerHistoryCyclePanel({
         stats={[
           {
             label: "Culturas",
-            value: data.crops.map((c) => CROP_LABELS[c] ?? c).join(" + ") || "—",
+            value: cropsLabel(data.crops) || "—",
           },
           {
             label: "Fazendas",
@@ -362,7 +363,7 @@ export function ProducerHistoryCyclePanel({
                         </div>
                         {farm.plots.map((plot) => {
                           const plotOpen = openPlot === plot.season_id;
-                          const cropLabel = CROP_LABELS[plot.crop] ?? plot.crop;
+                          const cropLabel = cropLabelOf(plot.crop);
                           return (
                             <div
                               key={plot.season_id}

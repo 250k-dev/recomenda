@@ -6,10 +6,11 @@ export const FORMULATION_SELECT_OPTIONS = FORMULATION_MIX_OPTIONS.map((o) => ({
   label: o.label,
 }));
 
-/** Categorias cuja unidade é fixa: soja→bag, milho→sacos, fertilizante→t/ha. */
+/** Categorias cuja unidade é fixa: soja→bag, milho→sacos, feijão→kg, fertilizante→t/ha. */
 export function fixedDoseUnitForCategory(category: string | null | undefined): string | null {
   if (category === "CULTIVAR_SOJA") return "BAG";
   if (category === "HIBRIDO_MILHO") return "SACA";
+  if (category === "CULTIVAR_FEIJAO") return "KG";
   if (category === "FERTILIZER") return "T_HA";
   return null;
 }
@@ -24,6 +25,7 @@ export function categoryHasFormulation(category: string | null | undefined): boo
   return (
     category !== "CULTIVAR_SOJA" &&
     category !== "HIBRIDO_MILHO" &&
+    category !== "CULTIVAR_FEIJAO" &&
     category !== "SEED" &&
     category !== "FERTILIZER"
   );

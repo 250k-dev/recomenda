@@ -188,6 +188,8 @@ export type StockByCycle = {
     list_id: string;
     list_name: string;
     list_created_at: string;
+    /** 1 = primeira da fila do galpão (fica com o estoque antes das outras). */
+    queue_position?: number;
     /** Tem estoque reservado — só essas ganham aba. */
     has_stock: boolean;
     items: StockByCycleItem[];

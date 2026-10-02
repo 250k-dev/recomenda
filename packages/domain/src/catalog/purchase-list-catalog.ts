@@ -1,6 +1,6 @@
 import type { GlobalProduct, PlatformCatalogEntry } from "@recomenda/api/catalog";
 
-export type PurchaseListCrop = "SOYBEAN" | "CORN";
+export type PurchaseListCrop = "SOYBEAN" | "CORN" | "BEAN";
 
 export type PurchaseListCatalogProduct = {
   /** Valor usado no formulário (`local_product_id` ou `global:{id}`). */
@@ -62,7 +62,7 @@ export function buildPurchaseListCatalog(
 }
 
 function parseVarietyCrop(value?: string | null): PurchaseListCrop | null {
-  if (value === "SOYBEAN" || value === "CORN") return value;
+  if (value === "SOYBEAN" || value === "CORN" || value === "BEAN") return value;
   return null;
 }
 
@@ -80,6 +80,7 @@ export function productsForPurchaseListCategory(
   const seedCropForCategory: Record<string, PurchaseListCrop> = {
     CULTIVAR_SOJA: "SOYBEAN",
     HIBRIDO_MILHO: "CORN",
+    CULTIVAR_FEIJAO: "BEAN",
   };
   const seedCrop = seedCropForCategory[category];
 
@@ -129,7 +130,7 @@ export function purchaseListProductLabel(
 ): string {
   const cropSuffix =
     product.category === "SEED" && product.crop
-      ? ` · ${product.crop === "SOYBEAN" ? "Soja" : "Milho"}`
+      ? ` · ${product.crop === "SOYBEAN" ? "Soja" : product.crop === "CORN" ? "Milho" : "Feijão"}`
       : "";
   const platformSuffix = product.isGlobalOnly ? " · Plataforma" : "";
   return `${product.name}${cropSuffix}${platformSuffix}`;

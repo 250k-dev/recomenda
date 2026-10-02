@@ -7,7 +7,7 @@ import { EmptyState } from "@recomenda/ui/patterns/empty-state";
 import { KpiStrip, KpiCell } from "@/components/domain/kpi-strip";
 import { ListCardsSkeleton } from "@/components/domain/page-skeletons";
 import { useCycleCostPlan } from "@recomenda/api-hooks";
-import { CROP_LABELS } from "@recomenda/utils";
+import { CROP_LABELS, cropLabel } from "@recomenda/utils";
 
 const fmtBrl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -19,6 +19,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   SEED: "Sementes",
   CULTIVAR_SOJA: "Cultivar de soja",
   HIBRIDO_MILHO: "Híbrido de milho",
+  CULTIVAR_FEIJAO: "Cultivar de feijão",
   SEED_TREATMENT: "Tratamento de sementes",
   HERBICIDE: "Herbicidas",
   FUNGICIDE: "Fungicidas",
@@ -122,7 +123,7 @@ export function CycleCostPlanView({
                       <td className="py-2.5 pr-4 font-medium text-foreground">
                         {row.crop === "COMMON"
                           ? "Comum às culturas"
-                          : (CROP_LABELS[row.crop] ?? row.crop)}
+                          : cropLabel(row.crop)}
                       </td>
                       <td className="py-2.5 pr-4 text-right tabular-nums">
                         {fmtBrl(row.total_brl)}

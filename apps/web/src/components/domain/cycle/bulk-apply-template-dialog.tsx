@@ -19,7 +19,7 @@ import {
   useTimingTemplates,
 } from "@recomenda/api-hooks";
 import type { CycleDetail, CycleSeasonRow } from "@recomenda/api/cycles";
-import { CROP_LABELS } from "@recomenda/utils";
+import { CROP_LABELS, cropLabel } from "@recomenda/utils";
 import {
   FarmPlotSelection,
   type SelectablePlot,
@@ -126,13 +126,13 @@ export function BulkApplyTemplateDialog({
           label: season.plot_name,
           hint: [
             `${season.plot_area_ha.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ha`,
-            CROP_LABELS[season.crop] ?? season.crop,
+            cropLabel(season.crop),
             season.recommendations_total > 0
               ? `${season.recommendations_total} ${season.recommendations_total === 1 ? "etapa" : "etapas"}${pending > 0 ? ` · ${pending} pendente${pending === 1 ? "" : "s"}` : ""}`
               : "sem etapas",
           ].join(" · "),
           disabledReason: cropMismatch
-            ? `Modelo é de ${CROP_LABELS[template.crop] ?? template.crop}; o talhão é ${CROP_LABELS[season.crop] ?? season.crop}.`
+            ? `Modelo é de ${CROP_LABELS[template.crop] ?? template.crop}; o talhão é ${cropLabel(season.crop)}.`
             : null,
         };
       }),

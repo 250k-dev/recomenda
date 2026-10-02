@@ -87,7 +87,7 @@ export function usePurchaseListCatalogProducts(
 
   // Catálogo completo: global (admin) + local (agrônomo). Sementes ficam de fora (item 12).
   const catalogProducts = useMemo(() => {
-    const seedCategories = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO"];
+    const seedCategories = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO", "CULTIVAR_FEIJAO"];
     return buildPurchaseListCatalog(
       platformCatalog.data?.data ?? [],
       globalCatalog.data?.data ?? [],
@@ -286,7 +286,8 @@ function StageProductsEditor({
         (category) =>
           category !== "SEED" &&
           category !== "CULTIVAR_SOJA" &&
-          category !== "HIBRIDO_MILHO",
+          category !== "HIBRIDO_MILHO" &&
+          category !== "CULTIVAR_FEIJAO",
       ),
     [],
   );

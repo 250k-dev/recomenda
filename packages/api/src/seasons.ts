@@ -59,6 +59,8 @@ export interface RecommendationItem {
   mapa_registration?: string | null;
   equivalence_group?: string | null;
   formulation_key?: string | null;
+  /** Categoria do produto (semente de feijão é em kg, igual a insumo). */
+  category?: string | null;
 }
 
 export interface Recommendation {

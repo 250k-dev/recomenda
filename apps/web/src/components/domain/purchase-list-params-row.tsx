@@ -5,7 +5,7 @@ import { DollarSign, PaperBag, RulerDimensionLine } from "lucide-react";
 import { Input } from "@recomenda/ui/primitives/input";
 import { MoneyInput } from "@recomenda/ui/forms/money-input";
 import { useCan } from "@recomenda/api-hooks/use-can";
-import { cn } from "@recomenda/utils";
+import { cn, cropLabel } from "@recomenda/utils";
 import {
   listItemsToBuyByKey,
   DEFAULT_SPACING_M,
@@ -44,6 +44,8 @@ export function PurchaseListParamsRow({
   variant = "card",
   inverted = false,
   className,
+  grainCrop,
+  grainCrops,
 }: {
   items: ListItem[];
   totalHa: number;
@@ -52,6 +54,10 @@ export function PurchaseListParamsRow({
   /** Sobre o verde do herói: texto e ícones claros. */
   inverted?: boolean;
   className?: string;
+  /** Cultura da saca (a principal da safra). Feijão/outra não têm cotação automática. */
+  grainCrop?: string | null;
+  /** Culturas da safra: a 1ª usa o preço principal; as demais ganham campo próprio. */
+  grainCrops?: string[] | null;
 }) {
   const canViewPrices = useCan("PRICE_VIEW");
   const chipClass = inverted
@@ -71,12 +77,18 @@ export function PurchaseListParamsRow({
     fxRateUserEdited,
     grainPrice,
     setGrainPrice,
+    grainPrices,
+    setGrainPrices,
     spacing: spacingStr,
     setSpacing,
   } = useCurrencyStore();
   const fx = Number(fxRate) || 0;
   const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
   const spacing = Number(spacingStr) || DEFAULT_SPACING_M;
+  // Feijão e outras culturas: o padrão (R$ 110, soja) não serve — pede o preço.
+  const needsManualGrainPrice = grainCrop === "BEAN";
+  // Safra com mais de uma cultura: um preço de saca para cada (a 1ª é a principal).
+  const extraCrops = (grainCrops ?? []).slice(1).filter((c) => c !== "ANY");
 
   // Cotação ao vivo só entra como padrão enquanto o usuário nunca editou o
   // campo (flag persistida). Depois da primeira digitação, o valor dele fica.
@@ -177,10 +189,14 @@ export function PurchaseListParamsRow({
           </span>
           <div className="flex flex-col">
             <span className={cn("text-[11px] font-semibold uppercase tracking-wide", labelClass)}>
-              Preço da saca
+              {grainCrop && grainCrop !== "ANY"
+                ? `Saca de ${cropLabel(grainCrop).toLowerCase()}`
+                : "Preço da saca"}
             </span>
             <span className={cn("text-[11px]", hintClass)}>
-              converte o custo em sacas
+              {needsManualGrainPrice && !grainPrice
+                ? "sem cotação automática — informe o preço"
+                : "converte o custo em sacas"}
             </span>
           </div>
           {readOnly ? (
@@ -200,6 +216,49 @@ export function PurchaseListParamsRow({
           )}
         </div>
       ) : null}
+      {canViewPrices
+        ? extraCrops.map((crop) => {
+            const value = grainPrices[crop] ?? "";
+            const manual = crop === "BEAN";
+            return (
+              <div key={crop} className="flex items-center gap-2">
+                <span className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-lg",
+                    chipClass,
+                  )}>
+                  <PaperBag className="h-4 w-4" />
+                </span>
+                <div className="flex flex-col">
+                  <span className={cn("text-[11px] font-semibold uppercase tracking-wide", labelClass)}>
+                    Saca de {cropLabel(crop).toLowerCase()}
+                  </span>
+                  <span className={cn("text-[11px]", hintClass)}>
+                    {manual && !value
+                      ? "sem cotação automática — informe o preço"
+                      : "converte a semente dessa cultura"}
+                  </span>
+                </div>
+                {readOnly ? (
+                  <span className={cn("ml-2 self-end text-sm font-semibold tabular-nums", valueClass)}>
+                    {Number(value) > 0 ? fmtBrl(Number(value)) : "—"}
+                  </span>
+                ) : (
+                  <div className="ml-2 flex items-center gap-1">
+                    <span className={cn("text-sm", hintClass)}>R$</span>
+                    <MoneyInput
+                      placeholder={fmtBrl(saca).replace("R$", "").trim()}
+                      value={value}
+                      onValueChange={(v) =>
+                        setGrainPrices({ ...useCurrencyStore.getState().grainPrices, [crop]: v })
+                      }
+                      className="h-8 w-24"
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })
+        : null}
       {/* Espaçamento entre linhas (m) — parâmetro único; deriva a população da semente. */}
       <div className="flex items-center gap-2">
         <span className={cn(

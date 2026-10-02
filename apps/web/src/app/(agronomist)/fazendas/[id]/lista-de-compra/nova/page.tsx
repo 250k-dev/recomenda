@@ -76,7 +76,19 @@ export default function FarmPurchaseListNewPage() {
 
   const cyclePlotsReady = cyclePlotQueries.map((q) => q.data ?? null);
 
+  const cyclePlotRows = cycle?.plots;
   const plots = useMemo(() => {
+    // Safra: só os talhões DELA (escolhidos na criação), com a área na safra —
+    // é a mesma cobertura que o servidor usa para calcular a lista.
+    if (cycleId && cyclePlotRows && cyclePlotRows.length > 0) {
+      return cyclePlotRows.map((p) => ({
+        id: p.plot_id,
+        name: p.plot_name,
+        area: p.area_ha,
+        farmId: p.farm_id,
+        farmName: p.farm_name,
+      }));
+    }
     if (cycleId) {
       const nameByFarm = new Map(
         (cycle?.farms ?? []).map((f) => [f.id, f.name] as const),
@@ -102,6 +114,7 @@ export default function FarmPurchaseListNewPage() {
     }));
   }, [
     cycleId,
+    cyclePlotRows,
     cycle?.farms,
     cycleFarmIds,
     cyclePlotsReady,
@@ -232,6 +245,7 @@ export default function FarmPurchaseListNewPage() {
         plots={plots}
         farmName={farmLabel}
         cycleId={cycleId}
+        cycleCrops={cycle?.crops ?? null}
         draftList={isDraft ? existingList : null}
         successRedirectLabel={cycleId ? "Ir para a safra" : "Ir para o produtor"}
         onComplete={() => {

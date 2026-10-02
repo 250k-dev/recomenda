@@ -49,7 +49,13 @@ function computeMetrics(
     };
   }
   const items = (list.items ?? []).map(detailItemToListItem);
-  const base = computePurchaseListMetrics(items, list.total_hectares ?? 0, fx, saca);
+  const base = computePurchaseListMetrics(
+    items,
+    list.total_hectares ?? 0,
+    fx,
+    saca,
+    list.grain_prices_brl ?? null,
+  );
   return applyManualTotalSpent(
     base,
     list.manual_total_spent_brl,

@@ -26,37 +26,9 @@ import {
   validateListItems,
   type ListItem,
 } from "@recomenda/domain/purchase-list/list-item";
+import { detailItemToListItem } from "@recomenda/domain/purchase-list/breakdown";
 
-type Crop = "SOYBEAN" | "CORN" | "ANY";
-
-function detailItemToListItem(it: PurchaseListDetail["items"][number]): ListItem {
-  return {
-    key: it.id,
-    category: it.category ?? "OTHER",
-    productId: it.local_product_id,
-    productName: it.product_name,
-    equivalenceGroup: it.equivalence_group ?? null,
-    stage: it.stage,
-    dose: String(it.dose_per_hectare),
-    unit: it.dose_unit,
-    nApps: String(it.n_applications),
-    stock: String(it.current_stock),
-    price: it.price_brl_fixed != null ? String(it.price_brl_fixed) : "",
-    priceUsd: it.price_usd != null ? String(it.price_usd) : "",
-    seedsPerMeter: it.seeds_per_meter != null ? String(it.seeds_per_meter) : "",
-    cycleDays: it.cycle_days != null ? String(it.cycle_days) : "",
-    thousandPlants: it.thousand_plants_per_ha != null ? String(it.thousand_plants_per_ha) : "",
-    seedingArea: it.seeding_area_ha != null ? String(it.seeding_area_ha) : "",
-    bagsOverride: it.bags_override != null ? String(it.bags_override) : undefined,
-    volumeOverride: it.volume_override != null ? String(it.volume_override) : undefined,
-    outOfProgram: it.out_of_program || undefined,
-    areaPercent:
-      it.area_factor != null && it.area_factor > 0 && it.area_factor !== 1
-        ? String(Number((it.area_factor * 100).toFixed(4)))
-        : "",
-    areaNote: it.area_note ?? "",
-  };
-}
+type Crop = "SOYBEAN" | "CORN" | "BEAN" | "ANY";
 
 export function CompraTemplatesView() {
   const { data: currentUser } = useMe();
@@ -203,7 +175,10 @@ function TemplateEditor({
   const updateMutation = useUpdatePurchaseListTemplate(template?.id ?? "");
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  const cropButtons = useMemo(() => ["SOYBEAN", "CORN"] as const, []);
+  const cropButtons = useMemo(
+    () => ["SOYBEAN", "CORN", "BEAN", "ANY"] as const,
+    [],
+  );
 
   const save = async () => {
     setError(null);
@@ -269,9 +244,9 @@ function TemplateEditor({
         </div>
         <div className="space-y-2">
           <Label className="text-sm font-medium text-muted-foreground">Cultura(s)</Label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {cropButtons.map((c) => {
-              const on = crop === c || crop === "ANY";
+              const on = crop === c;
               return (
                 <Button
                   key={c}
@@ -279,14 +254,8 @@ function TemplateEditor({
                   variant={on ? "default" : "outline"}
                   size="sm"
                   disabled={readOnly}
-                  onClick={() => {
-                    const sojaOn = crop === "SOYBEAN" || crop === "ANY";
-                    const milhoOn = crop === "CORN" || crop === "ANY";
-                    const nextSoja = c === "SOYBEAN" ? !sojaOn : sojaOn;
-                    const nextMilho = c === "CORN" ? !milhoOn : milhoOn;
-                    if (!nextSoja && !nextMilho) return;
-                    setCrop(nextSoja && nextMilho ? "ANY" : nextSoja ? "SOYBEAN" : "CORN");
-                  }}
+                  aria-pressed={on}
+                  onClick={() => setCrop(c)}
                 >
                   {CROP_LABELS[c]}
                 </Button>

@@ -57,12 +57,13 @@ export default function CycleDetailPage() {
     : page.hrefs.novaListaDeCompra;
 
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardPlotIds, setWizardPlotIds] = useState<string[] | undefined>();
   const [archiveConfirm, setArchiveConfirm] = useState<{
     id: string;
     name: string;
   } | null>(null);
 
-  const tryOpenWizard = () => {
+  const tryOpenWizard = (plotIds?: string[]) => {
     if (!hasActivePurchaseList) {
       toast.error(
         "Finalize a lista de compra da safra antes de programar talhões.",
@@ -70,6 +71,7 @@ export default function CycleDetailPage() {
       router.push(listCtaHref);
       return;
     }
+    setWizardPlotIds(plotIds);
     setWizardOpen(true);
   };
 
@@ -96,7 +98,9 @@ export default function CycleDetailPage() {
     programmedArea > 0
       ? programmedArea
       : (cycle?.total_cadastral_hectares ?? 0);
-  const plotCount = areaByPlot.size;
+  // Talhões da safra (escolhidos na criação + programados) e a área da lista.
+  const plotCount = cycle?.plots?.length ?? areaByPlot.size;
+  const cycleArea = cycle?.plots_area_ha ?? totalArea;
   const harvestSummary = useMemo(
     () => cycleHarvestFromSeasons(seasons),
     [seasons],
@@ -111,6 +115,7 @@ export default function CycleDetailPage() {
         <CycleBlockWizard
           cycle={cycle}
           producerId={producerId}
+          initialPlotIds={wizardPlotIds}
           onDone={() => setWizardOpen(false)}
           onCancel={() => setWizardOpen(false)}
         />
@@ -123,7 +128,7 @@ export default function CycleDetailPage() {
       ? [{ label: "Fazendas", value: cycle.farms.length }]
       : []),
     { label: "Talhões", value: plotCount },
-    { label: "Área", value: `${fmtHa(totalArea)} ha` },
+    { label: "Área", value: `${fmtHa(cycleArea)} ha` },
     {
       label: "Aplicações",
       value: totalRecs > 0 ? `${doneRecs}/${totalRecs}` : "—",
@@ -185,7 +190,8 @@ export default function CycleDetailPage() {
             cycle={cycle}
             producerId={producerId}
             seasons={seasons}
-            onAddPlot={tryOpenWizard}
+            onAddPlot={() => tryOpenWizard()}
+            onProgramPlots={(plotIds) => tryOpenWizard(plotIds)}
             onArchiveSeason={setArchiveConfirm}
             archivePending={archiveSeason.isPending}
           />
@@ -229,7 +235,7 @@ export default function CycleDetailPage() {
 
           <StickyMobileCta>
             {hasActivePurchaseList && hasAvailablePlots ? (
-              <Button size="lg" className="gap-2" onClick={tryOpenWizard}>
+              <Button size="lg" className="gap-2" onClick={() => tryOpenWizard()}>
                 <Plus className="size-4" />
                 Adicionar talhão
               </Button>
