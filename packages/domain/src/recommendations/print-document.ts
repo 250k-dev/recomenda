@@ -6,6 +6,9 @@ import {
   resolveFormulationKey,
 } from "./formulation-mix-order";
 import { sortRecommendationItemsByMixOrder } from "./mix-order";
+import { suggestPhenologicalStage } from "./phenology";
+import { fmtHectares, fmtQuantity, fmtTankCount, productQuantities } from "./prescription-calc";
+import { nonSprayOperation, recipeTargetFor, stagePrescription } from "./recipe-document";
 import type { RecommendationShareData, SharePlotSpec } from "./share-message";
 import {
   escapeHtml,
@@ -462,7 +465,242 @@ export const REC_CSS = `
   .cover-num div { min-width: 92px; }
   .cover-num dt { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #7a7a70; margin: 0; }
   .cover-num dd { font-size: 20px; font-weight: 600; color: #20201c; margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+  /* Relatório no padrão da receita (rp-*). */
+  .todo { color: #b45309 !important; font-weight: 600; }
+  .rp-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 14px; }
+  .rp-progress { text-align: right; font-size: 11px; color: #6b6b62; line-height: 1.7; white-space: nowrap; }
+  .rp-progress b { color: #20201c; }
+  .rp-sub { font-weight: 400; color: #7a7a70; font-size: 12px; }
+  .rp-id { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #e2e0d6; border-radius: 8px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+  .rp-id > div { padding: 4px 12px; border-right: 1px solid #e2e0d6; border-bottom: 1px solid #e2e0d6; }
+  .rp-id .s2 { grid-column: span 2; }
+  .rp-k { display: block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #7a7a70; }
+  .rp-v { display: block; font-size: 12.5px; font-weight: 600; color: #20201c; margin-top: 1px; }
+  .rp-v small { font-weight: 400; color: #7a7a70; font-size: 11px; }
+  .rp-stg { border: 1px solid #e2e0d6; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: #ffffff; break-inside: avoid; page-break-inside: avoid; }
+  .rp-head { display: flex; align-items: center; gap: 8px; }
+  .rp-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: #2f6d3f; color: #ffffff; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .rp-name { font-size: 13.5px; font-weight: 700; color: #20201c; flex: 1; }
+  .rp-chip { font-size: 10px; color: #4a4a42; background: #f1f0ea; border: 1px solid #e2e0d6; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .rp-dates { margin: 5px 0 0 30px; font-size: 11px; color: #6b6b62; }
+  .rp-dates b { color: #20201c; }
+  .rp-app { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 8px 30px; padding: 5px 9px; background: #faf9f5; border: 1px solid #e2e0d6; border-radius: 7px; font-size: 10.5px; color: #2b2b27; }
+  .rp-app b { color: #7a7a70; font-weight: 700; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+  .rp-table { width: calc(100% - 30px); margin-left: 30px; border-collapse: collapse; font-size: 10.5px; }
+  .rp-table thead th { background: #2f6d3f; color: #ffffff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; text-align: left; padding: 5px 6px; }
+  .rp-table thead th.num { text-align: right; }
+  .rp-table td { padding: 3px 6px; line-height: 1.3; border-bottom: 1px solid #efeee8; vertical-align: middle; color: #2b2b27; }
+  .rp-table tbody tr:nth-child(even) td { background: #faf9f5; }
+  .rp-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rp-table .muted { color: #7a7a70; }
+  .rp-table .ix { color: #2f6d3f; font-weight: 700; width: 14px; }
+  .rp-table .pn { font-weight: 600; color: #20201c; }
+  .rp-table .pm { font-size: 9px; color: #7a7a70; }
+  .rp-table .tot { font-weight: 700; color: #20201c; }
+  .rp-table tfoot td { font-weight: 700; border-top: 1px solid #e2e0d6; border-bottom: none; }
+  .rp-table > tfoot { display: table-row-group; }
+  .rp-obs { margin: 6px 0 0 30px; font-size: 10.5px; color: #4a4a42; }
 `;
+
+const TRIGGER_LABELS: Record<string, string> = {
+  PRE_PLANTING: "Pré-plantio",
+  PLANTING: "Plantio",
+  POST_PLANTING: "Pós-plantio",
+};
+const TODO = `<span class="todo">A definir</span>`;
+
+/** Área do relatório: a plantada (onde se aplica), senão a cadastral — igual à receita. */
+function reportAreaHa(data: RecommendationShareData): number | null {
+  const area = data.spec?.plantedAreaHa ?? data.spec?.areaHa;
+  return typeof area === "number" && area > 0 ? area : null;
+}
+
+function rpCell(label: string, value: string, cls = ""): string {
+  return `<div class="${cls}"><span class="rp-k">${label}</span><span class="rp-v">${value}</span></div>`;
+}
+
+/**
+ * Etapa do relatório no padrão visual da receita: cabeçalho com fase, estádio
+ * e status; datas; faixa com os dados da aplicação; tabela verde com a ordem
+ * de mistura, alvo, dose/ha, área e total (+ custo/ha com preço). Sem
+ * Empresa/Registro — isso fica só no Caderno de safra.
+ */
+function reportStageHtml(
+  rec: Recommendation,
+  data: RecommendationShareData,
+  opts: RenderOpts,
+): string {
+  const areaHa = reportAreaHa(data);
+  const items = sortRecommendationItemsByMixOrder(rec.items);
+  const operation = nonSprayOperation(items);
+  const presc = stagePrescription(rec, areaHa);
+  const suggestion = suggestPhenologicalStage(
+    data.spec?.crop,
+    rec.trigger_type,
+    rec.window_start_days,
+    rec.window_end_days,
+  );
+  const stage = rec.phenological_stage?.trim()
+    ? escapeHtml(rec.phenological_stage.trim())
+    : `${escapeHtml(suggestion.stage)}${suggestion.dapLabel ? ` · ${suggestion.dapLabel}` : ""}`;
+  const status = displayRecStatus(rec);
+  const statusClass = STATUS_CLASS[status] ?? "is-pending";
+
+  const dates = [
+    rec.predicted_date_current
+      ? `Prevista <b>${escapeHtml(fmtDate(rec.predicted_date_current))}</b>`
+      : `<span class="todo">Sem data prevista</span>`,
+    rec.executed_date ? `Aplicada <b>${escapeHtml(fmtDate(rec.executed_date))}</b>` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const appLine = operation
+    ? `<span><b>Operação</b>${escapeHtml(operation)}</span>`
+    : [
+        `<b>Vazão</b>${presc.sprayVolumeLHa != null ? `${fmtQuantity(presc.sprayVolumeLHa)} L/ha` : TODO}`,
+        `<b>Calda</b>${presc.totalMixL != null ? `${fmtQuantity(presc.totalMixL)} L` : TODO}`,
+        `<b>Tanque</b>${
+          presc.tankCapacityL != null
+            ? `${fmtQuantity(presc.tankCapacityL)} L${
+                presc.tankCount != null
+                  ? ` · ${fmtTankCount(presc.tankCount)} (${presc.fullTanks} ${presc.fullTanks === 1 ? "cheio" : "cheios"}${
+                      presc.lastTankL ? ` + último ${fmtQuantity(presc.lastTankL)} L` : ""
+                    })`
+                  : ""
+              }`
+            : TODO
+        }`,
+        `<b>Horário</b>${rec.application_time?.trim() ? escapeHtml(rec.application_time.trim()) : TODO}`,
+        `<b>Ponta</b>${rec.nozzle?.trim() ? escapeHtml(rec.nozzle.trim()) : TODO}`,
+      ]
+        .map((part) => `<span>${part}</span>`)
+        .join("");
+
+  const rows = items
+    .map((item, index) => {
+      const formKey = item.formulation_key ?? resolveFormulationKey(item.equivalence_group);
+      const form = formKey && formKey !== "OTHER" ? formulationShortLabel(formKey) : "";
+      const category = item.category
+        ? ((PRODUCT_CATEGORY_LABELS as Record<string, string>)[item.category] ?? item.category)
+        : "";
+      const meta = [form, category].filter(Boolean).join(" · ");
+      const target = recipeTargetFor(item, index, items.length);
+      const factor = item.area_factor ?? 1;
+      const totalUnit = doseUnitLabel(item.dose_unit).replace(/\/ha$/, "");
+      const total = productQuantities(item.dose_per_hectare, presc, "HA", factor).total;
+      const cost = itemCostPerHa(item, opts.prices);
+      return `<tr>
+        <td class="ix">${index + 1}</td>
+        <td><span class="pn">${escapeHtml(item.product_name)}</span>${
+          item.is_substitution ? `<span class="sub"> (substituído)</span>` : ""
+        } <span class="pm">${escapeHtml(meta)}</span></td>
+        <td>${target ? escapeHtml(target) : operation ? EM_DASH : TODO}${
+          item.area_note ? ` <span class="pm">${escapeHtml(item.area_note)}</span>` : ""
+        }</td>
+        <td class="num">${fmtNum(item.dose_per_hectare, 4)} ${escapeHtml(doseUnitLabel(item.dose_unit))}</td>
+        <td class="num muted">${areaHa != null ? `${fmtHectares(areaHa * factor)} ha` : EM_DASH}</td>
+        <td class="num tot">${total != null ? `${fmtQuantity(total)} ${escapeHtml(totalUnit)}` : EM_DASH}</td>
+        ${opts.money ? `<td class="num">${cost == null ? EM_DASH : fmtBrl(cost)}</td>` : ""}
+      </tr>`;
+    })
+    .join("");
+  const stageCost = stageCostPerHa(rec, opts.prices);
+
+  return `
+    <div class="rp-stg">
+      <div class="rp-head">
+        <span class="rp-num">${rec.order_index + 1}</span>
+        <span class="rp-name">${escapeHtml(rec.name)}</span>
+        ${rec.trigger_type && TRIGGER_LABELS[rec.trigger_type] ? `<span class="rp-chip">${TRIGGER_LABELS[rec.trigger_type]}</span>` : ""}
+        <span class="rp-chip">${stage}</span>
+        <span class="status ${statusClass}">${escapeHtml(recommendationStatusLabel(rec))}</span>
+      </div>
+      <div class="rp-dates">${dates}</div>
+      <div class="rp-app">${appLine}</div>
+      ${
+        items.length
+          ? `<table class="rp-table">
+              <thead><tr>
+                <th>#</th><th>Produto</th><th>Alvo / observação</th>
+                <th class="num">Dose/ha</th><th class="num">Área</th><th class="num">Total</th>
+                ${opts.money ? `<th class="num">Custo/ha</th>` : ""}
+              </tr></thead>
+              <tbody>${rows}</tbody>
+              ${
+                opts.money && stageCost != null
+                  ? `<tfoot><tr><td></td><td colspan="5">Total da etapa</td><td class="num">${fmtBrl(stageCost)}</td></tr></tfoot>`
+                  : ""
+              }
+            </table>`
+          : `<p class="empty">Nenhum produto vinculado a esta etapa.</p>`
+      }
+      ${rec.notes?.trim() ? `<p class="rp-obs"><b>Observações:</b> ${escapeHtml(rec.notes.trim())}</p>` : ""}
+    </div>`;
+}
+
+/** Talhão no padrão da receita: identificação + cronograma compacto. */
+function reportDocBody(
+  data: RecommendationShareData,
+  pageBreak: boolean,
+  opts: RenderOpts,
+): string {
+  const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
+  const spec = data.spec ?? {};
+  const areaHa = reportAreaHa(data);
+  const progressPct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+  const varieties = (spec.varieties ?? []).map((v) => v.variety).filter(Boolean).join(", ");
+  const stageOpts: RenderOpts = { ...opts, prices: data.unitPriceByProduct, plotAreaHa: plotAreaHa(data) };
+  const tags = [
+    spec.cycleName ? `<span>${escapeHtml(spec.cycleName)}</span>` : "",
+    `<span>${data.recommendations.length} ${data.recommendations.length === 1 ? "etapa" : "etapas"}</span>`,
+    data.statusLabel ? `<span>${escapeHtml(data.statusLabel)}</span>` : "",
+  ].join("");
+
+  const stages =
+    data.recommendations.length > 0
+      ? data.recommendations.map((rec) => reportStageHtml(rec, data, stageOpts)).join("")
+      : `<p class="empty" style="margin-left:0">Nenhuma etapa cadastrada nesta safra.</p>`;
+
+  return sheetHtml({
+    pageBreak,
+    label: `Resumo · ${data.plotName ? `Talhão ${data.plotName}` : data.title}`,
+    header: headerHtml(emittedAt, data.plotName ? `Talhão ${data.plotName}` : null),
+    body: `
+    <div class="rp-top">
+      <div class="title-block" style="margin-top:0">
+        <p class="kicker">Programação do talhão</p>
+        <h1 class="title">${escapeHtml(data.title)}</h1>
+        <div class="tags">${tags}</div>
+      </div>
+      <div class="rp-progress">
+        Plantio <b>${data.plantingDate ? escapeHtml(fmtDate(data.plantingDate)) : "não registrado"}</b><br>
+        ${data.done}/${data.total} aplicadas (${progressPct}%)
+      </div>
+    </div>
+    <h2 class="section-title">Identificação</h2>
+    <div class="rp-id">
+      ${rpCell("Produtor / cliente", escapeHtml(data.producerName ?? "—"), "s2")}
+      ${rpCell(
+        "Fazenda",
+        `${escapeHtml(spec.farmName ?? "—")}${spec.farmLocation ? ` <small>· ${escapeHtml(spec.farmLocation)}</small>` : ""}`,
+        "s2",
+      )}
+      ${rpCell("Talhão", escapeHtml(data.plotName ?? "—"))}
+      ${rpCell("Área", areaHa != null ? `${fmtMeasure(areaHa)} ha` : EM_DASH)}
+      ${rpCell("Cultura", escapeHtml(spec.cropLabel ?? "—"))}
+      ${rpCell("Safra", escapeHtml(spec.cycleName ?? "—"))}
+      ${rpCell("Variedade", escapeHtml(varieties || "—"))}
+      ${rpCell("Plantio", data.plantingDate ? escapeHtml(fmtDate(data.plantingDate)) : TODO)}
+      ${rpCell("Espaçamento", spec.spacingM != null ? `${fmtMeasure(spec.spacingM)} m` : EM_DASH)}
+      ${rpCell("Ciclo", spec.cycleDays != null ? `${spec.cycleDays} dias` : EM_DASH)}
+    </div>
+    <h2 class="section-title">Cronograma de aplicações <span class="rp-sub">— produtos na ordem de mistura</span></h2>
+    ${stages}
+    ${plotSummaryHtml(data, stageOpts)}`,
+    footer: footerHtml(data.agronomistName),
+  });
+}
 
 /** Corpo (`.doc`) de um talhão — reutilizado no documento simples e no multi. */
 function buildDocBody(
@@ -470,6 +708,9 @@ function buildDocBody(
   pageBreak = false,
   opts: RenderOpts = { money: false, registry: false },
 ): string {
+  // Relatório (Exportar): padrão visual da receita. O Caderno de safra segue
+  // no layout dele (com Empresa/Registro e as colunas do caderno).
+  if (!opts.notebook) return reportDocBody(data, pageBreak, opts);
   const progressPct =
     data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
   const emittedAt = fmtDate(new Date().toISOString().slice(0, 10));
@@ -644,6 +885,7 @@ function buildCoverBody(
   const productsTotal = rows.reduce((sum, row) => sum + (row.cost ?? 0), 0);
 
   return sheetHtml({
+    label: "Capa",
     header: headerHtml(emittedAt, cover.kicker),
     footer: footerHtml(list[0]?.agronomistName),
     body: `
@@ -839,4 +1081,19 @@ export function printRecommendations(
 ): void {
   if (list.length === 0) return;
   printHtml(buildRecommendationsHtml(list, title, options));
+}
+
+/**
+ * Peças do relatório do talhão para compor o PDF unificado (relatório +
+ * receitas no mesmo arquivo — `export-document.ts`).
+ */
+export function reportParts(list: RecommendationShareData[], options: PrintOptions = {}) {
+  const opts: RenderOpts = {
+    money: hasAnyPrice(list, options.showPrices),
+    registry: hasRegistryData(list),
+  };
+  return {
+    cover: options.cover ? buildCoverBody(options.cover, list, opts) : "",
+    body: (data: RecommendationShareData, pageBreak: boolean) => buildDocBody(data, pageBreak, opts),
+  };
 }

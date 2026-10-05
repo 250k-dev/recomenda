@@ -1,31 +1,49 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, Copy, FileDown, Printer } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@recomenda/ui/primitives/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@recomenda/ui/primitives/dialog";
+import { useMemo, useRef, useState } from "react";
+import { Download } from "lucide-react";
+import { useIsMobile } from "@recomenda/ui/hooks/use-mobile";
 import {
   buildWhatsappMessage,
   type RecommendationShareData,
 } from "@recomenda/domain/recommendations/share-message";
-import { printRecommendation } from "@recomenda/domain/recommendations/print-document";
-import {
-  countApplicationRecipes,
-  printApplicationRecipes,
-} from "@recomenda/domain/recommendations/recipe-document";
-import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
+import { countApplicationRecipes } from "@recomenda/domain/recommendations/recipe-document";
+import { buildExportHtml } from "@recomenda/domain/recommendations/export-document";
+import { displayRecStatus } from "@recomenda/domain/recommendations/format";
+import { cn } from "@recomenda/utils";
 import {
   readPricePreference,
   writePricePreference,
 } from "@/components/domain/export/price-preference";
-import { cn } from "@recomenda/utils";
+import {
+  PagedPreview,
+  DEFAULT_PREVIEW_ZOOM,
+  type PagedPreviewHandle,
+  type PreviewZoom,
+} from "@/components/domain/export/paged-preview";
+import {
+  ExportFooter,
+  ExportShell,
+  FooterButton,
+  PartCard,
+  PreviewEmpty,
+  PreviewToolbar,
+  PriceSwitch,
+  StatusBadge,
+  Step,
+  TriCheck,
+  WhatsappButton,
+  fmtPages,
+  triOf,
+} from "@/components/domain/export/export-ui";
+import { printPaged, type PagedResult } from "@/lib/print/paged-document";
+import {
+  copyText,
+  openWhatsapp,
+  pagesByPart,
+  partsSummary,
+  stageWhen,
+} from "@/components/domain/export/export-helpers";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
 
@@ -38,282 +56,240 @@ export function RecommendationExportDialog({
   onOpenChange: (open: boolean) => void;
   data: RecommendationShareData;
 }) {
-  const [copied, setCopied] = useState(false);
-  const [shareAll, setShareAll] = useState(true);
+  const mobile = useIsMobile();
+  const previewRef = useRef<PagedPreviewHandle>(null);
+  const recs = data.recommendations;
+  const allIds = useMemo(() => recs.map((r) => r.id), [recs]);
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Escolha por documento: mesmo com PRICE_VIEW, o agrônomo decide se aquele
-  // PDF vai com custo (entrega ao produtor) ou sem (quem vai aplicar).
+  // Nada vem marcado: o usuário escolhe o que entra (e a prévia nasce dele).
+  const [incReport, setIncReport] = useState(false);
+  const [incRecipes, setIncRecipes] = useState(false);
+  // O payload só traz preço para quem tem PRICE_VIEW — sem isso, a opção nem aparece.
+  const canPrice = Boolean(data.unitPriceByProduct);
   const [showPrices, setShowPrices] = useState(() => readPricePreference());
-  // O payload só traz preço para quem tem PRICE_VIEW — sem isso, nem a opção
-  // aparece e o documento sai sem valores de qualquer forma.
-  const canChoosePrices = Boolean(data.unitPriceByProduct);
+  const [zoom, setZoom] = useState<PreviewZoom>(DEFAULT_PREVIEW_ZOOM);
+  const [effectiveZoom, setEffectiveZoom] = useState(1);
+  const [mView, setMView] = useState<"config" | "preview">("config");
+  const [paged, setPaged] = useState<PagedResult | null>(null);
+  // Folhas por documento ficam lembradas mesmo quando ele é desmarcado.
+  const [partPages, setPartPages] = useState({ report: 0, recipes: 0 });
 
-  const allIds = useMemo(
-    () => data.recommendations.map((r) => r.id),
-    [data.recommendations],
-  );
-
-  // Ao abrir (ou trocar de safra), volta para "talhão todo" com tudo marcado.
-  // Padrão React de ajuste durante o render ao detectar mudança de `open`.
+  // Ao abrir: nada marcado. Ajuste durante o render (padrão React).
   const [prevOpen, setPrevOpen] = useState(false);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
-      setShareAll(true);
-      setSelected(new Set(allIds));
+      setSelected(new Set());
+      setIncReport(false);
+      setIncRecipes(false);
+      setMView("config");
+      setPaged(null);
     }
   }
 
-  const filteredData: RecommendationShareData = useMemo(() => {
-    if (shareAll) return data;
-    const recommendations = data.recommendations.filter((r) => selected.has(r.id));
+  const filtered: RecommendationShareData = useMemo(() => {
+    if (selected.size === recs.length) return data;
+    const recommendations = recs.filter((r) => selected.has(r.id));
     const done = recommendations.filter((r) => APPLIED.has(r.status)).length;
     return { ...data, recommendations, done, total: recommendations.length };
-  }, [shareAll, selected, data]);
+  }, [selected, data, recs]);
 
-  const hasSelection = shareAll || filteredData.recommendations.length > 0;
-  const message = hasSelection ? buildWhatsappMessage(filteredData) : "";
-  // api.whatsapp.com/send evita o redirect do wa.me que corrompe emojis UTF-8
-  // durante a redireção no servidor da Meta.
-  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+  const hasStages = filtered.recommendations.length > 0;
+  const hasParts = incReport || incRecipes;
+  const recipeCount = countApplicationRecipes([filtered]);
+  const priced = canPrice && showPrices;
+  const title = `Recomendação - ${data.plotName ?? data.title}`;
 
-  const toggle = (id: string) => {
+  const html = useMemo(
+    () =>
+      hasStages && hasParts && (incReport || recipeCount > 0)
+        ? buildExportHtml([filtered], title, {
+            report: incReport,
+            recipes: incRecipes,
+            showPrices: priced,
+          })
+        : null,
+    [filtered, hasStages, hasParts, incReport, incRecipes, priced, recipeCount, title],
+  );
+  const message = hasStages ? buildWhatsappMessage(filtered) : "";
+
+  const onPaged = (result: PagedResult) => {
+    setPaged(result);
+    const counts = pagesByPart(result);
+    setPartPages((prev) => ({
+      report: incReport ? counts.report : prev.report,
+      recipes: incRecipes ? counts.recipes : prev.recipes,
+    }));
+  };
+  const total = html && paged ? paged.total : 0;
+
+  const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  const tri = triOf(recs.map((r) => selected.has(r.id)));
+  const pendingIds = recs.filter((r) => r.status === "PENDING").map((r) => r.id);
+
+  const togglePrices = () => {
+    setShowPrices((value) => {
+      writePricePreference(!value);
+      return !value;
+    });
   };
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(message);
-      setCopied(true);
-      toast.success("Texto copiado para a area de transferencia.");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Nao foi possivel copiar. Copie o texto manualmente.");
-    }
+  const download = () => {
+    if (!html) return;
+    if (!previewRef.current?.print()) printPaged(html);
   };
 
-  const handleSendWhatsapp = () => {
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-  };
+  const ready = hasStages && hasParts;
+  const summary = !hasStages
+    ? "Nenhuma etapa marcada"
+    : `${filtered.recommendations.length} de ${recs.length} ${recs.length === 1 ? "etapa" : "etapas"}`;
+  const sub = hasStages
+    ? `${partsSummary(incReport, incRecipes, recipeCount)}${incReport && canPrice ? (priced ? " · com preços" : " · sem preços") : ""}`
+    : "Marque ao menos uma etapa para exportar.";
 
-  const handlePrint = () => {
-    onOpenChange(false);
-    window.setTimeout(
-      () =>
-        printRecommendation(filteredData, {
-          showPrices: canChoosePrices && showPrices,
-        }),
-      250,
-    );
-  };
+  const left = (
+    <div className="flex flex-col gap-6">
+      <Step n={1} title="O que vai no PDF">
+        <div className="flex flex-col gap-2">
+          <PartCard
+            title="Resumo e cronograma"
+            tag="Para o produtor"
+            tagTone="producer"
+            desc="Etapas, produtos e doses do talhão."
+            pages={partPages.report ? fmtPages(partPages.report) : undefined}
+            on={incReport}
+            onToggle={() => setIncReport((v) => !v)}
+          >
+            <PriceSwitch on={priced} onToggle={togglePrices} canPrice={canPrice} disabled={!incReport} />
+          </PartCard>
+          <PartCard
+            title="Receitas de aplicação"
+            tag="Para o operador"
+            tagTone="operator"
+            desc="Uma folha por etapa, para quem aplica. Sem preço."
+            pages={partPages.recipes ? fmtPages(partPages.recipes) : undefined}
+            on={incRecipes}
+            onToggle={() => setIncRecipes((v) => !v)}
+          />
+        </div>
+      </Step>
 
-  const recipeCount = countApplicationRecipes([filteredData]);
-  const handlePrintRecipes = () => {
-    onOpenChange(false);
-    window.setTimeout(
-      () =>
-        printApplicationRecipes(
-          [filteredData],
-          `Receitas de aplicação - ${data.plotName ?? data.title}`,
-        ),
-      250,
-    );
-  };
+      <Step
+        n={2}
+        title="O que exportar"
+        links={[
+          { label: "Todas", onClick: () => setSelected(new Set(allIds)) },
+          { label: "Pendentes", onClick: () => setSelected(new Set(pendingIds)) },
+          { label: "Nenhuma", onClick: () => setSelected(new Set()) },
+        ]}
+      >
+        <div className="overflow-hidden rounded-xl border border-[#e2e0d6] bg-white">
+          <button
+            type="button"
+            onClick={() => setSelected(tri === "on" ? new Set() : new Set(allIds))}
+            className="flex w-full items-center gap-2.5 border-b border-[#efede5] bg-[#f6f4ee] px-3 py-2.5 text-left"
+          >
+            <TriCheck state={tri} />
+            <span className="flex-1 text-[13.5px] font-semibold">Talhão todo</span>
+            <span className="text-xs text-[#6b6a62]">
+              {selected.size} de {recs.length} etapas
+            </span>
+          </button>
+          {recs.map((rec, i) => {
+            const on = selected.has(rec.id);
+            return (
+              <button
+                key={rec.id}
+                type="button"
+                onClick={() => toggle(rec.id)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 border-b border-[#f1f0ea] px-3 py-2 text-left last:border-b-0",
+                  on ? "bg-white" : "bg-[#faf9f5]",
+                )}
+              >
+                <TriCheck state={on ? "on" : "off"} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium">
+                    {i + 1}. {rec.name}
+                  </span>
+                  <span className="block text-[11.5px] text-[#7a786e]">{stageWhen(rec)}</span>
+                </span>
+                <StatusBadge status={displayRecStatus(rec)} />
+              </button>
+            );
+          })}
+        </div>
+      </Step>
+    </div>
+  );
 
-  const togglePrices = (value: boolean) => {
-    setShowPrices(value);
-    writePricePreference(value);
-  };
+  const right = (
+    <>
+      <PreviewToolbar
+        title={
+          <span>
+            Prévia do PDF
+            {total ? <span className="ml-1.5 font-normal text-[#6b6a62]">· {fmtPages(total)}</span> : null}
+          </span>
+        }
+        zoom={zoom}
+        effectiveZoom={effectiveZoom}
+        onZoom={setZoom}
+      />
+      <PagedPreview
+        ref={previewRef}
+        html={html}
+        zoom={zoom}
+        onPaged={onPaged}
+        onEffectiveZoom={setEffectiveZoom}
+        empty={
+          <PreviewEmpty
+            title="Nada para mostrar"
+            text={
+              !hasStages
+                ? "Marque ao menos uma etapa para ver as folhas do PDF."
+                : !hasParts
+                  ? "Marque o resumo, as receitas ou os dois."
+                  : "As etapas marcadas foram puladas — não geram receita."
+            }
+          />
+        }
+      />
+    </>
+  );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Exportar recomendação</DialogTitle>
-          <DialogDescription>
-            Envie o resumo pelo WhatsApp ou gere um PDF para entregar ao produtor.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto px-6 py-5">
-          {/* Primeiro item do modal: é a decisão que muda o que sai no documento. */}
-          {canChoosePrices ? (
-            <section className="rounded-xl border border-border bg-surface-2 p-4">
-              <label className="flex cursor-pointer items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4 accent-primary"
-                  checked={showPrices}
-                  onChange={(e) => togglePrices(e.target.checked)}
-                />
-                <span className="text-sm">
-                  <span className="font-semibold text-text-strong">
-                    Incluir preços e custos
-                  </span>
-                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
-                    Custo por hectare, total por etapa e total do talhão. Desmarque
-                    para entregar só a parte técnica.
-                  </span>
-                </span>
-              </label>
-            </section>
-          ) : null}
-
-          <section className="rounded-xl border border-border bg-surface-2 p-4">
-            <label className="flex cursor-pointer items-center gap-2.5">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={shareAll}
-                onChange={(e) => setShareAll(e.target.checked)}
-              />
-              <span className="text-sm font-semibold text-text-strong">
-                Compartilhar o talhão todo
-              </span>
-            </label>
-
-            {!shareAll ? (
-              <div className="mt-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Selecione as etapas a compartilhar
-                  </p>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary-strong hover:underline"
-                      onClick={() => setSelected(new Set(allIds))}
-                    >
-                      Todas
-                    </button>
-                    <span className="text-muted-foreground">·</span>
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary-strong hover:underline"
-                      onClick={() => setSelected(new Set())}
-                    >
-                      Nenhuma
-                    </button>
-                  </div>
-                </div>
-                <ul className="flex flex-col gap-1">
-                  {data.recommendations.map((rec, i) => {
-                    const on = selected.has(rec.id);
-                    return (
-                      <li key={rec.id}>
-                        <label
-                          className={cn(
-                            "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm",
-                            on
-                              ? "border-primary/40 bg-primary/5"
-                              : "border-border bg-card",
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            className="size-4 accent-primary"
-                            checked={on}
-                            onChange={() => toggle(rec.id)}
-                          />
-                          <span className="font-medium text-text-strong">
-                            {i + 1}. {rec.name}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="rounded-xl border border-border bg-surface-2 p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
-              <h3 className="text-sm font-semibold text-text-strong">
-                Mensagem do WhatsApp
-              </h3>
-            </div>
-            {hasSelection ? (
-              <div className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card px-3 py-2.5 font-mono text-[12px] leading-relaxed text-foreground">
-                {message}
-              </div>
-            ) : (
-              <p className="rounded-lg border border-dashed border-border bg-card px-3 py-2.5 text-[13px] text-muted-foreground">
-                Selecione ao menos uma etapa para gerar a mensagem.
-              </p>
-            )}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                className="gap-2 bg-[#25D366] text-white hover:bg-[#20BD5A]"
-                onClick={handleSendWhatsapp}
-                disabled={!hasSelection}
-              >
-                <WhatsAppIcon className="h-4 w-4" />
-                Enviar no WhatsApp
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleCopy}
-                disabled={!hasSelection}
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-primary" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-                {copied ? "Copiado" : "Copiar texto"}
-              </Button>
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-border bg-surface-2 p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <FileDown className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold text-text-strong">
-                Documento em PDF
-              </h3>
-            </div>
-            <p className="mb-3 text-[13px] text-muted-foreground">
-              <strong>Baixar PDF</strong> gera o relatório do talhão com as etapas
-              selecionadas; <strong>Receitas de aplicação</strong> gera uma folha por
-              etapa para o operador. Na janela de impressão, escolha{" "}
-              <strong>Salvar como PDF</strong>.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handlePrint}
-                disabled={!hasSelection}
-              >
-                <FileDown className="h-4 w-4" />
-                Baixar PDF
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handlePrintRecipes}
-                disabled={recipeCount === 0}
-                title="Uma folha por etapa, para o operador levar a campo."
-              >
-                <Printer className="h-4 w-4" />
-                Receitas de aplicação{recipeCount ? ` (${recipeCount})` : ""}
-              </Button>
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Dica: após baixar, anexe o PDF na conversa do WhatsApp para enviar o
-              documento junto com a mensagem.
-            </p>
-          </section>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ExportShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Exportar recomendação"
+      subtitle={[data.plotName, data.spec?.cycleName, data.producerName].filter(Boolean).join(" · ") || undefined}
+      left={left}
+      right={right}
+      mobile={mobile}
+      mobileView={mView}
+      onMobileView={setMView}
+      mobilePreviewLabel={total ? `Prévia · ${fmtPages(total)}` : "Prévia"}
+      footer={
+        <ExportFooter summary={summary} sub={sub} warn={!hasStages || !hasParts}>
+          <WhatsappButton
+            message={message}
+            disabled={!hasStages}
+            onCopy={() => void copyText(message)}
+            onSend={() => openWhatsapp(message)}
+          />
+          <FooterButton tone="primary" disabled={!ready || !html} onClick={download}>
+            <Download className="size-4" /> Baixar PDF{total ? ` · ${fmtPages(total)}` : ""}
+          </FooterButton>
+        </ExportFooter>
+      }
+    />
   );
 }

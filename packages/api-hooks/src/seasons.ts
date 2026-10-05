@@ -2,6 +2,7 @@
 
 import {
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type QueryClient,
@@ -24,6 +25,8 @@ import {
   createRecommendation,
   reorderRecommendations,
   patchRecommendation,
+  getSameStageRecommendations,
+  type SameStageRecommendation,
   deleteRecommendation,
   applyRecommendation,
   skipRecommendation,
@@ -289,6 +292,28 @@ export function useBulkApplySeasonTemplate(cycleId: string) {
   });
 }
 
+/**
+ * A mesma etapa nos outros talhões da safra, para cada etapa marcada no modal
+ * "Dados da aplicação" (chips "recebe / registrada, não muda").
+ */
+export function useSameStageRecommendations(ids: string[], enabled = true) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: ["same-stage", id],
+      queryFn: () => getSameStageRecommendations(id),
+      enabled: enabled && Boolean(id),
+      staleTime: 30_000,
+      retry: retryUnlessClientForbidden,
+    })),
+    combine: (results) => ({
+      byId: Object.fromEntries(
+        ids.map((id, index) => [id, results[index]?.data ?? null]),
+      ) as Record<string, SameStageRecommendation[] | null>,
+      isLoading: results.some((result) => result.isLoading),
+    }),
+  });
+}
+
 export function useSeasonTimeline(seasonId: string) {
   return useQuery({
     queryKey: queryKeys.seasonTimeline(seasonId),
@@ -329,8 +354,12 @@ export function usePatchRecommendation(seasonId: string) {
   return useMutation({
     mutationFn: ({ id, ...payload }: Parameters<typeof patchRecommendation>[1] & { id: string }) =>
       patchRecommendation(id, payload),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      // Dados da aplicação replicados para a mesma etapa nos outros talhões.
+      if (result?.replicated) {
+        void queryClient.invalidateQueries({ queryKey: ["season-timeline"] });
+      }
     },
   });
 }

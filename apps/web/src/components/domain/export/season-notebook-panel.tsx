@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -9,7 +9,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragOverEvent,
 } from "@dnd-kit/core";
 import {
   restrictToParentElement,
@@ -22,17 +21,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { FileDown } from "lucide-react";
-import { Button } from "@recomenda/ui/primitives/button";
 import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@recomenda/ui/primitives/native-select";
-import {
-  MAX_NOTES_PAGES,
+  NOTEBOOK_PAGED_LAYOUT,
   NOTEBOOK_SECTIONS,
-  resolveNotesPages,
+  buildSeasonNotebookHtml,
   notebookSectionAvailable,
-  printSeasonNotebook,
+  resolveNotesPages,
   resolvedNotebookSections,
   type NotebookSectionId,
   type NotebookSectionState,
@@ -43,12 +37,30 @@ import {
   writeNotebookPreference,
   type NotebookPreference,
 } from "@/components/domain/export/notebook-preference";
-import { NotebookPreviewList } from "@/components/domain/export/notebook-page-preview";
 import {
   PinnedNotebookRow,
   SortableNotebookRow,
   type NotebookRowProps,
 } from "@/components/domain/export/notebook-section-row";
+import {
+  PagedPreview,
+  DEFAULT_PREVIEW_ZOOM,
+  type PagedPreviewHandle,
+  type PreviewZoom,
+} from "@/components/domain/export/paged-preview";
+import {
+  ExportFooter,
+  FooterButton,
+  Pills,
+  PreviewEmpty,
+  PreviewToolbar,
+  PriceSwitch,
+  SkeletonList,
+  Step,
+  TriCheck,
+  fmtPages,
+} from "@/components/domain/export/export-ui";
+import { printPaged, type PagedResult } from "@/lib/print/paged-document";
 
 /** Por que a seção está indisponível — o toggle desligado precisa se explicar. */
 const UNAVAILABLE_REASON: Partial<Record<NotebookSectionId, string>> = {
@@ -60,45 +72,61 @@ const UNAVAILABLE_REASON: Partial<Record<NotebookSectionId, string>> = {
   "field-sheet": "Nenhum talhão programado nesta safra.",
 };
 
+const NOTES_OPTIONS = [1, 2, 4, 6];
+
 /**
- * Montagem do Caderno de Safra: liga/desliga, reordena arrastando e gera o PDF.
+ * Aba "Caderno de safra" do Exportar safra: liga/desliga e reordena as seções
+ * (dnd-kit: ponteiro + teclado, funciona no toque) com a prévia paginada de
+ * verdade ao lado — o número da folha de cada seção vem dela.
  *
- * A reordenação usa dnd-kit (sensores de ponteiro + teclado) em vez do
- * drag-and-drop nativo do HTML5, que não dispara em touchscreen — e o agrônomo
- * costuma estar no celular. O sensor de teclado dá Espaço/setas/Esc de graça,
- * com anúncio para leitor de tela, sem código nosso.
+ * Hook (e não componente) porque a aba entrega as três partes da moldura do
+ * diálogo (esquerda, prévia e rodapé): o diálogo continua um só ao trocar de aba.
  */
-export function SeasonNotebookPanel({
+export function useNotebookTab({
   data,
+  open,
+  active,
   unavailableReasons,
   isLoading = false,
   showPrices,
-  canChoosePrices,
-  onBeforePrint,
+  canPrice,
+  onTogglePrices,
   onDraggingChange,
+  title,
 }: {
-  data: SeasonNotebookData;
+  data: SeasonNotebookData | null | undefined;
+  /** Diálogo aberto (zera as seções a cada abertura). */
+  open: boolean;
+  /** Aba do caderno visível (só então pagina). */
+  active: boolean;
   /** Motivos mais específicos que os padrões (ex.: safra de arquivo). */
   unavailableReasons?: Partial<Record<NotebookSectionId, string>>;
   isLoading?: boolean;
-  /** Vem do mesmo checkbox "incluir preços" do diálogo de exportação. */
   showPrices: boolean;
-  canChoosePrices: boolean;
-  /** Fecha o diálogo antes de abrir a janela de impressão. */
-  onBeforePrint?: () => void;
+  canPrice: boolean;
+  onTogglePrices: () => void;
   /**
-   * Há um arrasto em curso. Quem contém o painel precisa saber: o Esc que
-   * cancela o arrasto é o mesmo que fecha um Dialog do Radix, e sem isso
-   * cancelar a reordenação derrubava o diálogo inteiro.
+   * Há um arrasto em curso. O Esc que cancela o arrasto é o mesmo que fecha o
+   * Dialog do Radix — quem contém a aba precisa segurar o fechamento.
    */
   onDraggingChange?: (dragging: boolean) => void;
+  title: string;
 }) {
-  const [pref, setPref] = useState<NotebookPreference>(() =>
-    readNotebookPreference(),
-  );
-  // Ordem provisória enquanto o dedo/cursor está no ar, para a prévia andar
-  // junto. A lista em si não usa: o dnd-kit já desloca os itens dela sozinho.
-  const [dragOrder, setDragOrder] = useState<NotebookSectionState[] | null>(null);
+  const previewRef = useRef<PagedPreviewHandle>(null);
+  const [pref, setPref] = useState<NotebookPreference>(() => readNotebookPreference());
+  const [zoom, setZoom] = useState<PreviewZoom>(DEFAULT_PREVIEW_ZOOM);
+  const [effectiveZoom, setEffectiveZoom] = useState(1);
+  const [paged, setPaged] = useState<PagedResult | null>(null);
+
+  // A cada abertura do diálogo, as seções começam desligadas (a ordem
+  // escolhida continua lembrada): o usuário liga o que quer no caderno.
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setPref((prev) => ({ ...prev, sections: prev.sections.map((s) => ({ ...s, enabled: false })) }));
+    }
+  }
 
   const update = (next: NotebookPreference) => {
     setPref(next);
@@ -108,74 +136,58 @@ export function SeasonNotebookPanel({
   const toggle = (id: NotebookSectionId) =>
     update({
       ...pref,
-      sections: pref.sections.map((s) =>
-        s.id === id ? { ...s, enabled: !s.enabled } : s,
-      ),
+      sections: pref.sections.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)),
     });
 
-  // ---- reordenação -----------------------------------------------------
-  // A capa fica fora do SortableContext: ela é sempre a 1ª folha, então nem
-  // arrasta nem serve de alvo. `sortable` cuida só do resto da lista.
+  // A capa fica fora do SortableContext: é sempre a 1ª folha.
   const [pinned, ...sortable] = pref.sections;
   const sortableIds = sortable.map((s) => s.id);
 
   const sensors = useSensors(
-    // 6px de folga antes de virar arrasto: sem isso, marcar o checkbox no
-    // celular (onde o dedo sempre desliza um pouco) arrastaria a seção.
+    // 6px de folga: no celular, marcar o checkbox não vira arrasto.
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-
-  /** Ordem que resultaria de soltar agora sobre `over`. */
-  const orderFor = (activeId: unknown, overId: unknown) => {
-    const from = sortableIds.indexOf(activeId as NotebookSectionId);
-    const to = sortableIds.indexOf(overId as NotebookSectionId);
-    if (from < 0 || to < 0) return null;
-    return [pinned, ...arrayMove(sortable, from, to)];
-  };
-
-  const onDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    setDragOrder(over ? orderFor(active.id, over.id) : null);
-  };
 
   const onDragEnd = (event: DragEndEvent) => {
     onDraggingChange?.(false);
-    setDragOrder(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const next = orderFor(active.id, over.id);
-    if (next) update({ ...pref, sections: next });
+    const { active: dragged, over } = event;
+    if (!over || dragged.id === over.id) return;
+    const from = sortableIds.indexOf(dragged.id as NotebookSectionId);
+    const to = sortableIds.indexOf(over.id as NotebookSectionId);
+    if (from < 0 || to < 0) return;
+    update({ ...pref, sections: [pinned, ...arrayMove(sortable, from, to)] });
   };
 
-  const cancelDrag = () => {
-    onDraggingChange?.(false);
-    setDragOrder(null);
-  };
+  const included = useMemo(
+    () => (data ? resolvedNotebookSections(data, pref.sections) : []),
+    [data, pref.sections],
+  );
+  const priced = canPrice && showPrices;
+  const notesPages = resolveNotesPages(pref.notesPages);
 
-  /** Quantas folhas pautadas — direto na linha, não numa caixa à parte. */
-  const notesControl = (
-    <NativeSelect
-      size="sm"
-      aria-label="Folhas de anotação"
-      className="shrink-0"
-      value={resolveNotesPages(pref.notesPages)}
-      onChange={(e) =>
-        update({ ...pref, notesPages: resolveNotesPages(Number(e.target.value)) })
-      }
-    >
-      {Array.from({ length: MAX_NOTES_PAGES }, (_, i) => i + 1).map((n) => (
-        <NativeSelectOption key={n} value={n}>
-          {n === 1 ? "1 folha" : `${n} folhas`}
-        </NativeSelectOption>
-      ))}
-    </NativeSelect>
+  // Só pagina com a aba aberta: o caderno é o documento mais pesado do app.
+  const html = useMemo(
+    () =>
+      active && data && included.length
+        ? buildSeasonNotebookHtml(data, {
+            sections: pref.sections,
+            showPrices: priced,
+            detailedSchedule: pref.detailedSchedule,
+            notesPages,
+          })
+        : null,
+    [active, data, included.length, pref.sections, pref.detailedSchedule, priced, notesPages],
+  );
+  const total = html && paged ? paged.total : 0;
+
+  const scrollToSection = useCallback(
+    (id: NotebookSectionId) => previewRef.current?.scrollToSection(id),
+    [],
   );
 
   const rowProps = (section: NotebookSectionState): NotebookRowProps => {
-    const available = notebookSectionAvailable(section.id, data);
+    const available = data ? notebookSectionAvailable(section.id, data) : false;
     return {
       id: section.id,
       enabled: section.enabled,
@@ -185,74 +197,39 @@ export function SeasonNotebookPanel({
         UNAVAILABLE_REASON[section.id] ??
         NOTEBOOK_SECTIONS[section.id].description,
       onToggle: () => toggle(section.id),
+      onSelect: () => scrollToSection(section.id),
       control:
-        section.id === "notes" && section.enabled && available
-          ? notesControl
-          : undefined,
+        section.id === "notes" && section.enabled && available ? (
+          <Pills
+            tone="soft"
+            items={NOTES_OPTIONS.map((n) => ({ id: String(n), label: `${n}` }))}
+            value={String(notesPages)}
+            onChange={(id) => update({ ...pref, notesPages: Number(id) })}
+          />
+        ) : undefined,
     };
   };
 
-  // ---- o que entra no PDF ---------------------------------------------
-  const included = useMemo(
-    () =>
-      resolvedNotebookSections(data, dragOrder ?? pref.sections),
-    [data, dragOrder, pref.sections],
-  );
+  const download = () => {
+    if (!html) return;
+    if (!previewRef.current?.print()) printPaged(html, NOTEBOOK_PAGED_LAYOUT);
+  };
+
   const hasSchedule = included.includes("schedule");
+  const scheduleCount = data?.schedule.length ?? 0;
 
-  /** Folhas que cada seção gera — o que a prévia empilha. */
-  const sheetsOf = (id: NotebookSectionId): number => {
-    if (id === "notes") return resolveNotesPages(pref.notesPages);
-    if (id === "schedule" && pref.detailedSchedule) {
-      return 1 + data.schedule.length;
-    }
-    if (id === "recommendation-model") {
-      return Math.max(
-        1,
-        data.models.filter((model) => model.recommendations.length > 0).length,
-      );
-    }
-    if (id === "field-sheet") {
-      return Math.max(
-        1,
-        data.fieldSheets.filter((sheet) => sheet.rows.length > 0).length,
-      );
-    }
-    return 1;
-  };
-  const totalSheets = included.reduce((sum, id) => sum + sheetsOf(id), 0);
-
-  const handlePrint = () => {
-    onBeforePrint?.();
-    window.setTimeout(
-      () =>
-        printSeasonNotebook(data, {
-          sections: pref.sections,
-          showPrices: canChoosePrices && showPrices,
-          detailedSchedule: pref.detailedSchedule,
-          notesPages: pref.notesPages,
-        }),
-      250,
-    );
-  };
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_224px]">
-        <section className="rounded-xl border border-border bg-surface-2 p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-text-strong">
-              Seções do caderno
-            </h3>
-            <span className="text-xs text-muted-foreground">
-              arraste para reordenar
-            </span>
-          </div>
-
-          {/* Duas listas de propósito. A capa fora da lista arrastável faz
-              `restrictToParentElement` confinar o arrasto só ao trecho
-              reordenável — numa lista só, o item subia por cima da capa, que
-              não se desloca por não estar no SortableContext. */}
+  const left =
+    isLoading || !data ? (
+      <SkeletonList rows={7} />
+    ) : (
+      <div className="flex flex-col gap-6">
+        <div className="overflow-hidden rounded-xl border border-[#cfdccf] bg-white">
+          <PriceSwitch on={priced} onToggle={onTogglePrices} canPrice={canPrice} />
+        </div>
+        <Step n={1} title="Seções do caderno">
+          <p className="-mt-1 text-xs text-[#6b6a62]">Arraste para mudar a ordem. A capa é sempre a 1ª folha.</p>
+          {/* Duas listas: com a capa fora da arrastável, `restrictToParentElement`
+              confina o arrasto ao trecho reordenável. */}
           <div className="flex flex-col gap-2 select-none">
             <ul>
               <PinnedNotebookRow {...rowProps(pinned)} />
@@ -262,14 +239,10 @@ export function SeasonNotebookPanel({
               collisionDetection={closestCenter}
               modifiers={[restrictToVerticalAxis, restrictToParentElement]}
               onDragStart={() => onDraggingChange?.(true)}
-              onDragOver={onDragOver}
               onDragEnd={onDragEnd}
-              onDragCancel={cancelDrag}
+              onDragCancel={() => onDraggingChange?.(false)}
             >
-              <SortableContext
-                items={sortableIds}
-                strategy={verticalListSortingStrategy}
-              >
+              <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
                 <ul className="flex flex-col gap-2">
                   {sortable.map((section) => (
                     <SortableNotebookRow key={section.id} {...rowProps(section)} />
@@ -278,78 +251,80 @@ export function SeasonNotebookPanel({
               </SortableContext>
             </DndContext>
           </div>
-
-          {hasSchedule ? (
-            <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-border px-3 py-2.5">
-              <input
-                type="checkbox"
-                className="mt-0.5 size-4 accent-primary"
-                checked={pref.detailedSchedule}
-                onChange={(e) =>
-                  update({ ...pref, detailedSchedule: e.target.checked })
-                }
-              />
-              <span className="text-sm">
-                <span className="font-semibold text-text-strong">
-                  Incluir detalhamento por etapa
-                </span>
-                <span className="mt-0.5 block text-[13px] text-muted-foreground">
-                  Uma folha por talhão com doses, quantidades e registro MAPA.
-                  Engorda o caderno em {data.schedule.length}{" "}
-                  {data.schedule.length === 1 ? "folha" : "folhas"}.
-                </span>
+        </Step>
+        {hasSchedule ? (
+          <button
+            type="button"
+            onClick={() => update({ ...pref, detailedSchedule: !pref.detailedSchedule })}
+            className="flex items-start gap-2.5 rounded-xl border border-[#e2e0d6] bg-white px-3 py-2.5 text-left"
+          >
+            <span className="mt-0.5">
+              <TriCheck state={pref.detailedSchedule ? "on" : "off"} />
+            </span>
+            <span>
+              <span className="block text-[13px] font-semibold">Incluir detalhamento por etapa</span>
+              <span className="block text-xs text-[#6b6a62]">
+                Uma folha por talhão com doses, quantidades e registro MAPA. +{fmtPages(scheduleCount)}.
               </span>
-            </label>
-          ) : null}
-
-        </section>
-
-        {/* Fora do celular: numa tela de 390px os cards ficam pequenos demais
-            para dizer algo e roubam o espaço da lista, que é o que se opera. */}
-        <aside className="hidden rounded-xl border border-border bg-surface-2 p-4 md:block">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-text-strong">Prévia</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {totalSheets} {totalSheets === 1 ? "folha" : "folhas"} na ordem
-              acima
-            </p>
-          </div>
-          {included.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground">
-              Nenhuma seção ligada.
-            </p>
-          ) : (
-            <NotebookPreviewList
-              items={included.map((id) => ({
-                id,
-                sheets: sheetsOf(id),
-                label: NOTEBOOK_SECTIONS[id].label,
-              }))}
-            />
-          )}
-        </aside>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          className="gap-2"
-          size="lg"
-          onClick={handlePrint}
-          disabled={isLoading || included.length === 0}
-        >
-          <FileDown className="size-4" />
-          Gerar caderno (PDF)
-        </Button>
-        {isLoading ? (
-          <span className="text-[13px] text-muted-foreground">
-            Carregando dados da safra...
-          </span>
-        ) : included.length === 0 ? (
-          <span className="text-[13px] text-muted-foreground">
-            Ligue ao menos uma seção.
-          </span>
+            </span>
+          </button>
         ) : null}
       </div>
-    </div>
+    );
+
+  const right = (
+    <>
+      <PreviewToolbar
+        title={
+          <span>
+            Prévia do caderno
+            {total ? <span className="ml-1.5 font-normal text-[#6b6a62]">· {fmtPages(total)}</span> : null}
+          </span>
+        }
+        zoom={zoom}
+        effectiveZoom={effectiveZoom}
+        onZoom={setZoom}
+      />
+      <PagedPreview
+        ref={previewRef}
+        html={html}
+        layout={NOTEBOOK_PAGED_LAYOUT}
+        zoom={zoom}
+        onPaged={setPaged}
+        onEffectiveZoom={setEffectiveZoom}
+        empty={
+          isLoading ? (
+            <div className="aspect-210/297 w-[min(520px,80%)] animate-pulse rounded-sm bg-white/70" />
+          ) : (
+            <PreviewEmpty title="Caderno vazio" text="Ligue ao menos uma seção." />
+          )
+        }
+      />
+    </>
   );
+
+  const footer = (
+    <ExportFooter
+      summary={
+        isLoading
+          ? "Carregando…"
+          : included.length
+            ? `${total ? fmtPages(total) : "…"} · ${title}`
+            : "Nenhuma seção ligada"
+      }
+      sub={`${priced ? "Com preços" : "Sem preços"}${pref.detailedSchedule && hasSchedule ? " · com detalhamento" : ""}`}
+      warn={!isLoading && included.length === 0}
+    >
+      <FooterButton tone="primary" disabled={isLoading || !html} onClick={download}>
+        <FileDown className="size-4" /> Gerar caderno (PDF){total ? ` · ${fmtPages(total)}` : ""}
+      </FooterButton>
+    </ExportFooter>
+  );
+
+  return {
+    left,
+    right,
+    footer,
+    mobilePreviewLabel: total ? `Prévia · ${fmtPages(total)}` : "Prévia",
+  };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type DragEvent } from "react";
-import { ArrowDown, ArrowUp, CircleAlert, FlaskConical, GripVertical, Info, ListOrdered, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleAlert, FlaskConical, GripVertical, Info, ListOrdered, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import { BrazilianDateInput } from "@recomenda/ui/forms/brazilian-date-input";
@@ -34,10 +34,11 @@ import {
 import type { StageProductDraft } from "@recomenda/domain/timing/types";
 import { suggestPhenologicalStage } from "@recomenda/domain/recommendations/phenology";
 import {
-  ApplicationDataFields,
+  applicationSummary,
   emptyApplicationData,
   type ApplicationDataDraft,
 } from "@/components/domain/application-data-fields";
+import { ApplicationDataDialog } from "@/components/domain/application-data-dialog";
 import {
   findPurchaseListOverages,
   formatDosePerHa,
@@ -718,6 +719,11 @@ export function TimingStagesEditor({
   floatingActions?: boolean;
 }) {
   const canTemplateCrud = useCan("TEMPLATE_CRUD");
+  // Etapa com o modal "Dados da aplicação" aberto.
+  const [applicationKey, setApplicationKey] = useState<string | null>(null);
+  const applicationStage = applicationKey
+    ? stages.find((stage) => stage.key === applicationKey) ?? null
+    : null;
   const { purchaseLists } = usePurchaseListCatalogProducts(producerId, crop, farmId);
 
   const overages = useMemo(
@@ -896,26 +902,25 @@ export function TimingStagesEditor({
                   </Field>
                 </div>
               </div>
-              <div className="mt-3 rounded-lg border border-dashed border-border p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Dados da aplicação (receita)
-                </p>
-                <ApplicationDataFields
-                  value={stage.application ?? emptyApplicationData()}
-                  onChange={(patch) =>
-                    onChange(stage.key, {
-                      application: { ...(stage.application ?? emptyApplicationData()), ...patch },
-                    })
-                  }
-                  stageSuggestion={
-                    suggestPhenologicalStage(
-                      crop,
-                      stage.trigger_type,
-                      isoDateToDayOffset(stage.recommended_date),
-                      isoDateToDayOffset(stage.recommended_date),
-                    ).stage
-                  }
-                />
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Dados da aplicação (receita)
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {applicationSummary(stage.application) ?? "Não preenchido"}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5"
+                  onClick={() => setApplicationKey(stage.key)}
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Dados da aplicação
+                </Button>
               </div>
               {showProducts ? (
                 <StageProductsEditor
@@ -932,6 +937,31 @@ export function TimingStagesEditor({
           ))}
         </div>
       )}
+
+      {applicationStage ? (
+        <ApplicationDataDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setApplicationKey(null);
+          }}
+          stageName={applicationStage.name || "Etapa"}
+          value={applicationStage.application ?? emptyApplicationData()}
+          stageSuggestion={
+            suggestPhenologicalStage(
+              crop,
+              applicationStage.trigger_type,
+              isoDateToDayOffset(applicationStage.recommended_date),
+              isoDateToDayOffset(applicationStage.recommended_date),
+            ).stage
+          }
+          readOnly={!canTemplateCrud}
+          onSave={(application) => {
+            // Vai para o rascunho do modelo; grava no "Salvar" do modelo.
+            onChange(applicationStage.key, { application });
+            setApplicationKey(null);
+          }}
+        />
+      ) : null}
 
       {/* Lista longa: barra fixa no rodapé do viewport para adicionar etapa sem
           rolar de volta ao topo do editor. */}

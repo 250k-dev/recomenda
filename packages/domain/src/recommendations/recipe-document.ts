@@ -12,7 +12,7 @@ import {
   type Prescription,
 } from "./prescription-calc";
 import type { RecommendationShareData } from "./share-message";
-import { escapeHtml, footerHtml, headerHtml, htmlShell, printHtml, sheetHtml } from "../print/print-core";
+import { escapeHtml, footerHtml, headerHtml, htmlShell, sheetHtml } from "../print/print-core";
 
 /**
  * Receita de aplicação: UMA folha por etapa × talhão, para o operador levar
@@ -96,16 +96,15 @@ function recipeAreaHa(data: RecommendationShareData): number | null {
   return typeof area === "number" && area > 0 ? area : null;
 }
 
-/** Prescrição da etapa: vazão da etapa, tanque da etapa ou da fazenda. */
+/** Prescrição da etapa: vazão e tanque da própria etapa (vindos do modelo). */
 export function stagePrescription(
   rec: Pick<Recommendation, "spray_volume_l_ha" | "tank_capacity_l">,
   areaHa: number | null,
-  farmTankCapacityL?: number | null,
 ): Prescription {
   return computePrescription({
     areaHa,
     sprayVolumeLHa: rec.spray_volume_l_ha ?? null,
-    tankCapacityL: rec.tank_capacity_l ?? farmTankCapacityL ?? null,
+    tankCapacityL: rec.tank_capacity_l ?? null,
   });
 }
 
@@ -138,7 +137,7 @@ function sheetBody(data: RecommendationShareData, rec: Recommendation): string {
   const items = sortRecommendationItemsByMixOrder(rec.items);
   const operation = nonSprayOperation(items);
   const spray = operation == null;
-  const presc = stagePrescription(rec, areaHa, spec.tankCapacityL);
+  const presc = stagePrescription(rec, areaHa);
   const withTanks = spray && presc.tankCount != null;
 
   const suggestion = suggestPhenologicalStage(
@@ -204,8 +203,8 @@ function sheetBody(data: RecommendationShareData, rec: Recommendation): string {
         <td class="num tot">${quantities.total != null ? `${fmtQuantity(quantities.total)} ${escapeHtml(unit)}` : "—"}</td>
         ${
           withTanks
-            ? `<td class="num">${quantities.perTank != null ? `${fmtQuantity(quantities.perTank)} ${escapeHtml(unit)}` : "—"}</td>
-               <td class="num">${quantities.lastTank ? `${fmtQuantity(quantities.lastTank)} ${escapeHtml(unit)}` : "—"}</td>`
+            ? `<td class="num tk">${quantities.perTank != null ? `${fmtQuantity(quantities.perTank)} ${escapeHtml(unit)}` : "—"}</td>
+               <td class="num tk">${quantities.lastTank ? `${fmtQuantity(quantities.lastTank)} ${escapeHtml(unit)}` : "—"}</td>`
             : ""
         }
       </tr>`;
@@ -267,7 +266,7 @@ function sheetBody(data: RecommendationShareData, rec: Recommendation): string {
             <thead><tr>
               <th>#</th><th>Produto</th><th>Alvo / observação</th>
               <th class="num">Dose/ha</th><th class="num">Área</th><th class="num">Total</th>
-              ${withTanks ? `<th class="num">Por tanque</th><th class="num">Últ. tanque</th>` : ""}
+              ${withTanks ? `<th class="num tk">Por tanque</th><th class="num tk">Últ. tanque</th>` : ""}
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>`
@@ -284,7 +283,7 @@ function sheetBody(data: RecommendationShareData, rec: Recommendation): string {
   return items.length > DENSE_ITEMS ? `<div class="dense">${body}</div>` : body;
 }
 
-const RECIPE_CSS = `
+const RECIPE_CSS_RAW = `
   .sheet > thead > tr > td { padding-top: 8px; padding-bottom: 6px; }
   .sheet > tfoot > tr > td { padding-bottom: 4px; }
   .footer { margin-top: 12px; }
@@ -303,11 +302,13 @@ const RECIPE_CSS = `
   .v { display: block; font-size: 12.5px; font-weight: 600; color: #20201c; margin-top: 1px; }
   .v small { font-weight: 400; color: #7a7a70; font-size: 11px; }
   .app { display: grid; gap: 6px; }
-  .app6 { grid-template-columns: 1fr 1.15fr 1.25fr 1.6fr 1fr 1fr; }
+  .app6 { grid-template-columns: repeat(3, 1fr); }
   .app4 { grid-template-columns: repeat(4, 1fr); }
   .app1 { grid-template-columns: 1fr; }
   .app > div { border: 1px solid #e2e0d6; background: #faf9f5; border-radius: 8px; padding: 5px 9px; }
-  .app .v { font-size: 12px; white-space: nowrap; }
+  .app .v { font-size: 13.5px; white-space: nowrap; }
+  .rx td.tk { background: #eef4ee !important; font-weight: 600; color: #20201c; }
+  .rx thead th.tk { background: #24562f; }
   .app .v small { display: block; font-size: 9.5px; white-space: normal; }
   .rx { width: 100%; border-collapse: collapse; font-size: 10.5px; }
   .rx thead th { background: #2f6d3f; color: #fff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; text-align: left; padding: 6px; }
@@ -333,26 +334,54 @@ const RECIPE_CSS = `
   .dense .sign { margin-top: 16px; }
 `;
 
-/** Folhas (etapa × talhão) na ordem recebida; etapa pulada não vira receita. */
+/**
+ * Prefixa cada seletor com o escopo: no PDF unificado as folhas da receita
+ * convivem com o relatório, e regras genéricas (`.title`, `.footer`…) da
+ * receita não podem mexer no relatório.
+ */
+function scopeCss(css: string, scope: string): string {
+  return css.replace(/([^{}]+)\{/g, (_, selectors: string) => {
+    const scoped = selectors
+      .split(",")
+      .map((sel) => sel.trim())
+      .filter(Boolean)
+      .map((sel) => `${scope} ${sel}`)
+      .join(", ");
+    return `\n  ${scoped} {`;
+  });
+}
+
+/** CSS da receita, valendo só dentro de `.recipe` (a folha da receita). */
+export const RECIPE_CSS = scopeCss(RECIPE_CSS_RAW, ".recipe");
+
+/**
+ * Folhas de receita de um talhão (uma por etapa; pulada não vira receita).
+ * `firstPageBreak`: a primeira folha também abre página nova (vem depois de
+ * outro conteúdo no mesmo arquivo).
+ */
+export function recipeSheets(data: RecommendationShareData, firstPageBreak: boolean): string[] {
+  const emittedAt = new Date().toLocaleDateString("pt-BR");
+  return data.recommendations
+    .filter((rec) => rec.status !== "SKIPPED")
+    .map((rec, index) =>
+      sheetHtml({
+        header: headerHtml(emittedAt, data.plotName ? `Talhão ${data.plotName}` : null),
+        body: sheetBody(data, rec),
+        footer: footerHtml(data.agronomistName),
+        pageBreak: firstPageBreak || index > 0,
+        docClass: "recipe",
+        label: `Receita · ${data.plotName ? `Talhão ${data.plotName} · ` : ""}${rec.name}`,
+      }),
+    );
+}
+
+/** Folhas (etapa × talhão) na ordem recebida. */
 export function buildApplicationRecipesHtml(
   datas: RecommendationShareData[],
   title = "Receitas de aplicação",
 ): string {
-  const emittedAt = new Date().toLocaleDateString("pt-BR");
   const sheets: string[] = [];
-  for (const data of datas) {
-    for (const rec of data.recommendations) {
-      if (rec.status === "SKIPPED") continue;
-      sheets.push(
-        sheetHtml({
-          header: headerHtml(emittedAt),
-          body: sheetBody(data, rec),
-          footer: footerHtml(data.agronomistName),
-          pageBreak: sheets.length > 0,
-        }),
-      );
-    }
-  }
+  for (const data of datas) sheets.push(...recipeSheets(data, sheets.length > 0));
   return htmlShell(title, sheets.join(""), RECIPE_CSS);
 }
 
@@ -361,8 +390,4 @@ export function countApplicationRecipes(datas: RecommendationShareData[]): numbe
     (sum, data) => sum + data.recommendations.filter((rec) => rec.status !== "SKIPPED").length,
     0,
   );
-}
-
-export function printApplicationRecipes(datas: RecommendationShareData[], title?: string): void {
-  printHtml(buildApplicationRecipesHtml(datas, title));
 }

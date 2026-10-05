@@ -1,40 +1,59 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, Copy, FileDown, Printer } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@recomenda/ui/primitives/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@recomenda/ui/primitives/dialog";
+import { useMemo, useRef, useState } from "react";
+import { ChevronDown, Download } from "lucide-react";
+import { useIsMobile } from "@recomenda/ui/hooks/use-mobile";
 import {
   buildMultiWhatsappMessage,
   type RecommendationShareData,
 } from "@recomenda/domain/recommendations/share-message";
-import {
-  printRecommendations,
-  type DocumentCover,
-} from "@recomenda/domain/recommendations/print-document";
-import {
-  countApplicationRecipes,
-  printApplicationRecipes,
-} from "@recomenda/domain/recommendations/recipe-document";
-import { WhatsAppIcon } from "@recomenda/ui/assets/whatsapp-icon";
+import type { DocumentCover } from "@recomenda/domain/recommendations/print-document";
+import { countApplicationRecipes } from "@recomenda/domain/recommendations/recipe-document";
+import { buildExportHtml } from "@recomenda/domain/recommendations/export-document";
+import { displayRecStatus } from "@recomenda/domain/recommendations/format";
 import type {
   NotebookSectionId,
   SeasonNotebookData,
 } from "@recomenda/domain/season-notebook/notebook-document";
+import { cn } from "@recomenda/utils";
 import {
   readPricePreference,
   writePricePreference,
 } from "@/components/domain/export/price-preference";
-import { SeasonNotebookPanel } from "@/components/domain/export/season-notebook-panel";
-import { SegmentedTabs } from "@/components/domain/segmented-tabs";
-import { cn } from "@recomenda/utils";
+import { useNotebookTab } from "@/components/domain/export/season-notebook-panel";
+import { useCycleApplicationTab } from "@/components/domain/export/cycle-application-data-panel";
+import {
+  PagedPreview,
+  DEFAULT_PREVIEW_ZOOM,
+  type PagedPreviewHandle,
+  type PreviewZoom,
+} from "@/components/domain/export/paged-preview";
+import {
+  ExportFooter,
+  ExportShell,
+  FooterButton,
+  PartCard,
+  Pills,
+  PreviewEmpty,
+  PreviewToolbar,
+  PriceSwitch,
+  SkeletonList,
+  StatusBadge,
+  Step,
+  TriCheck,
+  WhatsappButton,
+  fmtPages,
+  triOf,
+} from "@/components/domain/export/export-ui";
+import {
+  copyText,
+  openWhatsapp,
+  pagesByPart,
+  partsSummary,
+  stageKey,
+  stageWhen,
+} from "@/components/domain/export/export-helpers";
+import { printPaged, type PagedResult } from "@/lib/print/paged-document";
 
 const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
 
@@ -44,7 +63,16 @@ export interface FarmExportItem {
   data: RecommendationShareData;
 }
 
-type ExportMode = "share" | "notebook";
+type Tab = "export" | "application" | "notebook";
+type Mode = "stage" | "plot" | "full";
+
+const MODE_HELP: Record<Mode, string> = {
+  stage: "Marque a etapa uma vez e ela entra em todos os talhões que a têm — ideal para a aplicação da semana.",
+  plot: "Escolha talhão a talhão e, dentro de cada um, as etapas.",
+  full: "Todos os talhões e todas as etapas da safra.",
+};
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export function FarmSeasonsExportDialog({
   open,
@@ -56,6 +84,7 @@ export function FarmSeasonsExportDialog({
   cover,
   notebook,
   notebookUnavailable,
+  applicationData = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,556 +94,506 @@ export function FarmSeasonsExportDialog({
   items: FarmExportItem[];
   /** Capa do documento (números da safra/fazenda + consolidado). */
   cover?: DocumentCover | null;
-  /**
-   * Dados do Caderno de Safra. Ausente → a aba não aparece e o diálogo fica
-   * como era (só compartilhar), que é o caso dos escopos sem lista/estoque.
-   */
+  /** Dados do Caderno de Safra. Ausente → a aba não aparece. */
   notebook?: SeasonNotebookData | null;
   /** Sobrescreve o motivo padrão de uma seção indisponível do caderno. */
   notebookUnavailable?: Partial<Record<NotebookSectionId, string>>;
+  /** Aba "Dados da aplicação": configura as etapas da safra em todos os talhões. */
+  applicationData?: boolean;
 }) {
-  const [mode, setMode] = useState<ExportMode>("share");
-  const [notebookDragging, setNotebookDragging] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [shareAll, setShareAll] = useState(true);
-  const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set());
+  const mobile = useIsMobile();
+  const previewRef = useRef<PagedPreviewHandle>(null);
+  const [tab, setTab] = useState<Tab>("export");
+  const [mode, setMode] = useState<Mode>("stage");
+  const [treeOpen, setTreeOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Nada vem marcado: o usuário escolhe o que entra (e a prévia nasce dele).
+  const [incReport, setIncReport] = useState(false);
+  const [incRecipes, setIncRecipes] = useState(false);
   const [showPrices, setShowPrices] = useState(() => readPricePreference());
-  // Só oferece a escolha quando há preço no payload (isto é, quem exporta tem
-  // PRICE_VIEW). Sem isso o documento sai sem valores de qualquer forma.
-  // A lista de compra conta: no caderno ela pode trazer preço mesmo quando as
-  // etapas do cronograma não trazem.
-  const canChoosePrices =
+  const [zoom, setZoom] = useState<PreviewZoom>(DEFAULT_PREVIEW_ZOOM);
+  const [effectiveZoom, setEffectiveZoom] = useState(1);
+  const [mView, setMView] = useState<"config" | "preview">("config");
+  const [paged, setPaged] = useState<PagedResult | null>(null);
+  const [partPages, setPartPages] = useState({ report: 0, recipes: 0 });
+  const [notebookDragging, setNotebookDragging] = useState(false);
+
+  // Preço: só quando o payload traz (quem exporta tem PRICE_VIEW). A lista de
+  // compra conta: no caderno ela pode trazer preço mesmo sem o cronograma.
+  const canPrice =
     items.some((item) => item.data.unitPriceByProduct) ||
-    (notebook?.purchaseList?.items ?? []).some(
-      (item) => Number(item.unit_price_brl) > 0,
-    );
+    (notebook?.purchaseList?.items ?? []).some((item) => Number(item.unit_price_brl) > 0);
+  const priced = canPrice && showPrices;
+  const togglePrices = () =>
+    setShowPrices((value) => {
+      writePricePreference(!value);
+      return !value;
+    });
 
-  const allStageIds = useMemo(
-    () => items.flatMap((i) => i.data.recommendations.map((rec) => rec.id)),
-    [items],
-  );
-  const allStageKey = allStageIds.join("|");
+  const allRecs = useMemo(() => items.flatMap((i) => i.data.recommendations), [items]);
+  const allIds = useMemo(() => allRecs.map((r) => r.id), [allRecs]);
+  const allKey = allIds.join("|");
 
+  // Ao abrir (ou quando os talhões chegam): nada marcado, aba Exportar.
   const [resetKey, setResetKey] = useState("");
-  const nextResetKey = open ? allStageKey : "";
+  const nextResetKey = open ? allKey : "";
   if (nextResetKey !== resetKey) {
     setResetKey(nextResetKey);
     if (open) {
-      setMode("share");
-      setShareAll(true);
-      setSelectedStageIds(new Set(allStageKey ? allStageKey.split("|") : []));
+      setTab("export");
+      setMode("stage");
+      setTreeOpen(false);
+      setSelected(new Set());
+      setIncReport(false);
+      setIncRecipes(false);
+      setMView("config");
+      setPaged(null);
     }
   }
 
-  const stageNames = useMemo(() => {
-    const seen = new Map<string, string>();
+  /** Etapas da safra pelo nome (a mesma etapa em vários talhões). */
+  const stageGroups = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; ids: string[]; pending: number; order: number }>();
     for (const item of items) {
       for (const rec of item.data.recommendations) {
-        const key = rec.name.trim().toLocaleLowerCase("pt-BR");
-        if (key && !seen.has(key)) seen.set(key, rec.name.trim());
+        const key = stageKey(rec.name);
+        const group = map.get(key) ?? { key, name: rec.name.trim(), ids: [], pending: 0, order: rec.order_index };
+        group.ids.push(rec.id);
+        if (rec.status === "PENDING") group.pending += 1;
+        group.order = Math.min(group.order, rec.order_index);
+        map.set(key, group);
       }
     }
-    return [...seen.entries()]
-      .map(([key, label]) => ({ key, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+    return [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR"));
   }, [items]);
 
-  const selectedItems = useMemo(() => {
-    if (shareAll) return items.filter((i) => i.data.recommendations.length > 0);
-
-    return items
-      .map((item) => {
-        const recommendations = item.data.recommendations.filter((rec) =>
-          selectedStageIds.has(rec.id),
-        );
-        const done = recommendations.filter((rec) => APPLIED.has(rec.status)).length;
-        return {
-          ...item,
-          data: {
-            ...item.data,
-            recommendations,
-            done,
-            total: recommendations.length,
-          },
-        };
-      })
-      .filter((item) => item.data.recommendations.length > 0);
-  }, [items, selectedStageIds, shareAll]);
-  const message = selectedItems.length
-    ? buildMultiWhatsappMessage(
-        farmName,
-        selectedItems.map((i) => i.data),
-        contextLabel,
-      )
-    : "";
-  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-
-  const toggleStage = (id: string) => {
-    setShareAll(false);
-    setSelectedStageIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  /** Talhões agrupados pela fazenda a que pertencem (safra multi-fazenda). */
+  /** Talhões agrupados pela fazenda (safra multi-fazenda). */
   const farmGroups = useMemo(() => {
-    const map = new Map<string, { farmName: string; items: FarmExportItem[] }>();
+    const map = new Map<string, FarmExportItem[]>();
     for (const item of items) {
-      const farmName = item.data.spec?.farmName ?? "Sem fazenda";
-      const group = map.get(farmName);
-      if (group) group.items.push(item);
-      else map.set(farmName, { farmName, items: [item] });
+      const name = item.data.spec?.farmName ?? "Sem fazenda";
+      map.set(name, [...(map.get(name) ?? []), item]);
     }
-    return [...map.values()].sort((a, b) =>
-      a.farmName.localeCompare(b.farmName, "pt-BR"),
-    );
+    return [...map.entries()]
+      .map(([name, groupItems]) => ({ name, items: groupItems }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [items]);
 
-  /** Marca/desmarca todas as etapas de todos os talhões de uma fazenda. */
-  const setFarmSelected = (groupItems: FarmExportItem[], on: boolean) => {
-    setShareAll(false);
-    setSelectedStageIds((prev) => {
+  const selectedItems = useMemo(
+    () =>
+      items
+        .map((item) => {
+          if (item.data.recommendations.every((rec) => selected.has(rec.id))) return item;
+          const recommendations = item.data.recommendations.filter((rec) => selected.has(rec.id));
+          const done = recommendations.filter((rec) => APPLIED.has(rec.status)).length;
+          return { ...item, data: { ...item.data, recommendations, done, total: recommendations.length } };
+        })
+        .filter((item) => item.data.recommendations.length > 0),
+    [items, selected],
+  );
+  const datas = useMemo(() => selectedItems.map((i) => i.data), [selectedItems]);
+  const nSel = datas.reduce((sum, d) => sum + d.recommendations.length, 0);
+  const tSel = datas.length;
+  const hasParts = incReport || incRecipes;
+  const recipeCount = countApplicationRecipes(datas);
+  const title = `Recomendações - ${farmName ?? ""}`;
+
+  const html = useMemo(
+    () =>
+      tab === "export" && nSel > 0 && hasParts && (incReport || recipeCount > 0)
+        ? buildExportHtml(datas, title, { report: incReport, recipes: incRecipes, showPrices: priced, cover })
+        : null,
+    [tab, nSel, hasParts, incReport, incRecipes, recipeCount, datas, title, priced, cover],
+  );
+  const total = html && paged ? paged.total : 0;
+  const message = nSel ? buildMultiWhatsappMessage(farmName, datas, contextLabel) : "";
+
+  const onPaged = (result: PagedResult) => {
+    setPaged(result);
+    const counts = pagesByPart(result);
+    setPartPages((prev) => ({
+      report: incReport ? counts.report : prev.report,
+      recipes: incRecipes ? counts.recipes : prev.recipes,
+    }));
+  };
+
+  const setIds = (ids: string[], on: boolean) =>
+    setSelected((prev) => {
       const next = new Set(prev);
-      for (const item of groupItems) {
-        for (const rec of item.data.recommendations) {
-          if (on) next.add(rec.id);
-          else next.delete(rec.id);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  const triFor = (ids: string[]) => triOf(ids.map((id) => selected.has(id)));
+  const toggleIds = (ids: string[]) => setIds(ids, triFor(ids) !== "on");
+
+  const download = () => {
+    if (!html) return;
+    if (!previewRef.current?.print()) printPaged(html);
+  };
+
+  // ---------------------------------------------------------- outras abas
+  const applicationTab = useCycleApplicationTab({
+    items: items.map((i) => i.data),
+    isLoading,
+    onClose: () => onOpenChange(false),
+    onSeeRecipes: (keys) => {
+      const ids = allRecs.filter((rec) => keys.includes(stageKey(rec.name))).map((rec) => rec.id);
+      setSelected(new Set(ids));
+      setTab("export");
+      setMode("stage");
+      setIncRecipes(true);
+    },
+  });
+  const notebookTab = useNotebookTab({
+    data: notebook,
+    open,
+    active: open && tab === "notebook",
+    unavailableReasons: notebookUnavailable,
+    isLoading,
+    showPrices,
+    canPrice,
+    onTogglePrices: togglePrices,
+    onDraggingChange: setNotebookDragging,
+    title: notebook?.cycleName ?? farmName ?? "Safra",
+  });
+
+  // ---------------------------------------------------------- aba Exportar
+  const stageGrid = (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {stageGroups.map((group) => {
+        const tri = triFor(group.ids);
+        const plots = group.ids.length;
+        return (
+          <button
+            key={group.key}
+            type="button"
+            onClick={() => toggleIds(group.ids)}
+            className={cn(
+              "flex items-start gap-2.5 rounded-[10px] border px-3 py-2.5 text-left transition-colors",
+              tri === "off" ? "border-[#e2e0d6] bg-white" : "border-[#b9cdb9] bg-[#f3f6f1]",
+            )}
+          >
+            <span className="mt-0.5">
+              <TriCheck state={tri} />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-semibold">{group.name}</span>
+              <span className="block text-[11.5px] text-[#7a786e]">
+                {plural(plots, "talhão", "talhões")} ·{" "}
+                {group.pending ? plural(group.pending, "pendente", "pendentes") : "registrada"}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const tree = (
+    <div className="overflow-hidden rounded-xl border border-[#e2e0d6] bg-white">
+      {farmGroups.map((farm) => {
+        const farmIds = farm.items.flatMap((i) => i.data.recommendations.map((r) => r.id));
+        return (
+          <div key={farm.name}>
+            <button
+              type="button"
+              onClick={() => toggleIds(farmIds)}
+              className="flex w-full items-center gap-2.5 bg-[#f6f4ee] px-3 py-2 text-left"
+            >
+              <TriCheck state={triFor(farmIds)} />
+              <span className="flex-1 text-[12.5px] font-semibold">{farm.name}</span>
+              <span className="text-xs text-[#6b6a62]">{plural(farm.items.length, "talhão", "talhões")}</span>
+            </button>
+            {farm.items.map((item) => {
+              const ids = item.data.recommendations.map((r) => r.id);
+              const on = ids.filter((id) => selected.has(id)).length;
+              const isOpen = expanded.has(item.id);
+              const area = item.data.spec?.plantedAreaHa ?? item.data.spec?.areaHa;
+              return (
+                <div key={item.id} className="border-t border-[#efede5]">
+                  <div className="flex items-center gap-2.5 px-3 py-2">
+                    <button type="button" aria-label={`Marcar ${item.label}`} onClick={() => toggleIds(ids)}>
+                      <TriCheck state={triFor(ids)} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpanded((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(item.id)) next.delete(item.id);
+                          else next.add(item.id);
+                          return next;
+                        })
+                      }
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      <span className="truncate text-[13px] font-semibold">{item.label}</span>
+                      {area ? (
+                        <span className="text-xs text-[#7a786e]">{area.toLocaleString("pt-BR")} ha</span>
+                      ) : null}
+                      <span className="ml-auto text-xs text-[#6b6a62] tabular-nums">
+                        {on}/{ids.length}
+                      </span>
+                      <ChevronDown className={cn("size-4 text-[#7a786e] transition-transform", isOpen && "rotate-180")} />
+                    </button>
+                  </div>
+                  {isOpen ? (
+                    <div className="pb-1.5">
+                      {item.data.recommendations.map((rec, index) => (
+                        <button
+                          key={rec.id}
+                          type="button"
+                          onClick={() => toggleIds([rec.id])}
+                          className="flex w-full items-center gap-2.5 py-1.5 pr-3 pl-9 text-left"
+                        >
+                          <TriCheck state={selected.has(rec.id) ? "on" : "off"} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[12.5px]">
+                              {index + 1}. {rec.name}
+                            </span>
+                            <span className="block text-[11px] text-[#7a786e]">{stageWhen(rec)}</span>
+                          </span>
+                          <StatusBadge status={displayRecStatus(rec)} />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const fullList = (
+    <div className="overflow-hidden rounded-xl border border-[#e2e0d6] bg-white">
+      {items.map((item) => (
+        <div key={item.id} className="flex items-center gap-2.5 border-b border-[#f1f0ea] px-3 py-2 last:border-b-0">
+          <TriCheck state="on" />
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+            {item.label}
+            {item.data.spec?.farmName ? (
+              <span className="font-normal text-[#7a786e]"> · {item.data.spec.farmName}</span>
+            ) : null}
+          </span>
+          <span className="text-xs text-[#6b6a62] tabular-nums">
+            {item.data.done}/{item.data.total} registradas
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const plotsWithSelection = items.filter((i) => i.data.recommendations.some((r) => selected.has(r.id))).length;
+
+  const exportLeft = isLoading ? (
+    <SkeletonList rows={6} />
+  ) : items.length === 0 ? (
+    <p className="text-sm text-[#6b6a62]">Nenhum talhão com cronograma para exportar.</p>
+  ) : (
+    <div className="flex flex-col gap-6">
+      <Step n={1} title="O que vai no PDF">
+        <div className="flex flex-col gap-2">
+          <PartCard
+            title="Resumo e cronograma"
+            tag="Para o produtor"
+            tagTone="producer"
+            desc="Capa da safra e as etapas de cada talhão."
+            pages={partPages.report ? fmtPages(partPages.report) : undefined}
+            on={incReport}
+            onToggle={() => setIncReport((v) => !v)}
+          >
+            <PriceSwitch on={priced} onToggle={togglePrices} canPrice={canPrice} disabled={!incReport} />
+          </PartCard>
+          <PartCard
+            title="Receitas de aplicação"
+            tag="Para o operador"
+            tagTone="operator"
+            desc="Uma folha por etapa, para quem aplica. Sem preço."
+            pages={partPages.recipes ? fmtPages(partPages.recipes) : undefined}
+            on={incRecipes}
+            onToggle={() => setIncRecipes((v) => !v)}
+          />
+        </div>
+      </Step>
+
+      <Step
+        n={2}
+        title="O que exportar"
+        links={
+          mode === "full"
+            ? undefined
+            : [
+                { label: "Todas", onClick: () => setSelected(new Set(allIds)) },
+                {
+                  label: "Pendentes",
+                  onClick: () => setSelected(new Set(allRecs.filter((r) => r.status === "PENDING").map((r) => r.id))),
+                },
+                { label: "Nenhuma", onClick: () => setSelected(new Set()) },
+              ]
         }
+      >
+        <div className="flex flex-col gap-1.5">
+          <Pills
+            tone="soft"
+            items={[
+              { id: "stage", label: "Por etapa" },
+              { id: "plot", label: "Por talhão" },
+              { id: "full", label: "Safra completa" },
+            ]}
+            value={mode}
+            onChange={(id) => {
+              setMode(id as Mode);
+              if (id === "full") setSelected(new Set(allIds));
+            }}
+          />
+          <p className="text-xs text-[#6b6a62]">{MODE_HELP[mode]}</p>
+        </div>
+        {mode === "stage" ? (
+          <>
+            {stageGrid}
+            <button
+              type="button"
+              onClick={() => setTreeOpen((v) => !v)}
+              className="flex items-center gap-1.5 self-start text-[12.5px] font-semibold text-[#2f6d3f]"
+            >
+              <ChevronDown className={cn("size-3.5 transition-transform", treeOpen && "rotate-180")} />
+              {treeOpen
+                ? "Ocultar ajuste por talhão"
+                : `Ajustar talhão a talhão (${plotsWithSelection} de ${items.length} talhões)`}
+            </button>
+            {treeOpen ? tree : null}
+          </>
+        ) : mode === "plot" ? (
+          tree
+        ) : (
+          fullList
+        )}
+      </Step>
+    </div>
+  );
+
+  const exportRight = (
+    <>
+      <PreviewToolbar
+        title={
+          <span>
+            Prévia do PDF
+            {total ? <span className="ml-1.5 font-normal text-[#6b6a62]">· {fmtPages(total)}</span> : null}
+          </span>
+        }
+        zoom={zoom}
+        effectiveZoom={effectiveZoom}
+        onZoom={setZoom}
+      />
+      <PagedPreview
+        ref={previewRef}
+        html={html}
+        zoom={zoom}
+        onPaged={onPaged}
+        onEffectiveZoom={setEffectiveZoom}
+        empty={
+          isLoading ? (
+            <div className="aspect-210/297 w-[min(520px,80%)] animate-pulse rounded-sm bg-white/70" />
+          ) : (
+            <PreviewEmpty
+              title="Nada para mostrar"
+              text={
+                !nSel
+                  ? "Marque ao menos uma etapa para ver as folhas do PDF."
+                  : !hasParts
+                    ? "Marque o resumo, as receitas ou os dois."
+                    : "As etapas marcadas foram puladas — não geram receita."
+              }
+            />
+          )
+        }
+      />
+    </>
+  );
+
+  const exportFooter = (
+    <ExportFooter
+      summary={
+        isLoading
+          ? "Carregando…"
+          : nSel
+            ? `${plural(nSel, "etapa", "etapas")} em ${plural(tSel, "talhão", "talhões")}`
+            : "Nenhuma etapa marcada"
       }
-      return next;
-    });
-  };
-
-  const setSeasonSelected = (item: FarmExportItem, on: boolean) => {
-    setShareAll(false);
-    setSelectedStageIds((prev) => {
-      const next = new Set(prev);
-      for (const rec of item.data.recommendations) {
-        if (on) next.add(rec.id);
-        else next.delete(rec.id);
+      sub={
+        nSel
+          ? `${partsSummary(incReport, incRecipes, recipeCount)}${incReport && canPrice ? (priced ? " · com preços" : " · sem preços") : ""}`
+          : "Os botões liberam quando houver seleção."
       }
-      return next;
-    });
-  };
+      warn={!isLoading && (!nSel || !hasParts)}
+    >
+      <WhatsappButton
+        message={message}
+        disabled={!nSel}
+        onCopy={() => void copyText(message)}
+        onSend={() => openWhatsapp(message)}
+      />
+      <FooterButton tone="primary" disabled={!html || !nSel} onClick={download}>
+        <Download className="size-4" /> Baixar PDF{total ? ` · ${fmtPages(total)}` : ""}
+      </FooterButton>
+    </ExportFooter>
+  );
 
-  const selectAll = () => {
-    setShareAll(false);
-    setSelectedStageIds(new Set(allStageIds));
-  };
+  const tabs = [
+    { id: "export", label: "Exportar" },
+    ...(applicationData ? [{ id: "application", label: "Dados da aplicação" }] : []),
+    ...(notebook ? [{ id: "notebook", label: "Caderno de safra" }] : []),
+  ];
 
-  const clearSelection = () => {
-    setShareAll(false);
-    setSelectedStageIds(new Set());
-  };
-
-  const selectStageByName = (stageKey: string) => {
-    setShareAll(false);
-    const ids = items.flatMap((item) =>
-      item.data.recommendations
-        .filter((rec) => rec.name.trim().toLocaleLowerCase("pt-BR") === stageKey)
-        .map((rec) => rec.id),
-    );
-    setSelectedStageIds(new Set(ids));
-  };
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(message);
-      setCopied(true);
-      toast.success("Texto copiado para a area de transferencia.");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Nao foi possivel copiar. Copie o texto manualmente.");
-    }
-  };
-
-  const handlePrint = () => {
-    onOpenChange(false);
-    window.setTimeout(
-      () =>
-        printRecommendations(
-          selectedItems.map((i) => i.data),
-          `Recomendações - ${farmName ?? ""}`,
-          { showPrices: canChoosePrices && showPrices, cover },
-        ),
-      250,
-    );
-  };
-
-  // Receita de aplicação: uma folha por etapa × talhão selecionado (para o
-  // operador). "Etapa X em todos os talhões" = escolher a etapa pelo nome.
-  const recipeCount = countApplicationRecipes(selectedItems.map((i) => i.data));
-  const handlePrintRecipes = () => {
-    onOpenChange(false);
-    window.setTimeout(
-      () =>
-        printApplicationRecipes(
-          selectedItems.map((i) => i.data),
-          `Receitas de aplicação - ${farmName ?? ""}`,
-        ),
-      250,
-    );
-  };
-
-  const togglePrices = (value: boolean) => {
-    setShowPrices(value);
-    writePricePreference(value);
-  };
+  const slots =
+    tab === "application"
+      ? applicationTab
+      : tab === "notebook"
+        ? notebookTab
+        : {
+            left: exportLeft,
+            right: exportRight,
+            footer: exportFooter,
+            mobilePreviewLabel: total ? `Prévia · ${fmtPages(total)}` : "Prévia",
+          };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* A aba do caderno tem duas colunas (seções + prévia) e precisa de espaço. */}
-      <DialogContent
-        className={mode === "notebook" ? "max-w-4xl" : "max-w-2xl"}
-        // Esc reordenando pelo teclado cancela o arrasto (o dnd-kit continua
-        // recebendo a tecla); sem isto ele fechava o diálogo junto.
-        onEscapeKeyDown={(event) => {
-          if (notebookDragging) event.preventDefault();
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>Exportar safra</DialogTitle>
-          <DialogDescription>
-            {mode === "notebook"
-              ? "Monte o caderno para imprimir e encadernar: escolha as seções e a ordem."
-              : "Exporte a safra completa ou escolha etapas específicas dentro dos talhões."}
-          </DialogDescription>
-        </DialogHeader>
-
-        {notebook ? (
-          <div className="shrink-0 border-b border-border px-6 pt-1 pb-4">
-            <SegmentedTabs
-              value={mode}
-              onValueChange={setMode}
-              items={[
-                { value: "share", label: "Compartilhar" },
-                { value: "notebook", label: "Caderno de safra" },
-              ]}
-            />
-          </div>
-        ) : null}
-
-        {/* Layout de bloco, não flex: num `flex-col` com overflow-y-auto os
-            filhos encolhem antes de a rolagem entrar, e quem tem altura fixa
-            (a barra de abas, por exemplo) sai cortado. */}
-        <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
-          {/* Primeiro item do modal: é a decisão que muda o que sai no documento.
-              Vale para as duas abas — o caderno usa o mesmo showPrices. */}
-          {canChoosePrices ? (
-            <section className="rounded-xl border border-border bg-surface-2 p-4">
-              <label className="flex cursor-pointer items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4 accent-primary"
-                  checked={showPrices}
-                  onChange={(e) => togglePrices(e.target.checked)}
-                />
-                <span className="text-sm">
-                  <span className="font-semibold text-text-strong">
-                    Incluir preços e custos
-                  </span>
-                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
-                    Custo por talhão, lista de compra e totais. Desmarque para
-                    entregar só a parte técnica.
-                  </span>
-                </span>
-              </label>
-            </section>
-          ) : null}
-
-          {mode === "share" ? (
-            <>
-          <section className="rounded-xl border border-border bg-surface-2 p-4">
-            <label className="flex cursor-pointer items-center gap-2.5">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={shareAll}
-                onChange={(e) => {
-                  setShareAll(e.target.checked);
-                  if (e.target.checked) setSelectedStageIds(new Set(allStageIds));
-                }}
-              />
-              <span className="text-sm font-semibold text-text-strong">
-                Exportar safra completa
-              </span>
-            </label>
-
-            {isLoading ? (
-              <p className="mt-3 text-[13px] text-muted-foreground">
-                Carregando cronogramas dos talhões...
-              </p>
-            ) : !shareAll ? (
-              <div className="mt-4 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    Selecione as etapas que deseja exportar em cada talhão.
-                  </p>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary-strong hover:underline"
-                      onClick={selectAll}
-                    >
-                      Todas
-                    </button>
-                    <span className="text-muted-foreground">·</span>
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary-strong hover:underline"
-                      onClick={clearSelection}
-                    >
-                      Nenhuma
-                    </button>
-                  </div>
-                </div>
-
-                {stageNames.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {stageNames.map((stage) => (
-                      <button
-                        key={stage.key}
-                        type="button"
-                        className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
-                        onClick={() => selectStageByName(stage.key)}
-                      >
-                        {stage.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {items.length === 0 ? (
-                  <p className="text-[13px] text-muted-foreground">
-                    Nenhuma safra com cronograma para exportar.
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    {farmGroups.map((group) => {
-                      const groupStageIds = group.items.flatMap((it) =>
-                        it.data.recommendations.map((rec) => rec.id),
-                      );
-                      const groupSelected = groupStageIds.filter((id) =>
-                        selectedStageIds.has(id),
-                      ).length;
-                      const groupAll =
-                        groupStageIds.length > 0 &&
-                        groupSelected === groupStageIds.length;
-
-                      return (
-                        <div key={group.farmName} className="flex flex-col gap-2">
-                          {/* Cabeçalho da fazenda: marca todos os talhões dela de
-                              uma vez — com 2 fazendas × 20 talhões, marcar um a um
-                              é o que consome o tempo. */}
-                          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2">
-                            <label className="flex min-w-0 cursor-pointer items-center gap-2.5">
-                              <input
-                                type="checkbox"
-                                className="size-4 accent-primary"
-                                checked={groupAll}
-                                ref={(node) => {
-                                  if (node) {
-                                    node.indeterminate =
-                                      groupSelected > 0 && !groupAll;
-                                  }
-                                }}
-                                onChange={(e) =>
-                                  setFarmSelected(group.items, e.target.checked)
-                                }
-                              />
-                              <span className="truncate text-sm font-semibold text-text-strong">
-                                {group.farmName}
-                              </span>
-                            </label>
-                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                              {group.items.length}{" "}
-                              {group.items.length === 1 ? "talhão" : "talhões"}
-                            </span>
-                          </div>
-
-                  <ul className="flex flex-col gap-3">
-                    {group.items.map((item) => {
-                      const seasonStageIds = item.data.recommendations.map((rec) => rec.id);
-                      const selectedCount = seasonStageIds.filter((id) =>
-                        selectedStageIds.has(id),
-                      ).length;
-                      const allSelected =
-                        seasonStageIds.length > 0 &&
-                        selectedCount === seasonStageIds.length;
-
-                      return (
-                        <li
-                          key={item.id}
-                          className="rounded-xl border border-border bg-card p-3"
-                        >
-                          <div className="mb-2 flex items-center gap-2">
-                            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
-                              <input
-                                type="checkbox"
-                                className="size-4 accent-primary"
-                                checked={allSelected}
-                                ref={(node) => {
-                                  if (node) {
-                                    node.indeterminate =
-                                      selectedCount > 0 && !allSelected;
-                                  }
-                                }}
-                                onChange={(e) => setSeasonSelected(item, e.target.checked)}
-                              />
-                              <span className="truncate text-sm font-semibold text-text-strong">
-                                {item.label}
-                              </span>
-                            </label>
-                            <span className="text-xs text-muted-foreground">
-                              {selectedCount}/{seasonStageIds.length}
-                            </span>
-                          </div>
-
-                          <ul className="flex flex-col gap-1">
-                            {item.data.recommendations.map((rec, index) => {
-                              const on = selectedStageIds.has(rec.id);
-                              return (
-                                <li key={rec.id}>
-                                  <label
-                                    className={cn(
-                                      "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm",
-                                      on
-                                        ? "border-primary/40 bg-primary/5"
-                                        : "border-border bg-surface",
-                                    )}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      className="size-4 accent-primary"
-                                      checked={on}
-                                      onChange={() => toggleStage(rec.id)}
-                                    />
-                                    <span className="min-w-0 flex-1 truncate font-medium text-text-strong">
-                                      {index + 1}. {rec.name}
-                                    </span>
-                                  </label>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="mt-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-text-strong">Talhões</h3>
-                  <span className="text-xs text-muted-foreground">
-                    {items.length} {items.length === 1 ? "talhão" : "talhões"}
-                  </span>
-                </div>
-                {items.length === 0 ? (
-                  <p className="text-[13px] text-muted-foreground">
-                    Nenhuma safra com cronograma para exportar.
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-1">
-                    {items.map((it) => (
-                      <li
-                        key={it.id}
-                        className="flex items-center gap-2.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
-                      >
-                        <span className="min-w-0 truncate font-medium text-text-strong">
-                          {it.label}
-                          {it.data.spec?.farmName ? (
-                            <span className="font-normal text-muted-foreground">
-                              {" "}· {it.data.spec.farmName}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                          {it.data.done}/{it.data.total}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-xl border border-border bg-surface-2 p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
-              <h3 className="text-sm font-semibold text-text-strong">Mensagem do WhatsApp</h3>
-            </div>
-            {selectedItems.length ? (
-              <div className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-card px-3 py-2.5 font-mono text-[12px] leading-relaxed text-foreground">
-                {message}
-              </div>
-            ) : (
-              <p className="rounded-lg border border-dashed border-border bg-card px-3 py-2.5 text-[13px] text-muted-foreground">
-                Selecione ao menos uma etapa.
-              </p>
-            )}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                className="gap-2 bg-[#25D366] text-white hover:bg-[#20BD5A]"
-                onClick={() => window.open(whatsappUrl, "_blank", "noopener,noreferrer")}
-                disabled={!selectedItems.length}
-              >
-                <WhatsAppIcon className="h-4 w-4" />
-                Enviar no WhatsApp
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleCopy}
-                disabled={!selectedItems.length}
-              >
-                {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-                {copied ? "Copiado" : "Copiar texto"}
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handlePrint}
-                disabled={!selectedItems.length}
-              >
-                <FileDown className="h-4 w-4" />
-                Baixar PDF
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handlePrintRecipes}
-                disabled={recipeCount === 0}
-                title="Uma folha por etapa e talhão, para o operador levar a campo."
-              >
-                <Printer className="h-4 w-4" />
-                Receitas de aplicação{recipeCount ? ` (${recipeCount})` : ""}
-              </Button>
-            </div>
-          </section>
-            </>
-          ) : notebook ? (
-            <SeasonNotebookPanel
-              data={notebook}
-              unavailableReasons={notebookUnavailable}
-              isLoading={isLoading}
-              showPrices={showPrices}
-              canChoosePrices={canChoosePrices}
-              onBeforePrint={() => onOpenChange(false)}
-              onDraggingChange={setNotebookDragging}
-            />
-          ) : null}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ExportShell
+      open={open}
+      onOpenChange={(next) => !(tab === "application" && applicationTab.saving) && onOpenChange(next)}
+      // Esc reordenando pelo teclado cancela o arrasto; sem isto fechava o diálogo junto.
+      onEscapeKeyDown={(event) => {
+        if (notebookDragging) event.preventDefault();
+      }}
+      title="Exportar safra"
+      contentKey={tab}
+      subtitle={
+        tab === "notebook"
+          ? "Monte o caderno para imprimir e encadernar: escolha as seções e a ordem."
+          : tab === "application"
+            ? "Vazão, tanque, horário e ponta de cada etapa, para todos os talhões de uma vez — saem nas receitas."
+            : [farmName, plural(items.length, "talhão", "talhões")].filter(Boolean).join(" · ")
+      }
+      tabs={tabs.length > 1 ? tabs : undefined}
+      tab={tab}
+      onTab={(id) => {
+        setTab(id as Tab);
+        setMView("config");
+      }}
+      left={slots.left}
+      right={slots.right}
+      footer={slots.footer}
+      mobile={mobile}
+      mobileView={mView}
+      onMobileView={setMView}
+      mobilePreviewLabel={slots.mobilePreviewLabel}
+    />
   );
 }

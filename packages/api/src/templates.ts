@@ -33,6 +33,8 @@ export interface TimingStage {
   nozzle?: string | null;
   /** Estádio fenológico; vazio = sugerido pelos dias da etapa. */
   phenological_stage?: string | null;
+  /** Tanque do pulverizador (L); vai para a etapa ao publicar. */
+  tank_capacity_l?: number | string | null;
   /** Produtos do mix da etapa, já no GET do modelo (evita N+1 e cache separado). */
   mix_items?: MixTemplateItem[];
 }

@@ -130,10 +130,13 @@ export function sheetHtml(opts: {
   pageBreak?: boolean;
   /** Classe extra no invólucro (ex.: folha paisagem do caderno). */
   docClass?: string;
+  /** Rótulo da folha na prévia paginada (ex.: "Receita · Talhão C · Fungicida R1"). */
+  label?: string;
 }): string {
   const docClass = opts.docClass ? ` ${opts.docClass}` : "";
+  const label = opts.label ? ` data-label="${escapeHtml(opts.label)}"` : "";
   return `
-  <div class="doc${docClass}"${opts.pageBreak ? ' style="page-break-before: always"' : ""}>
+  <div class="doc${docClass}"${label}${opts.pageBreak ? ' style="page-break-before: always"' : ""}>
     <table class="sheet">
       <thead><tr><td>${opts.header}</td></tr></thead>
       <tbody><tr><td>${opts.body}</td></tr></tbody>

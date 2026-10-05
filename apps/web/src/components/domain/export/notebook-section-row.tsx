@@ -17,6 +17,8 @@ export interface NotebookRowProps {
   onToggle: () => void;
   /** Controle próprio da seção, na mesma linha (ex.: nº de folhas pautadas). */
   control?: React.ReactNode;
+  /** Clique na linha (fora do checkbox): leva a prévia até a seção. */
+  onSelect?: () => void;
 }
 
 /** Miolo da linha — igual na lista, na capa fixa e no overlay de arrasto. */
@@ -27,29 +29,50 @@ function RowBody({
   reason,
   onToggle,
   control,
+  onSelect,
   handle,
   inverted = false,
 }: NotebookRowProps & { handle: React.ReactNode; inverted?: boolean }) {
   const meta = NOTEBOOK_SECTIONS[id];
   return (
     <>
-      <label
+      {/* Só o checkbox marca; o resto da linha leva a prévia até a seção. */}
+      <div
+        role={onSelect ? "button" : undefined}
+        tabIndex={onSelect ? 0 : undefined}
+        onClick={onSelect}
+        onKeyDown={(event) => {
+          if (onSelect && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
         className={cn(
           // grow+basis (e não flex-1): abaixo de 10rem o rótulo para de
           // encolher e o controle quebra para a linha de baixo, em vez de
           // espremer o texto em seis linhas numa tela de 390px.
-          "flex min-w-0 grow basis-40 items-start gap-2.5 py-0.5",
-          available ? "cursor-pointer" : "cursor-not-allowed",
+          "flex min-w-0 grow basis-40 items-start gap-1 py-0.5",
+          onSelect && "cursor-pointer",
         )}
       >
-        <input
-          type="checkbox"
-          // No verde, `accent-primary` desenharia verde sobre verde.
-          className={cn("mt-0.5 size-4", inverted ? "accent-white" : "accent-primary")}
-          checked={enabled && available}
-          disabled={!available}
-          onChange={onToggle}
-        />
+        {/* Área de toque de 32px em volta da caixinha de 16px, sem mexer no desenho. */}
+        <label
+          onClick={(event) => event.stopPropagation()}
+          className={cn(
+            "-my-2 -ml-1.5 flex size-8 shrink-0 items-start justify-center rounded-md pt-2",
+            available ? "cursor-pointer hover:bg-black/5" : "cursor-not-allowed",
+          )}
+        >
+          <input
+            type="checkbox"
+            aria-label={meta.label}
+            // No verde, `accent-primary` desenharia verde sobre verde.
+            className={cn("mt-0.5 size-4", inverted ? "accent-white" : "accent-primary")}
+            checked={enabled && available}
+            disabled={!available}
+            onChange={onToggle}
+          />
+        </label>
         <span className="min-w-0">
           <span
             className={cn(
@@ -78,7 +101,7 @@ function RowBody({
             {available ? meta.description : reason}
           </span>
         </span>
-      </label>
+      </div>
       {control ? (
         // No estreito vira uma linha própria, depois do punho; a partir de
         // `sm` volta para o lugar dele, antes do punho.

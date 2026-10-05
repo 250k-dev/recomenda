@@ -14,6 +14,7 @@
  */
 import type { Recommendation } from "@recomenda/api";
 import type { PurchaseListDetail } from "@recomenda/api/purchase-lists";
+import type { PagedLayout } from "../print/paged";
 import {
   escapeHtml,
   footerHtml,
@@ -370,6 +371,7 @@ const NOTEBOOK_CSS = `
   .nb-toc li::before { content: counter(nb-toc); flex: 0 0 auto; width: 20px; font-size: 11px; font-weight: 700; color: #2f6d3f; font-variant-numeric: tabular-nums; }
   .nb-toc-label { font-size: 13px; font-weight: 600; color: #20201c; }
   .nb-toc-desc { font-size: 11px; color: #7a7a70; }
+  .nb-toc-page { margin-left: auto; flex: 0 0 auto; font-size: 12px; font-weight: 600; color: #2f6d3f; text-decoration: none; font-variant-numeric: tabular-nums; }
   /* Talhão curto fica inteiro na folha. Talhão longo (muitas etapas) pode
      continuar na seguinte: se fosse indivisível e não coubesse no espaço sob o
      título, o navegador o jogava inteiro para a próxima e deixava a folha em
@@ -498,7 +500,8 @@ function summaryPage(
   if (data.cropLabels.length) tags.push(data.cropLabels.join(" e "));
 
   // Lista o miolo: a capa não é item de sumário, e o sumário não se lista.
-  // Sem número de página — o Chrome não expõe contador de página ao conteúdo.
+  // O número da folha sai pelo `target-counter` da paginação (Paged.js); na
+  // impressão crua do navegador o link fica vazio.
   const toc = order
     .filter((id) => id !== "cover" && id !== "summary")
     .map((id) => {
@@ -508,6 +511,7 @@ function summaryPage(
             <span class="nb-toc-label">${escapeHtml(meta.label)}</span><br />
             <span class="nb-toc-desc">${escapeHtml(meta.description)}</span>
           </span>
+          <a class="nb-toc-page" href="#nb-sec-${id}"></a>
         </li>`;
     })
     .join("");
@@ -941,9 +945,10 @@ export function buildSeasonNotebookHtml(
 ): string {
   const order = resolvedNotebookSections(data, options.sections);
 
-  const pages = order.map((id, index) => {
-    // A primeira seção ligada abre o documento; o resto começa em folha nova.
-    const pageBreak = index > 0;
+  // Quem quebra a folha entre seções é o invólucro (abaixo): com a quebra
+  // também na 1ª folha da seção, a paginação abria uma folha em branco.
+  const pageBreak = false;
+  const pages = order.map((id) => {
     switch (id) {
       case "cover":
         return coverPage(data);
@@ -965,10 +970,18 @@ export function buildSeasonNotebookHtml(
         return notesPages(data, resolveNotesPages(options.notesPages));
     }
   });
+  // Invólucro por seção: a prévia paginada descobre em que folha cada seção
+  // começa (e o rótulo da folha) pelo `data-section`/`data-label`.
+  const sections = pages.map(
+    (html, index) =>
+      `<div class="nb-section" id="nb-sec-${order[index]}" data-section="${order[index]}" data-label="${escapeHtml(
+        NOTEBOOK_SECTIONS[order[index]].label,
+      )}"${index > 0 ? ' style="page-break-before: always"' : ""}>${html}</div>`,
+  );
 
   return htmlShell(
     `Caderno de safra - ${data.cycleName}`,
-    pages.join(""),
+    sections.join(""),
     REC_CSS + PURCHASE_LIST_CSS + NOTEBOOK_CSS,
   );
 }
@@ -981,3 +994,38 @@ export function printSeasonNotebook(
   if (resolvedNotebookSections(data, options.sections).length === 0) return;
   printHtml(buildSeasonNotebookHtml(data, options));
 }
+
+/**
+ * Paginação do caderno (prévia e impressão com o Paged.js): margem de
+ * lombada à esquerda, capa sem margem e sem cabeçalho/rodapé, acompanhamento
+ * em paisagem — as mesmas páginas nomeadas do CSS do caderno.
+ */
+export const NOTEBOOK_PAGED_LAYOUT: PagedLayout = {
+  margin: "22mm 14mm 16mm 22mm",
+  extraRules: `
+  @page cover {
+    margin: 0;
+    @top-left { content: none; }
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+  }
+  @page field { size: A4 landscape; margin: 18mm 10mm 14mm 16mm; }
+  /* O Paged.js 0.4 pagina tudo no tamanho do @page raiz: a folha nomeada
+     "field" ganha a classe, e aqui ela vira paisagem de fato. */
+  .pagedjs_page.pagedjs_field_page {
+    --pagedjs-width: 297mm; --pagedjs-height: 210mm;
+    --pagedjs-width-left: 297mm; --pagedjs-height-left: 210mm;
+    --pagedjs-width-right: 297mm; --pagedjs-height-right: 210mm;
+    --pagedjs-pagebox-width: 297mm; --pagedjs-pagebox-height: 210mm;
+  }
+  /* O invólucro da seção também é "cover": senão o fim dele cai numa folha
+     comum e sobra uma folha em branco depois da capa. */
+  .nb-section[data-section="cover"] { page: cover; }
+  .nb-section[style*="page-break-before"] { break-before: page; }
+  .nb-toc-page::after { content: "folha " target-counter(attr(href url), page); }`,
+  lateCss: `
+  @media print {
+    @page recomenda-landscape { size: 297mm 210mm; margin: 0; }
+    .pagedjs_page.pagedjs_field_page { page: recomenda-landscape; }
+  }`,
+};

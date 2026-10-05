@@ -90,7 +90,7 @@ export interface Recommendation {
   nozzle?: string | null;
   /** Estádio fenológico; vazio = sugerido pelos dias da etapa. */
   phenological_stage?: string | null;
-  /** Tanque (L) desta etapa; null = o da fazenda. */
+  /** Tanque do pulverizador (L) desta etapa (vem do modelo, editável aqui). */
   tank_capacity_l?: number | null;
   items: RecommendationItem[];
 }
@@ -297,9 +297,29 @@ export async function patchRecommendation(
     application_time?: string | null;
     nozzle?: string | null;
     phenological_stage?: string | null;
+    /** Leva os dados da aplicação para a mesma etapa pendente nos outros talhões. */
+    apply_to_same_stage?: boolean;
   },
 ) {
-  const { data } = await api.patch(`/recommendations/${id}`, payload);
+  const { data } = await api.patch<{ affected: number; replicated?: number }>(
+    `/recommendations/${id}`,
+    payload,
+  );
+  return data;
+}
+
+/** A mesma etapa (pelo nome) nos outros talhões da safra, com o status. */
+export interface SameStageRecommendation {
+  id: string;
+  season_id: string;
+  name: string;
+  status: string;
+  plot_name: string;
+  farm_name: string;
+}
+
+export async function getSameStageRecommendations(id: string) {
+  const { data } = await api.get<SameStageRecommendation[]>(`/recommendations/${id}/same-stage`);
   return data;
 }
 

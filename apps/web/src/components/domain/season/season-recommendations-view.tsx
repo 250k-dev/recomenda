@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, LayoutTemplate, Leaf, ListOrdered, Pencil, Plus, Share2, Wheat } from "lucide-react";
+import { CalendarDays, LayoutTemplate, Leaf, ListOrdered, Pencil, Plus, Share2, SlidersHorizontal, Wheat } from "lucide-react";
 import { PageHero } from "@/components/domain/page-hero";
 import { TimelineCardsSkeleton } from "@/components/domain/page-skeletons";
 import { EmptyState } from "@recomenda/ui/patterns/empty-state";
@@ -31,6 +31,7 @@ import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 import { extractError } from "@/components/domain/season/_shared";
 import { RecommendationCard, type ListProductPlan } from "@/components/domain/season/recommendation-card";
 import { RecommendationExportDialog } from "@/components/domain/season/recommendation-export-dialog";
+import { SeasonApplicationDataDialog } from "@/components/domain/season/season-application-data-dialog";
 import { PlantingDateRegisterPopover } from "@/components/domain/season/planting-date-register-popover";
 import { SeasonMixOrderDialog } from "@/components/domain/season/season-mix-order-dialog";
 import { EditSeasonCropDialog } from "@/components/domain/season/edit-season-crop-dialog";
@@ -41,7 +42,8 @@ import {
   RegisterHarvestDialog,
 } from "@/components/domain/season/register-harvest-dialog";
 import { fmtDate } from "@recomenda/domain/recommendations/format";
-import { printApplicationRecipes } from "@recomenda/domain/recommendations/recipe-document";
+import { buildApplicationRecipesHtml } from "@recomenda/domain/recommendations/recipe-document";
+import { printPaged } from "@/lib/print/paged-document";
 import type { FormulationKey } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { routes } from "@recomenda/config";
 import { EXPORT_ACTION_CLASS } from "@/components/domain/export-action-class";
@@ -385,10 +387,9 @@ export function SeasonRecommendationsView({
   // senão todos os itens piscariam em vermelho enquanto a lista não chega.
   const listReady = !catalogLoading;
   const [addingStage, setAddingStage] = useState(false);
-  // Botão de "Adicionar etapa" repetido no fim da lista (aparece quando há
-  // muitas etapas) para o agrônomo não precisar rolar até o topo.
-  const [addingStageBottom, setAddingStageBottom] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [applicationOpen, setApplicationOpen] = useState(false);
+  const addStageRef = useRef<HTMLDivElement>(null);
   const [mixOrderOpen, setMixOrderOpen] = useState(false);
   const [cropEditOpen, setCropEditOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
@@ -444,7 +445,6 @@ export function SeasonRecommendationsView({
       cycleDays: row?.cycle_days ?? null,
       desiccationDate: row?.desiccation_date ?? seasonLive?.desiccation_date ?? null,
       crop: crop ?? row?.crop ?? null,
-      tankCapacityL: farm?.tank_capacity_l ?? null,
     };
   }, [crop, cycle, cyclePurchaseList, seasonId, seasonLive]);
 
@@ -655,13 +655,54 @@ export function SeasonRecommendationsView({
     unitPriceByProduct,
   };
 
+  const canEditCrop =
+    canSeasonCrud && seasonStatus !== "ARCHIVED" && seasonStatus !== "HARVESTED";
+
   return (
-    <div className="flex flex-col gap-5">
+    // pb: o fim da lista não fica embaixo do rodapé fixo.
+    <div className="flex flex-col gap-5 pb-24 md:pb-20">
       <PageHero
         className="mb-7"
         icon={<Leaf className="size-6" />}
         eyebrow="Safra em execução"
         title={title}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setApplicationOpen(true)}>
+              <SlidersHorizontal className="h-4 w-4 shrink-0" />
+              Dados da aplicação
+            </Button>
+            <Button size="sm" className={cn("gap-1.5", EXPORT_ACTION_CLASS)} onClick={() => setExportOpen(true)}>
+              <Share2 className="h-4 w-4 shrink-0" />
+              Exportar
+            </Button>
+            {canManageStages ? (
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setMixOrderOpen(true)}>
+                <ListOrdered className="h-4 w-4 shrink-0 text-muted-foreground" />
+                Ordem de mistura
+              </Button>
+            ) : null}
+            {canManageStages ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setTemplateOpen(true)}
+                disabled={hasAppliedStage}
+                title={applyTemplateTitle}
+              >
+                <LayoutTemplate className="h-4 w-4 shrink-0" />
+                Aplicar modelo
+              </Button>
+            ) : null}
+            {harvestable ? (
+              <Button size="sm" className="gap-1.5" onClick={() => setHarvestOpen(true)}>
+                <Wheat className="h-4 w-4 shrink-0" />
+                Registrar colheita
+              </Button>
+            ) : null}
+          </div>
+        }
         stats={[
           ...(plotName ? [{ label: "Talhão", value: plotName }] : []),
           {
@@ -695,31 +736,17 @@ export function SeasonRecommendationsView({
         </div>
       </PageHero>
 
-      <ScheduleToolbar
-        showExport
-        onExport={() => setExportOpen(true)}
-        canManageStages={canManageStages}
-        canEditCrop={
-          canSeasonCrud &&
-          seasonStatus !== "ARCHIVED" &&
-          seasonStatus !== "HARVESTED"
-        }
-        harvestable={harvestable}
-        onMixOrder={() => setMixOrderOpen(true)}
-        onEditCrop={() => setCropEditOpen(true)}
-        onHarvest={() => setHarvestOpen(true)}
-        onApplyTemplate={() => setTemplateOpen(true)}
-        applyTemplateDisabled={hasAppliedStage}
-        applyTemplateTitle={applyTemplateTitle}
-        onAddStage={() => setAddingStage((v) => !v)}
-        producerId={producerId}
-      />
+      <h2 className="text-base font-semibold font-display text-text-strong">
+        Etapas do cronograma
+      </h2>
 
       {addingStage ? (
-        <AddStagePanel
-          seasonId={seasonId}
-          onClose={() => setAddingStage(false)}
-        />
+        <div ref={addStageRef} className="scroll-mt-4">
+          <AddStagePanel
+            seasonId={seasonId}
+            onClose={() => setAddingStage(false)}
+          />
+        </div>
       ) : null}
 
       <ul className="flex flex-col gap-3">
@@ -749,46 +776,68 @@ export function SeasonRecommendationsView({
             listReady={listReady}
             recipe={{
               areaHa: exportSpec.plantedAreaHa ?? exportSpec.areaHa ?? null,
-              farmTankCapacityL: exportSpec.tankCapacityL,
               crop: exportSpec.crop,
+              // Paginado (Paged.js): sai igual à prévia do Exportar, com "Folha X de Y".
               onPrint: (stage) =>
-                printApplicationRecipes(
-                  [{ ...shareData, recommendations: [stage] }],
-                  `Receita - ${stage.name} - ${plotName ?? ""}`,
+                printPaged(
+                  buildApplicationRecipesHtml(
+                    [{ ...shareData, recommendations: [stage] }],
+                    `Receita - ${stage.name} - ${plotName ?? ""}`,
+                  ),
                 ),
             }}
           />
         ))}
       </ul>
 
-      {/* Etapas costumam passar de 4 — repete o "adicionar" embaixo da última,
-          como um card fantasma com + centralizado, pra não obrigar o agrônomo a
-          rolar de volta ao topo. */}
-      {canManageStages && recommendations.length >= 4 ? (
-        addingStageBottom ? (
-          <AddStagePanel
-            seasonId={seasonId}
-            onClose={() => setAddingStageBottom(false)}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAddingStageBottom(true)}
-            className="flex flex-col items-center justify-center w-full gap-2 py-8 transition-colors border-2 border-dashed rounded-xl border-border bg-card/30 text-muted-foreground hover:border-primary/50 hover:bg-primary-soft/30 hover:text-primary-strong"
-          >
-            <span className="flex items-center justify-center border-2 border-current border-dashed rounded-full h-11 w-11">
-              <Plus className="w-5 h-5" />
-            </span>
-            <span className="text-sm font-medium">Adicionar etapa</span>
-          </button>
-        )
-      ) : null}
-
       <RecommendationExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
         data={shareData}
       />
+      <SeasonApplicationDataDialog
+        open={applicationOpen}
+        onOpenChange={setApplicationOpen}
+        seasonId={seasonId}
+        data={shareData}
+        canEdit={canManageStages}
+      />
+      {canManageStages || canEditCrop ? (
+        // Rodapé fixo (mesmo padrão do editor de modelo): editar cultivo e
+        // adicionar etapa à mão em qualquer ponto do cronograma.
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-[0_-6px_20px_-8px_rgb(0_0_0/0.25)] backdrop-blur print:hidden">
+          <div className="mx-auto grid w-full max-w-[calc(var(--container-app)+2rem)] grid-cols-2 gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:flex md:max-w-[calc(var(--container-app)+4rem)] md:flex-wrap md:items-center md:justify-end md:px-8">
+            {canEditCrop ? (
+              <Button
+                type="button"
+                variant="outline"
+                className={cn("w-full gap-2 md:w-auto", !canManageStages && "col-span-2")}
+                onClick={() => setCropEditOpen(true)}
+              >
+                <Pencil className="h-4 w-4" />
+                Editar cultivo
+              </Button>
+            ) : null}
+            {canManageStages ? (
+              <Button
+                type="button"
+                className={cn("w-full gap-2 md:w-auto", !canEditCrop && "col-span-2")}
+                onClick={() => {
+                  setAddingStage(true);
+                  // O painel abre no topo das etapas: leva o agrônomo até ele.
+                  window.setTimeout(
+                    () => addStageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                    50,
+                  );
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Adicionar etapa
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <SeasonMixOrderDialog
         open={mixOrderOpen}
         onOpenChange={setMixOrderOpen}

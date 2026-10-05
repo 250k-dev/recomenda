@@ -338,8 +338,6 @@ export function CycleExportButton({
             cycleDays: season.cycle_days,
             desiccationDate: season.desiccation_date,
             crop: season.crop,
-            tankCapacityL:
-              cycle.farms.find((f) => f.id === season.farm_id)?.tank_capacity_l ?? null,
           },
           unitPriceByProduct: unitPrices,
         },
@@ -509,6 +507,7 @@ export function CycleExportButton({
         items={sortedItems}
         cover={cover}
         notebook={notebook}
+        applicationData
         notebookUnavailable={
           cycle?.backfill
             ? { stock: "Safra de arquivo: o estoque de hoje não é o desta safra." }

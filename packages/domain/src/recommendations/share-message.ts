@@ -30,8 +30,6 @@ export interface SharePlotSpec {
   desiccationDate?: string | null;
   /** Código da cultura (SOYBEAN/CORN/BEAN) — sugestão de estádio na receita. */
   crop?: string | null;
-  /** Tanque do pulverizador da fazenda (L) — padrão da receita de aplicação. */
-  tankCapacityL?: number | null;
 }
 
 export interface RecommendationShareData {

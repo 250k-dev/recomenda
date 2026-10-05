@@ -8,8 +8,6 @@ import { PageHero } from "@/components/domain/page-hero";
 import { FarmLocationFields } from "@/components/domain/farm-location-fields";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
-import { MoneyInput } from "@recomenda/ui/forms/money-input";
-import { draftNumber, numberDraft } from "@/components/domain/application-data-fields";
 import {
   Dialog,
   DialogContent,
@@ -52,14 +50,10 @@ export default function FarmDetailPage() {
   const [editName, setEditName] = useState("");
   const [editStateUf, setEditStateUf] = useState("");
   const [editCity, setEditCity] = useState("");
-  const [editTank, setEditTank] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
 
   // Semeia o formulário ao abrir o dialog (evita useEffect + setState).
-  const editSeed =
-    editOpen && farm
-      ? `${farm.id}:${farm.name}:${farm.location ?? ""}:${farm.tank_capacity_l ?? ""}`
-      : null;
+  const editSeed = editOpen && farm ? `${farm.id}:${farm.name}:${farm.location ?? ""}` : null;
   const [prevEditSeed, setPrevEditSeed] = useState<string | null>(null);
   if (editSeed !== prevEditSeed) {
     setPrevEditSeed(editSeed);
@@ -68,7 +62,6 @@ export default function FarmDetailPage() {
       const parsed = parseFarmLocation(farm.location);
       setEditStateUf(parsed.uf);
       setEditCity(parsed.city);
-      setEditTank(numberDraft(farm.tank_capacity_l));
       setNameError(null);
     }
   }
@@ -83,7 +76,6 @@ export default function FarmDetailPage() {
       {
         name: editName.trim(),
         location: optionalFarmLocation(editCity, editStateUf) ?? "",
-        tank_capacity_l: draftNumber(editTank),
       },
       {
         onSuccess: () => {
@@ -159,13 +151,6 @@ export default function FarmDetailPage() {
           },
           { label: "Área total", value: `${fmtHa(totalHectares)} ha` },
           { label: "Safras ativas", value: activeSeasonsCount },
-          {
-            label: "Tanque",
-            value: draftNumber(numberDraft(farm?.tank_capacity_l))
-              ? `${fmtHa(Number(farm?.tank_capacity_l))} L`
-              : "Não informado",
-            onClick: () => setEditOpen(true),
-          },
         ]}
       />
 
@@ -209,25 +194,6 @@ export default function FarmDetailPage() {
               onStateChange={setEditStateUf}
               onCityChange={setEditCity}
             />
-            <div className="space-y-1.5">
-              <label
-                htmlFor="edit-farm-tank"
-                className="mb-1.5 block text-xs font-medium text-foreground"
-              >
-                Tanque do pulverizador (L)
-              </label>
-              <MoneyInput
-                id="edit-farm-tank"
-                value={editTank}
-                onValueChange={setEditTank}
-                placeholder="Ex.: 2.000"
-                className="text-right tabular-nums"
-              />
-              <p className="text-xs text-muted-foreground">
-                Padrão das receitas de aplicação desta fazenda (nº de tanques e
-                quantidade por tanque). Cada etapa pode usar outro.
-              </p>
-            </div>
           </div>
           <DialogFooter className="sm:flex-row sm:justify-end">
             <Button
