@@ -191,20 +191,20 @@ export function SeasonApplicationDataDialog({
     </div>
   );
 
-  const form =
-    selectedRecs.length === 0 ? (
-      <div className="rounded-xl border border-dashed border-[#d9d6ca] px-4 py-10 text-center text-[13px] text-[#6b6a62]">
-        {editableIds.length
-          ? "Marque abaixo uma ou mais etapas pendentes para preencher."
-          : "Não há etapas pendentes com calda neste talhão — as registradas mantêm os dados com que foram feitas."}
-      </div>
-    ) : (
+  // O formulário fica sempre à vista; sem etapa marcada, desabilitado.
+  const none = selectedRecs.length === 0;
+  const form = (
       <div className="flex min-w-0 flex-col gap-3">
         <div>
-          <p className="text-sm font-semibold">{single ? single.name : `${selectedRecs.length} etapas marcadas`}</p>
+          <p className="text-sm font-semibold">
+            {none ? "Nenhuma etapa marcada" : single ? single.name : `${selectedRecs.length} etapas marcadas`}
+          </p>
           <p className="text-xs text-[#6b6a62]">
-            {areaHa ? `${areaHa.toLocaleString("pt-BR")} ha` : "Área não informada"}
-            {single ? "" : " · só muda o campo que você editar"}
+            {none
+              ? editableIds.length
+                ? "Marque abaixo uma ou mais etapas pendentes para preencher."
+                : "Não há etapas pendentes com calda neste talhão — as registradas mantêm os dados com que foram feitas."
+              : `${areaHa ? `${areaHa.toLocaleString("pt-BR")} ha` : "Área não informada"}${single ? "" : " · só muda o campo que você editar"}`}
           </p>
         </div>
         <FormBlock title="Calda, tanques e operação">
@@ -216,7 +216,7 @@ export function SeasonApplicationDataDialog({
             }}
             areaHa={areaHa}
             stageSuggestion={stageSuggestion}
-            readOnly={!canEdit}
+            readOnly={!canEdit || none}
             mixed={common.mixed}
             hideStage={!single}
           />
@@ -226,7 +226,7 @@ export function SeasonApplicationDataDialog({
             </p>
           ) : null}
         </FormBlock>
-        {canEdit ? (
+        {canEdit && !none ? (
           <div className="rounded-xl border border-[#e2e0d6] bg-white">
             <button
               type="button"

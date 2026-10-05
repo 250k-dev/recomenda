@@ -237,11 +237,16 @@ export function FarmSeasonsExportDialog({
 
   // ---------------------------------------------------------- outras abas
   const applicationTab = useCycleApplicationTab({
-    items: items.map((i) => i.data),
+    open,
+    items,
     isLoading,
     onClose: () => onOpenChange(false),
-    onSeeRecipes: (keys) => {
-      const ids = allRecs.filter((rec) => keys.includes(stageKey(rec.name))).map((rec) => rec.id);
+    onSeeRecipes: (keys, plotIds) => {
+      const ids = items
+        .filter((item) => plotIds.includes(item.id))
+        .flatMap((item) => item.data.recommendations)
+        .filter((rec) => keys.includes(stageKey(rec.name)))
+        .map((rec) => rec.id);
       setSelected(new Set(ids));
       setTab("export");
       setMode("stage");
@@ -392,6 +397,13 @@ export function FarmSeasonsExportDialog({
 
   const plotsWithSelection = items.filter((i) => i.data.recommendations.some((r) => selected.has(r.id))).length;
 
+  // PDF grande (safra com muitos talhões): avisa antes de paginar. Estimativa
+  // até a prévia contar: capa + ~2 etapas por folha de resumo + 1 por receita.
+  const estimatedPages =
+    total ||
+    (incReport ? 1 + tSel + Math.ceil(nSel / 2) : 0) + (incRecipes ? recipeCount : 0);
+  const bigPdf = Boolean(html) && estimatedPages > 100;
+
   const exportLeft = isLoading ? (
     <SkeletonList rows={6} />
   ) : items.length === 0 ? (
@@ -420,6 +432,12 @@ export function FarmSeasonsExportDialog({
             on={incRecipes}
             onToggle={() => setIncRecipes((v) => !v)}
           />
+          {bigPdf ? (
+            <p className="rounded-[10px] bg-[#fdf3e7] px-3 py-2 text-xs text-[#8a5a00]">
+              PDF grande (~{fmtPages(estimatedPages)}): pode levar alguns segundos para gerar. Para enxugar,
+              use “Por talhão” e marque só a fazenda que precisa.
+            </p>
+          ) : null}
         </div>
       </Step>
 

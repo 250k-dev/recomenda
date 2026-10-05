@@ -36,12 +36,15 @@ export function pagedDocumentHtml(
   layout: PagedLayout = DEFAULT_PAGED_LAYOUT,
 ): string {
   const head = `
-<style>${buildPagedCss(layout)}${PAGED_SCREEN_CSS}</style>
+<style>${buildPagedCss(layout)}</style>
 <script>
   window.PagedConfig = {
     auto: true,
     after: function (flow) {
-      var late = ${JSON.stringify(layout.lateCss ?? "")};
+      // CSS de tela entra só depois de paginar: o Paged.js reprocessa os
+      // <style> do documento e descartava o @media screen (folhas encostadas
+      // à esquerda, sem o rótulo de cada folha).
+      var late = ${JSON.stringify(PAGED_SCREEN_CSS)} + ${JSON.stringify(layout.lateCss ?? "")};
       if (late) {
         var style = document.createElement("style");
         style.textContent = late;

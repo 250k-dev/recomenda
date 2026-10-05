@@ -401,8 +401,10 @@ export function PreviewToolbar({
   zoom,
   effectiveZoom,
   onZoom,
+  extra,
 }: {
   title: ReactNode;
+  extra?: ReactNode;
   zoom: PreviewZoom;
   effectiveZoom: number;
   onZoom: (zoom: PreviewZoom) => void;
@@ -414,6 +416,7 @@ export function PreviewToolbar({
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-[#dedbd0] bg-[#f6f4ee] px-4 py-2.5">
       <div className="min-w-0 flex-1 truncate text-[13px] font-semibold">{title}</div>
+      {extra}
       <div className="flex items-center rounded-lg border border-[#d9d6ca] bg-white">
         <button type="button" aria-label="Diminuir zoom" className="p-1.5 text-[#55534b]" onClick={() => step(-0.1)}>
           <Minus className="size-3.5" />

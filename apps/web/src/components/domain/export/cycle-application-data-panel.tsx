@@ -22,13 +22,20 @@ import {
 import {
   DataStageRow,
   FormBlock,
+  PlotPicker,
+  type PlotOption,
   RecipeLivePreview,
   withRecipeDraft,
 } from "@/components/domain/export/application-data-ui";
 import { ExportFooter, FooterButton, SkeletonList } from "@/components/domain/export/export-ui";
 import { stageKey } from "@/components/domain/export/export-helpers";
 
-type StageEntry = { rec: Recommendation; data: RecommendationShareData };
+type StageEntry = { rec: Recommendation; data: RecommendationShareData; plotId: string };
+
+/** Um talhão da safra no "Onde aplicar". */
+export type ApplicationPlotItem = { id: string; label: string; data: RecommendationShareData };
+
+const sprayPending = (rec: Recommendation) => rec.status === "PENDING" && !nonSprayOperation(rec.items);
 
 type StageGroup = {
   key: string;
@@ -41,9 +48,9 @@ type StageGroup = {
   firstOrder: number;
 };
 
-export function groupStages(datas: RecommendationShareData[]): StageGroup[] {
+export function groupStages(plots: ApplicationPlotItem[]): StageGroup[] {
   const byKey = new Map<string, StageGroup>();
-  for (const data of datas) {
+  for (const { id: plotId, data } of plots) {
     for (const rec of data.recommendations) {
       const key = stageKey(rec.name);
       let group = byKey.get(key);
@@ -58,8 +65,8 @@ export function groupStages(datas: RecommendationShareData[]): StageGroup[] {
         };
         byKey.set(key, group);
       }
-      group.entries.push({ rec, data });
-      if (rec.status === "PENDING" && !nonSprayOperation(rec.items)) group.pending.push({ rec, data });
+      group.entries.push({ rec, data, plotId });
+      if (sprayPending(rec)) group.pending.push({ rec, data, plotId });
       group.firstOrder = Math.min(group.firstOrder, rec.order_index);
     }
   }
@@ -67,29 +74,50 @@ export function groupStages(datas: RecommendationShareData[]): StageGroup[] {
 }
 
 /**
- * Aba "Dados da aplicação" do Exportar safra: as etapas agrupadas pelo nome
- * em todos os talhões. Marca um grupo, preenche e grava nas etapas PENDENTES
- * em todos os talhões; a tabela mostra como fica a calda de cada um e a
- * prévia, a receita do primeiro. Hook: entrega as partes da moldura.
+ * Aba "Dados da aplicação" do Exportar safra. Primeiro "onde aplicar"
+ * (fazendas e talhões — pulverizadores diferentes por fazenda), depois as
+ * etapas pelo nome, só as que existem nesses talhões. Grava nas etapas
+ * PENDENTES dos talhões marcados. A prévia mostra uma receita por etapa (de um
+ * talhão de exemplo, escolhível): com 200 talhões, 200 folhas iguais não
+ * ajudam a conferir e travam a tela. Hook: entrega as partes da moldura.
  */
 export function useCycleApplicationTab({
+  open,
   items,
   isLoading = false,
   onSeeRecipes,
   onClose,
 }: {
-  items: RecommendationShareData[];
+  /** Diálogo aberto: a cada abertura, nada marcado. */
+  open: boolean;
+  items: ApplicationPlotItem[];
   isLoading?: boolean;
-  /** "Ver receitas →" do toast: vai para a aba Exportar com essas etapas. */
-  onSeeRecipes: (stageKeys: string[]) => void;
+  /** "Ver receitas →" do toast: vai para a aba Exportar com essas etapas nesses talhões. */
+  onSeeRecipes: (stageKeys: string[], plotIds: string[]) => void;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const canEdit = useCan("RECOMMENDATION_EDIT_STRUCTURE");
-  const groups = useMemo(() => groupStages(items), [items]);
+  const [plots, setPlots] = useState<Set<string>>(new Set());
+  const scoped = useMemo(() => items.filter((item) => plots.has(item.id)), [items, plots]);
+  const groups = useMemo(() => groupStages(scoped), [scoped]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [previewPlot, setPreviewPlot] = useState<string | null>(null);
   const [draft, setDraft] = useState<ApplicationDataDraft>(emptyApplicationData());
   const [touched, setTouched] = useState<Set<ApplicationDraftKey>>(new Set());
+
+  // A cada abertura do diálogo: nenhum talhão nem etapa marcados.
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setPlots(new Set());
+      setSelected(new Set());
+      setPreviewPlot(null);
+      setDraft(emptyApplicationData());
+      setTouched(new Set());
+    }
+  }
   const [saving, setSaving] = useState(false);
 
   const selectedGroups = groups.filter((g) => selected.has(g.key));
@@ -97,14 +125,27 @@ export function useCycleApplicationTab({
   const common = commonApplicationDraft(targets.map((t) => t.rec));
   const keys = [...touched].filter((key) => key !== "phenologicalStage");
 
-  const resetForm = (next: Set<string>) => {
+  const resetForm = (next: Set<string>, scope: StageGroup[] = groups) => {
     setSelected(next);
     setDraft(
-      commonApplicationDraft(groups.filter((g) => next.has(g.key)).flatMap((g) => g.pending.map((t) => t.rec)))
+      commonApplicationDraft(scope.filter((g) => next.has(g.key)).flatMap((g) => g.pending.map((t) => t.rec)))
         .value,
     );
     setTouched(new Set());
   };
+  // Trocar os talhões recalcula o "comum" do formulário no recorte novo.
+  const changePlots = (next: Set<string>) => {
+    setPlots(next);
+    resetForm(selected, groupStages(items.filter((item) => next.has(item.id))));
+  };
+
+  const plotOptions: PlotOption[] = items.map((item) => ({
+    id: item.id,
+    label: item.label,
+    farmName: item.data.spec?.farmName ?? "Sem fazenda",
+    areaHa: item.data.spec?.plantedAreaHa ?? item.data.spec?.areaHa ?? null,
+    pending: item.data.recommendations.filter(sprayPending).length,
+  }));
   const toggle = (key: string) => {
     const next = new Set(selected);
     if (next.has(key)) next.delete(key);
@@ -114,13 +155,19 @@ export function useCycleApplicationTab({
 
   const noPending = groups.every((g) => g.pending.length === 0);
 
-  // Todas as receitas que o salvar vai mudar: talhão a talhão, na ordem das
-  // etapas, com o rascunho aplicado.
-  const previewSheets = items.map((data) => ({
-    ...data,
-    recommendations: targets
-      .filter((target) => target.data === data)
-      .map((target) => withRecipeDraft(target.rec, keys, draft))
+  // Prévia: uma receita por etapa marcada, do talhão de exemplo (ou, onde
+  // ele não tem a etapa pendente, do primeiro que tem).
+  const previewCandidates = items.filter((item) => targets.some((t) => t.plotId === item.id));
+  const examplePlot =
+    previewCandidates.find((item) => item.id === previewPlot)?.id ?? previewCandidates[0]?.id ?? null;
+  const examples = selectedGroups
+    .map((g) => g.pending.find((t) => t.plotId === examplePlot) ?? g.pending[0])
+    .filter((t): t is StageEntry => Boolean(t));
+  const previewSheets = items.map((item) => ({
+    ...item.data,
+    recommendations: examples
+      .filter((t) => t.plotId === item.id)
+      .map((t) => withRecipeDraft(t.rec, keys, draft))
       .sort((a, b) => a.order_index - b.order_index),
   }));
 
@@ -128,6 +175,7 @@ export function useCycleApplicationTab({
     if (targets.length === 0 || keys.length === 0) return;
     const payload = recipeFieldsPayload(keys, draft);
     const savedKeys = selectedGroups.map((g) => g.key);
+    const savedPlots = [...plots];
     const unchanged = selectedGroups.reduce(
       (sum, g) => sum + g.entries.filter((e) => e.rec.status !== "PENDING").length,
       0,
@@ -141,7 +189,7 @@ export function useCycleApplicationTab({
       toast.success(
         `Salvo em ${n} ${n === 1 ? "etapa pendente" : "etapas pendentes"}.` +
           (unchanged ? ` ${unchanged} ${unchanged === 1 ? "registrada não mudou" : "registradas não mudaram"}.` : ""),
-        { action: { label: "Ver receitas →", onClick: () => onSeeRecipes(savedKeys) } },
+        { action: { label: "Ver receitas →", onClick: () => onSeeRecipes(savedKeys, savedPlots) } },
       );
       setTouched(new Set());
     } catch (e) {
@@ -154,7 +202,7 @@ export function useCycleApplicationTab({
   const list = (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold tracking-wider text-[#7a786e] uppercase">Etapas da safra</span>
+        <span className="text-[11px] font-bold tracking-wider text-[#7a786e] uppercase">Etapas</span>
         <span className="flex gap-2.5 text-[12.5px] font-semibold">
           <button
             type="button"
@@ -168,12 +216,16 @@ export function useCycleApplicationTab({
           </button>
         </span>
       </div>
-      {noPending ? (
+      {plots.size === 0 ? (
+        <p className="rounded-[10px] border border-dashed border-[#d9d6ca] px-3 py-4 text-center text-[12.5px] text-[#6b6a62]">
+          Marque acima os talhões para ver as etapas deles.
+        </p>
+      ) : noPending ? (
         <div className="flex gap-2 rounded-[10px] bg-[#e3efe4] p-3 text-[12.5px] text-[#24562f]">
           <Check className="mt-0.5 size-4 flex-none" />
           <span>
-            <b>Tudo registrado.</b> Não há etapas pendentes nesta safra — as aplicadas mantêm os dados com que
-            foram feitas.
+            <b>Tudo registrado.</b> Não há etapas pendentes nesses talhões — as aplicadas mantêm os dados com
+            que foram feitas.
           </span>
         </div>
       ) : null}
@@ -204,21 +256,22 @@ export function useCycleApplicationTab({
     </div>
   );
 
-  const form =
-    selectedGroups.length === 0 ? (
-      <div className="rounded-xl border border-dashed border-[#d9d6ca] px-4 py-10 text-center text-[13px] text-[#6b6a62]">
-        Marque abaixo as etapas que levam a mesma configuração. Vale para todos os talhões da safra — etapas
-        já registradas não mudam.
-      </div>
-    ) : (
+  // O formulário fica sempre à vista; sem etapa marcada, desabilitado.
+  const noTargets = targets.length === 0;
+  const form = (
       <div className="flex min-w-0 flex-col gap-3">
         <div>
           <p className="text-sm font-semibold">
-            {selectedGroups.length === 1 ? selectedGroups[0].name : `${selectedGroups.length} etapas marcadas`}
+            {noTargets
+              ? "Nenhuma etapa marcada"
+              : selectedGroups.length === 1
+                ? selectedGroups[0].name
+                : `${selectedGroups.length} etapas marcadas`}
           </p>
           <p className="text-xs text-[#6b6a62]">
-            {targets.length} {targets.length === 1 ? "aplicação pendente" : "aplicações pendentes"} · cada talhão usa a
-            área dele
+            {noTargets
+              ? "Marque os talhões e, abaixo, as etapas para preencher."
+              : `${targets.length} ${targets.length === 1 ? "aplicação pendente" : "aplicações pendentes"} · cada talhão usa a área dele`}
           </p>
         </div>
         <FormBlock title="Calda, tanque e operação">
@@ -228,7 +281,7 @@ export function useCycleApplicationTab({
               setDraft((prev) => ({ ...prev, ...patch }));
               setTouched((prev) => new Set([...prev, ...(Object.keys(patch) as ApplicationDraftKey[])]));
             }}
-            readOnly={!canEdit}
+            readOnly={!canEdit || noTargets}
             mixed={common.mixed}
             hideStage
           />
@@ -243,12 +296,30 @@ export function useCycleApplicationTab({
 
   const left = isLoading ? (
     <SkeletonList rows={6} />
-  ) : groups.length === 0 ? (
-    <p className="text-sm text-[#6b6a62]">Nenhuma etapa na safra.</p>
+  ) : items.length === 0 ? (
+    <p className="text-sm text-[#6b6a62]">Nenhum talhão na safra.</p>
   ) : (
-    // Formulário em cima, lista embaixo: a coluna é estreita (mesma proporção
+    // Onde aplicar → formulário → etapas: a coluna é estreita (mesma proporção
     // das outras abas) e o que se edita fica sempre à vista.
     <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold tracking-wider text-[#7a786e] uppercase">Onde aplicar</span>
+          <span className="flex gap-2.5 text-[12.5px] font-semibold">
+            <button
+              type="button"
+              className="text-[#2f6d3f] hover:underline"
+              onClick={() => changePlots(new Set(items.map((item) => item.id)))}
+            >
+              Todos
+            </button>
+            <button type="button" className="text-[#2f6d3f] hover:underline" onClick={() => changePlots(new Set())}>
+              Nenhum
+            </button>
+          </span>
+        </div>
+        <PlotPicker plots={plotOptions} selected={plots} onChange={changePlots} />
+      </div>
       {form}
       {list}
     </div>
@@ -257,7 +328,23 @@ export function useCycleApplicationTab({
   const right = (
     <RecipeLivePreview
       sheets={previewSheets}
-      emptyText="Marque uma etapa pendente para ver a receita como vai sair."
+      emptyText="Marque os talhões e uma etapa pendente para ver a receita como vai sair."
+      extra={
+        previewCandidates.length > 1 ? (
+          <select
+            aria-label="Talhão de exemplo da prévia"
+            value={examplePlot ?? ""}
+            onChange={(event) => setPreviewPlot(event.target.value)}
+            className="h-8 max-w-44 truncate rounded-lg border border-[#d9d6ca] bg-white px-2 text-xs"
+          >
+            {previewCandidates.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        ) : null
+      }
     />
   );
 
