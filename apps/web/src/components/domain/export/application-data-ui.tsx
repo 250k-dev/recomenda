@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import type { Recommendation } from "@recomenda/api";
+import type { SameStageRecommendation } from "@recomenda/api/seasons";
 import type { RecommendationShareData } from "@recomenda/domain/recommendations/share-message";
 import { buildApplicationRecipesHtml } from "@recomenda/domain/recommendations/recipe-document";
 import { cn } from "@recomenda/utils";
@@ -179,6 +181,115 @@ export function PlotPicker({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * "Aplicar também nos outros talhões": fechado por padrão, com o resumo na
+ * linha ("recebe em 12 talhões · 3 registradas não mudam"). Aberto, lista os
+ * talhões agrupados por etapa, com rolagem própria — numa fazenda com muitas
+ * etapas e talhões, chips soltos viravam um paredão.
+ */
+export function SameStageDisclosure({
+  rows,
+  loading,
+  replicate,
+  onToggleReplicate,
+}: {
+  rows: SameStageRecommendation[];
+  loading: boolean;
+  replicate: boolean;
+  onToggleReplicate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const pending = rows.filter((row) => row.status === "PENDING").length;
+  const locked = rows.length - pending;
+  const byStage = useMemo(() => {
+    const map = new Map<string, SameStageRecommendation[]>();
+    for (const row of rows) map.set(row.name, [...(map.get(row.name) ?? []), row]);
+    return [...map.entries()];
+  }, [rows]);
+
+  const summary = loading
+    ? "Procurando nos outros talhões…"
+    : rows.length === 0
+      ? "Nenhum outro talhão tem essa etapa."
+      : [
+          pending ? `recebe em ${pending} ${pending === 1 ? "talhão" : "talhões"}` : "nenhum pendente",
+          locked ? `${locked} ${locked === 1 ? "registrada não muda" : "registradas não mudam"}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+  return (
+    <div className="rounded-xl border border-[#e2e0d6] bg-white">
+      <div className="flex items-start gap-1 px-2 py-2">
+        <button
+          type="button"
+          aria-label="Aplicar também nos outros talhões"
+          onClick={onToggleReplicate}
+          disabled={!pending}
+          className="flex size-8 shrink-0 items-start justify-center rounded-md pt-2 hover:bg-black/5 disabled:opacity-50"
+        >
+          <TriCheck state={replicate && pending ? "on" : "off"} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          disabled={loading || rows.length === 0}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-start gap-2 py-1.5 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold">Aplicar também nos outros talhões</span>
+            <span className="block truncate text-xs text-[#6b6a62]">{summary}</span>
+          </span>
+          {rows.length ? (
+            <ChevronDown className={cn("mt-1 size-4 shrink-0 text-[#7a786e] transition-transform", open && "rotate-180")} />
+          ) : null}
+        </button>
+      </div>
+      {open && rows.length ? (
+        <div className="max-h-64 overflow-y-auto border-t border-[#efede5]">
+          {byStage.map(([stage, stageRows]) => (
+            <div key={stage}>
+              <p className="sticky top-0 bg-[#f6f4ee] px-3.5 py-1.5 text-[11px] font-bold tracking-wide text-[#55534b] uppercase">
+                {stage}
+                <span className="ml-1.5 font-medium normal-case text-[#7a786e]">
+                  · {stageRows.length} {stageRows.length === 1 ? "talhão" : "talhões"}
+                </span>
+              </p>
+              {stageRows.map((row) => {
+                const isPending = row.status === "PENDING";
+                return (
+                  <div
+                    key={row.id}
+                    className="flex items-center gap-2 border-t border-[#f1f0ea] px-3.5 py-1.5 text-[12.5px]"
+                  >
+                    <span className={cn("min-w-0 flex-1 truncate", !isPending && "text-[#a3a094]")}>
+                      {row.plot_name}
+                      <span className="text-[#a3a094]"> · {row.farm_name}</span>
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
+                        !isPending
+                          ? "bg-[#f1f0ea] text-[#a3a094]"
+                          : replicate
+                            ? "bg-[#e3efe4] text-[#2f6d3f]"
+                            : "bg-[#efede5] text-[#55534b]",
+                      )}
+                    >
+                      {isPending ? "recebe" : row.status === "SKIPPED" ? "pulada" : "registrada"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

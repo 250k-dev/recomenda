@@ -794,6 +794,8 @@ export function SeasonRecommendationsView({
         open={exportOpen}
         onOpenChange={setExportOpen}
         data={shareData}
+        seasonId={seasonId}
+        canEditApplication={canManageStages}
       />
       <SeasonApplicationDataDialog
         open={applicationOpen}

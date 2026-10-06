@@ -11,7 +11,6 @@ import { useIsMobile } from "@recomenda/ui/hooks/use-mobile";
 import { suggestPhenologicalStage } from "@recomenda/domain/recommendations/phenology";
 import { nonSprayOperation } from "@recomenda/domain/recommendations/recipe-document";
 import type { RecommendationShareData } from "@recomenda/domain/recommendations/share-message";
-import { cn } from "@recomenda/utils";
 import {
   ApplicationDataFields,
   applicationDraftFrom,
@@ -25,13 +24,12 @@ import {
 import {
   DataStageRow,
   FormBlock,
+  SameStageDisclosure,
   RecipeLivePreview,
   withRecipeDraft,
 } from "@/components/domain/export/application-data-ui";
-import { ExportFooter, ExportShell, FooterButton, TriCheck } from "@/components/domain/export/export-ui";
+import { ExportFooter, ExportShell, FooterButton } from "@/components/domain/export/export-ui";
 import { shortDate } from "@/components/domain/export/export-helpers";
-
-const APPLIED = new Set(["APPLIED_ON_TIME", "APPLIED_LATE"]);
 
 /** Só etapa pendente e com calda recebe dados da aplicação. */
 function editable(rec: Recommendation): boolean {
@@ -42,24 +40,26 @@ function editable(rec: Recommendation): boolean {
  * "Dados da aplicação" do talhão: marca as etapas que levam a mesma
  * configuração, preenche e salva; depois outro grupo. Só os campos mexidos
  * são gravados — "Vários" intocado preserva o valor de cada etapa. À direita,
- * a receita como vai sair, a cada tecla.
+ * as receitas como vão sair, a cada tecla.
+ *
+ * Hook (entrega as partes da moldura): é o modal do botão do topo do talhão
+ * e também a aba "Dados da aplicação" do Exportar do talhão.
  */
-export function SeasonApplicationDataDialog({
+export function useSeasonApplicationTab({
   open,
-  onOpenChange,
+  onClose,
   seasonId,
   data,
   canEdit,
 }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   seasonId: string;
   /** O mesmo payload do Exportar (ficha do talhão + etapas). */
   data: RecommendationShareData;
   canEdit: boolean;
 }) {
   const queryClient = useQueryClient();
-  const mobile = useIsMobile();
   const recommendations = data.recommendations;
   const areaHa = data.spec?.plantedAreaHa ?? data.spec?.areaHa ?? null;
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -67,7 +67,6 @@ export function SeasonApplicationDataDialog({
   const [touched, setTouched] = useState<Set<ApplicationDraftKey>>(new Set());
   const [replicate, setReplicate] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [mView, setMView] = useState<"config" | "preview">("config");
 
   const selectedRecs = useMemo(
     () => recommendations.filter((rec) => selected.has(rec.id)),
@@ -88,7 +87,6 @@ export function SeasonApplicationDataDialog({
     if (open) {
       resetForm(new Set());
       setReplicate(false);
-      setMView("config");
     }
   }
 
@@ -227,99 +225,84 @@ export function SeasonApplicationDataDialog({
           ) : null}
         </FormBlock>
         {canEdit && !none ? (
-          <div className="rounded-xl border border-[#e2e0d6] bg-white">
-            <button
-              type="button"
-              onClick={() => setReplicate((v) => !v)}
-              className="flex w-full items-start gap-2.5 px-3.5 py-3 text-left"
-            >
-              <span className="mt-0.5">
-                <TriCheck state={replicate ? "on" : "off"} />
-              </span>
-              <span>
-                <span className="block text-[13px] font-semibold">Aplicar também nos outros talhões</span>
-                <span className="block text-xs text-[#6b6a62]">
-                  Mesma etapa, ainda pendente, nos outros talhões da safra.
-                </span>
-              </span>
-            </button>
-            <div className="flex flex-wrap gap-1.5 border-t border-[#efede5] px-3.5 py-2.5">
-              {sameStage.isLoading ? (
-                <span className="text-xs text-[#7a786e]">Procurando nos outros talhões…</span>
-              ) : others.length === 0 ? (
-                <span className="rounded-full bg-[#f6f4ee] px-2 py-0.5 text-[11.5px] text-[#7a786e]">
-                  Nenhum outro talhão tem essa etapa.
-                </span>
-              ) : (
-                others.map((row) => {
-                  const pending = row.status === "PENDING";
-                  return (
-                    <span
-                      key={row.id}
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[11.5px]",
-                        !pending
-                          ? "bg-[#f6f4ee] text-[#a3a094]"
-                          : replicate
-                            ? "bg-[#e3efe4] text-[#24562f]"
-                            : "bg-[#efede5] text-[#55534b]",
-                      )}
-                    >
-                      {row.plot_name} · {row.name} — {pending ? "recebe" : APPLIED.has(row.status) ? "registrada, não muda" : "pulada, não muda"}
-                    </span>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <SameStageDisclosure
+            rows={others}
+            loading={sameStage.isLoading}
+            replicate={replicate}
+            onToggleReplicate={() => setReplicate((v) => !v)}
+          />
         ) : null}
       </div>
     );
 
   const n = selectedRecs.length;
+  return {
+    saving,
+    mobilePreviewLabel: "Receitas",
+    left: (
+      <div className="flex flex-col gap-5">
+        {form}
+        {list}
+      </div>
+    ),
+    right: (
+      <RecipeLivePreview sheets={previewSheets} emptyText="Marque uma etapa para ver a receita como vai sair." />
+    ),
+    footer: (
+      <ExportFooter
+        summary={
+          n === 0
+            ? "Nenhuma etapa marcada"
+            : keys.length
+              ? `${keys.length} ${keys.length === 1 ? "campo alterado" : "campos alterados"}`
+              : "Nenhuma alteração"
+        }
+        sub="Etapas já aplicadas não mudam."
+        warn={n === 0}
+      >
+        <FooterButton tone="ghost" disabled={saving} onClick={onClose}>
+          Fechar
+        </FooterButton>
+        {canEdit ? (
+          <FooterButton tone="primary" disabled={saving || n === 0 || keys.length === 0} onClick={() => void save()}>
+            {saving ? "Salvando…" : n <= 1 ? "Salvar na etapa" : `Salvar nas ${n} etapas`}
+          </FooterButton>
+        ) : null}
+      </ExportFooter>
+    ),
+  };
+}
+
+/** Modal do botão "Dados da aplicação" no topo do talhão. */
+export function SeasonApplicationDataDialog({
+  open,
+  onOpenChange,
+  seasonId,
+  data,
+  canEdit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  seasonId: string;
+  data: RecommendationShareData;
+  canEdit: boolean;
+}) {
+  const mobile = useIsMobile();
+  const [mView, setMView] = useState<"config" | "preview">("config");
+  const tab = useSeasonApplicationTab({ open, onClose: () => onOpenChange(false), seasonId, data, canEdit });
   return (
     <ExportShell
       open={open}
-      onOpenChange={(next) => !saving && onOpenChange(next)}
+      onOpenChange={(next) => !tab.saving && onOpenChange(next)}
       title="Dados da aplicação"
       subtitle={`${data.plotName ? `Talhão ${data.plotName} · ` : ""}vazão, tanque, horário, ponta e estádio — saem na receita de cada etapa.`}
       mobile={mobile}
       mobileView={mView}
       onMobileView={setMView}
-      left={
-        <div className="flex flex-col gap-5">
-          {form}
-          {list}
-        </div>
-      }
-      right={
-        <RecipeLivePreview
-          sheets={previewSheets}
-          emptyText="Marque uma etapa para ver a receita como vai sair."
-        />
-      }
-      footer={
-        <ExportFooter
-          summary={
-            n === 0
-              ? "Nenhuma etapa marcada"
-              : keys.length
-                ? `${keys.length} ${keys.length === 1 ? "campo alterado" : "campos alterados"}`
-                : "Nenhuma alteração"
-          }
-          sub="Etapas já aplicadas não mudam."
-          warn={n === 0}
-        >
-          <FooterButton tone="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
-            Fechar
-          </FooterButton>
-          {canEdit ? (
-            <FooterButton tone="primary" disabled={saving || n === 0 || keys.length === 0} onClick={() => void save()}>
-              {saving ? "Salvando…" : n <= 1 ? "Salvar na etapa" : `Salvar nas ${n} etapas`}
-            </FooterButton>
-          ) : null}
-        </ExportFooter>
-      }
+      mobilePreviewLabel={tab.mobilePreviewLabel}
+      left={tab.left}
+      right={tab.right}
+      footer={tab.footer}
     />
   );
 }

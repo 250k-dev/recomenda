@@ -37,6 +37,7 @@ import {
   triOf,
 } from "@/components/domain/export/export-ui";
 import { printPaged, type PagedResult } from "@/lib/print/paged-document";
+import { useSeasonApplicationTab } from "@/components/domain/season/season-application-data-dialog";
 import {
   copyText,
   openWhatsapp,
@@ -51,12 +52,25 @@ export function RecommendationExportDialog({
   open,
   onOpenChange,
   data,
+  seasonId,
+  canEditApplication = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: RecommendationShareData;
+  /** Com a safra, aparece a aba "Dados da aplicação" (vazão, tanque…). */
+  seasonId?: string;
+  canEditApplication?: boolean;
 }) {
   const mobile = useIsMobile();
+  const [tab, setTab] = useState<"export" | "application">("export");
+  const applicationTab = useSeasonApplicationTab({
+    open,
+    onClose: () => onOpenChange(false),
+    seasonId: seasonId ?? "",
+    data,
+    canEdit: canEditApplication,
+  });
   const previewRef = useRef<PagedPreviewHandle>(null);
   const recs = data.recommendations;
   const allIds = useMemo(() => recs.map((r) => r.id), [recs]);
@@ -80,6 +94,7 @@ export function RecommendationExportDialog({
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
+      setTab("export");
       setSelected(new Set());
       setIncReport(false);
       setIncRecipes(false);
@@ -265,31 +280,49 @@ export function RecommendationExportDialog({
     </>
   );
 
+  const exportFooter = (
+    <ExportFooter summary={summary} sub={sub} warn={!hasStages || !hasParts}>
+      <WhatsappButton
+        message={message}
+        disabled={!hasStages}
+        onCopy={() => void copyText(message)}
+        onSend={() => openWhatsapp(message)}
+      />
+      <FooterButton tone="primary" disabled={!ready || !html} onClick={download}>
+        <Download className="size-4" /> Baixar PDF{total ? ` · ${fmtPages(total)}` : ""}
+      </FooterButton>
+    </ExportFooter>
+  );
+  const onApplication = tab === "application";
+
   return (
     <ExportShell
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => !(onApplication && applicationTab.saving) && onOpenChange(next)}
       title="Exportar recomendação"
-      subtitle={[data.plotName, data.spec?.cycleName, data.producerName].filter(Boolean).join(" · ") || undefined}
-      left={left}
-      right={right}
+      tabs={
+        seasonId
+          ? [
+              { id: "export", label: "Exportar" },
+              { id: "application", label: "Dados da aplicação" },
+            ]
+          : undefined
+      }
+      tab={tab}
+      onTab={(id) => {
+        setTab(id as "export" | "application");
+        setMView("config");
+      }}
+      contentKey={tab}
+      left={onApplication ? applicationTab.left : left}
+      right={onApplication ? applicationTab.right : right}
       mobile={mobile}
       mobileView={mView}
       onMobileView={setMView}
-      mobilePreviewLabel={total ? `Prévia · ${fmtPages(total)}` : "Prévia"}
-      footer={
-        <ExportFooter summary={summary} sub={sub} warn={!hasStages || !hasParts}>
-          <WhatsappButton
-            message={message}
-            disabled={!hasStages}
-            onCopy={() => void copyText(message)}
-            onSend={() => openWhatsapp(message)}
-          />
-          <FooterButton tone="primary" disabled={!ready || !html} onClick={download}>
-            <Download className="size-4" /> Baixar PDF{total ? ` · ${fmtPages(total)}` : ""}
-          </FooterButton>
-        </ExportFooter>
+      mobilePreviewLabel={
+        onApplication ? applicationTab.mobilePreviewLabel : total ? `Prévia · ${fmtPages(total)}` : "Prévia"
       }
+      footer={onApplication ? applicationTab.footer : exportFooter}
     />
   );
 }
