@@ -47,8 +47,8 @@ export const FARM_STAFF_GRANT_DEFS: Array<{
   {
     key: "lists",
     label: "Criar e editar listas de compra",
-    description: "Monta e altera a lista de compra da safra.",
-    permissions: ["LIST_CRUD"],
+    description: "Monta e altera a lista de compra da safra e cadastra os produtos que faltam.",
+    permissions: ["LIST_CRUD", "CATALOG_CRUD"],
   },
   {
     key: "prices",

@@ -195,6 +195,9 @@ export default function DashboardPage() {
   const canManageTeam = useCan("TEAM_MANAGE");
   const canFarmTeam = useCan("FARM_TEAM_MANAGE");
   const canCreateProducer = useCan("PRODUCER_CREATE");
+  // Produtor e equipe da fazenda com "listas" têm CATALOG_CRUD (cadastram no
+  // catálogo do agrônomo).
+  const canCatalog = useCan("CATALOG_CRUD");
   const canTemplates = useCan("TEMPLATE_CRUD");
   const canViewPrices = useCan("PRICE_VIEW");
   const isFarmStaff =
@@ -300,7 +303,7 @@ export default function DashboardPage() {
                 sub="Carteira completa"
               />
             )}
-        {!isOwnOperation ? (
+        {!isOwnOperation || canCatalog ? (
           <ShortcutCard
             href={routes.produtos}
             icon={Package}
@@ -465,7 +468,8 @@ export default function DashboardPage() {
                         ) : null}
                       </p>
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {ev.farmName} · {ev.plotName} · {ev.producerName}
+                        {ev.farmName} · {ev.plotName}
+                        {ev.dap ? ` · ${ev.dap}` : ""} · {ev.producerName}
                       </div>
                     </div>
                     <div

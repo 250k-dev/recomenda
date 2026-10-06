@@ -1,5 +1,6 @@
 "use client";
 
+import { currentDapLabel } from "@recomenda/domain/timing/dap";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -486,6 +487,10 @@ export function SeasonRecommendationsView({
     (seasonStatus === "PUBLISHED" || seasonStatus === "IN_PROGRESS");
   const pendingCount = recommendations.filter((r) => r.status === "PENDING")
     .length;
+  const currentDap =
+    seasonStatus === "HARVESTED" || seasonStatus === "ARCHIVED" || plotRow?.harvest_total_bags != null
+      ? null
+      : currentDapLabel(plantingDate);
   const harvestStats =
     plotRow?.harvest_total_bags != null
       ? [
@@ -710,6 +715,8 @@ export function SeasonRecommendationsView({
             value: plantingDate ? fmtDate(plantingDate) : "Não registrado",
             tone: plantingDate ? "default" : "danger",
           },
+          // Onde a lavoura está hoje — some depois da colheita.
+          ...(currentDap ? [{ label: "Hoje", value: currentDap }] : []),
           ...(statusLabel ? [{ label: "Status", value: statusLabel }] : []),
           {
             label: "Aplicações",
@@ -774,6 +781,7 @@ export function SeasonRecommendationsView({
             listPlanByProductId={listPlanByProductId}
             listPlanByProductStage={listPlanByProductStage}
             listReady={listReady}
+            plantingDate={plantingDate}
             recipe={{
               areaHa: exportSpec.plantedAreaHa ?? exportSpec.areaHa ?? null,
               crop: exportSpec.crop,

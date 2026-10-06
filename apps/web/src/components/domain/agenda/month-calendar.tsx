@@ -1247,6 +1247,7 @@ function AgendaEventCard({
         </p>
         <p className="mt-1 truncate text-xs text-muted-foreground">
           {event.plotName} · {eventDate}
+          {event.dap ? ` · ${event.dap}` : ""}
         </p>
       </div>
     </>

@@ -1,5 +1,6 @@
 "use client";
 
+import { dapLabel, daysFromPlanting, todayYmd } from "@recomenda/domain/timing/dap";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -61,7 +62,7 @@ import {
 } from "@/components/domain/table-column-filter";
 
 const PLOT_GRID =
-  "grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(17rem,auto)] items-center gap-4";
+  "grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_minmax(0,0.7fr)_minmax(0,0.65fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(17rem,auto)] items-center gap-4";
 
 function canRegisterHarvest(status: string) {
   return status === "PUBLISHED" || status === "IN_PROGRESS";
@@ -81,7 +82,23 @@ function seasonDisplayName(season: CycleSeasonRow): string {
   }`;
 }
 
-type SeasonCol = "plot" | "crop" | "area" | "progress" | "harvest" | "status";
+type SeasonCol = "plot" | "crop" | "area" | "dap" | "progress" | "harvest" | "status";
+
+/**
+ * Dias da lavoura hoje (DAP); negativo = plantio ainda por vir. null sem data
+ * de plantio ou depois da colheita (aí o número não diz mais nada).
+ */
+function seasonDapDays(s: CycleSeasonRow): number | null {
+  if (s.status === "HARVESTED" || s.status === "ARCHIVED" || s.harvest_total_bags != null) return null;
+  return daysFromPlanting(s.planting_date, todayYmd());
+}
+
+function seasonDapText(s: CycleSeasonRow): string {
+  const days = seasonDapDays(s);
+  if (days == null) return "—";
+  if (days < 0) return `Plantio em ${-days} ${days === -1 ? "dia" : "dias"}`;
+  return dapLabel(days) ?? "—";
+}
 
 const EMPTY_SEASON_VIEW: TableView<SeasonCol> = { sort: null, filters: {} };
 
@@ -99,6 +116,7 @@ const SEASON_COLUMNS: Record<SeasonCol, ColumnAccessor<CycleSeasonRow>> = {
         ? Math.round((s.recommendations_done / s.recommendations_total) * 100)
         : null,
   },
+  dap: { kind: "range", get: (s) => seasonDapDays(s) },
   harvest: { kind: "range", get: (s) => s.harvest_total_bags ?? null },
   status: {
     kind: "options",
@@ -562,6 +580,7 @@ export function CycleFarmDisclosures({
                               group.seasons,
                             )}
                             {renderSeasonHeader("area", "Área", group.seasons)}
+                            {renderSeasonHeader("dap", "DAP", group.seasons)}
                             {renderSeasonHeader(
                               "progress",
                               "Progresso",
@@ -587,7 +606,12 @@ export function CycleFarmDisclosures({
                                 className={`${PLOT_GRID} border-t border-border px-5 py-3.5 text-sm`}
                               >
                                 <span className="min-w-0">
-                                  <span className="truncate font-semibold text-text-strong">
+                                  {/* block: sem ele o truncate não corta e o nome
+                                      longo invadia a coluna de cultura. */}
+                                  <span
+                                    className="block truncate font-semibold text-text-strong"
+                                    title={`Talhão ${season.plot_name}`}
+                                  >
                                     Talhão {season.plot_name}
                                   </span>
                                   {season.plot_missing ? (
@@ -629,6 +653,9 @@ export function CycleFarmDisclosures({
                                       de {fmtHa(season.plot_area_ha)} ha
                                     </span>
                                   ) : null}
+                                </span>
+                                <span className="text-sm font-semibold tabular-nums text-text-strong">
+                                  {seasonDapText(season)}
                                 </span>
                                 <span>
                                   {season.recommendations_total > 0 ? (
@@ -756,6 +783,7 @@ export function CycleFarmDisclosures({
                                         ? ` de ${fmtHa(season.plot_area_ha)}`
                                         : ""}{" "}
                                       ha
+                                      {seasonDapDays(season) != null ? ` · ${seasonDapText(season)}` : ""}
                                       {season.harvest_total_bags != null
                                         ? ` · ${fmtBags(season.harvest_total_bags)} sc`
                                         : ""}

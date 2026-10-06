@@ -52,6 +52,8 @@ const CONSULTANT_NAV: NavItem[] = [
 const PRODUCER_NAV: NavItem[] = [
   { label: "Dashboard", href: routes.dashboard },
   { label: "Cronograma", href: routes.cronograma() },
+  // O produtor tem CATALOG_CRUD: cadastra e edita produto no catálogo do agrônomo dele.
+  { label: "Produtos", href: routes.produtos },
   { label: "Equipe", href: routes.equipe.lista },
 ];
 

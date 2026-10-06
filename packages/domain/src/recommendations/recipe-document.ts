@@ -126,9 +126,13 @@ function windowLabel(rec: Recommendation, plantingDate: string | null | undefine
     const b = ymdToBr(addDays(plantingDate, to))?.slice(0, 5);
     return a === b ? `Janela ${a}` : `Janela ${a} a ${b}`;
   }
-  if (trigger === "PRE_PLANTING") return `${we} a ${ws} dias antes do plantio`;
+  // Menor número primeiro: saía "4 a 0 dias antes do plantio".
+  const lo = Math.min(ws, we);
+  const hi = Math.max(ws, we);
+  const range = lo === hi ? `${lo}` : `${lo} a ${hi}`;
+  if (trigger === "PRE_PLANTING") return `${range} dias antes do plantio`;
   if (trigger === "PLANTING") return "No plantio";
-  return `${ws} a ${we} dias após o plantio`;
+  return `${range} dias após o plantio`;
 }
 
 function sheetBody(data: RecommendationShareData, rec: Recommendation): string {

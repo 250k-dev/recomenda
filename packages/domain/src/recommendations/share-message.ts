@@ -2,6 +2,7 @@ import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import { DOSE_UNIT_SHORT_LABELS } from "@recomenda/utils";
 import { displayRecStatus, fmtDate } from "./format";
 import { sortRecommendationItemsByMixOrder } from "./mix-order";
+import { dapOf } from "../timing/dap";
 
 /** Uma variedade do talhão, com a área que ocupa e a população desejada. */
 export interface ShareVariety {
@@ -107,17 +108,22 @@ function formatProduct(item: RecommendationItem, areaHa: number | null): string 
 }
 
 /** Linha de data da etapa: prevista, aplicada (✅), atrasada (⚠️) ou pulada. */
-function formatStageDate(rec: Recommendation): string | null {
+function formatStageDate(rec: Recommendation, plantingDate?: string | null): string | null {
   const status = displayRecStatus(rec);
+  // "(35 DAP)": é como produtor e operador falam da lavoura.
+  const dap = (date: string) => {
+    const label = dapOf(plantingDate, date);
+    return label ? ` (${label})` : "";
+  };
   if (rec.executed_date) {
     const icon = status === "SKIPPED" ? "" : " ✅";
     const label = status === "SKIPPED" ? "Pulada em" : "Aplicado em";
-    return `*${label}:* ${fmtDateNumeric(rec.executed_date)}${icon}`;
+    return `*${label}:* ${fmtDateNumeric(rec.executed_date)}${status === "SKIPPED" ? "" : dap(rec.executed_date)}${icon}`;
   }
   if (status === "SKIPPED") return "*Status:* Pulada";
   const late = status === "OVERDUE" ? " ⚠️ Atrasada" : "";
   if (rec.predicted_date_current) {
-    return `*Data prevista:* ${fmtDateNumeric(rec.predicted_date_current)}${late}`;
+    return `*Data prevista:* ${fmtDateNumeric(rec.predicted_date_current)}${dap(rec.predicted_date_current)}${late}`;
   }
   return late ? `*Status:*${late}` : null;
 }
@@ -170,7 +176,7 @@ function buildPlotSection(
 
   if (data.recommendations.length === 1) {
     const rec = data.recommendations[0];
-    const date = formatStageDate(rec);
+    const date = formatStageDate(rec, data.plantingDate);
     return [
       farm,
       `*${rec.name.toUpperCase()}*`,
@@ -183,7 +189,7 @@ function buildPlotSection(
   }
 
   const stages = data.recommendations.map((rec) => {
-    const date = formatStageDate(rec);
+    const date = formatStageDate(rec, data.plantingDate);
     const head = [`*${rec.name.toUpperCase()}*`, date].filter(Boolean).join("\n");
     return [head, formatProducts(rec, areaHa), formatComments(rec)]
       .filter(Boolean)

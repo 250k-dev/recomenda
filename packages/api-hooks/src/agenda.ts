@@ -1,5 +1,6 @@
 "use client";
 
+import { dapOf } from "@recomenda/domain/timing/dap";
 import { useMemo } from "react";
 import {
   fmtShortageQty,
@@ -57,6 +58,8 @@ export type AgendaEvent = {
   areaHa: number | null;
   /** Data prevista atual da etapa (só APPLICATION); null em plantio. */
   predictedYmd: string | null;
+  /** DAP da data prevista ("35 DAP"); null sem plantio ou em plantio. */
+  dap?: string | null;
 };
 
 export type AgronomistAgendaResult = {
@@ -282,6 +285,7 @@ async function fetchAgendaEvents(
       windowEndYmd: window.endYmd,
       isCenterDay: displayYmd === window.centerYmd,
       predictedYmd: window.centerYmd,
+      dap: dapOf(season.planting_date ? String(season.planting_date) : null, window.centerYmd),
     };
 
     if (!calendarMarkersByDay[displayYmd]) calendarMarkersByDay[displayYmd] = [];

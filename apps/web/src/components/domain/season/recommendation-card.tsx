@@ -1,5 +1,6 @@
 "use client";
 
+import { dapOf } from "@recomenda/domain/timing/dap";
 import {
   useEffect,
   useMemo,
@@ -182,11 +183,14 @@ function StageDateBadge({
   date,
   originalDate,
   tone = "primary",
+  dap,
 }: {
   label: string;
   date: string;
   originalDate?: string | null;
   tone?: "primary" | "neutral" | "success";
+  /** "35 DAP" / "4 dias antes do plantio" — o dia da lavoura dessa data. */
+  dap?: string | null;
 }) {
   const toneClasses = {
     primary: "border-border bg-surface-2 shadow-sm",
@@ -222,6 +226,9 @@ function StageDateBadge({
       <span className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
         {fmtDate(date)}
       </span>
+      {dap ? (
+        <span className={cn("text-[11px] font-semibold tabular-nums", labelClasses[tone])}>{dap}</span>
+      ) : null}
       {showOriginal ? (
         <span className="mt-0.5 text-[11px] text-muted-foreground line-through">
           {fmtDate(originalDate)}
@@ -1155,6 +1162,7 @@ export function RecommendationCard({
   listPlanByProductStage,
   listReady,
   recipe,
+  plantingDate,
 }: {
   rec: Recommendation;
   index: number;
@@ -1180,6 +1188,8 @@ export function RecommendationCard({
     crop?: string | null;
     onPrint: (rec: Recommendation) => void;
   };
+  /** Plantio do talhão: mostra o DAP ao lado da data da etapa. */
+  plantingDate?: string | null;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [addingProduct, setAddingProduct] = useState(false);
@@ -1509,6 +1519,7 @@ export function RecommendationCard({
               label="Aplicado"
               date={rec.executed_date}
               tone="success"
+              dap={dapOf(plantingDate, rec.executed_date)}
             />
           ) : isSkipped ? null : rec.predicted_date_current ? (
             <StageDateBadge
@@ -1516,6 +1527,7 @@ export function RecommendationCard({
               date={rec.predicted_date_current}
               originalDate={rec.predicted_date_original}
               tone="primary"
+              dap={dapOf(plantingDate, rec.predicted_date_current)}
             />
           ) : null}
           {isPending ? (
