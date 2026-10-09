@@ -68,6 +68,28 @@ export type AdminDeactivatedCatalogEntry = {
   label_url?: string | null;
   price_brl?: string | null;
   agronomist_name?: string | null;
+  /** Auditoria da desativação (só customizado). */
+  deactivated_at?: string | null;
+  deactivated_by_name?: string | null;
+};
+
+/** Produto customizado desativado, com quem/quando o desativou. */
+export type InactiveLocalProduct = Product & {
+  agronomist_id?: string;
+  agronomist_name?: string | null;
+  deactivated_at?: string | null;
+  deactivated_by?: string | null;
+  deactivated_by_name?: string | null;
+};
+
+/** Lista de compra ativa que ainda referencia um produto desativado. */
+export type ProductListUsage = {
+  purchase_list_id: string;
+  list_name: string;
+  producer_id: string | null;
+  producer_name: string | null;
+  cycle_id: string | null;
+  items_count: number;
 };
 
 export type GlobalCatalogImportResult = {
@@ -83,8 +105,15 @@ export async function getLocalCatalog() {
 }
 
 export async function getInactiveLocalCatalog() {
-  const { data } = await api.get<PaginatedResponse<Product>>("/catalog/local/inactive");
+  const { data } = await api.get<PaginatedResponse<InactiveLocalProduct>>("/catalog/local/inactive");
   return data;
+}
+
+export async function getProductListUsage(localProductId: string) {
+  const { data } = await api.get<{ data: ProductListUsage[] }>(
+    `/catalog/local/${encodeURIComponent(localProductId)}/usage`,
+  );
+  return data.data;
 }
 
 export async function getAllInactiveLocalCatalog() {

@@ -12,6 +12,7 @@ import { Package, Plus } from "lucide-react";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
 import { DeletePermanentIconButton } from "@/components/domain/delete-permanent-icon-button";
 import { TableRowsSkeleton } from "@/components/domain/page-skeletons";
+import { ProductDeactivationInfoDialog } from "@/components/domain/product-deactivation-info-dialog";
 import { TruncatedNameCell, DataTable } from "@recomenda/ui/patterns/data-table";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
@@ -699,7 +700,7 @@ export default function AdminGlobalCatalogPage() {
   });
 
   const inactiveRows = paginatedInactiveRows.map((p) => [
-    <TruncatedNameCell key={`in-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} />,
+    <TruncatedNameCell key={`in-${p.global_product_id ?? p.local_product_id ?? p.name}`} name={p.name} lines={2} />,
     PRODUCT_CATEGORY_LABELS[p.category as keyof typeof PRODUCT_CATEGORY_LABELS] ?? p.category,
     DOSE_UNIT_LABELS[p.dose_unit as keyof typeof DOSE_UNIT_LABELS] ?? p.dose_unit,
     p.entry_type === "GLOBAL_INACTIVE" ? (
@@ -711,6 +712,11 @@ export default function AdminGlobalCatalogPage() {
     ) : (
       "—"
     ),
+    p.entry_type === "CUSTOM_INACTIVE" && p.deactivated_at
+      ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(
+          new Date(p.deactivated_at),
+        )
+      : "—",
     p.entry_type === "GLOBAL_INACTIVE" && !canManagePlatform ? (
       <span
         key={`ina-${p.entry_type}-${p.global_product_id ?? p.local_product_id}`}
@@ -721,8 +727,16 @@ export default function AdminGlobalCatalogPage() {
     ) : (
       <div
         key={`ina-${p.entry_type}-${p.global_product_id ?? p.local_product_id}`}
-        className="flex flex-wrap justify-end gap-2"
+        className="flex flex-wrap items-center justify-end gap-2"
       >
+        {p.entry_type === "CUSTOM_INACTIVE" && p.local_product_id ? (
+          <ProductDeactivationInfoDialog
+            localProductId={p.local_product_id}
+            productName={p.name}
+            deactivatedAt={p.deactivated_at}
+            deactivatedByName={p.deactivated_by_name}
+          />
+        ) : null}
         <Button
           type="button"
           variant="outline"
@@ -1080,20 +1094,21 @@ export default function AdminGlobalCatalogPage() {
       {activeTab === "desativados" && (
         <>
           {deactivatedLoading ? (
-            <TableRowsSkeleton rows={10} columns={5} />
+            <TableRowsSkeleton rows={10} columns={6} />
           ) : inactiveProducts.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhum produto removido do catálogo ativo</p>
           ) : filteredInactiveProducts.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado para o filtro.</p>
           ) : (
             <DataTable
-              headers={["Nome", "Categoria", "Unidade", "Origem", "Ações"]}
+              headers={["Nome", "Categoria", "Unidade", "Origem", "Removido em", "Ações"]}
               rows={inactiveRows}
               columnCellClassNames={[
                 "max-w-0 min-w-0",
                 "whitespace-nowrap",
                 "whitespace-nowrap",
                 "max-w-0 min-w-0",
+                "whitespace-nowrap",
                 "whitespace-nowrap",
               ]}
               footer={

@@ -47,6 +47,7 @@ import {
   type FormulationKey,
 } from "@recomenda/domain/recommendations/formulation-mix-order";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
+import { ProductDeactivationInfoDialog } from "@/components/domain/product-deactivation-info-dialog";
 import {
   categoryHasFormulation,
   defaultDoseUnitForCategory,
@@ -251,6 +252,8 @@ export default function CatalogPage() {
     category?: string;
     dose_unit?: string;
     price_brl?: string | null;
+    deactivated_at?: string | null;
+    deactivated_by_name?: string | null;
   }>;
 
   const globalEntries = useMemo(
@@ -441,6 +444,7 @@ export default function CatalogPage() {
     <TruncatedNameCell
       key={`g-${p.global_product_id ?? p.name}`}
       name={p.name}
+      lines={2}
     />,
     PRODUCT_CATEGORY_LABELS[
       p.category as keyof typeof PRODUCT_CATEGORY_LABELS
@@ -486,6 +490,7 @@ export default function CatalogPage() {
       <TruncatedNameCell
         key={`c-${p.local_product_id ?? p.peer_local_product_id ?? p.name}`}
         name={p.name}
+        lines={2}
       />,
       PRODUCT_CATEGORY_LABELS[
         p.category as keyof typeof PRODUCT_CATEGORY_LABELS
@@ -500,7 +505,7 @@ export default function CatalogPage() {
   });
 
   const inactiveTableRows = paginatedInactive.map((product) => [
-    <TruncatedNameCell key={`i-${product.id}`} name={product.name} />,
+    <TruncatedNameCell key={`i-${product.id}`} name={product.name} lines={2} />,
     product.category
       ? (PRODUCT_CATEGORY_LABELS[
           product.category as keyof typeof PRODUCT_CATEGORY_LABELS
@@ -513,7 +518,18 @@ export default function CatalogPage() {
     product.price_brl
       ? `R$ ${parseFloat(String(product.price_brl)).toFixed(2)}`
       : "—",
-    <div key={`ia-${product.id}`} className="flex flex-wrap justify-end gap-2">
+    product.deactivated_at
+      ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(
+          new Date(product.deactivated_at),
+        )
+      : "—",
+    <div key={`ia-${product.id}`} className="flex flex-wrap items-center justify-end gap-2">
+      <ProductDeactivationInfoDialog
+        localProductId={product.id}
+        productName={product.name}
+        deactivatedAt={product.deactivated_at}
+        deactivatedByName={product.deactivated_by_name}
+      />
       <Button
         type="button"
         variant="outline"
@@ -844,7 +860,7 @@ export default function CatalogPage() {
       {activeTab === "inativos" && (
         <>
           {inactiveLoading ? (
-            <TableRowsSkeleton rows={10} columns={5} />
+            <TableRowsSkeleton rows={10} columns={6} />
           ) : inactiveProducts.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Nenhum produto removido.
@@ -855,10 +871,18 @@ export default function CatalogPage() {
             </p>
           ) : (
             <DataTable
-              headers={["Nome", "Categoria", "Unidade", "Preço", "Ações"]}
+              headers={[
+                "Nome",
+                "Categoria",
+                "Unidade",
+                "Preço",
+                "Removido em",
+                "Ações",
+              ]}
               rows={inactiveTableRows}
               columnCellClassNames={[
                 "max-w-0 min-w-0",
+                "whitespace-nowrap",
                 "whitespace-nowrap",
                 "whitespace-nowrap",
                 "whitespace-nowrap",

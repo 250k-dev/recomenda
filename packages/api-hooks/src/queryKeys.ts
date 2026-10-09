@@ -36,6 +36,7 @@ export const queryKeys = {
   platformCatalog: ["platform-catalog"],
   adminPlatformActive: ["admin-platform-active"],
   adminDeactivatedCatalog: ["admin-deactivated-catalog"],
+  productListUsage: (localProductId: string) => ["product-list-usage", localProductId] as const,
   seasons: ["seasons"],
   season: (id: string) => ["season", id],
   seasonTimeline: (seasonId: string) => ["season-timeline", seasonId],

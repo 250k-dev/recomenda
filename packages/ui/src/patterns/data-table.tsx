@@ -61,11 +61,30 @@ export function DataTable({
   );
 }
 
-/** Célula de nome com truncamento e `title` — nada específico de tela. */
-export function TruncatedNameCell({ name }: { name: string }) {
+/**
+ * Célula de nome com `title` — nada específico de tela. Por padrão trunca em
+ * uma linha (14rem). `lines={2}` deixa quebrar em até duas linhas ocupando a
+ * largura da coluna, para nomes longos (ex.: genéricos com várias marcas) não
+ * ficarem cortados demais.
+ */
+export function TruncatedNameCell({
+  name,
+  lines = 1,
+  className,
+}: {
+  name: string;
+  lines?: 1 | 2;
+  className?: string;
+}) {
   return (
     <span
-      className="block max-w-[14rem] truncate font-semibold text-text-strong"
+      className={cn(
+        "block font-semibold text-text-strong",
+        lines === 2
+          ? "line-clamp-2 whitespace-normal break-words"
+          : "max-w-[14rem] truncate",
+        className,
+      )}
       title={name}
     >
       {name}

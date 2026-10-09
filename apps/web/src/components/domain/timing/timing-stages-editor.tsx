@@ -95,11 +95,42 @@ export function usePurchaseListCatalogProducts(
   // Catálogo completo: global (admin) + local (agrônomo). Sementes ficam de fora (item 12).
   const catalogProducts = useMemo(() => {
     const seedCategories = ["SEED", "CULTIVAR_SOJA", "HIBRIDO_MILHO", "CULTIVAR_FEIJAO"];
-    return buildPurchaseListCatalog(
+    const base = buildPurchaseListCatalog(
       platformCatalog.data?.data ?? [],
       globalCatalog.data?.data ?? [],
     ).filter((product) => !seedCategories.includes(product.category));
-  }, [platformCatalog.data?.data, globalCatalog.data?.data]);
+
+    // Produto que já está numa lista de compra ativa mas sumiu do catálogo —
+    // tipicamente desativado DEPOIS de entrar na lista. Sem isto o item segue
+    // na lista mas some do seletor da recomendação (o catálogo filtra inativo).
+    // Mexer no produto não pode reescrever uma safra em andamento: reinjeta a
+    // opção a partir do snapshot do item. Escopo: só produtos já na lista — não
+    // ressuscita o produto para listas/adições novas.
+    const known = new Set(base.map((product) => product.optionValue));
+    const listOnly = new Map<string, PurchaseListCatalogProduct>();
+    for (const list of purchaseLists) {
+      for (const item of list.items) {
+        const id = item.local_product_id;
+        if (!id || known.has(id) || listOnly.has(id)) continue;
+        const category = item.category ?? "OTHER";
+        if (seedCategories.includes(category)) continue;
+        listOnly.set(id, {
+          optionValue: id,
+          name: item.product_name,
+          category,
+          dose_unit: item.dose_unit ?? "L",
+          globalId: null,
+          isGlobalOnly: false,
+          crop: null,
+          equivalence_group: item.equivalence_group ?? null,
+        });
+      }
+    }
+    if (listOnly.size === 0) return base;
+    return [...base, ...listOnly.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, "pt-BR"),
+    );
+  }, [platformCatalog.data?.data, globalCatalog.data?.data, purchaseLists]);
 
   // Produtos que já estão na lista de compra (o que está "na programação").
   const listProductIds = useMemo(

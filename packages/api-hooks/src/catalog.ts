@@ -8,6 +8,7 @@ import {
   getPlatformCatalog,
   getAdminPlatformActiveCatalog,
   getAdminDeactivatedCatalog,
+  getProductListUsage,
   createLocalProduct,
   updateLocalProduct,
   deleteLocalProduct,
@@ -36,6 +37,16 @@ export function useInactiveLocalCatalog() {
   return useQuery({
     queryKey: [...queryKeys.inactiveLocalCatalog, scopeKey],
     queryFn: getInactiveLocalCatalog,
+  });
+}
+
+/** Listas de compra ativas que ainda usam um produto. Só busca quando aberto
+ *  (ex.: modal "em uso"), para não disparar a query na tabela inteira. */
+export function useProductListUsage(localProductId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.productListUsage(localProductId ?? ""),
+    queryFn: () => getProductListUsage(localProductId as string),
+    enabled: Boolean(localProductId),
   });
 }
 
