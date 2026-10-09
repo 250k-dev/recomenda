@@ -41,6 +41,7 @@ export const queryKeys = {
   seasonTimeline: (seasonId: string) => ["season-timeline", seasonId],
   seasonShoppingList: (seasonId: string) => ["season-shopping-list", seasonId],
   notifications: ["notifications"],
+  fieldObservations: ["field-observations"],
   timingTemplates: (producerId: string) => ["timing-templates", producerId] as const,
   timingTemplate: (id: string) => ["timing-template", id],
   mixTemplates: ["mix-templates"],

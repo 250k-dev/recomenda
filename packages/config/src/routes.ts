@@ -85,6 +85,9 @@ export const routes = {
   /** Catálogo de produtos do agrônomo (rótulo de menu: "Produtos"). */
   produtos: "/produtos" satisfies Route,
   templatesDeCompra: "/templates-de-compra" satisfies Route,
+  /** Fotos de praga/doença analisadas pelo Lico no WhatsApp. */
+  /** Histórico de ocorrências/relatórios do Lico — SEM link na UI até validar em produção (08/10). */
+  licoOcorrencias: "/perfil/lico/ocorrencias" satisfies Route,
 
   produtores: {
     lista: "/produtores" satisfies Route,

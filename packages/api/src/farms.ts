@@ -5,6 +5,11 @@ export interface Farm {
   id: string;
   name: string;
   location?: string;
+  /** Ponto da sede (clima do Lico). Vem como string numérica no detalhe. */
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  /** 'whatsapp' | 'web' | 'geocode' — geocode é só o centro da cidade. */
+  coord_source?: string | null;
   created_by_user_id?: string | null;
   created_by_name?: string | null;
 }
@@ -60,7 +65,10 @@ export async function deleteFarm(id: string) {
   await api.delete(`/farms/${id}`);
 }
 
-export async function updateFarm(id: string, payload: { name?: string; location?: string }) {
+export async function updateFarm(
+  id: string,
+  payload: { name?: string; location?: string; latitude?: number | null; longitude?: number | null },
+) {
   const { data } = await api.patch<Farm>(`/farms/${id}`, payload);
   return data;
 }

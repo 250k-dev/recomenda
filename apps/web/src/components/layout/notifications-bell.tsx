@@ -12,6 +12,7 @@ import { ptBR } from "date-fns/locale";
 import {
   ArrowLeftRight,
   Bell,
+  Camera,
   Check,
   MessageCircle,
   Sprout,
@@ -302,6 +303,11 @@ const NOTIFICATION_STYLES: Record<
     tile: "bg-primary-soft",
     iconColor: "text-primary",
   },
+  FIELD_OBSERVATION: {
+    icon: Camera,
+    tile: "bg-danger-soft",
+    iconColor: "text-danger-strong",
+  },
 };
 
 const DEFAULT_STYLE = {
@@ -349,6 +355,7 @@ function getNotificationTitle(notification: Notification): string {
     HARVEST_REGISTERED: "Colheita registrada",
     TEAM_ACTIVITY: "Atividade da equipe",
     WHATSAPP_HANDOFF: "Pedido pelo WhatsApp",
+    FIELD_OBSERVATION: "Ocorrência de campo",
   };
   return typeMap[notification.type] || "Nova notificação";
 }
@@ -366,6 +373,12 @@ function getNotificationBody(notification: Notification): string | null {
         ? `${actor} (${p.producer_name})`
         : actor;
     return `${produtor} quer falar com você: "${summary}"`;
+  }
+
+  // Foto de praga/doença analisada pelo Lico (muitas vezes do operador no talhão).
+  if (notification.type === "FIELD_OBSERVATION") {
+    const onde = typeof p.producer_name === "string" && p.producer_name ? ` · ${p.producer_name}` : "";
+    return `${actor} mandou foto: ${summary}${onde}`;
   }
 
   if (notification.type !== "TEAM_ACTIVITY") return null;
@@ -389,10 +402,23 @@ function payloadRecommendationId(
   return typeof v === "string" && v.length > 0 ? v : null;
 }
 
+function payloadString(payload: Record<string, unknown> | undefined, key: string): string | null {
+  const v = payload?.[key];
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/**
+ * Para onde cada notificação leva. Toda notificação com produtor/safra/fazenda tem um
+ * destino — "clicar e não acontecer nada" era o relato de 08/10. Ordem: o lugar mais
+ * específico que o payload permite (safra > fazenda > produtor).
+ */
 function getNotificationPath(notification: Notification): Route | null {
   const { type, payload } = notification;
   const seasonId = payloadSeasonId(payload);
   const recommendationId = payloadRecommendationId(payload);
+  const farmId = payloadString(payload, "farm_id");
+  const producerId = payloadString(payload, "producer_id");
+  const fallback = farmId ? routes.fazendas.detalhe(farmId) : producerId ? routes.produtores.detalhe(producerId) : null;
   switch (type) {
     case "SEASON_PUBLISHED":
     case "HARVEST_REGISTERED":
@@ -403,15 +429,23 @@ function getNotificationPath(notification: Notification): Route | null {
         ? routes.safras.cronograma(seasonId, {
             recommendation_id: recommendationId,
           })
-        : null;
-    case "TEAM_ACTIVITY": {
-      const farmId = payload?.farm_id;
-      return typeof farmId === "string" && farmId
-        ? routes.fazendas.detalhe(farmId)
-        : null;
+        : fallback;
+    case "TEAM_ACTIVITY":
+      return seasonId ? routes.safras.cronograma(seasonId) : fallback;
+    // Foto analisada pelo Lico: abre o histórico já com o relatório daquela ocorrência.
+    case "FIELD_OBSERVATION": {
+      const qs = new URLSearchParams();
+      const obsId = payloadString(payload, "observation_id");
+      if (obsId) qs.set("ocorrencia", obsId);
+      if (producerId) qs.set("produtor", producerId);
+      const q = qs.toString();
+      return (q ? `${routes.licoOcorrencias}?${q}` : routes.licoOcorrencias) as Route;
     }
+    // "Quer falar com você" pelo Zap: abre o produtor de quem chamou.
+    case "WHATSAPP_HANDOFF":
+      return producerId ? routes.produtores.detalhe(producerId) : null;
     case "INVITATION":
     default:
-      return null;
+      return fallback;
   }
 }

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { BreadcrumbBack, type BreadcrumbItem } from "@/components/domain/breadcrumb-back";
 import { PageHero } from "@/components/domain/page-hero";
 import { FarmLocationFields } from "@/components/domain/farm-location-fields";
+import { FarmCoordinatesFields, parseCoordinate } from "@/components/domain/farm-coordinates-fields";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
 import {
@@ -50,6 +51,8 @@ export default function FarmDetailPage() {
   const [editName, setEditName] = useState("");
   const [editStateUf, setEditStateUf] = useState("");
   const [editCity, setEditCity] = useState("");
+  const [editCoords, setEditCoords] = useState({ latitude: "", longitude: "" });
+  const [coordsError, setCoordsError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
   // Semeia o formulário ao abrir o dialog (evita useEffect + setState).
@@ -62,6 +65,13 @@ export default function FarmDetailPage() {
       const parsed = parseFarmLocation(farm.location);
       setEditStateUf(parsed.uf);
       setEditCity(parsed.city);
+      // Ponto geocodificado é o centro da cidade — não mostra como se fosse a sede.
+      const exact = farm.coord_source && farm.coord_source !== "geocode";
+      setEditCoords({
+        latitude: exact && farm.latitude != null ? String(farm.latitude) : "",
+        longitude: exact && farm.longitude != null ? String(farm.longitude) : "",
+      });
+      setCoordsError(null);
       setNameError(null);
     }
   }
@@ -72,10 +82,19 @@ export default function FarmDetailPage() {
       return;
     }
     setNameError(null);
+    const lat = parseCoordinate(editCoords.latitude, 90);
+    const lng = parseCoordinate(editCoords.longitude, 180);
+    const anyCoord = Boolean(editCoords.latitude.trim() || editCoords.longitude.trim());
+    if (anyCoord && (lat === null || lng === null)) {
+      setCoordsError("Preencha latitude e longitude válidas (ou deixe as duas em branco).");
+      return;
+    }
+    setCoordsError(null);
     updateFarm.mutate(
       {
         name: editName.trim(),
         location: optionalFarmLocation(editCity, editStateUf) ?? "",
+        ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {}),
       },
       {
         onSuccess: () => {
@@ -194,6 +213,13 @@ export default function FarmDetailPage() {
               onStateChange={setEditStateUf}
               onCityChange={setEditCity}
             />
+            <FarmCoordinatesFields
+              idPrefix="edit-farm"
+              latitude={editCoords.latitude}
+              longitude={editCoords.longitude}
+              onChange={setEditCoords}
+            />
+            {coordsError ? <p className="text-xs text-destructive">{coordsError}</p> : null}
           </div>
           <DialogFooter className="sm:flex-row sm:justify-end">
             <Button

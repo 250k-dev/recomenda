@@ -29,6 +29,7 @@ export * from "./admin";
 export * from "./billing";
 export * from "./lico";
 export * from "./notifications";
+export * from "./field-observations";
 export * from "./purchase-lists";
 export * from "./portfolio-price-coverage";
 export * from "./quotes";

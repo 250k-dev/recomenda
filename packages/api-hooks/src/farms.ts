@@ -60,7 +60,8 @@ export function useDeleteFarm(producerId?: string) {
 export function useUpdateFarm(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { name?: string; location?: string }) => updateFarm(id, payload),
+    mutationFn: (payload: { name?: string; location?: string; latitude?: number | null; longitude?: number | null }) =>
+      updateFarm(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.farm(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.farms });
