@@ -77,12 +77,7 @@ export function recommendationWindowSpanDays(
   return Math.max(windowEndDays - windowStartDays, 0);
 }
 
-/**
- * Acima desta diferença (dias) entre a aplicação e a data prevista, o registro
- * pede confirmação: o servidor desloca TODAS as etapas pendentes seguintes da
- * safra pelo mesmo tanto, e um salto desse tamanho quase sempre é previsão
- * errada (janela ou plantio), não atraso real de campo.
- */
+/** Limiar histórico (UI de confirmação removida); mantido para testes/utilitários. */
 export const SCHEDULE_SHIFT_WARN_DAYS = 30;
 
 /** Aplicação − previsão, em dias (positivo = aplicada depois). Null sem previsão. */

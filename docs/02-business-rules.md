@@ -38,22 +38,27 @@ predicted_date_current = anchor_date + window_start_days
 predicted_date_original = predicted_date_current   (set once, never changes)
 ```
 
-### Cascade on application registration
-When a producer registers a Recommendation as applied or skipped:
+### Application registration (no cascade on following stages)
+When a producer registers a Recommendation as applied:
 
 ```
-1. Set executed_date and final status (APPLIED_ON_TIME / APPLIED_LATE / SKIPPED).
+1. Set executed_date and final status (APPLIED_ON_TIME / APPLIED_LATE).
 2. Determine status:
      APPLIED_ON_TIME if executed_date ≤ predicted_date_current + (window_end_days - window_start_days)
      APPLIED_LATE    if executed_date > that threshold
-     SKIPPED         if explicitly skipped (executed_date may be null or set to "marked-skipped" date)
-3. delta_days = executed_date - predicted_date_current
-4. For every Recommendation in the same Season with status = PENDING and order_index > current.order_index:
-     predicted_date_current += delta_days
-     predicted_date_original is preserved untouched
-5. Persist all changes in one transaction.
-6. Notify agronomist asynchronously.
+3. delta_days = executed_date - predicted_date_current (audit only; does not move other stages)
+4. Pending recommendations with higher order_index keep their predicted_date_current unchanged.
+5. Persist in one transaction and notify agronomist asynchronously.
 ```
+
+When a recommendation is **skipped**:
+
+```
+1. Set status SKIPPED and execution_notes; executed_date may be set to the skip date.
+2. Do not shift predicted dates of subsequent pending recommendations.
+```
+
+Changing **planting_date** or **desiccation_date** still recomputes predicted dates for PENDING recommendations only (see SeasonsService).
 
 ### Display rule
 On any UI showing recommendation dates: show `predicted_date_current` as primary. If `predicted_date_original` differs, show it secondarily (e.g., struck through, in muted color, or as "originally planned: DD/MM").
@@ -62,7 +67,7 @@ On any UI showing recommendation dates: show `predicted_date_current` as primary
 If a producer or agronomist undoes an application:
 - Revert recommendation to PENDING.
 - Revert stock movements (create reverse StockMovement entries).
-- Recompute the cascade for subsequent pending recommendations using the previous-previous executed date.
+- If the apply was recorded before the fixed-schedule change and shifted subsequent stages, `revertApplyShift` may restore those pending dates from audit `shifted_recommendations` when still unchanged.
 - Audit log records the unwind.
 
 ## 3. Stock

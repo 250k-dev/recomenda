@@ -420,9 +420,8 @@ export type BulkRegisterResult = {
 /**
  * Registro em massa do cronograma: aplica (ou pula) várias etapas com uma data só.
  * Não há endpoint batch no server — resolve item a item, UM DE CADA VEZ, na
- * ordem da safra e da data prevista. Em paralelo, cada registro arrastava as
- * etapas seguintes ao mesmo tempo que os outros e o resultado dependia de quem
- * terminava primeiro. Tolera falha parcial e invalida a agenda + as timelines.
+ * ordem da safra e da data prevista (evita condição de corrida no estoque).
+ * Tolera falha parcial e invalida a agenda + as timelines.
  */
 export function useBulkRegisterRecommendations() {
   const queryClient = useQueryClient();

@@ -44,10 +44,6 @@ import {
 } from "@recomenda/domain/catalog/purchase-list-catalog";
 import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import {
-  isLargeScheduleShift,
-  scheduleShiftDays,
-} from "@recomenda/domain/timing/window-days";
-import {
   SEED_CATEGORIES,
   areaFactorOf,
   areaPercentFieldFromFactor,
@@ -93,11 +89,6 @@ import { RecommendationRegisterPopover } from "@/components/domain/recommendatio
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { useExecutionImpactGuard } from "@/components/domain/season/execution-impact-guard";
 import { StockShortageDialog } from "@/components/domain/stock-shortage-dialog";
-import {
-  ScheduleShiftConfirmDialog,
-  type ScheduleShift,
-} from "@/components/domain/schedule-shift-confirm-dialog";
-
 export type ListProductPlan = {
   dose: number;
   unit: string;
@@ -1342,7 +1333,6 @@ export function RecommendationCard({
     });
   };
 
-  const [pendingShift, setPendingShift] = useState<ScheduleShift | null>(null);
   const [shortage, setShortage] = useState<PublishBlockSummary | null>(null);
 
   const doApply = (withoutQuote?: { manualTotal: number | null }) => {
@@ -1365,12 +1355,10 @@ export function RecommendationCard({
               ? "Falta lançada no estoque e etapa registrada."
               : "Etapa registrada como aplicada.",
           );
-          setPendingShift(null);
           setShortage(null);
           setRegistering(false);
         },
         onError: (e: unknown) => {
-          setPendingShift(null);
           const missing = stockShortageSummaryFromError(e);
           if (missing) {
             setShortage(missing);
@@ -1383,16 +1371,6 @@ export function RecommendationCard({
   };
 
   const handleApply = () => {
-    const delta = scheduleShiftDays(rec.predicted_date_current, executedDate);
-    if (rec.predicted_date_current && isLargeScheduleShift(delta)) {
-      setPendingShift({
-        title: rec.name,
-        predictedYmd: rec.predicted_date_current.slice(0, 10),
-        executedYmd: executedDate,
-        deltaDays: delta,
-      });
-      return;
-    }
     doApply();
   };
 
@@ -1908,12 +1886,6 @@ export function RecommendationCard({
         </div>
       )}
 
-      <ScheduleShiftConfirmDialog
-        shifts={pendingShift ? [pendingShift] : []}
-        loading={applyMut.isPending}
-        onCancel={() => setPendingShift(null)}
-        onConfirm={() => doApply()}
-      />
       <StockShortageDialog
         summary={shortage}
         onClose={() => setShortage(null)}

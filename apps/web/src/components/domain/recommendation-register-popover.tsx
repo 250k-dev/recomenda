@@ -16,22 +16,13 @@ import {
   useSkipRecommendation,
 } from "@recomenda/api-hooks";
 import { useCan } from "@recomenda/api-hooks/use-can";
-import {
-  isLargeScheduleShift,
-  scheduleShiftDays,
-  todayLocalYmd,
-} from "@recomenda/domain/timing/window-days";
+import { todayLocalYmd } from "@recomenda/domain/timing/window-days";
 import {
   apiErrorMessage,
   stockShortageSummaryFromError,
   type PublishBlockSummary,
 } from "@recomenda/api/api-error";
 import { StockShortageDialog } from "@/components/domain/stock-shortage-dialog";
-import {
-  ScheduleShiftConfirmDialog,
-  type ScheduleShift,
-} from "@/components/domain/schedule-shift-confirm-dialog";
-
 /**
  * Atalho "Registrar aplicação": abre um popover ancorado com o mesmo mini-form do
  * painel de Execução (data + observações + Marcar como aplicada + Pular), sem tirar
@@ -42,7 +33,7 @@ export function RecommendationRegisterPopover({
   seasonId,
   recommendationId,
   title,
-  predictedDate,
+  predictedDate: _predictedDate,
   defaultDate,
   align = "end",
   trigger,
@@ -51,7 +42,7 @@ export function RecommendationRegisterPopover({
   recommendationId: string;
   /** Nome da etapa, mostrado no cabeçalho do popover ("Registrar · Dessecação"). */
   title?: string;
-  /** Data prevista atual da etapa — aplicação muito longe dela pede confirmação. */
+  /** Data prevista atual da etapa (exibição no cabeçalho, se necessário). */
   predictedDate?: string | null;
   /** Data pré-preenchida (padrão: hoje). */
   defaultDate?: string;
@@ -62,7 +53,6 @@ export function RecommendationRegisterPopover({
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(defaultDate ?? todayLocalYmd());
   const [notes, setNotes] = useState("");
-  const [pendingShift, setPendingShift] = useState<ScheduleShift | null>(null);
   const [shortage, setShortage] = useState<PublishBlockSummary | null>(null);
 
   const applyMut = useApplyRecommendation(seasonId);
@@ -99,12 +89,10 @@ export function RecommendationRegisterPopover({
               ? "Falta lançada no estoque e etapa registrada."
               : "Etapa registrada como aplicada.",
           );
-          setPendingShift(null);
           setShortage(null);
           setOpen(false);
         },
         onError: (e: unknown) => {
-          setPendingShift(null);
           const missing = stockShortageSummaryFromError(e);
           if (missing) {
             setOpen(false);
@@ -119,16 +107,6 @@ export function RecommendationRegisterPopover({
 
   const handleApply = () => {
     if (!date) return;
-    const delta = scheduleShiftDays(predictedDate, date);
-    if (predictedDate && isLargeScheduleShift(delta)) {
-      setPendingShift({
-        title: title ?? "Etapa",
-        predictedYmd: predictedDate.slice(0, 10),
-        executedYmd: date,
-        deltaDays: delta,
-      });
-      return;
-    }
     doApply();
   };
 
@@ -215,12 +193,6 @@ export function RecommendationRegisterPopover({
           </div>
         </PopoverContent>
       </Popover>
-      <ScheduleShiftConfirmDialog
-        shifts={pendingShift ? [pendingShift] : []}
-        loading={applyMut.isPending}
-        onCancel={() => setPendingShift(null)}
-        onConfirm={() => doApply()}
-      />
       <StockShortageDialog
         summary={shortage}
         onClose={() => setShortage(null)}
