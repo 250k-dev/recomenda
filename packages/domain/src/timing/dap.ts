@@ -1,7 +1,6 @@
 /**
- * DAP (dias após o plantio) para exibir: o dia da lavoura em que uma data cai,
- * contado da data de plantio do talhão. Antes do plantio não existe DAP
- * negativo na fala do campo — vira "N dias antes do plantio".
+ * DAP (dias em relação ao plantio) para exibir. O número é a distância em
+ * dias; o sinal da etapa de pré-plantio vem da fase (`-N DAP`).
  *
  * Puro (datas civis YYYY-MM-DD, sem fuso).
  */
@@ -36,6 +35,22 @@ export function dapOf(
   date: string | null | undefined,
 ): string | null {
   return dapLabel(daysFromPlanting(plantingDate, date));
+}
+
+/**
+ * Selo da etapa. Pré-plantio sempre leva o sinal negativo (`-7 DAP`):
+ * a fase conta para trás do plantio. As outras fases seguem `dapLabel`.
+ */
+export function stageDapLabel(
+  triggerType: string | null | undefined,
+  plantingDate: string | null | undefined,
+  date: string | null | undefined,
+): string | null {
+  const days = daysFromPlanting(plantingDate, date);
+  if (days == null) return null;
+  if (days === 0) return "No plantio";
+  if (triggerType === "PRE_PLANTING") return `-${Math.abs(days)} DAP`;
+  return dapLabel(days);
 }
 
 /** Hoje em YYYY-MM-DD local. */

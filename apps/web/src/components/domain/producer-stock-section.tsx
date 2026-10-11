@@ -138,7 +138,9 @@ export function ProducerStockSection({
   );
 
   const enrichedRows = useMemo(() => {
-    return (stock ?? []).map((item) => {
+    return (stock ?? [])
+      .filter((item) => Number(item.quantity) > 1e-9)
+      .map((item) => {
       const catalog = productById.get(item.local_product_id);
       const price =
         item.price_brl != null && Number.isFinite(Number(item.price_brl))
@@ -294,11 +296,42 @@ export function ProducerStockSection({
     }
   };
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editQty, setEditQty] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+
   const editEntry = (row: (typeof enrichedRows)[number]) => {
-    setFormOpen(true);
-    setProductId(row.local_product_id);
-    setQuantity(String(row.quantity));
-    setPriceBrl(row.price_brl != null ? String(row.price_brl) : "");
+    setFormOpen(false);
+    setEditingId(row.local_product_id);
+    setEditQty(String(row.quantity));
+    setEditPrice(row.price_brl != null ? String(row.price_brl) : "");
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    const n = Number(brToCanonical(editQty) || editQty);
+    if (!Number.isFinite(n) || n < 0) {
+      return toast.error("Informe uma quantidade válida.");
+    }
+    const priceRaw = editPrice.trim();
+    let price: number | null = null;
+    if (priceRaw !== "") {
+      price = Number(priceRaw);
+      if (!Number.isFinite(price) || price < 0) {
+        return toast.error("Informe um preço válido.");
+      }
+    }
+    try {
+      await adjust.mutateAsync({
+        local_product_id: editingId,
+        new_quantity: n,
+        price_brl: price,
+      });
+      toast.success("Estoque atualizado.");
+      setEditingId(null);
+    } catch (e) {
+      toast.error(apiErrorMessage(e, "Não foi possível salvar o estoque."));
+    }
   };
 
   const exportData: StockExportData = useMemo(
@@ -349,7 +382,18 @@ export function ProducerStockSection({
       label: "Quantidade",
       align: "right",
       accessor: { kind: "range", get: (r) => r.quantity },
-      render: (r) => withUnit(r.quantity, r.dose_unit),
+      render: (r) =>
+        editingId === r.local_product_id ? (
+          <MoneyInput
+            value={editQty}
+            onValueChange={setEditQty}
+            decimals={2}
+            grouping={false}
+            placeholder="0"
+          />
+        ) : (
+          withUnit(r.quantity, r.dose_unit)
+        ),
     },
     {
       id: "committed",
@@ -378,7 +422,14 @@ export function ProducerStockSection({
       label: "Preço médio",
       align: "right",
       accessor: { kind: "range", get: (r) => r.price_brl },
-      render: (r) => (r.price_brl != null ? fmtBrl(r.price_brl) : "—"),
+      render: (r) =>
+        editingId === r.local_product_id ? (
+          <MoneyInput placeholder="R$" value={editPrice} onValueChange={setEditPrice} />
+        ) : r.price_brl != null ? (
+          fmtBrl(r.price_brl)
+        ) : (
+          "—"
+        ),
     },
     {
       id: "value",
@@ -419,14 +470,36 @@ export function ProducerStockSection({
               Em uso
             </Badge>
           ) : null}
-          <button
-            type="button"
-            onClick={() => editEntry(r)}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Editar item"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
+          {editingId === r.local_product_id ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                disabled={saving}
+                className="text-primary hover:text-primary-strong"
+                aria-label="Salvar item"
+              >
+                <Save className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingId(null)}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Cancelar edição"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => editEntry(r)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Editar item"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() =>

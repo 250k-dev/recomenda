@@ -13,6 +13,9 @@ export interface MixTemplateItem {
   equivalence_group?: string | null;
   /** Alvo/observação do produto (vai para a etapa ao publicar). */
   target?: string | null;
+  n_applications?: number | null;
+  area_factor?: number | string | null;
+  area_note?: string | null;
 }
 
 export interface TimingStage {
@@ -196,6 +199,9 @@ export async function replaceMixTemplateItems(
     dose_per_hectare: number;
     dose_unit?: string;
     target?: string | null;
+    n_applications?: number;
+    area_factor?: number;
+    area_note?: string | null;
   }>,
 ) {
   const { data } = await api.put<MixTemplate & { items: MixTemplateItem[] }>(

@@ -63,6 +63,8 @@ export interface RecommendationItem {
   category?: string | null;
   /** Alvo/observação do produto na receita de aplicação. */
   target?: string | null;
+  /** Vezes na compra. A quantidade desta passada não multiplica por este número. */
+  n_applications?: number;
 }
 
 export interface Recommendation {
@@ -361,6 +363,7 @@ export async function createRecommendationItem(payload: {
   dose_unit?: string;
   area_factor?: number;
   area_note?: string | null;
+  n_applications?: number;
 }) {
   const { data } = await api.post(`/recommendation_items`, payload);
   return data;
@@ -376,6 +379,7 @@ export async function updateRecommendationItem(
     area_factor?: number;
     area_note?: string | null;
     target?: string | null;
+    n_applications?: number;
   },
 ) {
   const { data } = await api.patch(`/recommendation_items/${id}`, payload);

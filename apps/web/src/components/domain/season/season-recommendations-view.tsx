@@ -134,8 +134,6 @@ function ScheduleToolbar({
   onEditCrop,
   onHarvest,
   onApplyTemplate,
-  applyTemplateDisabled,
-  applyTemplateTitle,
   onAddStage,
   producerId,
 }: {
@@ -148,8 +146,6 @@ function ScheduleToolbar({
   onEditCrop: () => void;
   onHarvest: () => void;
   onApplyTemplate: () => void;
-  applyTemplateDisabled?: boolean;
-  applyTemplateTitle?: string;
   onAddStage: () => void;
   producerId?: string | null;
 }) {
@@ -186,8 +182,6 @@ function ScheduleToolbar({
             size="sm"
             className={TOOLBAR_BTN}
             onClick={onApplyTemplate}
-            disabled={applyTemplateDisabled}
-            title={applyTemplateTitle}
           >
             <LayoutTemplate className="h-4 w-4 shrink-0" />
             Aplicar modelo
@@ -374,6 +368,7 @@ export function SeasonRecommendationsView({
           unit: item.dose_unit,
           areaFactor: Number(item.area_factor) > 0 ? Number(item.area_factor) : 1,
           areaNote: item.area_note ?? null,
+          nApplications: Number(item.n_applications) >= 1 ? Number(item.n_applications) : 1,
         };
         const stage = keyOf(item.stage || "");
         if (stage) byProductStage.set(`${item.local_product_id}::${stage}`, plan);
@@ -470,17 +465,6 @@ export function SeasonRecommendationsView({
     ) as Recommendation[];
   }, [data]);
 
-  // Aplicação registrada trava a troca de modelo: não se passa produto por cima
-  // do que já foi para o campo. Mesma regra do aplicar em massa, que esconde
-  // esses talhões da seleção. Definido antes dos returns condicionais porque os
-  // dois botões "Aplicar modelo" vivem em ramos diferentes do render.
-  const hasAppliedStage = recommendations.some(
-    (r) => r.status === "APPLIED_ON_TIME" || r.status === "APPLIED_LATE",
-  );
-  const applyTemplateTitle = hasAppliedStage
-    ? "Este talhão já tem aplicação registrada — o modelo não pode ser trocado."
-    : undefined;
-
   const plotRow = cycle?.seasons.find((s) => s.id === seasonId);
   const harvestable =
     canHarvest &&
@@ -566,8 +550,6 @@ export function SeasonRecommendationsView({
           onEditCrop={() => setCropEditOpen(true)}
           onHarvest={() => setHarvestOpen(true)}
           onApplyTemplate={() => setTemplateOpen(true)}
-          applyTemplateDisabled={hasAppliedStage}
-          applyTemplateTitle={applyTemplateTitle}
           onAddStage={() => setAddingStage(true)}
           producerId={producerId}
         />
@@ -693,8 +675,6 @@ export function SeasonRecommendationsView({
                 variant="outline"
                 className="gap-1.5"
                 onClick={() => setTemplateOpen(true)}
-                disabled={hasAppliedStage}
-                title={applyTemplateTitle}
               >
                 <LayoutTemplate className="h-4 w-4 shrink-0" />
                 Aplicar modelo

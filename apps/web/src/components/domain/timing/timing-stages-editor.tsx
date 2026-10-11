@@ -32,6 +32,7 @@ import {
   isoDateToDayOffset,
 } from "@recomenda/domain/timing/window-days";
 import type { StageProductDraft } from "@recomenda/domain/timing/types";
+import { SEED_CATEGORIES } from "@recomenda/domain/purchase-list/list-item";
 import { suggestPhenologicalStage } from "@recomenda/domain/recommendations/phenology";
 import {
   applicationSummary,
@@ -642,6 +643,7 @@ function StageProductsEditor({
                   placeholder="0"
                   aria-invalid={item.productId ? overBudgetProductIds.has(item.productId) : undefined}
                   className={cn(
+                    "h-8 w-full min-w-0 px-2 text-sm tabular-nums max-md:text-base",
                     item.productId &&
                       overBudgetProductIds.has(item.productId) &&
                       "border-destructive/50 focus-visible:ring-destructive/20",
@@ -652,7 +654,8 @@ function StageProductsEditor({
                 <DoseUnitSelect
                   value={item.unit}
                   onChange={(unit) => updateProduct(item.key, { unit })}
-                  className="w-full"
+                  size="sm"
+                  className="w-full [&>button]:h-8"
                 />
               </Field>
               <div className="flex items-end justify-end sm:pb-0.5">
@@ -667,6 +670,52 @@ function StageProductsEditor({
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
+              {(SEED_CATEGORIES as readonly string[]).includes(item.category) ? null : (
+                <div className="grid gap-2 sm:col-span-full sm:grid-cols-[7rem_7rem_minmax(0,1fr)] sm:items-end">
+                  <Field label="Nº apl.">
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      inputMode="numeric"
+                      value={item.nApps ?? ""}
+                      onChange={(e) => {
+                        const whole = e.target.value.replace(/[.,].*$/, "").replace(/\D/g, "");
+                        updateProduct(item.key, { nApps: whole });
+                      }}
+                      placeholder="1"
+                      aria-label="Número de aplicações"
+                      className="h-8 w-full min-w-0 px-2 text-sm tabular-nums max-md:text-base"
+                    />
+                  </Field>
+                  <Field label="% da área">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={item.areaPercent ?? ""}
+                      onChange={(e) => updateProduct(item.key, { areaPercent: e.target.value })}
+                      placeholder="100"
+                      aria-label="% da área"
+                      className="h-8 w-full min-w-0 px-2 text-sm tabular-nums max-md:text-base"
+                    />
+                  </Field>
+                  <Field label="Obs. área">
+                    <Input
+                      value={item.areaNote ?? ""}
+                      onChange={(e) => updateProduct(item.key, { areaNote: e.target.value })}
+                      placeholder="Ex.: só cabeceira"
+                      aria-label="Observação de área"
+                      maxLength={180}
+                      className="h-8 text-sm max-md:text-base"
+                    />
+                  </Field>
+                  <p className="text-[11px] leading-4 text-muted-foreground sm:col-span-full">
+                    Volume e hectares tratados calculam quando o modelo entra no talhão.
+                  </p>
+                </div>
+              )}
               <div className="sm:col-span-full">
                 <Input
                   value={item.target ?? ""}

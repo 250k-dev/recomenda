@@ -1,6 +1,12 @@
 import type { MixTemplateItem } from "@recomenda/api/templates";
 import type { StageProductDraft } from "./types";
 import type { Product } from "@recomenda/api/catalog";
+import {
+  SEED_CATEGORIES,
+  areaFactorOf,
+  areaPercentFieldFromFactor,
+  parseNApplications,
+} from "../purchase-list/list-item";
 
 function parseDose(value: string): number {
   return Number(String(value).replace(",", "."));
@@ -44,6 +50,12 @@ export function mapMixItemsToStageProducts(
       dose: String(item.dose_per_hectare),
       unit: item.dose_unit ?? product?.dose_unit ?? "L",
       target: item.target ?? "",
+      nApps:
+        item.n_applications != null && Number(item.n_applications) > 1
+          ? String(item.n_applications)
+          : "",
+      areaPercent: areaPercentFieldFromFactor(item.area_factor),
+      areaNote: item.area_note ?? "",
     };
   });
 }
@@ -53,6 +65,9 @@ export type MixItemInput = {
   dose_per_hectare: number;
   dose_unit: string;
   target: string | null;
+  n_applications: number;
+  area_factor: number;
+  area_note: string | null;
 };
 
 /** O que a etapa precisa que aconteça no servidor. Decidir isto é lógica de
@@ -118,11 +133,15 @@ export function planStageProducts({
   // 200 chamadas); agora é 1 chamada, atômica no servidor.
   const byProduct = new Map<string, MixItemInput>();
   for (const product of validProducts) {
+    const seed = SEED_CATEGORIES.includes(product.category);
     byProduct.set(product.productId, {
       local_product_id: product.productId,
       dose_per_hectare: parseDose(product.dose),
       dose_unit: product.unit,
       target: product.target?.trim() || null,
+      n_applications: seed ? 1 : parseNApplications(product.nApps),
+      area_factor: seed ? 1 : areaFactorOf({ areaPercent: product.areaPercent }),
+      area_note: seed ? null : product.areaNote?.trim() || null,
     });
   }
 

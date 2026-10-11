@@ -16,8 +16,11 @@ import { Label } from "@recomenda/ui/primitives/label";
 import { Select } from "@recomenda/ui/forms/select";
 import {
   useBulkApplySeasonTemplate,
+  useTimingTemplate,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
+import { zeroPeriodStageNames } from "@recomenda/domain/timing/window-days";
+import { ZeroPeriodApplyDialog } from "@/components/domain/season/zero-period-apply-dialog";
 import type { CycleDetail, CycleSeasonRow } from "@recomenda/api/cycles";
 import { CROP_LABELS, cropLabel } from "@recomenda/utils";
 import {
@@ -63,6 +66,10 @@ export function BulkApplyTemplateDialog({
   const bulkApply = useBulkApplySeasonTemplate(cycle.id);
   const [templateId, setTemplateId] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [zeroOpen, setZeroOpen] = useState(false);
+  const { data: templateDetail, isLoading: detailLoading } = useTimingTemplate(
+    open ? templateId : "",
+  );
 
   const options = useMemo(
     () =>
@@ -97,18 +104,12 @@ export function BulkApplyTemplateDialog({
     }
   }
 
-  // Talhão que já teve aplicação registrada sai da lista: não se passa produto
-  // por cima de aplicação feita. Ele é contado à parte para explicar a ausência
-  // — talhão sumir sem motivo confunde mais do que ajuda.
-  const applicable = useMemo(
+  // Talhão com aplicação registrada entra na lista: o servidor preserva essas
+  // etapas e só substitui as que ainda estão pendentes.
+  const seasons = useMemo(
     () => cycle.seasons.filter((s) => APPLICABLE_STATUS.has(s.status)),
     [cycle.seasons],
   );
-  const seasons = useMemo(
-    () => applicable.filter((s) => s.recommendations_done === 0),
-    [applicable],
-  );
-  const alreadyAppliedCount = applicable.length - seasons.length;
 
   // O servidor recusa modelo de cultura diferente da do talhão — em vez de
   // deixar falhar no lote, o talhão já aparece bloqueado com o motivo.
@@ -128,7 +129,7 @@ export function BulkApplyTemplateDialog({
             `${season.plot_area_ha.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ha`,
             cropLabel(season.crop),
             season.recommendations_total > 0
-              ? `${season.recommendations_total} ${season.recommendations_total === 1 ? "etapa" : "etapas"}${pending > 0 ? ` · ${pending} pendente${pending === 1 ? "" : "s"}` : ""}`
+              ? `${season.recommendations_total} ${season.recommendations_total === 1 ? "etapa" : "etapas"}${pending > 0 ? ` · ${pending} pendente${pending === 1 ? "" : "s"}` : ""}${season.recommendations_done > 0 ? ` · ${season.recommendations_done} registrada${season.recommendations_done === 1 ? "" : "s"} permanece${season.recommendations_done === 1 ? "" : "m"}` : ""}`
               : "sem etapas",
           ].join(" · "),
           disabledReason: cropMismatch
@@ -155,15 +156,12 @@ export function BulkApplyTemplateDialog({
     0,
   );
 
-  const handleApply = () => {
-    if (!templateId) {
-      toast.error("Selecione um modelo.");
-      return;
-    }
-    if (validSelected.size === 0) {
-      toast.error("Selecione ao menos um talhão.");
-      return;
-    }
+  const zeroNames = useMemo(
+    () => zeroPeriodStageNames(templateDetail?.stages ?? []),
+    [templateDetail?.stages],
+  );
+
+  const runApply = () => {
     bulkApply.mutate(
       {
         timingTemplateId: templateId,
@@ -188,6 +186,7 @@ export function BulkApplyTemplateDialog({
             toast.success(
               `Modelo aplicado em ${ok} ${ok === 1 ? "talhão" : "talhões"}.`,
             );
+            setZeroOpen(false);
             onOpenChange(false);
             return;
           }
@@ -201,6 +200,22 @@ export function BulkApplyTemplateDialog({
         onError: () => toast.error("Não foi possível aplicar o modelo."),
       },
     );
+  };
+
+  const handleApply = () => {
+    if (!templateId) {
+      toast.error("Selecione um modelo.");
+      return;
+    }
+    if (validSelected.size === 0) {
+      toast.error("Selecione ao menos um talhão.");
+      return;
+    }
+    if (zeroNames.length > 0) {
+      setZeroOpen(true);
+      return;
+    }
+    runApply();
   };
 
   return (
@@ -243,26 +258,15 @@ export function BulkApplyTemplateDialog({
                 {pendingToReplace}{" "}
                 {pendingToReplace === 1 ? "etapa pendente" : "etapas pendentes"}{" "}
                 {pendingToReplace === 1 ? "será substituída" : "serão substituídas"}{" "}
-                pelo modelo nos talhões marcados. Etapas já aplicadas permanecem.
+                pelo modelo nos talhões marcados. Etapas já aplicadas ou puladas
+                permanecem.
               </span>
-            </p>
-          ) : null}
-
-          {alreadyAppliedCount > 0 ? (
-            <p className="text-[13px] text-muted-foreground">
-              {alreadyAppliedCount}{" "}
-              {alreadyAppliedCount === 1
-                ? "talhão não aparece porque já tem aplicação registrada"
-                : "talhões não aparecem porque já têm aplicação registrada"}
-              .
             </p>
           ) : null}
 
           {seasons.length === 0 ? (
             <p className="text-[13px] text-muted-foreground">
-              {applicable.length > 0
-                ? "Todos os talhões desta safra já têm aplicação registrada."
-                : "Esta safra ainda não tem talhões programados."}
+              Esta safra ainda não tem talhões programados.
             </p>
           ) : (
             <FarmPlotSelection
@@ -296,7 +300,10 @@ export function BulkApplyTemplateDialog({
           <Button
             onClick={handleApply}
             disabled={
-              bulkApply.isPending || !templateId || validSelected.size === 0
+              bulkApply.isPending ||
+              detailLoading ||
+              !templateId ||
+              validSelected.size === 0
             }
           >
             {bulkApply.isPending
@@ -305,6 +312,13 @@ export function BulkApplyTemplateDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ZeroPeriodApplyDialog
+        open={zeroOpen}
+        onOpenChange={setZeroOpen}
+        stageNames={zeroNames}
+        loading={bulkApply.isPending}
+        onConfirm={runApply}
+      />
     </Dialog>
   );
 }

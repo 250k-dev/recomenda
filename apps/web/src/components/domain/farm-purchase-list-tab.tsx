@@ -180,6 +180,47 @@ export type FarmPurchaseListTabProps = {
   itemsNotice?: ReactNode;
 };
 
+type StockDrop = {
+  productId: string;
+  name: string;
+  from: number;
+  to: number;
+};
+
+/** Estoque da lista que ficou menor que o último valor salvo, por produto. */
+function collectStockDrops(baseline: ListItem[], draft: ListItem[]): StockDrop[] {
+  const fromByProduct = new Map<string, { qty: number; name: string }>();
+  for (const item of baseline) {
+    if (!item.productId || fromByProduct.has(item.productId)) continue;
+    fromByProduct.set(item.productId, {
+      qty: Number(item.stock) || 0,
+      name: item.productName || "Produto",
+    });
+  }
+  const drops: StockDrop[] = [];
+  const seen = new Set<string>();
+  for (const item of draft) {
+    if (!item.productId || seen.has(item.productId)) continue;
+    seen.add(item.productId);
+    const previous = fromByProduct.get(item.productId);
+    if (!previous) continue;
+    const to = Number(item.stock) || 0;
+    if (to + 1e-9 < previous.qty) {
+      drops.push({
+        productId: item.productId,
+        name: item.productName || previous.name,
+        from: previous.qty,
+        to,
+      });
+    }
+  }
+  return drops;
+}
+
+function fmtStock(n: number) {
+  return n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+
 export function FarmPurchaseListTab({
   farmId,
   list,
@@ -250,6 +291,10 @@ export function FarmPurchaseListTab({
   const [restoreItems, setRestoreItems] = useState<ListItem[] | null>(null);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [editBaseline, setEditBaseline] = useState<ListItem[]>([]);
+  const [stockDrops, setStockDrops] = useState<StockDrop[] | null>(null);
+  const stockDropBypassRef = useRef(false);
+  const stockDialogOpenRef = useRef(false);
+  stockDialogOpenRef.current = stockDrops != null;
   const [editBaselineUpdatedAt, setEditBaselineUpdatedAt] = useState<string | null>(
     null,
   );
@@ -540,6 +585,13 @@ export function FarmPurchaseListTab({
       return true;
     }
 
+    const drops = collectStockDrops(editBaseline, draftForSave);
+    if (drops.length > 0 && !stockDropBypassRef.current) {
+      setStockDrops(drops);
+      return false;
+    }
+    stockDropBypassRef.current = false;
+
     try {
       saveInFlightRef.current = true;
       setSaveState("saving");
@@ -813,6 +865,7 @@ export function FarmPurchaseListTab({
   );
   useEffect(() => {
     if (!PURCHASE_LIST_AUTOSAVE_ENABLED) return;
+    if (stockDialogOpenRef.current) return;
     if (!editing || !list || draftItems.length === 0 || !draftIsDirty) return;
     if (saveInFlightRef.current || saveState === "saving") return;
     const timer = setTimeout(() => {
@@ -1324,6 +1377,72 @@ export function FarmPurchaseListTab({
           }
         />
       )}
+
+      <Dialog
+        open={stockDrops != null}
+        onOpenChange={(open) => {
+          if (open || stockDropBypassRef.current) return;
+          const ids = new Set((stockDrops ?? []).map((drop) => drop.productId));
+          setDraftItems((prev) =>
+            prev.map((item) => {
+              if (!ids.has(item.productId)) return item;
+              const base = editBaseline.find((row) => row.productId === item.productId);
+              return base ? { ...item, stock: base.stock } : item;
+            }),
+          );
+          setStockDrops(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Baixar estoque do galpão</DialogTitle>
+            <DialogDescription>
+              A coluna desta lista é o estoque que ela enxerga. O que as safras
+              anteriores já reservaram permanece no galpão. Se não houver outra
+              safra, zerar tira o produto do estoque.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-2 text-sm">
+            {(stockDrops ?? []).map((drop) => (
+              <li key={drop.productId}>
+                <span className="font-medium">{drop.name}</span>
+                {": "}
+                saem {fmtStock(drop.from - drop.to)} do galpão ({fmtStock(drop.from)} →{" "}
+                {fmtStock(drop.to)}).
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const ids = new Set((stockDrops ?? []).map((drop) => drop.productId));
+                setDraftItems((prev) =>
+                  prev.map((item) => {
+                    if (!ids.has(item.productId)) return item;
+                    const base = editBaseline.find((row) => row.productId === item.productId);
+                    return base ? { ...item, stock: base.stock } : item;
+                  }),
+                );
+                setStockDrops(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                stockDropBypassRef.current = true;
+                setStockDrops(null);
+                void saveItems({ silent: true });
+              }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <PurchaseListExportDialog
         open={exportOpen}

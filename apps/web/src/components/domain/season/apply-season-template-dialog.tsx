@@ -15,9 +15,12 @@ import { Label } from "@recomenda/ui/primitives/label";
 import { Select } from "@recomenda/ui/forms/select";
 import {
   useApplySeasonTemplate,
+  useTimingTemplate,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
 import { apiErrorMessage } from "@recomenda/api/api-error";
+import { zeroPeriodStageNames } from "@recomenda/domain/timing/window-days";
+import { ZeroPeriodApplyDialog } from "@/components/domain/season/zero-period-apply-dialog";
 
 export function ApplySeasonTemplateDialog({
   open,
@@ -37,6 +40,10 @@ export function ApplySeasonTemplateDialog({
   const { data: templates, isLoading } = useTimingTemplates(producerId);
   const applyMut = useApplySeasonTemplate(seasonId);
   const [templateId, setTemplateId] = useState("");
+  const [zeroOpen, setZeroOpen] = useState(false);
+  const { data: templateDetail, isLoading: detailLoading } = useTimingTemplate(
+    open ? templateId : "",
+  );
 
   const options = useMemo(
     () =>
@@ -58,11 +65,12 @@ export function ApplySeasonTemplateDialog({
     );
   }, [open, options]);
 
-  const handleApply = () => {
-    if (!templateId) {
-      toast.error("Selecione um modelo de timing.");
-      return;
-    }
+  const zeroNames = useMemo(
+    () => zeroPeriodStageNames(templateDetail?.stages ?? []),
+    [templateDetail?.stages],
+  );
+
+  const runApply = () => {
     applyMut.mutate(templateId, {
       onSuccess: (res) => {
         const impact = res.list_impact;
@@ -77,12 +85,25 @@ export function ApplySeasonTemplateDialog({
           );
         }
         toast.success("Modelo aplicado às etapas deste talhão.");
+        setZeroOpen(false);
         onOpenChange(false);
       },
       onError: (e: unknown) => {
         toast.error(apiErrorMessage(e, "Não foi possível aplicar o modelo."));
       },
     });
+  };
+
+  const handleApply = () => {
+    if (!templateId) {
+      toast.error("Selecione um modelo de timing.");
+      return;
+    }
+    if (zeroNames.length > 0) {
+      setZeroOpen(true);
+      return;
+    }
+    runApply();
   };
 
   return (
@@ -92,8 +113,8 @@ export function ApplySeasonTemplateDialog({
           <DialogTitle>Aplicar modelo de timing</DialogTitle>
           <DialogDescription>
             {hasPendingStages
-              ? "As etapas pendentes deste talhão serão substituídas pelo modelo. Etapas já aplicadas permanecem."
-              : "As etapas do modelo entram neste talhão. Você pode editar depois."}
+              ? "As etapas pendentes deste talhão serão substituídas pelo modelo. Etapas já aplicadas ou puladas permanecem."
+              : "As etapas do modelo entram neste talhão. Etapas já aplicadas ou puladas com o mesmo nome permanecem."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 px-6 py-4">
@@ -123,12 +144,19 @@ export function ApplySeasonTemplateDialog({
           </Button>
           <Button
             onClick={handleApply}
-            disabled={applyMut.isPending || !templateId}
+            disabled={applyMut.isPending || detailLoading || !templateId}
           >
             {applyMut.isPending ? "Aplicando…" : "Aplicar modelo"}
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ZeroPeriodApplyDialog
+        open={zeroOpen}
+        onOpenChange={setZeroOpen}
+        stageNames={zeroNames}
+        loading={applyMut.isPending}
+        onConfirm={runApply}
+      />
     </Dialog>
   );
 }

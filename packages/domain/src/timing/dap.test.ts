@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { currentDapLabel, dapLabel, dapOf, daysFromPlanting } from "./dap.ts";
+import { currentDapLabel, dapLabel, dapOf, daysFromPlanting, stageDapLabel } from "./dap.ts";
 
 describe("dap", () => {
   it("conta os dias a partir do plantio", () => {
@@ -15,6 +15,14 @@ describe("dap", () => {
     assert.equal(dapLabel(-4), "4 dias antes do plantio");
     assert.equal(dapLabel(-1), "1 dia antes do plantio");
     assert.equal(dapOf("2026-10-01", "2026-11-05T12:00:00Z"), "35 DAP");
+  });
+
+  it("pré-plantio mostra a distância com sinal negativo", () => {
+    assert.equal(stageDapLabel("PRE_PLANTING", "2026-10-14", "2026-10-07"), "-7 DAP");
+    assert.equal(stageDapLabel("PRE_PLANTING", "2026-09-30", "2026-10-07"), "-7 DAP");
+    assert.equal(stageDapLabel("PRE_PLANTING", "2026-10-07", "2026-10-07"), "No plantio");
+    assert.equal(stageDapLabel("POST_PLANTING", "2026-10-01", "2026-10-08"), "7 DAP");
+    assert.equal(stageDapLabel("POST_PLANTING", "2026-10-01", "2026-09-27"), "4 dias antes do plantio");
   });
 
   it("hoje: DAP ou quanto falta para o plantio", () => {

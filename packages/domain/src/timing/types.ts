@@ -17,4 +17,9 @@ export type StageProductDraft = {
   outOfProgram?: boolean;
   /** Alvo/observação na receita de aplicação. */
   target?: string;
+  /** Vazio = 1. Não multiplica a calda; entra na compra quando há hectare. */
+  nApps?: string;
+  /** Vazio = 100% da área. */
+  areaPercent?: string;
+  areaNote?: string;
 };

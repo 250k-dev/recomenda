@@ -442,6 +442,7 @@ export function useUpdateRecommendationItem(seasonId: string) {
       area_factor?: number;
       area_note?: string | null;
       target?: string | null;
+      n_applications?: number;
     }) => updateRecommendationItem(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });

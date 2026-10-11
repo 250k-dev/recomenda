@@ -1,6 +1,6 @@
 "use client";
 
-import { dapOf } from "@recomenda/domain/timing/dap";
+import { stageDapLabel } from "@recomenda/domain/timing/dap";
 import {
   useEffect,
   useMemo,
@@ -47,6 +47,7 @@ import {
   SEED_CATEGORIES,
   areaFactorOf,
   areaPercentFieldFromFactor,
+  parseNApplications,
   seedsPerUnit,
 } from "@recomenda/domain/purchase-list/list-item";
 import { displayRecStatus, fmtDate } from "@recomenda/domain/recommendations/format";
@@ -89,11 +90,151 @@ import { RecommendationRegisterPopover } from "@/components/domain/recommendatio
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { useExecutionImpactGuard } from "@/components/domain/season/execution-impact-guard";
 import { StockShortageDialog } from "@/components/domain/stock-shortage-dialog";
+function fmtQty(n: number) {
+  return n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+}
+
+/** Mesma caixa da lista de compras: digitar ou ajustar pelas setas. */
+const RATE_INPUT_CLASS =
+  "h-8 w-full min-w-0 px-2 text-sm tabular-nums max-md:text-base";
+
+function RateLabel({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="grid min-w-0 content-start gap-1">
+      <span className="text-[11px] font-medium leading-4 text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/** O que se digita fica na primeira linha. Volume e hectares vêm preenchidos, como na lista. */
+function TalhaoRateFields({
+  areaPercent,
+  onAreaPercent,
+  nApps,
+  onNApps,
+  dose,
+  onDose,
+  unit,
+  onUnit,
+  plotHa,
+}: {
+  areaPercent: string;
+  onAreaPercent: (value: string) => void;
+  nApps: string;
+  onNApps: (value: string) => void;
+  dose: string;
+  onDose: (value: string) => void;
+  unit: string;
+  onUnit: (value: string) => void;
+  plotHa?: number | null;
+}) {
+  const ha = plotHa != null && plotHa > 0 ? plotHa : 0;
+  const doseN = Number(String(dose).replace(",", ".")) || 0;
+  const factor = areaFactorOf({ areaPercent });
+  const apps = parseNApplications(nApps);
+  const treated = ha * factor;
+  const thisPass = doseN * treated;
+  const buy = thisPass * apps;
+  const shown = (n: number) => (ha > 0 ? fmtQty(n) : "");
+  const unitLabel = unit || "un.";
+  const calculatedClass = cn(RATE_INPUT_CLASS, "bg-muted/40");
+  return (
+    <div className="grid gap-2">
+      <div className="grid grid-cols-2 gap-x-2 gap-y-2 sm:grid-cols-[minmax(0,1.4fr)_6.75rem_minmax(4.75rem,0.7fr)_minmax(5rem,0.85fr)]">
+        <RateLabel label="Dose / ha">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            value={dose}
+            onChange={(e) => onDose(e.target.value)}
+            className={RATE_INPUT_CLASS}
+            aria-label="Dose por hectare"
+          />
+        </RateLabel>
+        <RateLabel label="Unidade">
+          <DoseUnitSelect
+            value={unit}
+            onChange={onUnit}
+            size="sm"
+            className="w-full min-w-0 max-w-none [&>button]:h-8"
+          />
+        </RateLabel>
+        <RateLabel label="Nº apl.">
+          <Input
+            type="number"
+            step="1"
+            min="1"
+            inputMode="numeric"
+            value={nApps}
+            onChange={(e) => {
+              const whole = e.target.value.replace(/[.,].*$/, "").replace(/\D/g, "");
+              onNApps(whole);
+            }}
+            placeholder="1"
+            className={RATE_INPUT_CLASS}
+            aria-label="Número de aplicações"
+          />
+        </RateLabel>
+        <RateLabel label="% da área">
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={areaPercent}
+            onChange={(e) => onAreaPercent(e.target.value)}
+            placeholder="100"
+            className={RATE_INPUT_CLASS}
+            aria-label="% da área"
+          />
+        </RateLabel>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <RateLabel label="Ha tratados">
+          <Input
+            readOnly
+            tabIndex={-1}
+            value={shown(treated)}
+            placeholder="—"
+            className={calculatedClass}
+            aria-label="Hectares tratados"
+          />
+        </RateLabel>
+        <RateLabel label={`Volume nesta aplicação (${unitLabel})`}>
+          <Input
+            readOnly
+            tabIndex={-1}
+            value={shown(thisPass)}
+            placeholder="—"
+            title="Dose × hectares tratados. Não multiplica pelo número de aplicações."
+            className={calculatedClass}
+            aria-label="Volume nesta aplicação"
+          />
+        </RateLabel>
+        <RateLabel label={`Compra do talhão (${unitLabel})`}>
+          <Input
+            readOnly
+            tabIndex={-1}
+            value={shown(buy)}
+            placeholder="—"
+            title="Volume desta aplicação × número de aplicações. Não altera a lista de compras."
+            className={calculatedClass}
+            aria-label="Compra deste talhão"
+          />
+        </RateLabel>
+      </div>
+    </div>
+  );
+}
+
 export type ListProductPlan = {
   dose: number;
   unit: string;
   areaFactor: number;
   areaNote: string | null;
+  nApplications: number;
 };
 
 
@@ -241,9 +382,12 @@ function ProductRow({
   onDragStart,
   onDragOver,
   onDragEnd,
+  plotHa = null,
 }: {
   item: RecommendationItem;
   seasonId: string;
+  /** Hectares deste talhão. Volume da passada usa só esta área. */
+  plotHa?: number | null;
   onDelete: (id: string) => void;
   outOfProgram?: boolean;
   canDelete?: boolean;
@@ -263,6 +407,9 @@ function ProductRow({
   );
   const [areaNote, setAreaNote] = useState(item.area_note ?? "");
   const [target, setTarget] = useState(item.target ?? "");
+  const [nApps, setNApps] = useState(
+    item.n_applications != null && item.n_applications > 1 ? String(item.n_applications) : "",
+  );
   const updateMut = useUpdateRecommendationItem(seasonId);
   const impact = useExecutionImpactGuard();
 
@@ -272,6 +419,9 @@ function ProductRow({
     setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
     setAreaNote(item.area_note ?? "");
     setTarget(item.target ?? "");
+    setNApps(
+      item.n_applications != null && item.n_applications > 1 ? String(item.n_applications) : "",
+    );
     setEditing(true);
   };
 
@@ -297,6 +447,7 @@ function ProductRow({
             area_factor: areaFactor,
             area_note: areaNote.trim() || null,
             target: target.trim() || null,
+            n_applications: parseNApplications(nApps),
           },
           {
             onSuccess: () => {
@@ -386,71 +537,45 @@ function ProductRow({
       )}
 
       {editing ? (
-        <div className="grid w-full min-w-0 gap-2">
-          <div className="grid min-w-0 grid-cols-2 gap-1.5">
+        <div className="grid w-full min-w-0 gap-3">
+          <TalhaoRateFields
+            areaPercent={areaPercent}
+            onAreaPercent={setAreaPercent}
+            nApps={nApps}
+            onNApps={setNApps}
+            dose={dose}
+            onDose={setDose}
+            unit={unit}
+            onUnit={setUnit}
+            plotHa={plotHa}
+          />
+          <div className="grid gap-2 sm:grid-cols-2">
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-medium text-muted-foreground">
-                Dose / ha
+              <span className="text-[11px] font-medium leading-4 text-muted-foreground">
+                Obs. área
               </span>
               <Input
-                value={dose}
-                onChange={(e) => setDose(e.target.value)}
-                inputMode="decimal"
-                className="h-9 min-w-0 w-full text-right text-sm tabular-nums"
+                value={areaNote}
+                onChange={(e) => setAreaNote(e.target.value)}
+                placeholder="Ex.: só cabeceira"
+                className="h-8 min-w-0 w-full px-2 text-sm max-md:text-base"
+                aria-label="Observação de área"
               />
             </label>
             <label className="grid min-w-0 gap-1">
-              <span className="text-[11px] font-medium text-muted-foreground">
-                Unidade
+              <span className="text-[11px] font-medium leading-4 text-muted-foreground">
+                Alvo
               </span>
-              <DoseUnitSelect
-                value={unit}
-                onChange={setUnit}
-                className="h-9 w-full min-w-0 max-w-none shrink"
+              <Input
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder="Ex.: Gramíneas — capim-amargoso"
+                maxLength={240}
+                className="h-8 min-w-0 w-full px-2 text-sm max-md:text-base"
+                aria-label="Alvo do produto"
               />
             </label>
           </div>
-          <label className="grid gap-1">
-            <span className="text-[11px] font-medium text-muted-foreground">
-              % da área
-            </span>
-            <div className="flex items-center gap-1.5">
-              <Input
-                value={areaPercent}
-                onChange={(e) => setAreaPercent(e.target.value)}
-                inputMode="decimal"
-                placeholder="100"
-                className="h-9 min-w-0 w-full text-right text-sm tabular-nums"
-                aria-label="% da área"
-              />
-              <span className="shrink-0 text-xs text-muted-foreground">%</span>
-            </div>
-          </label>
-          <label className="grid gap-1">
-            <span className="text-[11px] font-medium text-muted-foreground">
-              Obs. área
-            </span>
-            <Input
-              value={areaNote}
-              onChange={(e) => setAreaNote(e.target.value)}
-              placeholder="Ex.: só cabeceira"
-              className="h-9 min-w-0 w-full text-sm"
-              aria-label="Observação de área"
-            />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-[11px] font-medium text-muted-foreground">
-              Alvo / observação (receita)
-            </span>
-            <Input
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="Ex.: Gramíneas — capim-amargoso"
-              maxLength={240}
-              className="h-9 min-w-0 w-full text-sm"
-              aria-label="Alvo do produto"
-            />
-          </label>
           <div className="flex gap-2 pt-0.5">
             <Button
               size="sm"
@@ -472,6 +597,11 @@ function ProductRow({
                 setAreaPercent(areaPercentFieldFromFactor(item.area_factor));
                 setAreaNote(item.area_note ?? "");
                 setTarget(item.target ?? "");
+                setNApps(
+                  item.n_applications != null && item.n_applications > 1
+                    ? String(item.n_applications)
+                    : "",
+                );
               }}
             >
               Cancelar
@@ -482,18 +612,24 @@ function ProductRow({
         <div className="flex min-w-0 items-center justify-between gap-2 pl-8 sm:contents sm:pl-0">
           <span className="min-w-0 text-xs tabular-nums text-muted-foreground sm:text-right">
             {item.dose_per_hectare} {item.dose_unit}/ha
+            {" · "}
+            {Math.round((item.area_factor ?? 1) * 100)}% da área
+            {" · "}
+            {item.n_applications ?? 1}{" "}
+            {(item.n_applications ?? 1) === 1 ? "aplicação" : "aplicações"}
             {item.total_quantity > 0 ? (
               <>
-                {" "}
-                ·{" "}
+                {" · nesta aplicação "}
                 {item.total_quantity.toLocaleString("pt-BR", {
                   maximumFractionDigits: 1,
                 })}{" "}
-                {item.dose_unit} total
+                {item.dose_unit}
+                {" · compra "}
+                {(item.total_quantity * (item.n_applications ?? 1)).toLocaleString("pt-BR", {
+                  maximumFractionDigits: 1,
+                })}{" "}
+                {item.dose_unit}
               </>
-            ) : null}
-            {item.area_factor != null && item.area_factor < 0.999 ? (
-              <> · {Math.round(item.area_factor * 100)}% da área</>
             ) : null}
             {item.area_note ? <> · {item.area_note}</> : null}
             {item.target ? <> · Alvo: {item.target}</> : null}
@@ -534,6 +670,7 @@ function AddProductRow({
   inProgramProductIds,
   listPlanByProductId,
   listPlanByProductStage,
+  plotHa = null,
 }: {
   recommendationId: string;
   seasonId: string;
@@ -544,6 +681,7 @@ function AddProductRow({
   inProgramProductIds: Set<string>;
   listPlanByProductId: Map<string, ListProductPlan>;
   listPlanByProductStage: Map<string, ListProductPlan>;
+  plotHa?: number | null;
 }) {
   const [category, setCategory] = useState("");
   const [productId, setProductId] = useState("");
@@ -552,6 +690,7 @@ function AddProductRow({
   const [unit, setUnit] = useState("L");
   const [areaPercent, setAreaPercent] = useState("");
   const [areaNote, setAreaNote] = useState("");
+  const [nApps, setNApps] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [resolving, setResolving] = useState(false);
   const createMut = useCreateRecommendationItem(seasonId);
@@ -603,6 +742,7 @@ function AddProductRow({
       if (planned) {
         setAreaPercent(areaPercentFieldFromFactor(planned.areaFactor));
         setAreaNote(planned.areaNote ?? "");
+        setNApps(planned.nApplications > 1 ? String(planned.nApplications) : "");
       }
     };
     if (!product.globalId || !product.isGlobalOnly) {
@@ -657,6 +797,7 @@ function AddProductRow({
             dose_unit: unit,
             area_factor: areaFactor,
             area_note: areaNote.trim() || null,
+            n_applications: parseNApplications(nApps),
           },
           {
             onSuccess: () => {
@@ -748,49 +889,29 @@ function AddProductRow({
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:col-span-2">
-            <div className="min-w-0 space-y-1">
-              <Label className="text-xs text-muted-foreground">Dose / ha</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0"
-                value={dose}
-                onChange={(e) => setDose(e.target.value)}
-                className="h-9 min-w-0 w-full text-sm"
-              />
-            </div>
-            <div className="min-w-0 space-y-1">
-              <Label className="text-xs text-muted-foreground">Unidade</Label>
-              <DoseUnitSelect
-                value={unit}
-                onChange={setUnit}
-                className="h-9 w-full min-w-0 max-w-none shrink"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">% área</Label>
+        <div className="grid gap-3">
+          <TalhaoRateFields
+            areaPercent={areaPercent}
+            onAreaPercent={setAreaPercent}
+            nApps={nApps}
+            onNApps={setNApps}
+            dose={dose}
+            onDose={setDose}
+            unit={unit}
+            onUnit={setUnit}
+            plotHa={plotHa}
+          />
+          <div className="min-w-0 space-y-1">
+            <Label className="text-[11px] font-medium leading-4 text-muted-foreground">Obs. área</Label>
             <Input
-              inputMode="decimal"
-              placeholder="100"
-              value={areaPercent}
-              onChange={(e) => setAreaPercent(e.target.value)}
-              className="h-9 w-full text-sm text-right tabular-nums"
-            />
-          </div>
-          <div className="min-w-0 space-y-1 sm:col-span-2">
-            <Label className="text-xs text-muted-foreground">Obs. área</Label>
-            <Input
-              placeholder="Ex: áreas sujas"
+              placeholder="Ex.: só cabeceira"
               value={areaNote}
               onChange={(e) => setAreaNote(e.target.value)}
-              className="h-9 w-full text-sm"
+              className="h-8 w-full px-2 text-sm max-md:text-base"
+              aria-label="Observação de área"
             />
           </div>
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               onClick={handleAdd}
@@ -1497,7 +1618,7 @@ export function RecommendationCard({
               label="Aplicado"
               date={rec.executed_date}
               tone="success"
-              dap={dapOf(plantingDate, rec.executed_date)}
+              dap={stageDapLabel(rec.trigger_type, plantingDate, rec.executed_date)}
             />
           ) : isSkipped ? null : rec.predicted_date_current ? (
             <StageDateBadge
@@ -1505,7 +1626,7 @@ export function RecommendationCard({
               date={rec.predicted_date_current}
               originalDate={rec.predicted_date_original}
               tone="primary"
-              dap={dapOf(plantingDate, rec.predicted_date_current)}
+              dap={stageDapLabel(rec.trigger_type, plantingDate, rec.predicted_date_current)}
             />
           ) : null}
           {isPending ? (
@@ -1551,29 +1672,7 @@ export function RecommendationCard({
               }
               readOnly={!isPending || !canEditStructure}
             />
-            {isPending && canEditStructure ? (
-              <div className="flex flex-wrap gap-2 mt-3">
-                <Button
-                  size="sm"
-                  onClick={handleSaveStage}
-                  disabled={isBusy}
-                  className="h-8 gap-1.5"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  Salvar etapa
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setDeleteStageOpen(true)}
-                  disabled={isBusy}
-                  className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Excluir etapa
-                </Button>
-              </div>
-            ) : (
+            {isPending && canEditStructure ? null : (
               <p className="mt-3 text-xs text-muted-foreground">
                 Etapas aplicadas ou puladas não podem ter nome e data alterados.
               </p>
@@ -1654,6 +1753,7 @@ export function RecommendationCard({
                     outOfProgram={
                       listReady && !inProgramProductIds.has(item.local_product_id)
                     }
+                    plotHa={recipe?.areaHa ?? null}
                   />
                 ))}
               </div>
@@ -1721,6 +1821,7 @@ export function RecommendationCard({
                   inProgramProductIds={inProgramProductIds}
                   listPlanByProductId={listPlanByProductId}
                   listPlanByProductStage={listPlanByProductStage}
+                  plotHa={recipe?.areaHa ?? null}
                 />
               </div>
             ) : null}
@@ -1883,6 +1984,30 @@ export function RecommendationCard({
               </Button>
             ) : null}
           </div>
+
+          {isPending && canEditStructure ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={handleSaveStage}
+                disabled={isBusy}
+                className="h-8 gap-1.5"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Salvar etapa
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDeleteStageOpen(true)}
+                disabled={isBusy}
+                className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Excluir etapa
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
 

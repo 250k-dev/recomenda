@@ -70,6 +70,15 @@ export function windowToTargetDay(windowStartDays: number, windowEndDays: number
   return Math.round((windowStartDays + windowEndDays) / 2);
 }
 
+/** Etapas cujo período digitado é 0: a data cai no dia do plantio. */
+export function zeroPeriodStageNames(
+  stages: Array<{ name: string; window_start_days: number; window_end_days: number }>,
+): string[] {
+  return stages
+    .filter((stage) => windowToTargetDay(stage.window_start_days, stage.window_end_days) === 0)
+    .map((stage) => stage.name.trim() || "Etapa sem nome");
+}
+
 export function recommendationWindowSpanDays(
   windowStartDays: number,
   windowEndDays: number,
