@@ -22,7 +22,7 @@ import type { HelpTourStep } from "./types";
  * desktop) e esconde uma por CSS — um `querySelector` simples pegaria a
  * escondida e o destaque cairia num retângulo vazio.
  */
-function visibleTourTarget(name: string): HTMLElement | null {
+export function visibleTourTarget(name: string): HTMLElement | null {
   const els = document.querySelectorAll<HTMLElement>(
     `[data-tour="${CSS.escape(name)}"]`,
   );

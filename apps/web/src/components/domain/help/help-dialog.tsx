@@ -13,10 +13,12 @@ import {
   Compass,
   Info,
   Keyboard,
+  LocateFixed,
   Mail,
   MessageCircleQuestionMark,
   Play,
   Route as RouteIcon,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 import type { AccessLevel } from "@recomenda/api/auth-types";
@@ -30,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@recomenda/ui/primitives/dialog";
+import { Input } from "@recomenda/ui/primitives/input";
 import { cn } from "@recomenda/utils";
 import { links } from "@/components/landing/content";
 import { useHelpTourStore } from "@/stores/help-tour";
@@ -41,14 +44,23 @@ import {
   interfaceTour,
   shortcuts,
 } from "./generic-help";
-import { buildTourSteps } from "./help-tour";
+import {
+  highlightNode,
+  highlightText,
+  nodeText,
+  searchItems,
+  searchTerms,
+} from "./help-search";
+import { buildTourSteps, visibleTourTarget } from "./help-tour";
 import { resolvePageHelp } from "./registry";
 import type {
   HelpContext,
   HelpFaqItem,
   HelpFormula,
+  HelpGlossaryTerm,
   HelpSection,
   HelpShell,
+  HelpShortcut,
   HelpTourStep,
 } from "./types";
 
@@ -61,6 +73,11 @@ const VIEW_TITLES: Record<Exclude<HelpView, "home">, string> = {
   faq: "Perguntas frequentes",
   shortcuts: "Atalhos de teclado",
 };
+
+/** Rodapé "Falar com a 250k" — oculto por enquanto; `true` traz de volta. */
+const SHOW_CONTACT = false;
+
+const NO_TERMS: string[] = [];
 
 /** Papel, nível e carteiras do usuário — o que muda o que a ajuda mostra. */
 function useHelpContext(shell: HelpShell): HelpContext {
@@ -87,6 +104,19 @@ function useHelpContext(shell: HelpShell): HelpContext {
   };
 }
 
+/** Uma entrada clicável do modal: tour, seção ou elemento a mostrar na tela. */
+type HelpOptionItem = {
+  key: string;
+  group?: "page" | "reference";
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  /** `play` inicia algo (tour); `open` navega para uma seção do modal. */
+  action?: "open" | "play";
+  onClick: () => void;
+  className?: string;
+};
+
 /**
  * Central de ajuda da tela atual: tours, documentação, cálculos e referência.
  * O conteúdo específico vem de `registry.tsx`; o que a tela não tiver cai no
@@ -106,9 +136,12 @@ export function HelpDialog({
   const page = resolvePageHelp(pathname);
   const startTour = useHelpTourStore((s) => s.start);
   const [view, setView] = useState<HelpView>("home");
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   // Tour escolhido no modal: só começa depois que ele termina de fechar, senão
-  // o foco e o overlay do Dialog brigam com os do tour.
-  const pendingTour = useRef<HelpTourStep[] | null>(null);
+  // o foco e o overlay do Dialog brigam com os do tour. Estado, não ref: as
+  // opções guardam o `onClick` num objeto e o compilador não aceita ref ali.
+  const [pendingTour, setPendingTour] = useState<HelpTourStep[] | null>(null);
 
   const pageTour = page?.tour ?? [];
   const pageDocs = page?.docs ?? [];
@@ -118,24 +151,176 @@ export function HelpDialog({
   const formulas = generalFormulas(ctx);
   const faq = generalFaq(ctx);
   const keyboard = shortcuts(ctx);
+  const terms = searchTerms(query);
+  const searching = view === "home" && terms.length > 0;
 
   const launchTour = (steps: HelpTourStep[]) => {
-    pendingTour.current = steps;
+    setPendingTour(steps);
     onOpenChange(false);
   };
+
+  const options: HelpOptionItem[] = [
+    ...(pageTour.length > 0
+      ? [
+          {
+            key: "page-tour",
+            group: "page" as const,
+            icon: RouteIcon,
+            title: "Tour desta tela",
+            description: "Os elementos desta tela, um de cada vez.",
+            action: "play" as const,
+            onClick: () => launchTour(pageTour),
+          },
+        ]
+      : []),
+    {
+      key: "interface-tour",
+      group: "page",
+      icon: Compass,
+      title: "Tour da interface",
+      description:
+        shell === "admin"
+          ? "Menu, notificações e perfil — o que está em toda tela."
+          : "Trilha, busca, notificações e menu — o que está em toda tela.",
+      action: "play",
+      onClick: () => launchTour(interfaceTour(ctx)),
+    },
+    {
+      key: "docs",
+      group: "page",
+      icon: BookOpen,
+      title: "Documentação",
+      description:
+        pageDocs.length > 0
+          ? "Como esta tela funciona, parte por parte."
+          : "Guia geral de uso do Recomenda.",
+      onClick: () => setView("docs"),
+    },
+    ...(pageFormulas.length + formulas.length > 0
+      ? [
+          {
+            key: "formulas",
+            group: "page" as const,
+            icon: Calculator,
+            title: "Fórmulas e cálculos",
+            description:
+              pageFormulas.length > 0
+                ? "Como os números desta tela são calculados."
+                : "DAP, janela, receita, dólar e sacas — as contas do dia a dia.",
+            onClick: () => setView("formulas"),
+          },
+        ]
+      : []),
+    {
+      key: "glossary",
+      group: "reference",
+      icon: BookA,
+      title: "Glossário",
+      description: "Safra, talhão, etapa, DAP e outros termos.",
+      onClick: () => setView("glossary"),
+    },
+    {
+      key: "faq",
+      group: "reference",
+      icon: MessageCircleQuestionMark,
+      title: "Perguntas frequentes",
+      description: "Respostas rápidas para as dúvidas mais comuns.",
+      onClick: () => setView("faq"),
+    },
+    {
+      key: "shortcuts",
+      group: "reference",
+      icon: Keyboard,
+      title: "Atalhos de teclado",
+      description: "Para quem prefere não tirar a mão do teclado.",
+      onClick: () => setView("shortcuts"),
+      // Sem teclado físico no celular, a lista só ocupa espaço.
+      className: "max-sm:hidden",
+    },
+  ];
+
+  const results = searching
+    ? {
+        options: searchItems(options, terms, (o) => ({
+          title: o.title,
+          body: o.description,
+        })),
+        // Passos dos tours viram "mostrar na tela" — só os que estão visíveis
+        // agora, senão o destaque não teria onde cair.
+        spots: searchItems(
+          [...pageTour, ...interfaceTour(ctx)].flatMap<HelpOptionItem>(
+            (step) =>
+              step.target != null && visibleTourTarget(step.target)
+                ? [
+                    {
+                      key: step.target,
+                      icon: LocateFixed,
+                      title: step.title,
+                      description: nodeText(step.content),
+                      action: "play",
+                      onClick: () => launchTour([step]),
+                    },
+                  ]
+                : [],
+          ),
+          terms,
+          (o) => ({ title: o.title, body: o.description }),
+        ),
+        docs: searchItems([...pageDocs, ...guide], terms, (section) => ({
+          title: section.title,
+          body: section.body,
+        })),
+        formulas: searchItems([...pageFormulas, ...formulas], terms, (f) => ({
+          title: f.name,
+          body: [f.expressions.join(" "), f.description, f.example],
+        })),
+        faq: searchItems([...pageFaq, ...faq], terms, (item) => ({
+          title: item.question,
+          body: item.answer,
+        })),
+        glossary: searchItems(glossary(), terms, (item) => ({
+          title: item.term,
+          body: item.definition,
+        })),
+        shortcuts: searchItems(keyboard, terms, (shortcut) => ({
+          title: shortcut.description,
+          body: shortcut.keys.join(" "),
+        })),
+      }
+    : null;
+  const resultCount = results
+    ? Object.values(results).reduce((sum, list) => sum + list.length, 0)
+    : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-xl"
+        // Altura fixa: com a busca, o conteúdo muda a cada tecla e o modal
+        // centralizado subiria e desceria junto, levando o campo com ele.
+        className="h-[calc(100dvh-2rem)] max-w-xl sm:h-[min(44rem,calc(100dvh-2rem))]"
+        onOpenAutoFocus={(event) => {
+          // No celular, focar a busca abriria o teclado por cima das opções.
+          if (!window.matchMedia("(pointer: coarse)").matches) return;
+          event.preventDefault();
+          if (event.currentTarget instanceof HTMLElement) {
+            event.currentTarget.focus();
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          // Com busca preenchida, Esc limpa a busca antes de fechar o modal.
+          if (view !== "home" || !query) return;
+          event.preventDefault();
+          setQuery("");
+          searchRef.current?.focus();
+        }}
         onCloseAutoFocus={(event) => {
           setView("home");
-          const steps = pendingTour.current;
-          if (!steps) return;
-          pendingTour.current = null;
+          setQuery("");
+          if (!pendingTour) return;
+          setPendingTour(null);
           // Devolver o foco ao botão de ajuda tiraria o foco do balão do tour.
           event.preventDefault();
-          startTour(buildTourSteps(steps));
+          startTour(buildTourSteps(pendingTour));
         }}
       >
         <DialogHeader>
@@ -174,79 +359,115 @@ export function HelpDialog({
               </DialogDescription>
             </div>
           </div>
+          {view === "home" ? (
+            // O header reserva espaço à direita para o X; a busca fica abaixo
+            // dele e pode ir até a margem.
+            <div className="relative mt-2 -mr-8">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar na ajuda…"
+                aria-label="Buscar na ajuda"
+                autoComplete="off"
+                className="h-10 pl-9"
+              />
+            </div>
+          ) : null}
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {view === "home" ? (
+            <p className="sr-only" aria-live="polite">
+              {searching
+                ? resultCount === 1
+                  ? "1 resultado"
+                  : `${resultCount} resultados`
+                : ""}
+            </p>
+          ) : null}
+
+          {view === "home" && !results ? (
             <div className="space-y-5">
               <OptionGroup label="Nesta tela">
-                {pageTour.length > 0 ? (
-                  <HelpOption
-                    icon={RouteIcon}
-                    title="Tour desta tela"
-                    description="Os elementos desta tela, um de cada vez."
-                    action="play"
-                    onClick={() => launchTour(pageTour)}
-                  />
-                ) : null}
-                <HelpOption
-                  icon={Compass}
-                  title="Tour da interface"
-                  description={
-                    shell === "admin"
-                      ? "Menu, notificações e perfil — o que está em toda tela."
-                      : "Trilha, busca, notificações e menu — o que está em toda tela."
-                  }
-                  action="play"
-                  onClick={() => launchTour(interfaceTour(ctx))}
-                />
-                <HelpOption
-                  icon={BookOpen}
-                  title="Documentação"
-                  description={
-                    pageDocs.length > 0
-                      ? "Como esta tela funciona, parte por parte."
-                      : "Guia geral de uso do Recomenda."
-                  }
-                  onClick={() => setView("docs")}
-                />
-                {pageFormulas.length + formulas.length > 0 ? (
-                  <HelpOption
-                    icon={Calculator}
-                    title="Fórmulas e cálculos"
-                    description={
-                      pageFormulas.length > 0
-                        ? "Como os números desta tela são calculados."
-                        : "DAP, janela, receita, dólar e sacas — as contas do dia a dia."
-                    }
-                    onClick={() => setView("formulas")}
-                  />
-                ) : null}
+                {options
+                  .filter((option) => option.group === "page")
+                  .map((option) => (
+                    <HelpOption key={option.key} option={option} />
+                  ))}
               </OptionGroup>
-
               <OptionGroup label="Para consultar">
-                <HelpOption
-                  icon={BookA}
-                  title="Glossário"
-                  description="Safra, talhão, etapa, DAP e outros termos."
-                  onClick={() => setView("glossary")}
-                />
-                <HelpOption
-                  icon={MessageCircleQuestionMark}
-                  title="Perguntas frequentes"
-                  description="Respostas rápidas para as dúvidas mais comuns."
-                  onClick={() => setView("faq")}
-                />
-                {/* Sem teclado físico no celular, a lista só ocupa espaço. */}
-                <HelpOption
-                  icon={Keyboard}
-                  title="Atalhos de teclado"
-                  description="Para quem prefere não tirar a mão do teclado."
-                  onClick={() => setView("shortcuts")}
-                  className="max-sm:hidden"
-                />
+                {options
+                  .filter((option) => option.group === "reference")
+                  .map((option) => (
+                    <HelpOption key={option.key} option={option} />
+                  ))}
               </OptionGroup>
             </div>
+          ) : null}
+
+          {results ? (
+            resultCount === 0 ? (
+              <EmptyNotice>
+                Nada encontrado para “{query.trim()}”. Tente outra palavra ou
+                só o começo dela.
+              </EmptyNotice>
+            ) : (
+              <div className="space-y-6">
+                {results.options.length > 0 ? (
+                  <OptionGroup label="Na central de ajuda">
+                    {results.options.map((option) => (
+                      <HelpOption
+                        key={option.key}
+                        option={option}
+                        terms={terms}
+                      />
+                    ))}
+                  </OptionGroup>
+                ) : null}
+                {results.spots.length > 0 ? (
+                  <OptionGroup label="Mostrar na tela">
+                    {results.spots.map((option) => (
+                      <HelpOption
+                        key={option.key}
+                        option={option}
+                        terms={terms}
+                      />
+                    ))}
+                  </OptionGroup>
+                ) : null}
+                {results.docs.length > 0 ? (
+                  <ContentGroup label="Documentação" className="px-2.5">
+                    <Sections sections={results.docs} terms={terms} />
+                  </ContentGroup>
+                ) : null}
+                {results.formulas.length > 0 ? (
+                  <ContentGroup label="Fórmulas e cálculos" className="px-2.5">
+                    <Formulas formulas={results.formulas} terms={terms} />
+                  </ContentGroup>
+                ) : null}
+                {results.faq.length > 0 ? (
+                  <ContentGroup label="Perguntas frequentes" className="px-2.5">
+                    <Faq items={results.faq} terms={terms} open />
+                  </ContentGroup>
+                ) : null}
+                {results.glossary.length > 0 ? (
+                  <ContentGroup label="Glossário" className="px-2.5">
+                    <Glossary items={results.glossary} terms={terms} />
+                  </ContentGroup>
+                ) : null}
+                {results.shortcuts.length > 0 ? (
+                  <ContentGroup
+                    label="Atalhos de teclado"
+                    className="px-2.5 max-sm:hidden"
+                  >
+                    <Shortcuts items={results.shortcuts} terms={terms} />
+                  </ContentGroup>
+                ) : null}
+              </div>
+            )
           ) : null}
 
           {view === "docs" ? (
@@ -292,20 +513,7 @@ export function HelpDialog({
             </div>
           ) : null}
 
-          {view === "glossary" ? (
-            <dl className="divide-y divide-border">
-              {glossary().map((item) => (
-                <div key={item.term} className="py-3 first:pt-0 last:pb-0">
-                  <dt className="text-sm font-semibold text-text-strong">
-                    {item.term}
-                  </dt>
-                  <dd className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                    {item.definition}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
+          {view === "glossary" ? <Glossary items={glossary()} /> : null}
 
           {view === "faq" ? (
             <div className="space-y-6">
@@ -322,26 +530,7 @@ export function HelpDialog({
 
           {view === "shortcuts" ? (
             <div className="space-y-3">
-              <ul className="divide-y divide-border">
-                {keyboard.map((shortcut) => (
-                  <li
-                    key={shortcut.description}
-                    className="flex items-center justify-between gap-4 py-2.5 text-sm text-foreground"
-                  >
-                    <span>{shortcut.description}</span>
-                    <span className="flex shrink-0 items-center gap-1">
-                      {shortcut.keys.map((key) => (
-                        <kbd
-                          key={key}
-                          className="min-w-6 rounded border border-border bg-muted px-1.5 py-0.5 text-center font-sans text-xs font-medium text-muted-foreground"
-                        >
-                          {key}
-                        </kbd>
-                      ))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <Shortcuts items={keyboard} />
               <p className="text-xs text-muted-foreground">
                 No Windows e no Linux, use Ctrl no lugar de ⌘.
               </p>
@@ -349,17 +538,19 @@ export function HelpDialog({
           ) : null}
         </div>
 
-        <DialogFooter className="flex-row items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            Não encontrou o que precisava?
-          </p>
-          <Button asChild variant="outline" size="sm">
-            <a href={supportMailto(page?.title ?? null, pathname)}>
-              <Mail />
-              Falar com a 250k
-            </a>
-          </Button>
-        </DialogFooter>
+        {SHOW_CONTACT ? (
+          <DialogFooter className="flex-row items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              Não encontrou o que precisava?
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <a href={supportMailto(page?.title ?? null, pathname)}>
+                <Mail />
+                Falar com a 250k
+              </a>
+            </Button>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -390,20 +581,11 @@ function OptionGroup({
 }
 
 function HelpOption({
-  icon: Icon,
-  title,
-  description,
-  action = "open",
-  onClick,
-  className,
+  option: { icon: Icon, title, description, action = "open", onClick, className },
+  terms = NO_TERMS,
 }: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  /** `play` inicia algo (tour); `open` navega para uma seção do modal. */
-  action?: "open" | "play";
-  onClick: () => void;
-  className?: string;
+  option: HelpOptionItem;
+  terms?: string[];
 }) {
   const Trailing = action === "play" ? Play : ChevronRight;
   return (
@@ -420,10 +602,10 @@ function HelpOption({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-text-strong">
-          {title}
+          {highlightText(title, terms)}
         </span>
         <span className="mt-px block text-xs leading-snug text-muted-foreground">
-          {description}
+          {highlightText(description, terms)}
         </span>
       </span>
       <Trailing
@@ -438,13 +620,15 @@ function HelpOption({
 
 function ContentGroup({
   label,
+  className,
   children,
 }: {
   label?: string;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section>
+    <section className={className}>
       {label ? (
         <p className="pb-2 text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
           {label}
@@ -464,16 +648,22 @@ function EmptyNotice({ children }: { children: ReactNode }) {
   );
 }
 
-function Sections({ sections }: { sections: HelpSection[] }) {
+function Sections({
+  sections,
+  terms = NO_TERMS,
+}: {
+  sections: HelpSection[];
+  terms?: string[];
+}) {
   return (
     <div className="space-y-5">
       {sections.map((section) => (
         <article key={section.title}>
           <h3 className="font-display text-[0.95rem] font-semibold text-text-strong">
-            {section.title}
+            {highlightText(section.title, terms)}
           </h3>
           <div className="mt-1.5 space-y-2 text-sm leading-relaxed text-muted-foreground">
-            {section.body}
+            {highlightNode(section.body, terms)}
           </div>
         </article>
       ))}
@@ -481,7 +671,13 @@ function Sections({ sections }: { sections: HelpSection[] }) {
   );
 }
 
-function Formulas({ formulas }: { formulas: HelpFormula[] }) {
+function Formulas({
+  formulas,
+  terms = NO_TERMS,
+}: {
+  formulas: HelpFormula[];
+  terms?: string[];
+}) {
   return (
     <div className="space-y-3">
       {formulas.map((formula) => (
@@ -490,22 +686,22 @@ function Formulas({ formulas }: { formulas: HelpFormula[] }) {
           className="rounded-xl border border-border bg-card p-4"
         >
           <h3 className="text-sm font-semibold text-text-strong">
-            {formula.name}
+            {highlightText(formula.name, terms)}
           </h3>
           <div className="mt-2 space-y-1 rounded-lg bg-muted px-3 py-2.5 font-mono text-[0.8rem] leading-relaxed text-foreground">
             {formula.expressions.map((expression) => (
-              <p key={expression}>{expression}</p>
+              <p key={expression}>{highlightText(expression, terms)}</p>
             ))}
           </div>
           {formula.description ? (
             <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-              {formula.description}
+              {highlightNode(formula.description, terms)}
             </p>
           ) : null}
           {formula.example ? (
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               <span className="font-semibold text-foreground">Exemplo: </span>
-              {formula.example}
+              {highlightText(formula.example, terms)}
             </p>
           ) : null}
         </article>
@@ -514,23 +710,87 @@ function Formulas({ formulas }: { formulas: HelpFormula[] }) {
   );
 }
 
-function Faq({ items }: { items: HelpFaqItem[] }) {
+function Faq({
+  items,
+  terms = NO_TERMS,
+  open = false,
+}: {
+  items: HelpFaqItem[];
+  terms?: string[];
+  /** Na busca, a resposta já vem aberta — o trecho que bateu pode estar nela. */
+  open?: boolean;
+}) {
   return (
     <div className="space-y-2">
       {items.map((item) => (
         <details
           key={item.question}
+          open={open}
           className="group rounded-xl border border-border bg-card px-4 py-3 [&_summary::-webkit-details-marker]:hidden"
         >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-sm font-semibold text-text-strong outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-            {item.question}
+            <span>{highlightText(item.question, terms)}</span>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
           </summary>
           <div className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {item.answer}
+            {highlightNode(item.answer, terms)}
           </div>
         </details>
       ))}
     </div>
+  );
+}
+
+function Glossary({
+  items,
+  terms = NO_TERMS,
+}: {
+  items: HelpGlossaryTerm[];
+  terms?: string[];
+}) {
+  return (
+    <dl className="divide-y divide-border">
+      {items.map((item) => (
+        <div key={item.term} className="py-3 first:pt-0 last:pb-0">
+          <dt className="text-sm font-semibold text-text-strong">
+            {highlightText(item.term, terms)}
+          </dt>
+          <dd className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+            {highlightNode(item.definition, terms)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function Shortcuts({
+  items,
+  terms = NO_TERMS,
+}: {
+  items: HelpShortcut[];
+  terms?: string[];
+}) {
+  return (
+    <ul className="divide-y divide-border">
+      {items.map((shortcut) => (
+        <li
+          key={shortcut.description}
+          className="flex items-center justify-between gap-4 py-2.5 text-sm text-foreground"
+        >
+          <span>{highlightText(shortcut.description, terms)}</span>
+          <span className="flex shrink-0 items-center gap-1">
+            {shortcut.keys.map((key) => (
+              <kbd
+                key={key}
+                className="min-w-6 rounded border border-border bg-muted px-1.5 py-0.5 text-center font-sans text-xs font-medium text-muted-foreground"
+              >
+                {key}
+              </kbd>
+            ))}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
