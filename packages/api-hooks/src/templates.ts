@@ -9,6 +9,8 @@ import {
   updateTimingTemplate,
   deleteTimingTemplate,
   hardDeleteTimingTemplate,
+  restoreTimingTemplate,
+  cloneTimingTemplate,
   getArchivedTimingTemplates,
   createTimingStage,
   deleteTimingStage,
@@ -86,6 +88,27 @@ export function useHardDeleteTimingTemplate(producerId: string) {
     mutationFn: hardDeleteTimingTemplate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplatesArchived(producerId) });
+    },
+  });
+}
+
+export function useRestoreTimingTemplate(producerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: restoreTimingTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplates(producerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplatesArchived(producerId) });
+    },
+  });
+}
+
+export function useCloneTimingTemplate(producerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => cloneTimingTemplate(id, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.timingTemplates(producerId) });
     },
   });
 }

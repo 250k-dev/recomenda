@@ -14,6 +14,7 @@ const CARTEIRA_BASE: Permission[] = [
   "SEASON_CRUD",
   "CYCLE_CRUD",
   "TEMPLATE_CRUD",
+  "TEMPLATE_EDIT",
   "RECOMMENDATION_REGISTER",
   "RECOMMENDATION_EDIT_ITEM",
   "RECOMMENDATION_EDIT_STRUCTURE",
@@ -58,6 +59,7 @@ const PRODUCER_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   "PRICE_VIEW",
   "FARM_TEAM_MANAGE",
   "FARM_EDIT",
+  "TEMPLATE_EDIT",
 ]);
 
 export type Principal = {

@@ -798,7 +798,7 @@ export function TimingStagesEditor({
    *  do template de compras), em vez do topo. Só para telas sem rodapé próprio. */
   floatingActions?: boolean;
 }) {
-  const canTemplateCrud = useCan("TEMPLATE_CRUD");
+  const canTemplateCrud = useCan("TEMPLATE_EDIT");
   // Etapa com o modal "Dados da aplicação" aberto.
   const [applicationKey, setApplicationKey] = useState<string | null>(null);
   const applicationStage = applicationKey
@@ -848,7 +848,7 @@ export function TimingStagesEditor({
               Ordem de mistura
             </Button>
           ) : null}
-          {!floatingActions && showSaveButton && onSave ? (
+          {!floatingActions && canTemplateCrud && showSaveButton && onSave ? (
             <Button
               type="button"
               size="sm"
@@ -1062,10 +1062,10 @@ export function TimingStagesEditor({
                 {isAdding ? "Adicionando…" : "Adicionar etapa"}
               </Button>
             ) : null}
-            {showSaveButton && onSave ? (
+            {canTemplateCrud && showSaveButton && onSave ? (
               <Button
                 type="button"
-                className={cn("w-full gap-2 md:w-auto", !canTemplateCrud && "col-span-2")}
+                className="w-full gap-2 md:w-auto"
                 disabled={isSaving || saveDisabled}
                 onClick={onSave}
               >
@@ -1077,7 +1077,7 @@ export function TimingStagesEditor({
       ) : stages.length > 3 ? (
         <div className="sticky bottom-3 z-10 mt-4 flex justify-end">
           <div className="flex items-center gap-2 rounded-full border border-border bg-card/95 px-2 py-1.5 shadow-lg backdrop-blur">
-            {showSaveButton && onSave ? (
+            {canTemplateCrud && showSaveButton && onSave ? (
               <Button
                 type="button"
                 size="sm"

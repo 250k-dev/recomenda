@@ -9,6 +9,7 @@ export const FARM_STAFF_GRANT_KEYS = [
   "lists",
   "prices",
   "invite_ops",
+  "templates",
 ] as const;
 
 export type FarmStaffGrantKey = (typeof FARM_STAFF_GRANT_KEYS)[number];
@@ -55,6 +56,13 @@ export const FARM_STAFF_GRANT_DEFS: Array<{
     label: "Ver preços",
     description: "Valores da lista, cotação e custo por hectare.",
     permissions: ["PRICE_VIEW"],
+  },
+  {
+    key: "templates",
+    label: "Editar modelos de recomendação",
+    description: "Cria, altera, arquiva, recupera e clona os modelos deste produtor.",
+    permissions: ["TEMPLATE_EDIT"],
+    managerOnly: true,
   },
   {
     key: "invite_ops",

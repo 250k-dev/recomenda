@@ -29,6 +29,7 @@ const CATEGORY_OPTIONS = [
   { value: "all", label: "Todas as categorias" },
   { value: "Compras", label: "Compras", entity: "purchase" },
   { value: "Programação", label: "Programação", entity: "cycle" },
+  { value: "Modelos", label: "Modelos", entity: "timing_template" },
   { value: "Estoque", label: "Estoque", entity: "stock" },
   { value: "Aplicação", label: "Aplicação", entity: "application" },
   { value: "Acesso", label: "Acesso", entity: "access" },
@@ -88,6 +89,8 @@ function actorRoleLabel(role?: string | null) {
       return "Gerente";
     case "FARM_OPERATOR":
       return "Operador";
+    case "PRODUCER":
+      return "Produtor";
     case "STAFF":
       return "Equipe";
     default:

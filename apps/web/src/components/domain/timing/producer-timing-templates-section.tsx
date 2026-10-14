@@ -11,8 +11,10 @@ import { z } from "zod";
 import {
   ArrowRight,
   Clock,
+  Copy,
   Leaf,
   Plus,
+  RotateCcw,
 } from "lucide-react";
 
 import { cn, CROP_LABELS, CROP_OPTIONS, deactivateOutlineButtonClass } from "@recomenda/utils";
@@ -37,9 +39,12 @@ import {
   useArchivedTimingTemplates,
   useCreateTimingTemplate,
   useDeleteTimingTemplate,
+  useCloneTimingTemplate,
   useHardDeleteTimingTemplate,
+  useRestoreTimingTemplate,
   useTimingTemplates,
 } from "@recomenda/api-hooks";
+import { useCan } from "@recomenda/api-hooks/use-can";
 import { toast } from "sonner";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 
@@ -69,6 +74,10 @@ export function ProducerTimingTemplatesPanel({
   const createMutation = useCreateTimingTemplate(producerId);
   const deleteMutation = useDeleteTimingTemplate(producerId);
   const hardDeleteMutation = useHardDeleteTimingTemplate(producerId);
+  const restoreMutation = useRestoreTimingTemplate(producerId);
+  const cloneMutation = useCloneTimingTemplate(producerId);
+  const canEditTemplate = useCan("TEMPLATE_EDIT");
+  const canHardDeleteTemplate = useCan("TEMPLATE_CRUD");
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [tab, setTab] = useState<"active" | "archived">("active");
@@ -78,6 +87,8 @@ export function ProducerTimingTemplatesPanel({
   const [hardDeleteConfirm, setHardDeleteConfirm] = useState<{ id: string; name: string } | null>(
     null,
   );
+  const [cloneSource, setCloneSource] = useState<{ id: string; name: string } | null>(null);
+  const [cloneName, setCloneName] = useState("");
 
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
@@ -131,7 +142,7 @@ export function ProducerTimingTemplatesPanel({
                 },
               ]}
             />
-            {tab === "active" ? (
+            {tab === "active" && canEditTemplate ? (
               <Button size="sm" className="gap-1.5" onClick={handleNewModel}>
                 <Plus className="h-4 w-4" />
                 Novo modelo
@@ -149,10 +160,12 @@ export function ProducerTimingTemplatesPanel({
                 description="Crie modelos de recomendação para reutilizar nas safras deste produtor."
                 variant="inline"
                 action={
-                  <Button size="sm" className="gap-1.5" onClick={handleNewModel}>
-                    <Plus className="h-4 w-4" />
-                    Criar primeiro modelo
-                  </Button>
+                  canEditTemplate ? (
+                    <Button size="sm" className="gap-1.5" onClick={handleNewModel}>
+                      <Plus className="h-4 w-4" />
+                      Criar primeiro modelo
+                    </Button>
+                  ) : undefined
                 }
               />
             ) : (
@@ -175,19 +188,39 @@ export function ProducerTimingTemplatesPanel({
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={cn("h-8", deactivateOutlineButtonClass)}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setDeleteConfirm({ id: template.id, name: template.name });
-                        }}
-                      >
-                        Remover
-                      </Button>
+                      {canEditTemplate ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setCloneSource({ id: template.id, name: template.name });
+                            setCloneName(`Cópia de ${template.name}`);
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          Clonar
+                        </Button>
+                      ) : null}
+                      {canEditTemplate ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cn("h-8", deactivateOutlineButtonClass)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDeleteConfirm({ id: template.id, name: template.name });
+                          }}
+                        >
+                          Remover
+                        </Button>
+                      ) : null}
                       <span className="inline-flex items-center gap-1 text-sm font-medium text-primary opacity-80 transition-opacity group-hover:opacity-100">
-                        Editar
+                        {canEditTemplate ? "Editar" : "Abrir"}
                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                       </span>
                     </div>
@@ -216,12 +249,32 @@ export function ProducerTimingTemplatesPanel({
                       {CROP_LABELS[template.crop] ?? template.crop}
                     </Badge>
                   </div>
-                  <DeletePermanentIconButton
-                    disabled={hardDeleteMutation.isPending}
-                    onClick={() =>
-                      setHardDeleteConfirm({ id: template.id, name: template.name })
-                    }
-                  />
+                  {canEditTemplate ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      disabled={restoreMutation.isPending}
+                      onClick={() =>
+                        restoreMutation.mutate(template.id, {
+                          onError: (err) =>
+                            toast.error(apiErrorMessage(err, "Não foi possível recuperar o modelo.")),
+                        })
+                      }
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Recuperar
+                    </Button>
+                  ) : null}
+                  {canHardDeleteTemplate ? (
+                    <DeletePermanentIconButton
+                      disabled={hardDeleteMutation.isPending}
+                      onClick={() =>
+                        setHardDeleteConfirm({ id: template.id, name: template.name })
+                      }
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -273,6 +326,64 @@ export function ProducerTimingTemplatesPanel({
                 variant="outline"
                 onClick={() => setSheetOpen(false)}
               >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={!!cloneSource}
+        onOpenChange={(open) => {
+          if (!open) setCloneSource(null);
+        }}
+      >
+        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+          <SheetHeader className="border-b px-4 py-4 pr-12">
+            <SheetTitle>Clonar modelo</SheetTitle>
+            <SheetDescription>
+              Cria um modelo novo com as mesmas etapas e produtos
+              {cloneSource ? ` de “${cloneSource.name}”` : ""}. O original permanece.
+            </SheetDescription>
+          </SheetHeader>
+          <form
+            className="space-y-4 px-4 py-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!cloneSource) return;
+              const name = cloneName.trim();
+              if (!name) {
+                toast.error("Informe o nome do novo modelo.");
+                return;
+              }
+              cloneMutation.mutate(
+                { id: cloneSource.id, name },
+                {
+                  onSuccess: (created) => {
+                    setCloneSource(null);
+                    router.push(templateHref(created.id));
+                  },
+                  onError: (err) =>
+                    toast.error(apiErrorMessage(err, "Não foi possível clonar o modelo.")),
+                },
+              );
+            }}
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="timing-clone-name">Nome do novo modelo</Label>
+              <Input
+                id="timing-clone-name"
+                value={cloneName}
+                onChange={(event) => setCloneName(event.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" disabled={cloneMutation.isPending} className="flex-1">
+                {cloneMutation.isPending ? "Clonando…" : "Clonar e configurar"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setCloneSource(null)}>
                 Cancelar
               </Button>
             </div>

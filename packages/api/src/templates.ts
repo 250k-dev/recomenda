@@ -107,6 +107,16 @@ export async function hardDeleteTimingTemplate(id: string) {
   await api.delete(`/timing_templates/${id}/hard`);
 }
 
+export async function restoreTimingTemplate(id: string) {
+  const { data } = await api.post<TimingTemplate>(`/timing_templates/${id}/restore`);
+  return data;
+}
+
+export async function cloneTimingTemplate(id: string, name: string) {
+  const { data } = await api.post<TimingTemplate>(`/timing_templates/${id}/clone`, { name });
+  return data;
+}
+
 export async function createTimingStage(
   templateId: string,
   payload: Omit<TimingStage, "id" | "timing_template_id">,
