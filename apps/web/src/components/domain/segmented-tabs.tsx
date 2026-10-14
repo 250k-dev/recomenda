@@ -17,6 +17,8 @@ export type SegmentedTabsProps<T extends string> = {
   items: SegmentedTabItem<T>[];
   variant?: "default" | "pill";
   className?: string;
+  /** Alvo do tour da ajuda (`data-tour`). */
+  "data-tour"?: string;
 };
 
 export function SegmentedTabs<T extends string>({
@@ -25,11 +27,13 @@ export function SegmentedTabs<T extends string>({
   items,
   variant = "default",
   className,
+  "data-tour": dataTour,
 }: SegmentedTabsProps<T>) {
   const isPill = variant === "pill";
   return (
     <div
       role="tablist"
+      data-tour={dataTour}
       className={cn(
         // Mesma altura do Button size default (h-10).
         "inline-flex h-10 w-fit max-w-full items-stretch gap-0.5 overflow-x-auto rounded-lg border border-border bg-surface-2 p-0.5",

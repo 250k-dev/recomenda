@@ -985,14 +985,14 @@ export function FarmPurchaseListTab({
   const hasItems = (list.items ?? []).length > 0;
 
   /** Link do herói: editando, vira botão desligado (âncora não desabilita). */
-  const linkAction = (href: Route, icon: ReactNode, label: string) =>
+  const linkAction = (href: Route, icon: ReactNode, label: string, tour: string) =>
     editing ? (
-      <Button variant="outline" size="sm" className="gap-1.5" disabled>
+      <Button variant="outline" size="sm" className="gap-1.5" disabled data-tour={tour}>
         {icon}
         {label}
       </Button>
     ) : (
-      <Button asChild variant="outline" size="sm" className="gap-1.5">
+      <Button asChild variant="outline" size="sm" className="gap-1.5" data-tour={tour}>
         <Link href={href}>
           {icon}
           {label}
@@ -1104,6 +1104,7 @@ export function FarmPurchaseListTab({
       ) : null}
 
       <PageHero
+        data-tour="lista-resumo"
         variant="inverted"
         className="mb-7"
         icon={<Leaf className="size-6" />}
@@ -1139,6 +1140,7 @@ export function FarmPurchaseListTab({
               ) : null}
               <IconActionButton
                 label="Exportar"
+                data-tour="lista-exportar"
                 icon={<Share2 className="h-4 w-4" />}
                 className={EXPORT_ACTION_CLASS}
                 onClick={() => setExportOpen(true)}
@@ -1150,10 +1152,10 @@ export function FarmPurchaseListTab({
         statsActions={
           <>
             {canQuoteCrud && quotesHref
-              ? linkAction(quotesHref, <Store className="h-4 w-4" />, "Cotações")
+              ? linkAction(quotesHref, <Store className="h-4 w-4" />, "Cotações", "lista-cotacoes")
               : null}
             {stockHref
-              ? linkAction(stockHref, <Boxes className="h-4 w-4" />, "Estoque")
+              ? linkAction(stockHref, <Boxes className="h-4 w-4" />, "Estoque", "lista-estoque")
               : null}
           </>
         }
@@ -1188,15 +1190,17 @@ export function FarmPurchaseListTab({
       >
         {/* Dólar, saca e espaçamento alimentam as contas da tabela — ficam no
             herói, numa linha abaixo das métricas. */}
-        <PurchaseListParamsRow
-          items={editing ? draftItems : viewItems}
-          totalHa={totalHa}
-          readOnly={!editing}
-          variant="plain"
-          inverted
-          grainCrop={list.cycle_crops?.[0] ?? list.crop ?? null}
-          grainCrops={list.cycle_crops ?? null}
-        />
+        <div data-tour="lista-parametros">
+          <PurchaseListParamsRow
+            items={editing ? draftItems : viewItems}
+            totalHa={totalHa}
+            readOnly={!editing}
+            variant="plain"
+            inverted
+            grainCrop={list.cycle_crops?.[0] ?? list.crop ?? null}
+            grainCrops={list.cycle_crops ?? null}
+          />
+        </div>
       </PageHero>
 
       {remotePeerEditing && !editing ? (
@@ -1265,7 +1269,7 @@ export function FarmPurchaseListTab({
           mão. Meta única (sc/ha) ganha a barra Real × Meta em cima; metas
           antigas por categoria seguem na tabela Realizado × Meta. */}
       {canViewPrices ? (
-        <div className="flex flex-col gap-4">
+        <div data-tour="lista-metas" className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             {!editing && !effectiveReadOnly ? (
               <div className="flex justify-end">
@@ -1321,6 +1325,7 @@ export function FarmPurchaseListTab({
                   <Button
                     size="sm"
                     className="gap-1.5"
+                    data-tour="lista-salvar"
                     onClick={() => void saveItems()}
                     disabled={updateMutation.isPending || saveState === "saving"}
                   >
@@ -1336,6 +1341,7 @@ export function FarmPurchaseListTab({
                 <Button
                   size="sm"
                   className="gap-1.5"
+                  data-tour="lista-editar"
                   onClick={() => startEditing()}
                 >
                   <Pencil className="h-4 w-4" />

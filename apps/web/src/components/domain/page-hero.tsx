@@ -132,6 +132,7 @@ export function PageHero({
   className,
   variant = "default",
   sticky = false,
+  "data-tour": dataTour,
 }: {
   icon: ReactNode;
   eyebrow: string;
@@ -155,10 +156,13 @@ export function PageHero({
   variant?: "default" | "inverted";
   /** Fixa o herói no topo do viewport ao scrollar (ações permanecem acessíveis). */
   sticky?: boolean;
+  /** Alvo do tour da ajuda (`data-tour`). */
+  "data-tour"?: string;
 }) {
   const inverted = variant === "inverted";
   return (
     <section
+      data-tour={dataTour}
       className={cn(
         "mb-12",
         "rounded-xl p-5 shadow-sm sm:p-6",

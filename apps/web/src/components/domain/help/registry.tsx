@@ -1,3 +1,7 @@
+import {
+  listaDeCompraHelp,
+  montarListaDeCompraHelp,
+} from "./pages/lista-de-compra";
 import type { PageHelp } from "./types";
 
 /**
@@ -22,6 +26,10 @@ import type { PageHelp } from "./types";
  * ```
  *
  * O que ficar vazio cai no conteúdo genérico de `generic-help.tsx`.
+ *
+ * Tela com conteúdo de verdade ganha um arquivo em `pages/` (ver
+ * `pages/lista-de-compra.tsx`) e a entrada aqui só espalha o objeto: o
+ * registro continua um índice legível das rotas.
  */
 const PAGE_HELP: Record<string, PageHelp> = {
   // ---- Área do agrônomo / equipe / produtor ----
@@ -50,6 +58,7 @@ const PAGE_HELP: Record<string, PageHelp> = {
   "/fazendas/[id]/safras/[cycleId]": { title: "Safra da fazenda" },
   "/fazendas/[id]/safras/[cycleId]/lista-de-compra": {
     title: "Lista de compra da safra",
+    ...listaDeCompraHelp,
   },
   "/fazendas/[id]/safras/[cycleId]/lista-de-compra/cotacoes": {
     title: "Cotações",
@@ -57,8 +66,16 @@ const PAGE_HELP: Record<string, PageHelp> = {
   "/fazendas/[id]/safras/[cycleId]/plano-de-custo": {
     title: "Plano de custo da safra",
   },
-  "/fazendas/[id]/lista-de-compra/nova": { title: "Montar lista de compra" },
-  "/fazendas/[id]/lista-de-compra/[listId]": { title: "Lista de compra" },
+  // Também retoma o rascunho da lista da safra.
+  "/fazendas/[id]/lista-de-compra/nova": {
+    title: "Montar lista de compra",
+    ...montarListaDeCompraHelp,
+  },
+  // Visão só-leitura: os passos de edição do tour somem sozinhos (sem alvo).
+  "/fazendas/[id]/lista-de-compra/[listId]": {
+    title: "Lista de compra",
+    ...listaDeCompraHelp,
+  },
 
   // "Safra" em `/safras` é a programação de UM talhão (ver `routes.safras`).
   "/safras/nova": { title: "Nova programação de talhão" },

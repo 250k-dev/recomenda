@@ -38,7 +38,7 @@ export function PlanSurplusNotice({
   const count = surplus.length;
 
   return (
-    <div className="mb-4 rounded-lg border border-border bg-surface-2">
+    <div data-tour="lista-sobra" className="mb-4 rounded-lg border border-border bg-surface-2">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

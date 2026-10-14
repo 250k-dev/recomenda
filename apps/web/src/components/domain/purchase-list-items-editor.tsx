@@ -1609,6 +1609,7 @@ export function PurchaseListItemsEditor({
     return (
       <div
         key={band.id}
+        data-tour="lista-tabela"
         className="overflow-hidden rounded-xl border bg-card shadow-sm"
       >
         {/* `overscroll-x-contain`: no celular, chegar à borda da tabela rolando
@@ -1999,14 +2000,16 @@ export function PurchaseListItemsEditor({
       )}
     >
       {hideParams ? null : (
-        <PurchaseListParamsRow
-          items={items}
-          totalHa={totalHa}
-          readOnly={readOnly}
-          className="mb-3"
-          grainCrop={crops?.[0] ?? crop ?? null}
-          grainCrops={crops ?? null}
-        />
+        <div data-tour="lista-parametros">
+          <PurchaseListParamsRow
+            items={items}
+            totalHa={totalHa}
+            readOnly={readOnly}
+            className="mb-3"
+            grainCrop={crops?.[0] ?? crop ?? null}
+            grainCrops={crops ?? null}
+          />
+        </div>
       )}
 
       {/* Abas das tabelas e a ação da lista. */}
@@ -2042,6 +2045,7 @@ export function PurchaseListItemsEditor({
             >
               {bands.length > 1 ? (
                 <SegmentedTabs
+                  data-tour="lista-abas"
                   value={activeBand?.id ?? bands[0].id}
                   onValueChange={(id: BandId) => {
                     setBandTab(id);
@@ -2155,6 +2159,7 @@ export function PurchaseListItemsEditor({
               type="button"
               onClick={addItem}
               className="w-full gap-2 md:w-auto"
+              data-tour="lista-adicionar"
             >
               <Plus className="h-4 w-4" />
               <span className="md:hidden">Produto</span>

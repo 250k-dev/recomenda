@@ -139,6 +139,7 @@ function SaveDraftButton({
       className={cn("gap-2", className)}
       onClick={onSaveDraft}
       disabled={savingDraft}
+      data-tour="lista-assistente-rascunho"
     >
       {savingDraft ? (
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -413,7 +414,7 @@ export function PurchaseListWizard({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <div className="mb-6 flex items-center gap-3">
+      <div data-tour="lista-assistente-progresso" className="mb-6 flex items-center gap-3">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-primary transition-all"
@@ -608,7 +609,10 @@ function StepList({
         </Button>
       </div>
 
-      <section className="mb-6 overflow-hidden rounded-xl border bg-card shadow-sm">
+      <section
+        data-tour="lista-assistente-identificacao"
+        className="mb-6 overflow-hidden rounded-xl border bg-card shadow-sm"
+      >
         <div className="border-b bg-muted/30 px-5 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Identificação
@@ -687,7 +691,10 @@ function StepList({
         </div>
       </section>
 
-      <section className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
+      <section
+        data-tour="lista-assistente-template"
+        className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4"
+      >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
@@ -743,7 +750,7 @@ function StepList({
       {/* Metas definidas no passo anterior — o agrônomo acompanha o Real × Meta
           enquanto monta a lista, e pode voltar para editá-las. */}
       {Object.values(targets).some((v) => (v ?? 0) > 0) ? (
-        <div className="mb-6">
+        <div data-tour="lista-assistente-meta-progresso" className="mb-6">
           <CategoryMetaProgress items={items} totalHa={totalHa} targets={targets} />
           <div className="mt-2 flex justify-end">
             <Button
@@ -808,6 +815,7 @@ function StepList({
                   type="button"
                   onClick={next}
                   className="w-full gap-2 md:w-auto"
+                  data-tour="lista-assistente-proximo"
                 >
                   Próximo
                   <ArrowRight className="h-4 w-4" />
@@ -883,7 +891,10 @@ function StepTargets({
       </div>
 
       {!enabled ? (
-        <section className="flex flex-col items-center gap-4 rounded-xl border bg-card px-6 py-10 text-center shadow-sm">
+        <section
+          data-tour="lista-assistente-meta"
+          className="flex flex-col items-center gap-4 rounded-xl border bg-card px-6 py-10 text-center shadow-sm"
+        >
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Target className="h-6 w-6" />
           </span>
@@ -903,7 +914,7 @@ function StepTargets({
           </div>
         </section>
       ) : (
-        <section className="rounded-xl border bg-card p-5 shadow-sm">
+        <section data-tour="lista-assistente-meta" className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="max-w-md space-y-2.5">
             <Label htmlFor="total-target" className="text-sm font-semibold text-foreground">
               Meta desejada (sc/ha)
@@ -1106,7 +1117,7 @@ function StepReview({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div data-tour="lista-assistente-revisao" className="grid gap-3 sm:grid-cols-3">
         <SummaryCard label="Produtor" value={producerName} />
         <SummaryCard label="Talhões" value={String(plots.length)} />
         <SummaryCard label="Área total" value={`${fmt(totalHa)} ha`} />
@@ -1158,7 +1169,10 @@ function StepReview({
 
       {/* Card próprio (fora do rodapé): com 4 botões o rodapé quebrava o layout
           em telas menores, e o template merece explicação do que ele guarda. */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
+      <div
+        data-tour="lista-assistente-salvar-template"
+        className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm"
+      >
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">Reaproveitar esta lista</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1190,7 +1204,13 @@ function StepReview({
           <SaveDraftButton onSaveDraft={onSaveDraft} savingDraft={savingDraft} />
         }
         primary={
-          <Button size="lg" onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
+          <Button
+            size="lg"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className="gap-2"
+            data-tour="lista-assistente-salvar"
+          >
             <Check className="h-4 w-4" />
             {mutation.isPending ? "Salvando…" : "Salvar lista"}
           </Button>

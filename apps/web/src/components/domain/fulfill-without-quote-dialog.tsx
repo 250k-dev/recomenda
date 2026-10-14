@@ -86,6 +86,7 @@ export function FulfillWithoutQuoteButton({
         )}
         disabled={disabled}
         onClick={() => setStep("warn")}
+        data-tour="lista-registrar-sem-cotacao"
       >
         <PackageCheck className="size-4" />
         Registrar sem cotação
