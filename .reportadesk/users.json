@@ -88,5 +88,15 @@
     "company": "250K",
     "active": true,
     "createdAt": "2026-09-17T15:07:19.004Z"
+  },
+  {
+    "id": "usr_1792001715569",
+    "name": "Samuel Carneiro",
+    "email": "analista.pesquisa@250k.org",
+    "passwordHash": "admin123",
+    "role": "client",
+    "company": "250k",
+    "active": true,
+    "createdAt": "2026-10-14T18:15:15.569Z"
   }
 ]
