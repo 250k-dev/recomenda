@@ -30,6 +30,8 @@ import {
   grainPricesFromList,
   grainPricesPayload,
   grainPricesToNumbers,
+  seedUnitSizesFromList,
+  seedUnitSizesToNumbers,
 } from "@/stores/currency";
 import {
   computePurchaseListMetrics,
@@ -95,6 +97,15 @@ const fmtBrl = (n: number) =>
 const PURCHASE_LIST_AUTOSAVE_ENABLED =
   process.env.NEXT_PUBLIC_PURCHASE_LIST_AUTOSAVE !== "false";
 const PURCHASE_LIST_AUTOSAVE_MS = 4000;
+
+function seedSizesDiffer(
+  store: Record<string, string>,
+  server: Record<string, number> | null | undefined,
+): boolean {
+  const a = seedUnitSizesToNumbers(store);
+  const b = seedUnitSizesToNumbers(seedUnitSizesFromList(server));
+  return (a.SOYBEAN ?? 0) !== (b.SOYBEAN ?? 0) || (a.CORN ?? 0) !== (b.CORN ?? 0);
+}
 
 function draftPayloadEquals(
   a: ListItem[],
@@ -360,6 +371,7 @@ export function FarmPurchaseListTab({
       grainPricesFromList(list?.grain_prices_brl, list?.cycle_crops?.[0] ?? list?.crop),
     );
     store.setSpacing(list?.spacing_m != null ? String(list.spacing_m) : "");
+    store.setSeedUnitSizes(seedUnitSizesFromList(list?.seed_unit_sizes));
   }, [
     list?.id,
     list?.fx_rate_usd_brl,
@@ -368,6 +380,7 @@ export function FarmPurchaseListTab({
     list?.cycle_crops,
     list?.crop,
     list?.spacing_m,
+    list?.seed_unit_sizes,
   ]);
 
   const closeLeaveDialog = () => {
@@ -558,7 +571,8 @@ export function FarmPurchaseListTab({
       fx !== serverFx ||
       grain !== serverGrain ||
       spacing !== serverSpacing ||
-      extraGrainPricesChanged(useCurrencyStore.getState().grainPrices)
+      extraGrainPricesChanged(useCurrencyStore.getState().grainPrices) ||
+      seedSizesDiffer(useCurrencyStore.getState().seedUnitSizes, list.seed_unit_sizes)
     );
   }, [list, extraGrainPricesChanged]);
 
@@ -644,6 +658,9 @@ export function FarmPurchaseListTab({
               useCurrencyStore.getState().grainPrices,
             ),
             spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
+            seed_unit_sizes: seedUnitSizesToNumbers(
+              useCurrencyStore.getState().seedUnitSizes,
+            ),
           },
           { ifMatch },
         );
@@ -778,6 +795,7 @@ export function FarmPurchaseListTab({
   const grainPriceStore = useCurrencyStore((state) => state.grainPrice);
   const grainPricesStore = useCurrencyStore((state) => state.grainPrices);
   const spacingStore = useCurrencyStore((state) => state.spacing);
+  const seedUnitSizesStore = useCurrencyStore((state) => state.seedUnitSizes);
 
   const draftIsDirty = useMemo(() => {
     if (!editing) return false;
@@ -797,7 +815,8 @@ export function FarmPurchaseListTab({
       fx !== serverFx ||
       grain !== serverGrain ||
       spacing !== serverSpacing ||
-      extraGrainPricesChanged(grainPricesStore)
+      extraGrainPricesChanged(grainPricesStore) ||
+      seedSizesDiffer(seedUnitSizesStore, list?.seed_unit_sizes)
     );
   }, [
     grainPricesStore,
@@ -810,9 +829,11 @@ export function FarmPurchaseListTab({
     list?.fx_rate_usd_brl,
     list?.grain_price_brl,
     list?.spacing_m,
+    list?.seed_unit_sizes,
     fxRateStore,
     grainPriceStore,
     spacingStore,
+    seedUnitSizesStore,
   ]);
   const dirtyRef = useRef(false);
   const saveItemsRef = useRef(saveItems);

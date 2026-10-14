@@ -198,8 +198,9 @@ export function CostPlanView({
       area_hectares: area,
       fx_rate_usd_brl: fxRate ? Number(fxRate) : null,
       grain_price_brl: grainPrice ? Number(grainPrice) : null,
+      seed_unit_sizes: plan?.seed_unit_sizes,
     });
-  }, [items, area, fxRate, grainPrice]);
+  }, [items, area, fxRate, grainPrice, plan?.seed_unit_sizes]);
 
   const lineById = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
 

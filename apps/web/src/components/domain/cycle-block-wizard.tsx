@@ -30,6 +30,7 @@ import { Badge } from "@recomenda/ui/primitives/badge";
 import { Skeleton } from "@recomenda/ui/primitives/skeleton";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
 import { SegmentedTabs } from "@/components/domain/segmented-tabs";
+import { TemplateStagePicker } from "@/components/domain/season/template-stage-picker";
 import {
   queryKeys,
   useCycleAvailablePlots,
@@ -609,6 +610,15 @@ function StepPlots({
   const { data: availablePlots, isLoading } = useCycleAvailablePlots(cycle.id);
   const { data: purchaseList } = useCyclePurchaseList(cycle.id);
   const applyBlock = useApplyCycleBlock(cycle.id);
+  const { data: selectedTemplate } = useTimingTemplate(timingTemplateId);
+  const templateStages = selectedTemplate?.stages ?? [];
+  const stageKey = templateStages.map((stage) => stage.id).join("|");
+  const [pickedKey, setPickedKey] = useState("");
+  const [pickedStages, setPickedStages] = useState<Set<string>>(new Set());
+  if (stageKey !== pickedKey) {
+    setPickedKey(stageKey);
+    setPickedStages(new Set(templateStages.map((stage) => stage.id)));
+  }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [configs, setConfigs] = useState<Record<string, PlotConfig>>({});
   const [error, setError] = useState<string | null>(null);
@@ -766,9 +776,17 @@ function StepPlots({
       setError("Selecione pelo menos um talhão para este modelo.");
       return;
     }
+    if (templateStages.length > 0 && pickedStages.size === 0) {
+      setError("Selecione ao menos uma etapa do modelo.");
+      return;
+    }
     applyBlock.mutate(
       {
         timing_template_id: timingTemplateId,
+        stage_ids:
+          templateStages.length > 0 && pickedStages.size < templateStages.length
+            ? [...pickedStages]
+            : undefined,
         plots: selectedPlots.map((p) => {
           const cfg = configs[p.id];
           // Só envia variedades com nome; a área de cada uma pode ficar vazia.
@@ -873,6 +891,13 @@ function StepPlots({
             Selecionados: {selectedPlots.length} · {fmt(totalHa)} ha
           </p>
         </div>
+      </div>
+      <div className="mb-4">
+        <TemplateStagePicker
+          stages={templateStages}
+          selectedIds={pickedStages}
+          onChange={setPickedStages}
+        />
       </div>
 
       {isLoading ? (

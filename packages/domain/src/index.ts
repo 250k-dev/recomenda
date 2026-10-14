@@ -48,9 +48,13 @@ export type {
 export {
   CATEGORY_ORDER,
   seedQuantityFromPopulation,
+  seedsPerCommercialUnit,
+  DEFAULT_SOY_SEEDS_PER_BAG,
+  DEFAULT_CORN_SEEDS_PER_SACK,
   calculateLine,
   calculateSummary,
 } from "./cost-plan/calculate";
+export type { SeedUnitSizes } from "./cost-plan/calculate";
 export { CATEGORY_LABELS, CATEGORY_COLORS } from "./cost-plan/categories";
 
 // ---- impressão (browser-only) ------------------------------------------
@@ -70,6 +74,7 @@ export type { ListItem } from "./purchase-list/list-item";
 export {
   areaFactorOf,
   areaPercentFieldFromFactor,
+  areaPercentFromTreatedHa,
   DEFAULT_SPACING_M,
   populationFromSeeds,
   SEED_CATEGORIES,

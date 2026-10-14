@@ -204,13 +204,13 @@ function sheetBody(data: RecommendationShareData, rec: Recommendation): string {
         <td class="num muted">${productArea != null ? `${fmtHectares(productArea)} ha` : "—"}${
           factor < 0.999 ? `<div class="pm">${Math.round(factor * 100)}% da área</div>` : ""
         }</td>
-        <td class="num tot">${quantities.total != null ? `${fmtQuantity(quantities.total)} ${escapeHtml(unit)}` : "—"}</td>
         ${
           withTanks
             ? `<td class="num tk">${quantities.perTank != null ? `${fmtQuantity(quantities.perTank)} ${escapeHtml(unit)}` : "—"}</td>
                <td class="num tk">${quantities.lastTank ? `${fmtQuantity(quantities.lastTank)} ${escapeHtml(unit)}` : "—"}</td>`
             : ""
         }
+        <td class="num tot">${quantities.total != null ? `${fmtQuantity(quantities.total)} ${escapeHtml(unit)}` : "—"}</td>
       </tr>`;
     })
     .join("");
@@ -269,8 +269,9 @@ function sheetBody(data: RecommendationShareData, rec: Recommendation): string {
         ? `<table class="rx">
             <thead><tr>
               <th>#</th><th>Produto</th><th>Alvo / observação</th>
-              <th class="num">Dose/ha</th><th class="num">Área</th><th class="num">Total</th>
+              <th class="num">Dose/ha</th><th class="num">Área</th>
               ${withTanks ? `<th class="num tk">Por tanque</th><th class="num tk">Últ. tanque</th>` : ""}
+              <th class="num">Total</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>`
@@ -394,4 +395,124 @@ export function countApplicationRecipes(datas: RecommendationShareData[]): numbe
     (sum, data) => sum + data.recommendations.filter((rec) => rec.status !== "SKIPPED").length,
     0,
   );
+}
+
+const WA_STAGE_DIVIDER = "———";
+const WA_TODO = "A definir";
+
+/** Corpo WhatsApp de uma receita (etapa × talhão), com tanques quando houver. */
+function formatRecipeStageWhatsapp(data: RecommendationShareData, rec: Recommendation): string {
+  const areaHa = recipeAreaHa(data);
+  const items = sortRecommendationItemsByMixOrder(rec.items);
+  const operation = nonSprayOperation(items);
+  const spray = operation == null;
+  const presc = stagePrescription(rec, areaHa);
+  const withTanks = spray && presc.tankCount != null;
+
+  const lines: string[] = [];
+  lines.push(`*RECEITA · ${rec.name.toUpperCase()}*`);
+  if (data.plotName) lines.push(`*Talhão:* ${data.plotName}`);
+  if (areaHa != null) lines.push(`*Área:* ${fmtHectares(areaHa)} ha`);
+  const predicted = ymdToBr(rec.predicted_date_current);
+  if (predicted) lines.push(`*Aplicação prevista:* ${predicted}`);
+
+  lines.push("");
+  lines.push("*Dados da aplicação*");
+  if (spray) {
+    lines.push(
+      `Vazão: ${
+        presc.sprayVolumeLHa != null ? `${fmtQuantity(presc.sprayVolumeLHa)} L/ha` : WA_TODO
+      }`,
+    );
+    lines.push(
+      `Calda total: ${presc.totalMixL != null ? `${fmtQuantity(presc.totalMixL)} L` : WA_TODO}`,
+    );
+    if (withTanks) {
+      lines.push(
+        `Tanque: ${fmtQuantity(presc.tankCapacityL)} L${
+          presc.haPerTank != null ? ` (${fmtHectares(presc.haPerTank)} ha)` : ""
+        }`,
+      );
+      const partial =
+        presc.lastTankL && presc.lastTankL > 0
+          ? ` + último com ${fmtQuantity(presc.lastTankL)} L`
+          : "";
+      lines.push(
+        `Nº de tanques: ${fmtTankCount(presc.tankCount)} (${presc.fullTanks ?? 0} cheio${
+          presc.fullTanks === 1 ? "" : "s"
+        }${partial})`,
+      );
+    }
+    lines.push(`Horário: ${rec.application_time?.trim() || WA_TODO}`);
+    lines.push(`Ponta: ${rec.nozzle?.trim() || WA_TODO}`);
+  } else {
+    lines.push(`Operação: ${operation}`);
+  }
+
+  lines.push("");
+  lines.push("*Produtos (ordem de mistura)*");
+  if (items.length === 0) {
+    lines.push("_Sem produtos vinculados._");
+  } else {
+    items.forEach((item, index) => {
+      const quantities = productQuantities(item.dose_per_hectare, presc, "HA", item.area_factor);
+      const unit = totalUnit(item.dose_unit);
+      const target = recipeTargetFor(item, index, items.length);
+      const factor = item.area_factor ?? 1;
+      const productArea = areaHa != null ? areaHa * factor : null;
+      const block: string[] = [`${index + 1}. _${item.product_name}_`];
+      block.push(
+        `Dose: ${fmtDose(item.dose_per_hectare)} ${doseUnit(item.dose_unit)}`,
+      );
+      if (productArea != null) {
+        block.push(
+          `Área: ${fmtHectares(productArea)} ha${
+            factor < 0.999 ? ` (${Math.round(factor * 100)}% da área)` : ""
+          }`,
+        );
+      }
+      if (target) block.push(`Alvo: ${target}`);
+      if (item.area_note) block.push(`Obs.: ${item.area_note}`);
+      if (quantities.total != null) {
+        block.push(`Total: ${fmtQuantity(quantities.total)} ${unit}`);
+      }
+      if (withTanks) {
+        const perTank =
+          quantities.perTank != null
+            ? `Por tanque: ${fmtQuantity(quantities.perTank)} ${unit}`
+            : null;
+        const last =
+          quantities.lastTank != null && quantities.lastTank > 0
+            ? `Últ. tanque: ${fmtQuantity(quantities.lastTank)} ${unit}`
+            : null;
+        const tankLines = [perTank, last].filter(Boolean);
+        if (tankLines.length) block.push(tankLines.join(" · "));
+      }
+      lines.push(block.join("\n"));
+    });
+  }
+
+  if (rec.notes?.trim()) {
+    lines.push("");
+    lines.push(`*Observações*\n${rec.notes.trim()}`);
+  }
+  return lines.join("\n");
+}
+
+/** Texto WhatsApp das receitas de aplicação (uma seção por etapa × talhão). */
+export function buildApplicationRecipesWhatsappMessage(
+  datas: RecommendationShareData[],
+): string {
+  const blocks: string[] = [];
+  for (const data of datas) {
+    for (const rec of data.recommendations.filter((r) => r.status !== "SKIPPED")) {
+      blocks.push(formatRecipeStageWhatsapp(data, rec));
+    }
+  }
+  if (blocks.length === 0) return "";
+  const agronomist = datas.find((d) => d.agronomistName)?.agronomistName;
+  const footer = agronomist
+    ? `_Responsável técnico: ${agronomist}_\n_Enviado pelo Recomenda_`
+    : "_Enviado pelo Recomenda_";
+  return `${blocks.join(`\n\n${WA_STAGE_DIVIDER}\n\n`)}\n\n${footer}`;
 }

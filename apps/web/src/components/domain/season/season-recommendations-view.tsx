@@ -654,17 +654,32 @@ export function SeasonRecommendationsView({
         eyebrow="Safra em execução"
         title={title}
         actions={
-          <div className="flex flex-wrap items-center gap-2 print:hidden">
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setApplicationOpen(true)}>
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 gap-1.5 print:hidden"
+              aria-label="Dados da aplicação"
+              onClick={() => setApplicationOpen(true)}
+            >
               <SlidersHorizontal className="h-4 w-4 shrink-0" />
-              Dados da aplicação
+              Aplicação
             </Button>
-            <Button size="sm" className={cn("gap-1.5", EXPORT_ACTION_CLASS)} onClick={() => setExportOpen(true)}>
+            <Button
+              size="sm"
+              className={cn("shrink-0 gap-1.5 print:hidden", EXPORT_ACTION_CLASS)}
+              onClick={() => setExportOpen(true)}
+            >
               <Share2 className="h-4 w-4 shrink-0" />
               Exportar
             </Button>
             {canManageStages ? (
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setMixOrderOpen(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 gap-1.5 print:hidden"
+                onClick={() => setMixOrderOpen(true)}
+              >
                 <ListOrdered className="h-4 w-4 shrink-0 text-muted-foreground" />
                 Ordem de mistura
               </Button>
@@ -673,7 +688,7 @@ export function SeasonRecommendationsView({
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5"
+                className="shrink-0 gap-1.5 print:hidden"
                 onClick={() => setTemplateOpen(true)}
               >
                 <LayoutTemplate className="h-4 w-4 shrink-0" />
@@ -681,12 +696,16 @@ export function SeasonRecommendationsView({
               </Button>
             ) : null}
             {harvestable ? (
-              <Button size="sm" className="gap-1.5" onClick={() => setHarvestOpen(true)}>
+              <Button
+                size="sm"
+                className="shrink-0 gap-1.5 print:hidden"
+                onClick={() => setHarvestOpen(true)}
+              >
                 <Wheat className="h-4 w-4 shrink-0" />
                 Registrar colheita
               </Button>
             ) : null}
-          </div>
+          </>
         }
         stats={[
           ...(plotName ? [{ label: "Talhão", value: plotName }] : []),

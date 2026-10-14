@@ -3,10 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { useIsMobile } from "@recomenda/ui/hooks/use-mobile";
-import {
-  buildWhatsappMessage,
-  type RecommendationShareData,
-} from "@recomenda/domain/recommendations/share-message";
+import type { RecommendationShareData } from "@recomenda/domain/recommendations/share-message";
 import { countApplicationRecipes } from "@recomenda/domain/recommendations/recipe-document";
 import { buildExportHtml } from "@recomenda/domain/recommendations/export-document";
 import { displayRecStatus } from "@recomenda/domain/recommendations/format";
@@ -39,6 +36,7 @@ import {
 import { printPaged, type PagedResult } from "@/lib/print/paged-document";
 import { useSeasonApplicationTab } from "@/components/domain/season/season-application-data-dialog";
 import {
+  composeRecommendationExportWhatsappMessage,
   copyText,
   openWhatsapp,
   pagesByPart,
@@ -127,7 +125,18 @@ export function RecommendationExportDialog({
         : null,
     [filtered, hasStages, hasParts, incReport, incRecipes, priced, recipeCount, title],
   );
-  const message = hasStages ? buildWhatsappMessage(filtered) : "";
+  const message = useMemo(
+    () =>
+      hasStages && hasParts
+        ? composeRecommendationExportWhatsappMessage({
+            report: incReport,
+            recipes: incRecipes,
+            recipeCount,
+            single: filtered,
+          })
+        : "",
+    [hasStages, hasParts, incReport, incRecipes, recipeCount, filtered],
+  );
 
   const onPaged = (result: PagedResult) => {
     setPaged(result);
@@ -284,7 +293,7 @@ export function RecommendationExportDialog({
     <ExportFooter summary={summary} sub={sub} warn={!hasStages || !hasParts}>
       <WhatsappButton
         message={message}
-        disabled={!hasStages}
+        disabled={!ready || !message.trim()}
         onCopy={() => void copyText(message)}
         onSend={() => openWhatsapp(message)}
       />

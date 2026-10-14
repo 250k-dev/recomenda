@@ -5,6 +5,7 @@ import { Calculator } from "lucide-react";
 import { Input } from "@recomenda/ui/primitives/input";
 import { MoneyInput } from "@recomenda/ui/forms/money-input";
 import {
+  canonicalFromComputed,
   computePrescription,
   fmtHectares,
   fmtQuantity,
@@ -152,8 +153,12 @@ export function ApplicationDataFields({
   });
   const hasArea = positive(areaHa ?? null) != null;
 
+  const totalMixText =
+    presc.totalMixL == null ? "" : canonicalFromComputed(presc.totalMixL, 3);
+  const tankCountText =
+    presc.tankCount == null ? "" : canonicalFromComputed(presc.tankCount, 2);
   const lastTankText =
-    presc.lastTankL == null ? "" : presc.lastTankL > 0 ? String(presc.lastTankL) : "0";
+    presc.lastTankL == null ? "" : presc.lastTankL > 0 ? canonicalFromComputed(presc.lastTankL, 3) : "0";
 
   return (
     <div className={cn("grid gap-3 sm:grid-cols-2", className)}>
@@ -171,16 +176,18 @@ export function ApplicationDataFields({
         <label className="grid gap-1">
           <Label formula="Vazão × Área">Calda total (L)</Label>
           <MoneyInput
-            value={editing === "total" ? draftTotal : presc.totalMixL != null ? String(presc.totalMixL) : ""}
+            value={editing === "total" ? draftTotal : totalMixText}
             onFocus={() => {
               setEditing("total");
-              setDraftTotal(presc.totalMixL != null ? String(presc.totalMixL) : "");
+              setDraftTotal(totalMixText);
             }}
             onBlur={() => setEditing(null)}
             onValueChange={(total) => {
               setDraftTotal(total);
               const sprayVolume = sprayVolumeFromTotal(total, areaHa);
-              onChange({ sprayVolume: sprayVolume != null ? String(sprayVolume) : "" });
+              onChange({
+                sprayVolume: sprayVolume != null ? canonicalFromComputed(sprayVolume, 3) : "",
+              });
             }}
             disabled={readOnly}
             className="h-9 text-right tabular-nums"
@@ -204,17 +211,19 @@ export function ApplicationDataFields({
           <label className="grid gap-1">
             <Label formula="Calda total ÷ Tanque">Nº de tanques</Label>
             <MoneyInput
-              value={editing === "tanks" ? draftTanks : presc.tankCount != null ? String(presc.tankCount) : ""}
+              value={editing === "tanks" ? draftTanks : tankCountText}
               decimals={editing === "tanks" ? undefined : 2}
               onFocus={() => {
                 setEditing("tanks");
-                setDraftTanks(presc.tankCount != null ? String(presc.tankCount) : "");
+                setDraftTanks(tankCountText);
               }}
               onBlur={() => setEditing(null)}
               onValueChange={(count) => {
                 setDraftTanks(count);
                 const capacity = tankCapacityFromCount(count, presc.totalMixL);
-                onChange({ tankCapacity: capacity != null ? String(capacity) : "" });
+                onChange({
+                  tankCapacity: capacity != null ? canonicalFromComputed(capacity, 3) : "",
+                });
               }}
               disabled={readOnly || presc.totalMixL == null}
               className="h-9 text-right tabular-nums"

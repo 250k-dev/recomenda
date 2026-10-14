@@ -21,6 +21,7 @@ import {
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { zeroPeriodStageNames } from "@recomenda/domain/timing/window-days";
 import { ZeroPeriodApplyDialog } from "@/components/domain/season/zero-period-apply-dialog";
+import { TemplateStagePicker } from "@/components/domain/season/template-stage-picker";
 
 export function ApplySeasonTemplateDialog({
   open,
@@ -65,13 +66,28 @@ export function ApplySeasonTemplateDialog({
     );
   }, [open, options]);
 
+  const stages = templateDetail?.stages ?? [];
+  const stageKey = stages.map((stage) => stage.id).join("|");
+  const [pickedKey, setPickedKey] = useState("");
+  const [pickedStages, setPickedStages] = useState<Set<string>>(new Set());
+  if (stageKey !== pickedKey) {
+    setPickedKey(stageKey);
+    setPickedStages(new Set(stages.map((stage) => stage.id)));
+  }
+  const partial = stages.length > 0 && pickedStages.size < stages.length;
+  const stageIds = partial ? [...pickedStages] : undefined;
+
   const zeroNames = useMemo(
-    () => zeroPeriodStageNames(templateDetail?.stages ?? []),
-    [templateDetail?.stages],
+    () => zeroPeriodStageNames(stages),
+    [stages],
   );
 
   const runApply = () => {
-    applyMut.mutate(templateId, {
+    if (pickedStages.size === 0) {
+      toast.error("Selecione ao menos uma etapa.");
+      return;
+    }
+    applyMut.mutate({ timingTemplateId: templateId, stageIds }, {
       onSuccess: (res) => {
         const impact = res.list_impact;
         if (impact?.conflicts.length) {
@@ -112,9 +128,11 @@ export function ApplySeasonTemplateDialog({
         <DialogHeader>
           <DialogTitle>Aplicar modelo de timing</DialogTitle>
           <DialogDescription>
-            {hasPendingStages
-              ? "As etapas pendentes deste talhão serão substituídas pelo modelo. Etapas já aplicadas ou puladas permanecem."
-              : "As etapas do modelo entram neste talhão. Etapas já aplicadas ou puladas com o mesmo nome permanecem."}
+            {partial
+              ? "Só as etapas marcadas entram. As outras pendentes deste talhão permanecem. Aplicadas ou puladas de mesmo nome não são recriadas."
+              : hasPendingStages
+                ? "As etapas pendentes deste talhão serão substituídas pelo modelo. Etapas já aplicadas ou puladas permanecem."
+                : "As etapas do modelo entram neste talhão. Etapas já aplicadas ou puladas com o mesmo nome permanecem."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 px-6 py-4">
@@ -127,6 +145,11 @@ export function ApplySeasonTemplateDialog({
               isLoading ? "Carregando…" : "Selecione um modelo…"
             }
             options={options}
+          />
+          <TemplateStagePicker
+            stages={stages}
+            selectedIds={pickedStages}
+            onChange={setPickedStages}
           />
           {options.length === 0 && !isLoading ? (
             <p className="text-xs text-muted-foreground">
@@ -144,9 +167,9 @@ export function ApplySeasonTemplateDialog({
           </Button>
           <Button
             onClick={handleApply}
-            disabled={applyMut.isPending || detailLoading || !templateId}
+            disabled={applyMut.isPending || detailLoading || !templateId || pickedStages.size === 0}
           >
-            {applyMut.isPending ? "Aplicando…" : "Aplicar modelo"}
+            {applyMut.isPending ? "Aplicando…" : partial ? "Aplicar etapas" : "Aplicar modelo"}
           </Button>
         </DialogFooter>
       </DialogContent>

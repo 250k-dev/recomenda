@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DollarSign, PaperBag, RulerDimensionLine } from "lucide-react";
+import { DollarSign, PaperBag, RulerDimensionLine, Wheat } from "lucide-react";
 import { Input } from "@recomenda/ui/primitives/input";
 import { MoneyInput } from "@recomenda/ui/forms/money-input";
 import { useCan } from "@recomenda/api-hooks/use-can";
@@ -12,6 +12,10 @@ import {
   type ListItem,
 } from "@recomenda/domain/purchase-list/list-item";
 import { useCurrencyStore, DEFAULT_GRAIN_PRICE_BRL } from "@/stores/currency";
+import {
+  DEFAULT_CORN_SEEDS_PER_SACK,
+  DEFAULT_SOY_SEEDS_PER_BAG,
+} from "@recomenda/domain/cost-plan/calculate";
 import { useLiveFxRate } from "@/hooks/use-live-fx-rate";
 import { fmt } from "@/components/domain/season/_shared";
 
@@ -81,6 +85,8 @@ export function PurchaseListParamsRow({
     setGrainPrices,
     spacing: spacingStr,
     setSpacing,
+    seedUnitSizes,
+    setSeedUnitSizes,
   } = useCurrencyStore();
   const fx = Number(fxRate) || 0;
   const saca = Number(grainPrice) || DEFAULT_GRAIN_PRICE_BRL;
@@ -89,6 +95,16 @@ export function PurchaseListParamsRow({
   const needsManualGrainPrice = grainCrop === "BEAN";
   // Safra com mais de uma cultura: um preço de saca para cada (a 1ª é a principal).
   const extraCrops = (grainCrops ?? []).slice(1).filter((c) => c !== "ANY");
+  const seedCrops = (grainCrops?.length ? grainCrops : grainCrop ? [grainCrop] : []).filter(
+    (c) => c === "SOYBEAN" || c === "CORN",
+  );
+  const showSoyBag = seedCrops.includes("SOYBEAN");
+  const showCornSack = seedCrops.includes("CORN");
+  const fmtSeeds = (n: number) => n.toLocaleString("pt-BR");
+  const setSeedSize = (crop: "SOYBEAN" | "CORN", raw: string) => {
+    const digits = raw.replace(/\D/g, "");
+    setSeedUnitSizes({ ...useCurrencyStore.getState().seedUnitSizes, [crop]: digits });
+  };
 
   // Cotação ao vivo só entra como padrão enquanto o usuário nunca editou o
   // campo (flag persistida). Depois da primeira digitação, o valor dele fica.
@@ -259,6 +275,32 @@ export function PurchaseListParamsRow({
             );
           })
         : null}
+      {showSoyBag ? (
+        <SeedSizeField
+          label="Tamanho do bag"
+          hint="sementes por bag de soja"
+          unit="sem"
+          placeholder={fmtSeeds(DEFAULT_SOY_SEEDS_PER_BAG)}
+          value={seedUnitSizes.SOYBEAN ?? ""}
+          fallback={DEFAULT_SOY_SEEDS_PER_BAG}
+          readOnly={readOnly}
+          inverted={inverted}
+          onChange={(raw) => setSeedSize("SOYBEAN", raw)}
+        />
+      ) : null}
+      {showCornSack ? (
+        <SeedSizeField
+          label="Tamanho do saco"
+          hint="sementes por saco de milho"
+          unit="sem"
+          placeholder={fmtSeeds(DEFAULT_CORN_SEEDS_PER_SACK)}
+          value={seedUnitSizes.CORN ?? ""}
+          fallback={DEFAULT_CORN_SEEDS_PER_SACK}
+          readOnly={readOnly}
+          inverted={inverted}
+          onChange={(raw) => setSeedSize("CORN", raw)}
+        />
+      ) : null}
       {/* Espaçamento entre linhas (m) — parâmetro único; deriva a população da semente. */}
       <div className="flex items-center gap-2">
         <span className={cn(
@@ -313,6 +355,67 @@ export function PurchaseListParamsRow({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SeedSizeField({
+  label,
+  hint,
+  unit,
+  placeholder,
+  value,
+  fallback,
+  readOnly,
+  inverted,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  unit: string;
+  placeholder: string;
+  value: string;
+  fallback: number;
+  readOnly: boolean;
+  inverted: boolean;
+  onChange: (raw: string) => void;
+}) {
+  const chipClass = inverted
+    ? "bg-white/15 text-white"
+    : "bg-primary-soft text-primary-strong";
+  const labelClass = inverted ? "text-primary-foreground/80" : "text-muted-foreground";
+  const hintClass = inverted ? "text-primary-foreground/70" : "text-muted-foreground";
+  const valueClass = inverted ? "text-primary-foreground" : "text-foreground";
+  const shown = Number(value) > 0 ? Number(value) : fallback;
+  const formatted = shown.toLocaleString("pt-BR");
+  return (
+    <div className="flex items-center gap-2">
+      <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", chipClass)}>
+        <Wheat className="h-4 w-4" />
+      </span>
+      <div className="flex flex-col">
+        <span className={cn("text-[11px] font-semibold uppercase tracking-wide", labelClass)}>
+          {label}
+        </span>
+        <span className={cn("text-[11px]", hintClass)}>{hint}</span>
+      </div>
+      {readOnly ? (
+        <span className={cn("ml-2 self-end text-sm font-semibold tabular-nums", valueClass)}>
+          {formatted}
+        </span>
+      ) : (
+        <div className="ml-2 flex items-center gap-1">
+          <Input
+            inputMode="numeric"
+            placeholder={placeholder}
+            value={value ? Number(value).toLocaleString("pt-BR") : ""}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-8 w-28"
+            aria-label={label}
+          />
+          <span className={cn("text-sm", hintClass)}>{unit}</span>
+        </div>
+      )}
     </div>
   );
 }

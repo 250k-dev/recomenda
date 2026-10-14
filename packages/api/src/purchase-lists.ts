@@ -71,6 +71,8 @@ export interface PurchaseListInput {
   category_targets?: Record<string, number>;
   /** Espaçamento entre linhas (m) — parâmetro único da lista (semente). */
   spacing_m?: number | null;
+  /** Sementes por bag (SOYBEAN) e por saco (CORN). */
+  seed_unit_sizes?: Record<string, number>;
   season_id?: string | null;
   /** Rascunho (em montagem) × finalizada. Default 'active' no backend. */
   status?: "draft" | "active";
@@ -116,6 +118,8 @@ export interface PurchaseListDetail {
   grain_prices_brl?: Record<string, number>;
   category_targets?: Record<string, number>;
   spacing_m?: number | null;
+  /** Sementes por bag (SOYBEAN) e por saco (CORN). Ausente = padrão. */
+  seed_unit_sizes?: Record<string, number>;
   created_at: string;
   updated_at?: string;
   /** Total gasto informado na mão (sem rateio nos itens). */

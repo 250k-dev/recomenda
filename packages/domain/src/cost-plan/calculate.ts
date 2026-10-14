@@ -36,6 +36,8 @@ export interface CostParams {
   area_hectares: number;
   fx_rate_usd_brl: number | null;
   grain_price_brl: number | null;
+  /** Sementes por bag/saco da lista. Ausente = 5 milhões (soja) e 60 mil (milho). */
+  seed_unit_sizes?: SeedUnitSizes | null;
 }
 
 export interface CostLineResult {
@@ -85,6 +87,36 @@ export const CATEGORY_ORDER = [
 /** PMS padrão da semente de feijão (g) quando a linha não informa. */
 export const DEFAULT_BEAN_PMS_G = 250;
 
+/** Sementes por bag de soja quando a lista não informa outro tamanho. */
+export const DEFAULT_SOY_SEEDS_PER_BAG = 5_000_000;
+
+/** Sementes por saco de milho quando a lista não informa outro tamanho. */
+export const DEFAULT_CORN_SEEDS_PER_SACK = 60_000;
+
+/** Cultura → sementes por unidade comercial (SOYBEAN bag, CORN saco). */
+export type SeedUnitSizes = Partial<Record<"SOYBEAN" | "CORN", number>>;
+
+function positiveSize(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Sementes por unidade comercial. Feijão continua pelo PMS. */
+export function seedsPerCommercialUnit(
+  category: string,
+  pmsG?: number | null,
+  sizes?: SeedUnitSizes | null,
+): number {
+  if (category === "CULTIVAR_SOJA") {
+    return positiveSize(sizes?.SOYBEAN) ?? DEFAULT_SOY_SEEDS_PER_BAG;
+  }
+  if (category === "HIBRIDO_MILHO") {
+    return positiveSize(sizes?.CORN) ?? DEFAULT_CORN_SEEDS_PER_SACK;
+  }
+  if (category === "CULTIVAR_FEIJAO") return beanSeedsPerKg(pmsG);
+  return 1;
+}
+
 /** Sementes por kg de feijão: 1.000.000 ÷ PMS (g). */
 export function beanSeedsPerKg(pmsG?: number | null): number {
   const pms = pmsG != null && pmsG > 0 ? pmsG : DEFAULT_BEAN_PMS_G;
@@ -106,10 +138,16 @@ export function seedQuantityFromPopulation(
   populationBase: number,
   category: string,
   pmsG?: number | null,
+  sizes?: SeedUnitSizes | null,
 ): number {
-  if (category === "CULTIVAR_SOJA") return populationBase / 5_000_000;
-  if (category === "HIBRIDO_MILHO") return populationBase / 60_000;
-  if (category === "CULTIVAR_FEIJAO") return populationBase / beanSeedsPerKg(pmsG);
+  if (
+    category === "CULTIVAR_SOJA" ||
+    category === "HIBRIDO_MILHO" ||
+    category === "CULTIVAR_FEIJAO"
+  ) {
+    const perUnit = seedsPerCommercialUnit(category, pmsG, sizes);
+    return perUnit > 0 ? populationBase / perUnit : 0;
+  }
   return populationBase;
 }
 
@@ -133,6 +171,7 @@ export function calculateLine(item: CostItemInput, params: CostParams): CostLine
             item.population_base ?? 0,
             item.category,
             item.thousand_seed_weight_g,
+            params.seed_unit_sizes,
           );
     if (item.deduct_stock) G = G - stock;
   } else if (item.calc_rule === "SEED_BAGS") {

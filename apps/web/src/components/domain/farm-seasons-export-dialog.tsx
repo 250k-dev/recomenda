@@ -3,10 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { ChevronDown, Download } from "lucide-react";
 import { useIsMobile } from "@recomenda/ui/hooks/use-mobile";
-import {
-  buildMultiWhatsappMessage,
-  type RecommendationShareData,
-} from "@recomenda/domain/recommendations/share-message";
+import type { RecommendationShareData } from "@recomenda/domain/recommendations/share-message";
 import type { DocumentCover } from "@recomenda/domain/recommendations/print-document";
 import { countApplicationRecipes } from "@recomenda/domain/recommendations/recipe-document";
 import { buildExportHtml } from "@recomenda/domain/recommendations/export-document";
@@ -46,6 +43,7 @@ import {
   triOf,
 } from "@/components/domain/export/export-ui";
 import {
+  composeRecommendationExportWhatsappMessage,
   copyText,
   openWhatsapp,
   pagesByPart,
@@ -207,7 +205,18 @@ export function FarmSeasonsExportDialog({
     [tab, nSel, hasParts, incReport, incRecipes, recipeCount, datas, title, priced, cover],
   );
   const total = html && paged ? paged.total : 0;
-  const message = nSel ? buildMultiWhatsappMessage(farmName, datas, contextLabel) : "";
+  const message = useMemo(
+    () =>
+      nSel && hasParts
+        ? composeRecommendationExportWhatsappMessage({
+            report: incReport,
+            recipes: incRecipes,
+            recipeCount,
+            multi: { farmName, datas, contextLabel },
+          })
+        : "",
+    [nSel, hasParts, incReport, incRecipes, recipeCount, farmName, datas, contextLabel],
+  );
 
   const onPaged = (result: PagedResult) => {
     setPaged(result);
@@ -554,7 +563,7 @@ export function FarmSeasonsExportDialog({
     >
       <WhatsappButton
         message={message}
-        disabled={!nSel}
+        disabled={!nSel || !hasParts || !message.trim()}
         onCopy={() => void copyText(message)}
         onSend={() => openWhatsapp(message)}
       />

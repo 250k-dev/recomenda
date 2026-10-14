@@ -9,6 +9,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@recomenda/ui/primitives/button";
 import { Input } from "@recomenda/ui/primitives/input";
@@ -29,6 +30,7 @@ import {
   useSeasonCostPlan,
   useSkipRecommendation,
   useUndoRecommendation,
+  useReplicateRecommendationItem,
   useUpdateRecommendationItem,
   useUpdateSeasonVarieties,
 } from "@recomenda/api-hooks";
@@ -44,9 +46,19 @@ import {
 } from "@recomenda/domain/catalog/purchase-list-catalog";
 import type { Recommendation, RecommendationItem } from "@recomenda/api";
 import {
+  getSameStageRecommendations,
+  type SameStageRecommendation,
+  type StageItemReplication,
+} from "@recomenda/api/seasons";
+import {
+  StageItemReplicationPicker,
+  useReplicateTargetIds,
+} from "@/components/domain/season/stage-item-replication-panel";
+import {
   SEED_CATEGORIES,
   areaFactorOf,
   areaPercentFieldFromFactor,
+  areaPercentFromTreatedHa,
   parseNApplications,
   seedsPerUnit,
 } from "@recomenda/domain/purchase-list/list-item";
@@ -88,6 +100,7 @@ import {
 } from "@/components/domain/recommendation-stage-fields";
 import { RecommendationRegisterPopover } from "@/components/domain/recommendation-register-popover";
 import { ConfirmDialog } from "@recomenda/ui/patterns/confirm-dialog";
+import { DeleteStageItemDialog } from "@/components/domain/season/delete-stage-item-dialog";
 import { useExecutionImpactGuard } from "@/components/domain/season/execution-impact-guard";
 import { StockShortageDialog } from "@/components/domain/stock-shortage-dialog";
 function fmtQty(n: number) {
@@ -134,11 +147,37 @@ function TalhaoRateFields({
   const factor = areaFactorOf({ areaPercent });
   const apps = parseNApplications(nApps);
   const treated = ha * factor;
-  const thisPass = doseN * treated;
+  const derivedTreatedHa =
+    ha > 0 && treated > 0 ? String(Number(treated.toFixed(4))) : "";
+  const [treatedHaDraft, setTreatedHaDraft] = useState<string | null>(null);
+  const [treatedHaFocused, setTreatedHaFocused] = useState(false);
+
+  useEffect(() => {
+    if (!treatedHaFocused) setTreatedHaDraft(null);
+  }, [areaPercent, ha, treatedHaFocused]);
+
+  const treatedFromDraft = (): number => {
+    if (treatedHaDraft === null) return treated;
+    const trimmed = treatedHaDraft.trim();
+    if (!trimmed) return 0;
+    const n = Number(trimmed.replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : treated;
+  };
+  const effectiveTreated = treatedHaDraft !== null ? treatedFromDraft() : treated;
+  const thisPass = doseN * effectiveTreated;
   const buy = thisPass * apps;
   const shown = (n: number) => (ha > 0 ? fmtQty(n) : "");
   const unitLabel = unit || "un.";
   const calculatedClass = cn(RATE_INPUT_CLASS, "bg-muted/40");
+
+  const syncAreaPercentFromTreatedHa = (raw: string) => {
+    if (!(ha > 0)) return;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const treatedN = Number(trimmed.replace(",", "."));
+    if (!Number.isFinite(treatedN) || treatedN < 0) return;
+    onAreaPercent(areaPercentFromTreatedHa(treatedN, ha));
+  };
   return (
     <div className="grid gap-2">
       <div className="grid grid-cols-2 gap-x-2 gap-y-2 sm:grid-cols-[minmax(0,1.4fr)_6.75rem_minmax(4.75rem,0.7fr)_minmax(5rem,0.85fr)]">
@@ -194,11 +233,35 @@ function TalhaoRateFields({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <RateLabel label="Ha tratados">
           <Input
-            readOnly
-            tabIndex={-1}
-            value={shown(treated)}
+            type="number"
+            step="0.01"
+            min="0"
+            readOnly={ha <= 0}
+            tabIndex={ha <= 0 ? -1 : undefined}
+            value={ha > 0 ? (treatedHaDraft ?? derivedTreatedHa) : ""}
             placeholder="—"
-            className={calculatedClass}
+            onFocus={() => {
+              if (!(ha > 0)) return;
+              setTreatedHaFocused(true);
+              setTreatedHaDraft(derivedTreatedHa);
+            }}
+            onBlur={(e) => {
+              setTreatedHaFocused(false);
+              const raw = e.target.value;
+              if (!raw.trim()) {
+                onAreaPercent("");
+              } else {
+                syncAreaPercentFromTreatedHa(raw);
+              }
+              setTreatedHaDraft(null);
+            }}
+            onChange={(e) => {
+              if (!(ha > 0)) return;
+              const raw = e.target.value;
+              setTreatedHaDraft(raw);
+              syncAreaPercentFromTreatedHa(raw);
+            }}
+            className={ha > 0 ? RATE_INPUT_CLASS : calculatedClass}
             aria-label="Hectares tratados"
           />
         </RateLabel>
@@ -250,9 +313,12 @@ function seedsPerDoseUnit(
   category: string | null | undefined,
   unit: string,
   pmsG: number | null,
+  sizes?: Record<string, number> | null,
 ): number {
-  if (category === "CULTIVAR_FEIJAO") return seedsPerUnit("CULTIVAR_FEIJAO", pmsG);
-  return unit === "SACA" ? 60000 : 5000000;
+  if (category === "CULTIVAR_FEIJAO") return seedsPerUnit("CULTIVAR_FEIJAO", pmsG, sizes);
+  const seedCategory =
+    category === "HIBRIDO_MILHO" || unit === "SACA" ? "HIBRIDO_MILHO" : "CULTIVAR_SOJA";
+  return seedsPerUnit(seedCategory, null, sizes);
 }
 
 function stageKey(name: string): string {
@@ -374,6 +440,7 @@ function ProductRow({
   item,
   seasonId,
   onDelete,
+  onCommitted,
   outOfProgram,
   canDelete = true,
   canReorder = false,
@@ -383,12 +450,19 @@ function ProductRow({
   onDragOver,
   onDragEnd,
   plotHa = null,
+  sameStageRows = [],
+  sameStageLoading = false,
+  recommendationId,
 }: {
   item: RecommendationItem;
   seasonId: string;
   /** Hectares deste talhão. Volume da passada usa só esta área. */
   plotHa?: number | null;
   onDelete: (id: string) => void;
+  onCommitted?: (change: StageItemReplication) => void;
+  sameStageRows?: SameStageRecommendation[];
+  sameStageLoading?: boolean;
+  recommendationId: string;
   outOfProgram?: boolean;
   canDelete?: boolean;
   canReorder?: boolean;
@@ -411,7 +485,9 @@ function ProductRow({
     item.n_applications != null && item.n_applications > 1 ? String(item.n_applications) : "",
   );
   const updateMut = useUpdateRecommendationItem(seasonId);
+  const replicateMut = useReplicateRecommendationItem(seasonId);
   const impact = useExecutionImpactGuard();
+  const [replicateTargets, setReplicateTargets] = useReplicateTargetIds(sameStageRows, editing);
 
   const startEditing = () => {
     setDose(String(item.dose_per_hectare));
@@ -451,8 +527,47 @@ function ProductRow({
           },
           {
             onSuccess: () => {
-              toast.success("Produto atualizado.");
-              setEditing(false);
+              const change: StageItemReplication = {
+                operation: "update",
+                local_product_id: item.local_product_id,
+                dose_per_hectare: parsed,
+                dose_unit: unit,
+                area_factor: areaFactor,
+                area_note: areaNote.trim() || null,
+                n_applications: parseNApplications(nApps),
+                target: target.trim() || null,
+              };
+              const targets = [...replicateTargets];
+              const finish = () => {
+                toast.success("Produto atualizado.");
+                setEditing(false);
+                onCommitted?.(change);
+              };
+              if (targets.length === 0) {
+                finish();
+                return;
+              }
+              replicateMut.mutate(
+                { recommendationId, ...change, target_recommendation_ids: targets },
+                {
+                  onSuccess: (res) => {
+                    finish();
+                    if (res.applied > 0) {
+                      toast.success(
+                        res.applied === 1
+                          ? "Alteração aplicada em mais 1 talhão."
+                          : `Alteração aplicada em mais ${res.applied} talhões.`,
+                      );
+                    }
+                  },
+                  onError: (e: unknown) => {
+                    finish();
+                    toast.error(
+                      apiErrorMessage(e, "Salvo neste talhão, mas não foi possível aplicar nos outros."),
+                    );
+                  },
+                },
+              );
             },
             onError: () => toast.error("Não foi possível atualizar o produto."),
           },
@@ -576,12 +691,18 @@ function ProductRow({
               />
             </label>
           </div>
+          <StageItemReplicationPicker
+            rows={sameStageRows}
+            loading={sameStageLoading}
+            selectedIds={replicateTargets}
+            onSelectedIdsChange={setReplicateTargets}
+          />
           <div className="flex gap-2 pt-0.5">
             <Button
               size="sm"
               className="h-9 flex-1 gap-1.5 sm:flex-none"
               onClick={handleSave}
-              disabled={updateMut.isPending || impact.checking}
+              disabled={updateMut.isPending || replicateMut.isPending || impact.checking}
             >
               <Save className="h-3.5 w-3.5" />
               Salvar
@@ -666,16 +787,22 @@ function AddProductRow({
   seasonId,
   stageName,
   onClose,
+  onCommitted,
   catalogProducts,
   inProgramProductIds,
   listPlanByProductId,
   listPlanByProductStage,
   plotHa = null,
+  sameStageRows = [],
+  sameStageLoading = false,
 }: {
   recommendationId: string;
   seasonId: string;
   stageName: string;
   onClose: () => void;
+  onCommitted?: (change: StageItemReplication) => void;
+  sameStageRows?: SameStageRecommendation[];
+  sameStageLoading?: boolean;
   catalogProducts: PurchaseListCatalogProduct[];
   /** Produtos "na programação": lista de compra ∪ estoque do produtor. */
   inProgramProductIds: Set<string>;
@@ -694,8 +821,10 @@ function AddProductRow({
   const [expanded, setExpanded] = useState(false);
   const [resolving, setResolving] = useState(false);
   const createMut = useCreateRecommendationItem(seasonId);
+  const replicateMut = useReplicateRecommendationItem(seasonId);
   const cloneGlobal = useCloneGlobalProduct();
   const impact = useExecutionImpactGuard();
+  const [replicateTargets, setReplicateTargets] = useReplicateTargetIds(sameStageRows, true);
 
   // Por padrão a lista de compra e o estoque do produtor; ao expandir, o catálogo
   // completo (global + local). Produtos fora da lista e sem estoque entram
@@ -801,8 +930,46 @@ function AddProductRow({
           },
           {
             onSuccess: () => {
-              toast.success("Produto adicionado.");
-              onClose();
+              const change: StageItemReplication = {
+                operation: "create",
+                local_product_id: localId,
+                dose_per_hectare: doseVal,
+                dose_unit: unit,
+                area_factor: areaFactor,
+                area_note: areaNote.trim() || null,
+                n_applications: parseNApplications(nApps),
+              };
+              const targets = [...replicateTargets];
+              const finish = () => {
+                toast.success("Produto adicionado.");
+                onCommitted?.(change);
+                onClose();
+              };
+              if (targets.length === 0) {
+                finish();
+                return;
+              }
+              replicateMut.mutate(
+                { recommendationId, ...change, target_recommendation_ids: targets },
+                {
+                  onSuccess: (res) => {
+                    finish();
+                    if (res.applied > 0) {
+                      toast.success(
+                        res.applied === 1
+                          ? "Produto incluído em mais 1 talhão."
+                          : `Produto incluído em mais ${res.applied} talhões.`,
+                      );
+                    }
+                  },
+                  onError: (e: unknown) => {
+                    finish();
+                    toast.error(
+                      apiErrorMessage(e, "Salvo neste talhão, mas não foi possível aplicar nos outros."),
+                    );
+                  },
+                },
+              );
             },
             onError: () => toast.error("Não foi possível adicionar o produto."),
           },
@@ -911,15 +1078,28 @@ function AddProductRow({
               aria-label="Observação de área"
             />
           </div>
+          <StageItemReplicationPicker
+            rows={sameStageRows}
+            loading={sameStageLoading}
+            selectedIds={replicateTargets}
+            onSelectedIdsChange={setReplicateTargets}
+          />
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               onClick={handleAdd}
-              disabled={!category || !productId || !dose || createMut.isPending || impact.checking}
+              disabled={
+                !category ||
+                !productId ||
+                !dose ||
+                createMut.isPending ||
+                replicateMut.isPending ||
+                impact.checking
+              }
               className="h-8 gap-1.5"
             >
-              <Plus className="h-3.5 w-3.5" />
-              Adicionar
+              <Save className="h-3.5 w-3.5" />
+              Salvar
             </Button>
             <Button size="sm" variant="ghost" onClick={onClose} className="h-8">
               Cancelar
@@ -937,12 +1117,14 @@ function SeedRow({
   item,
   seasonId,
   onDelete,
+  onCommitted,
   canDelete = true,
   canEdit = false,
 }: {
   item: RecommendationItem;
   seasonId: string;
   onDelete: (id: string) => void;
+  onCommitted?: (change: StageItemReplication) => void;
   canDelete?: boolean;
   canEdit?: boolean;
 }) {
@@ -958,6 +1140,7 @@ function SeedRow({
     item.category ?? currentListSeed?.category ?? null,
     item.dose_unit,
     currentListSeed?.thousand_seed_weight_g ?? null,
+    purchaseList?.seed_unit_sizes,
   );
   const currentPop = Number(item.dose_per_hectare) * perUnitSeeds;
   const [productId, setProductId] = useState(item.local_product_id);
@@ -1031,6 +1214,7 @@ function SeedRow({
       selected?.category ?? item.category ?? null,
       unit,
       selected?.thousand_seed_weight_g ?? currentListSeed?.thousand_seed_weight_g ?? null,
+      purchaseList?.seed_unit_sizes,
     );
     const productName = selected?.product_name ?? item.product_name;
     updateItem.mutate(
@@ -1042,6 +1226,13 @@ function SeedRow({
       },
       {
         onSuccess: () => {
+          onCommitted?.({
+            operation: "update",
+            local_product_id: selected?.local_product_id ?? item.local_product_id,
+            match_local_product_id: item.local_product_id,
+            dose_per_hectare: plants / perUnit,
+            dose_unit: unit,
+          });
           void persistVarieties(productName, plants).then(
             () => {
               toast.success("Semente atualizada.");
@@ -1156,10 +1347,12 @@ function AddSeedRow({
   recommendationId,
   seasonId,
   onClose,
+  onCommitted,
 }: {
   recommendationId: string;
   seasonId: string;
   onClose: () => void;
+  onCommitted?: (change: StageItemReplication) => void;
 }) {
   const { data: plan } = useSeasonCostPlan(seasonId);
   const { data: season } = useSeason(seasonId);
@@ -1183,6 +1376,7 @@ function AddSeedRow({
       selected.category,
       unit,
       selected.thousand_seed_weight_g ?? null,
+      plan?.seed_unit_sizes,
     );
     const pop =
       plotPop && plotPop > 0
@@ -1198,6 +1392,12 @@ function AddSeedRow({
       {
         onSuccess: () => {
           toast.success("Semente adicionada.");
+          onCommitted?.({
+            operation: "create",
+            local_product_id: selected.local_product_id,
+            dose_per_hectare: perUnitSeeds > 0 ? pop / perUnitSeeds : 0,
+            dose_unit: unit,
+          });
           onClose();
         },
         onError: () => toast.error("Não foi possível adicionar a semente."),
@@ -1398,6 +1598,7 @@ export function RecommendationCard({
   // "Registrar sem cotar" lança compra: mesma permissão do registro sem cotação da lista.
   const canRegisterPurchase = useCan("QUOTE_CRUD");
   const deleteMut = useDeleteRecommendationItem(seasonId);
+  const replicateItemMut = useReplicateRecommendationItem(seasonId);
 
   // Dados da receita (vazão, tanque, horário, ponta, estádio): só o resumo
   // aqui — edita-se no "Dados da aplicação" do topo da tela do talhão.
@@ -1411,6 +1612,7 @@ export function RecommendationCard({
   const isBusy =
     patchMut.isPending ||
     deleteMut.isPending ||
+    replicateItemMut.isPending ||
     deleteStageMut.isPending ||
     applyMut.isPending ||
     skipMut.isPending ||
@@ -1418,6 +1620,12 @@ export function RecommendationCard({
     reorderItemsMut.isPending;
 
   const isPending = rec.status === "PENDING";
+  const { data: sameStageRows = [], isLoading: sameStageLoading } = useQuery({
+    queryKey: ["same-stage", rec.id],
+    queryFn: () => getSameStageRecommendations(rec.id),
+    enabled: isPending && canEditStructure,
+    staleTime: 30_000,
+  });
   const isDone =
     rec.status === "APPLIED_ON_TIME" || rec.status === "APPLIED_LATE";
   const isSkipped = rec.status === "SKIPPED";
@@ -1446,12 +1654,67 @@ export function RecommendationCard({
     );
   };
 
-  const handleDeleteItem = (itemId: string) => {
-    deleteMut.mutate(itemId, {
-      onSuccess: () => toast.success("Produto removido."),
-      onError: (e: unknown) =>
-        toast.error(apiErrorMessage(e, "Não foi possível remover o produto.")),
+  const [deleteItemPrompt, setDeleteItemPrompt] = useState<{
+    itemId: string;
+    localProductId: string;
+    productName: string;
+  } | null>(null);
+  const deleteItemBusy = deleteMut.isPending || replicateItemMut.isPending;
+
+  const closeDeleteItemPrompt = () => {
+    if (!deleteItemBusy) setDeleteItemPrompt(null);
+  };
+
+  const deleteItemLocal = (itemId: string) =>
+    new Promise<void>((resolve, reject) => {
+      deleteMut.mutate(itemId, {
+        onSuccess: () => resolve(),
+        onError: (e: unknown) => reject(e),
+      });
     });
+
+  const handleDeleteItem = (itemId: string) => {
+    const item = rec.items.find((row) => row.id === itemId);
+    if (!item) return;
+    if (!isPending || !canEditStructure) {
+      void deleteItemLocal(itemId).then(
+        () => toast.success("Produto removido."),
+        (e: unknown) =>
+          toast.error(apiErrorMessage(e, "Não foi possível remover o produto.")),
+      );
+      return;
+    }
+    setDeleteItemPrompt({
+      itemId,
+      localProductId: item.local_product_id,
+      productName: item.product_name,
+    });
+  };
+
+  const finishDeleteItem = async (replicateIds: string[]) => {
+    if (!deleteItemPrompt) return;
+    const { itemId, localProductId } = deleteItemPrompt;
+    try {
+      await deleteItemLocal(itemId);
+      if (replicateIds.length > 0) {
+        const res = await replicateItemMut.mutateAsync({
+          recommendationId: rec.id,
+          operation: "delete",
+          local_product_id: localProductId,
+          target_recommendation_ids: replicateIds,
+        });
+        toast.success(
+          res.applied === 1
+            ? "Produto removido neste talhão e em mais 1."
+            : `Produto removido neste talhão e em mais ${res.applied} talhões.`,
+        );
+      } else {
+        toast.success("Produto removido.");
+      }
+      setDeleteItemPrompt(null);
+    } catch (e: unknown) {
+      toast.error(apiErrorMessage(e, "Não foi possível remover o produto."));
+    }
   };
 
   const [shortage, setShortage] = useState<PublishBlockSummary | null>(null);
@@ -1729,6 +1992,9 @@ export function RecommendationCard({
                     item={item}
                     seasonId={seasonId}
                     onDelete={handleDeleteItem}
+                    recommendationId={rec.id}
+                    sameStageRows={sameStageRows}
+                    sameStageLoading={sameStageLoading}
                     canDelete={canEditStructure && !isDone}
                     canReorder={canEditStructure}
                     mixPosition={index + 1}
@@ -1822,6 +2088,8 @@ export function RecommendationCard({
                   listPlanByProductId={listPlanByProductId}
                   listPlanByProductStage={listPlanByProductStage}
                   plotHa={recipe?.areaHa ?? null}
+                  sameStageRows={sameStageRows}
+                  sameStageLoading={sameStageLoading}
                 />
               </div>
             ) : null}
@@ -2018,6 +2286,18 @@ export function RecommendationCard({
         onRegisterWithoutQuote={
           canRegisterPurchase ? (manualTotal) => doApply({ manualTotal }) : undefined
         }
+      />
+
+      <DeleteStageItemDialog
+        open={deleteItemPrompt != null}
+        onOpenChange={(next) => !next && closeDeleteItemPrompt()}
+        productName={deleteItemPrompt?.productName ?? ""}
+        stageName={rec.name}
+        sameStageRows={sameStageRows}
+        sameStageLoading={sameStageLoading}
+        loading={deleteItemBusy}
+        onOnlyHere={() => finishDeleteItem([])}
+        onHereAndOthers={(ids) => finishDeleteItem(ids)}
       />
 
       <ConfirmDialog

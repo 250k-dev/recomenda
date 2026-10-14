@@ -37,6 +37,7 @@ import {
   DEFAULT_SPACING_M,
   grainPricesFromList,
   grainPricesPayload,
+  seedUnitSizesToNumbers,
 } from "@/stores/currency";
 import {
   CategoryMetaProgress,
@@ -218,6 +219,7 @@ function buildListPayload(opts: {
       useCurrencyStore.getState().grainPrices,
     ),
     spacing_m: spacingRaw ? Number(spacingRaw) : DEFAULT_SPACING_M,
+    seed_unit_sizes: seedUnitSizesToNumbers(useCurrencyStore.getState().seedUnitSizes),
     category_targets: cleanedTargets,
     status: opts.status,
     plots: opts.plots.map((p) => ({
@@ -326,6 +328,13 @@ export function PurchaseListWizard({
       grainPricesFromList(draftList.grain_prices_brl, cycleCrops?.[0] ?? draftList.crop),
     );
     store.setSpacing(draftList.spacing_m != null ? String(draftList.spacing_m) : "");
+    store.setSeedUnitSizes(
+      Object.fromEntries(
+        Object.entries(draftList.seed_unit_sizes ?? {})
+          .filter(([, n]) => Number(n) > 0)
+          .map(([crop, n]) => [crop, String(Math.round(Number(n)))]),
+      ),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftList?.id]);
 

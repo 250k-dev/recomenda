@@ -26,7 +26,9 @@ import {
   reorderRecommendations,
   patchRecommendation,
   getSameStageRecommendations,
+  replicateRecommendationItem,
   type SameStageRecommendation,
+  type StageItemReplication,
   deleteRecommendation,
   applyRecommendation,
   skipRecommendation,
@@ -232,8 +234,11 @@ export function useUpdateSeasonVarieties(seasonId: string) {
 export function useApplySeasonTemplate(seasonId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (timingTemplateId: string) =>
-      applySeasonTemplate(seasonId, timingTemplateId),
+    mutationFn: (input: string | { timingTemplateId: string; stageIds?: string[] }) => {
+      const timingTemplateId = typeof input === "string" ? input : input.timingTemplateId;
+      const stageIds = typeof input === "string" ? undefined : input.stageIds;
+      return applySeasonTemplate(seasonId, timingTemplateId, stageIds);
+    },
     onSuccess: () => {
       invalidateSeasonCropCaches(queryClient, seasonId);
       invalidatePurchaseListsAfterRecommendationChange(queryClient);
@@ -269,13 +274,16 @@ export function useBulkApplySeasonTemplate(cycleId: string) {
     mutationFn: async ({
       timingTemplateId,
       seasons,
+      stageIds,
     }: {
       timingTemplateId: string;
       seasons: Array<{ id: string; label: string }>;
+      stageIds?: string[];
     }): Promise<BulkApplyTemplateResult> =>
       applyCycleTemplateBulk(cycleId, {
         timing_template_id: timingTemplateId,
         season_ids: seasons.map((s) => s.id),
+        stage_ids: stageIds,
       }),
     onSuccess: (_result, { seasons }) => {
       for (const season of seasons) {
@@ -446,6 +454,25 @@ export function useUpdateRecommendationItem(seasonId: string) {
     }) => updateRecommendationItem(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      invalidatePurchaseListsAfterRecommendationChange(queryClient);
+    },
+  });
+}
+
+export function useReplicateRecommendationItem(seasonId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      recommendationId,
+      ...payload
+    }: StageItemReplication & {
+      recommendationId: string;
+      target_recommendation_ids: string[];
+    }) => replicateRecommendationItem(recommendationId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seasonTimeline(seasonId) });
+      queryClient.invalidateQueries({ queryKey: ["same-stage"] });
+      queryClient.invalidateQueries({ queryKey: ["cycle"] });
       invalidatePurchaseListsAfterRecommendationChange(queryClient);
     },
   });

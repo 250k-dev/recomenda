@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Recommendation } from "@recomenda/api";
-import { patchRecommendation } from "@recomenda/api/seasons";
+import { patchRecommendation, type SameStageRecommendation } from "@recomenda/api/seasons";
 import { apiErrorMessage } from "@recomenda/api/api-error";
 import { useSameStageRecommendations } from "@recomenda/api-hooks/seasons";
 import { useIsMobile } from "@recomenda/ui/hooks/use-mobile";
@@ -24,12 +24,14 @@ import {
 import {
   DataStageRow,
   FormBlock,
-  SameStageDisclosure,
+  SameStageTargetPicker,
+  allPendingSameStageIds,
+  syncedSameStageRowIds,
   RecipeLivePreview,
   withRecipeDraft,
 } from "@/components/domain/export/application-data-ui";
 import { ExportFooter, ExportShell, FooterButton } from "@/components/domain/export/export-ui";
-import { shortDate } from "@/components/domain/export/export-helpers";
+import { rowHasStoredRecipeFields, shortDate } from "@/components/domain/export/export-helpers";
 
 /** Só etapa pendente e com calda recebe dados da aplicação. */
 function editable(rec: Recommendation): boolean {
@@ -65,7 +67,8 @@ export function useSeasonApplicationTab({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<ApplicationDataDraft>(emptyApplicationData());
   const [touched, setTouched] = useState<Set<ApplicationDraftKey>>(new Set());
-  const [replicate, setReplicate] = useState(false);
+  const [replicateTargets, setReplicateTargets] = useState<Set<string>>(new Set());
+  const [initialPendingTargets, setInitialPendingTargets] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
   const selectedRecs = useMemo(
@@ -86,7 +89,7 @@ export function useSeasonApplicationTab({
     setWasOpen(open);
     if (open) {
       resetForm(new Set());
-      setReplicate(false);
+      setReplicateTargets(new Set());
     }
   }
 
@@ -106,8 +109,55 @@ export function useSeasonApplicationTab({
   const editableIds = recommendations.filter(editable).map((rec) => rec.id);
   const selectedIds = useMemo(() => [...selected], [selected]);
   const sameStage = useSameStageRecommendations(selectedIds, open && canEdit);
-  const others = selectedIds.flatMap((id) => sameStage.byId[id] ?? []);
+  const others = useMemo(() => {
+    const seen = new Set<string>();
+    const list: SameStageRecommendation[] = [];
+    for (const id of selectedIds) {
+      for (const row of sameStage.byId[id] ?? []) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        list.push(row);
+      }
+    }
+    return list;
+  }, [selectedIds, sameStage.byId]);
   const othersPending = others.filter((row) => row.status === "PENDING").length;
+  const pendingOtherIds = useMemo(
+    () => others.filter((row) => row.status === "PENDING").map((row) => row.id),
+    [others],
+  );
+  const syncedOtherIds = useMemo(
+    () => syncedSameStageRowIds(others, selectedRecs),
+    [others, selectedRecs],
+  );
+  const allAppliedToOthers =
+    pendingOtherIds.length > 0 && pendingOtherIds.every((id) => syncedOtherIds.has(id));
+  const sourceHasRecipe = useMemo(
+    () => selectedRecs.some((rec) => rowHasStoredRecipeFields(rec)),
+    [selectedRecs],
+  );
+  /** Pendentes desmarcados que já têm calda/tanque gravados (ou iguais à etapa aqui). */
+  const removeTargetIds = useMemo(
+    () =>
+      others
+        .filter((row) => {
+          if (row.status !== "PENDING") return false;
+          if (replicateTargets.has(row.id)) return false;
+          if (rowHasStoredRecipeFields(row) || syncedOtherIds.has(row.id)) return true;
+          // Etapa deste talhão já tem receita: desmarcado = tirar dos outros talhões ao salvar.
+          return sourceHasRecipe && initialPendingTargets.has(row.id);
+        })
+        .map((row) => row.id),
+    [others, replicateTargets, syncedOtherIds, sourceHasRecipe, initialPendingTargets],
+  );
+  const othersInitKey = `${selectedIds.join("|")}|${pendingOtherIds.join(",")}`;
+  useEffect(() => {
+    if (!open) return;
+    const pending = allPendingSameStageIds(others);
+    setReplicateTargets(pending);
+    setInitialPendingTargets(pending);
+    // Só reinicia a seleção quando mudam etapas marcadas ou a lista de talhões — não em cada refetch.
+  }, [open, othersInitKey]);
 
   const keys = [...touched].filter((key) => key !== "phenologicalStage" || single);
   // Uma folha por etapa marcada, com o rascunho aplicado.
@@ -115,32 +165,59 @@ export function useSeasonApplicationTab({
     { ...data, recommendations: selectedRecs.map((rec) => withRecipeDraft(rec, keys, draft)) },
   ];
 
+  const clearRecipePayload = {
+    spray_volume_l_ha: null,
+    tank_capacity_l: null,
+    application_time: null,
+    nozzle: null,
+    phenological_stage: null,
+  };
+
   const save = async () => {
-    if (selectedRecs.length === 0 || keys.length === 0) return;
-    const payload = recipeFieldsPayload(keys, draft);
+    const removing = removeTargetIds.length;
+    if (selectedRecs.length === 0) return;
+    if (keys.length === 0 && removing === 0) return;
     setSaving(true);
     let replicated = 0;
     try {
-      for (const rec of selectedRecs) {
-        const result = await patchRecommendation(rec.id, {
-          ...payload,
-          ...(replicate ? { apply_to_same_stage: true } : {}),
-        });
-        replicated += result?.replicated ?? 0;
+      if (keys.length > 0) {
+        const payload = recipeFieldsPayload(keys, draft);
+        for (const rec of selectedRecs) {
+          const targetIds = [...replicateTargets];
+          const result = await patchRecommendation(rec.id, {
+            ...payload,
+            ...(targetIds.length > 0
+              ? { apply_to_same_stage: true, same_stage_target_ids: targetIds }
+              : {}),
+          });
+          replicated += result?.replicated ?? 0;
+        }
+        setTouched(new Set());
       }
-      void queryClient.invalidateQueries({
-        queryKey: replicate ? ["season-timeline"] : ["season-timeline", seasonId],
-      });
+      if (removing > 0) {
+        for (const id of removeTargetIds) {
+          await patchRecommendation(id, clearRecipePayload);
+        }
+        setReplicateTargets(allPendingSameStageIds(others));
+      }
+      void queryClient.invalidateQueries({ queryKey: ["season-timeline"] });
       void queryClient.invalidateQueries({ queryKey: ["same-stage"] });
       const n = selectedRecs.length;
-      const unchanged = replicate ? others.length - othersPending : 0;
-      toast.success(
-        `Salvo em ${n} ${n === 1 ? "etapa" : "etapas"}` +
-          (replicated ? ` e em mais ${replicated} nos outros talhões` : "") +
-          "." +
-          (unchanged ? ` ${unchanged} ${unchanged === 1 ? "registrada não mudou" : "registradas não mudaram"}.` : ""),
-      );
-      setTouched(new Set());
+      const unchanged = replicateTargets.size > 0 ? others.length - othersPending : 0;
+      const parts: string[] = [];
+      if (keys.length > 0) {
+        parts.push(
+          `Salvo em ${n} ${n === 1 ? "etapa" : "etapas"}` +
+            (replicated ? ` e em mais ${replicated} nos outros talhões` : "") +
+            (unchanged ? ` (${unchanged} ${unchanged === 1 ? "registrada não mudou" : "registradas não mudaram"})` : ""),
+        );
+      }
+      if (removing > 0) {
+        parts.push(
+          `Dados da aplicação removidos de ${removing} ${removing === 1 ? "talhão" : "talhões"}`,
+        );
+      }
+      toast.success(parts.join(". ") + ".");
     } catch (e) {
       toast.error(apiErrorMessage(e, "Não foi possível salvar os dados da aplicação."));
     } finally {
@@ -225,17 +302,30 @@ export function useSeasonApplicationTab({
           ) : null}
         </FormBlock>
         {canEdit && !none ? (
-          <SameStageDisclosure
+          <SameStageTargetPicker
             rows={others}
             loading={sameStage.isLoading}
-            replicate={replicate}
-            onToggleReplicate={() => setReplicate((v) => !v)}
+            selectedIds={replicateTargets}
+            onSelectedIdsChange={setReplicateTargets}
+            syncedRowIds={syncedOtherIds}
+            allAppliedToOthers={allAppliedToOthers}
           />
         ) : null}
       </div>
     );
 
   const n = selectedRecs.length;
+  const removingCount = removeTargetIds.length;
+  const canSave = n > 0 && (keys.length > 0 || removingCount > 0);
+  const saveLabel = saving
+    ? "Salvando…"
+    : removingCount > 0 && keys.length === 0
+      ? removingCount === 1
+        ? "Salvar · remover 1 talhão"
+        : `Salvar · remover ${removingCount} talhões`
+      : n <= 1
+        ? "Salvar na etapa"
+        : `Salvar nas ${n} etapas`;
   return {
     saving,
     mobilePreviewLabel: "Receitas",
@@ -253,19 +343,32 @@ export function useSeasonApplicationTab({
         summary={
           n === 0
             ? "Nenhuma etapa marcada"
-            : keys.length
-              ? `${keys.length} ${keys.length === 1 ? "campo alterado" : "campos alterados"}`
-              : "Nenhuma alteração"
+            : removingCount > 0 && keys.length === 0
+              ? `${removingCount} ${removingCount === 1 ? "talhão" : "talhões"} sem dados da aplicação`
+              : keys.length
+                ? `${keys.length} ${keys.length === 1 ? "campo alterado" : "campos alterados"}` +
+                  (removingCount
+                    ? ` · remover ${removingCount} ${removingCount === 1 ? "talhão" : "talhões"}`
+                    : "")
+                : allAppliedToOthers && othersPending > 0
+                  ? "Aplicado em todos os talhões"
+                  : "Nenhuma alteração"
         }
-        sub="Etapas já aplicadas não mudam."
+        sub={
+          removingCount > 0
+            ? "Use Salvar para confirmar a remoção nos talhões desmarcados."
+            : allAppliedToOthers && keys.length === 0 && othersPending > 0
+              ? "Desmarque talhões abaixo e salve para remover os dados da aplicação."
+              : "Etapas já aplicadas não mudam."
+        }
         warn={n === 0}
       >
         <FooterButton tone="ghost" disabled={saving} onClick={onClose}>
           Fechar
         </FooterButton>
         {canEdit ? (
-          <FooterButton tone="primary" disabled={saving || n === 0 || keys.length === 0} onClick={() => void save()}>
-            {saving ? "Salvando…" : n <= 1 ? "Salvar na etapa" : `Salvar nas ${n} etapas`}
+          <FooterButton tone="primary" disabled={saving || !canSave} onClick={() => void save()}>
+            {saveLabel}
           </FooterButton>
         ) : null}
       </ExportFooter>

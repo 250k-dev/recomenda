@@ -9,9 +9,10 @@
  */
 import type { PurchaseListItemInput } from "@recomenda/api/purchase-lists";
 import {
-  beanSeedsPerKg,
   DEFAULT_BEAN_PMS_G,
   seedQuantityFromPopulation,
+  seedsPerCommercialUnit,
+  type SeedUnitSizes,
 } from "../cost-plan/calculate";
 
 /** Item da lista de compra (estado de formulário). */
@@ -44,6 +45,8 @@ export type ListItem = {
   thousandPlants: string;
   /** Variedade/Híbrido: área a ser semeada (ha). */
   seedingArea: string;
+  /** Tamanho do bag/saco da lista usado neste cálculo. Não vai no payload. */
+  seedUnitSizes?: SeedUnitSizes | null;
   /** Produto cadastrado na hora, fora do catálogo/programação (destaque vermelho). */
   outOfProgram?: boolean;
   /** Semente: quantidade de bags/sacos digitada à mão (sobrepõe o cálculo). */
@@ -75,6 +78,14 @@ export function areaPercentFieldFromFactor(factor?: number | string | null): str
   const n = Number(factor);
   if (!Number.isFinite(n) || n <= 0 || n >= 0.999) return "";
   return String(Number((n * 100).toFixed(4)));
+}
+
+/** % área (vazio = 100%) a partir dos hectares tratados e da área de referência. */
+export function areaPercentFromTreatedHa(treatedHa: number, totalHa: number): string {
+  if (!(totalHa > 0) || !Number.isFinite(treatedHa) || treatedHa <= 0) return "";
+  const pct = Math.min(100, (treatedHa / totalHa) * 100);
+  if (pct >= 100) return "";
+  return String(Number(pct.toFixed(4)));
 }
 
 /** Espaçamento padrão entre linhas (m) quando a lista não informa outro valor. */
@@ -112,13 +123,14 @@ export function seedQuantityUnitLabel(category: string): string {
   return "pl";
 }
 
-/** Sementes por unidade: Big Bag BR de soja = 5.000.000; saco de milho = 60.000;
+/** Sementes por unidade: bag de soja e saco de milho vêm da lista (padrão 5 mi / 60 mil);
  *  kg de feijão = 1.000.000 ÷ PMS (g). */
-export function seedsPerUnit(category: string, pmsG?: number | null): number {
-  if (category === "CULTIVAR_SOJA") return 5_000_000;
-  if (category === "HIBRIDO_MILHO") return 60_000;
-  if (category === "CULTIVAR_FEIJAO") return beanSeedsPerKg(pmsG);
-  return 1;
+export function seedsPerUnit(
+  category: string,
+  pmsG?: number | null,
+  sizes?: SeedUnitSizes | null,
+): number {
+  return seedsPerCommercialUnit(category, pmsG, sizes);
 }
 
 /**
@@ -131,9 +143,10 @@ export function areaFromBags(
   populationPerHa: number,
   category: string,
   pmsG?: number | null,
+  sizes?: SeedUnitSizes | null,
 ): number {
   if (bags <= 0 || populationPerHa <= 0) return 0;
-  return (bags * seedsPerUnit(category, pmsG)) / populationPerHa;
+  return (bags * seedsPerUnit(category, pmsG, sizes)) / populationPerHa;
 }
 
 /** Os 4 números do planejamento de semente (auto-calculados). */
@@ -142,7 +155,7 @@ export function seedPlanOutputs(it: ListItem, totalHa: number) {
   const seedingArea = Number(it.seedingArea || 0) || totalHa;
   const totalSeeds = populationPerHa * seedingArea; // qtd de sementes
   const units = listItemQuantity(it, totalHa); // Big Bags (BR) / sacos
-  const perUnit = seedsPerUnit(it.category, pmsOf(it));
+  const perUnit = seedsPerUnit(it.category, pmsOf(it), it.seedUnitSizes);
   // Hectares atendidos pelas unidades efetivas (confere com a área quando exato).
   const hectaresServed = populationPerHa > 0 ? (units * perUnit) / populationPerHa : 0;
   return { populationPerHa, totalSeeds, units, hectaresServed };
@@ -156,7 +169,7 @@ export function seedPlanOutputs(it: ListItem, totalHa: number) {
 export function listItemRequired(it: ListItem, totalHa: number): number {
   if (isSeedItem(it)) {
     const populationBase = Number(it.thousandPlants || 0) * Number(it.seedingArea || 0);
-    return seedQuantityFromPopulation(populationBase, it.category, pmsOf(it));
+    return seedQuantityFromPopulation(populationBase, it.category, pmsOf(it), it.seedUnitSizes);
   }
   if (hasVolumeOverride(it)) return Number(it.volumeOverride) || 0;
   const nApps = parseNApplications(it.nApps);

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AlertTriangle, CircleAlert, Info, ListFilter, Lock, Plus, Sprout, Trash2 } from "lucide-react";
-import { useCurrencyStore } from "@/stores/currency";
+import { seedUnitSizesToNumbers, useCurrencyStore } from "@/stores/currency";
 import { toast } from "sonner";
 import { DoseUnitSelect } from "@/components/domain/dose-unit-select";
 import { defaultDoseUnitForCategory } from "@/components/domain/product-form-options";
@@ -529,7 +529,13 @@ export function PurchaseListItemsEditor({
     category: string,
     pmsG?: number,
   ): string => {
-    const area = areaFromBags(bags, pop, category, pmsG);
+    const area = areaFromBags(
+      bags,
+      pop,
+      category,
+      pmsG,
+      seedUnitSizesToNumbers(useCurrencyStore.getState().seedUnitSizes),
+    );
     return area > 0 ? String(Math.round(area * 100) / 100) : "";
   };
 
@@ -716,6 +722,7 @@ export function PurchaseListItemsEditor({
           pop,
           it.category,
           pmsOf(it),
+          seedUnitSizesToNumbers(useCurrencyStore.getState().seedUnitSizes),
         );
         return {
           ...it,
@@ -725,6 +732,27 @@ export function PurchaseListItemsEditor({
       }),
     );
   }, [spacing, readOnly, setItems]);
+
+  const seedSizesKey = JSON.stringify(useCurrencyStore((s) => s.seedUnitSizes));
+  const seedSizesRef = useRef(seedSizesKey);
+  useEffect(() => {
+    if (seedSizesRef.current === seedSizesKey) return;
+    seedSizesRef.current = seedSizesKey;
+    if (readOnly) return;
+    const sizes = seedUnitSizesToNumbers(useCurrencyStore.getState().seedUnitSizes);
+    setItems((prev) =>
+      prev.map((it) => {
+        if (!isSeedItem(it)) return it;
+        const pop = Number(it.thousandPlants || 0);
+        const area = areaFromBags(Number(it.bagsOverride || 0), pop, it.category, pmsOf(it), sizes);
+        return {
+          ...it,
+          seedUnitSizes: sizes,
+          seedingArea: area > 0 ? String(Math.round(area * 100) / 100) : it.seedingArea,
+        };
+      }),
+    );
+  }, [seedSizesKey, readOnly, setItems]);
 
   /** Preço unitário efetivo em R$: usa a conversão do US$ quando houver. */
   const unitBrl = (it: ListItem): number => {

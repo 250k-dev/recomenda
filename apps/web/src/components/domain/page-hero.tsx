@@ -177,8 +177,8 @@ export function PageHero({
     >
       {/* Título+ações na mesma linha quando cabem; senão as ações quebram para
           baixo (o título nunca é espremido — min-w garante isso). */}
-      <div className="flex flex-wrap items-start gap-x-4 gap-y-3 sm:items-center">
-        <div className="flex min-w-[14rem] flex-1 items-start gap-3.5 sm:items-center sm:gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-3.5 sm:items-center sm:gap-4">
           <span
             className={cn(
               "flex size-12 shrink-0 items-center justify-center rounded-lg sm:size-13",
@@ -217,7 +217,7 @@ export function PageHero({
         {actions ? (
           // Ocupa a sobra ao lado do título e quebra dentro da largura; sem
           // espaço, desce inteira para a linha de baixo (o título tem min-w).
-          <div className="hidden max-w-full min-w-0 flex-1 basis-52 flex-wrap justify-end gap-2 sm:flex">
+          <div className="hidden max-w-full shrink-0 flex-nowrap items-center justify-end gap-1.5 overflow-x-auto sm:flex sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {actions}
           </div>
         ) : null}

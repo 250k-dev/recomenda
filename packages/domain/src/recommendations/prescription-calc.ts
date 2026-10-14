@@ -154,6 +154,17 @@ function fmt(value: number | null | undefined, digits: number): string {
 
 /** Litros e doses: até 3 casas (65,565 · 2,186). */
 export const fmtQuantity = (value: number | null | undefined) => fmt(value, 3);
+
+/** Derivado (×, ÷) → string canônica para input, sem ruído de ponto flutuante. */
+export function canonicalFromComputed(
+  value: number | null | undefined,
+  decimals = 3,
+): string {
+  const n = positive(value);
+  if (n == null) return "";
+  const factor = 10 ** decimals;
+  return String(Math.round(n * factor) / factor);
+}
 /** Nº de tanques: 2 casas fixas (4,37). */
 export function fmtTankCount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "";

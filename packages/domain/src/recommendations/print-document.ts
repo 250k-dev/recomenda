@@ -600,8 +600,8 @@ function reportStageHtml(
         }</td>
         <td class="num">${fmtNum(item.dose_per_hectare, 4)} ${escapeHtml(doseUnitLabel(item.dose_unit))}</td>
         <td class="num muted">${areaHa != null ? `${fmtHectares(areaHa * factor)} ha` : EM_DASH}</td>
-        <td class="num tot">${total != null ? `${fmtQuantity(total)} ${escapeHtml(totalUnit)}` : EM_DASH}</td>
         ${opts.money ? `<td class="num">${cost == null ? EM_DASH : fmtBrl(cost)}</td>` : ""}
+        <td class="num tot">${total != null ? `${fmtQuantity(total)} ${escapeHtml(totalUnit)}` : EM_DASH}</td>
       </tr>`;
     })
     .join("");
@@ -623,13 +623,14 @@ function reportStageHtml(
           ? `<table class="rp-table">
               <thead><tr>
                 <th>#</th><th>Produto</th><th>Alvo / observação</th>
-                <th class="num">Dose/ha</th><th class="num">Área</th><th class="num">Total</th>
+                <th class="num">Dose/ha</th><th class="num">Área</th>
                 ${opts.money ? `<th class="num">Custo/ha</th>` : ""}
+                <th class="num">Total</th>
               </tr></thead>
               <tbody>${rows}</tbody>
               ${
                 opts.money && stageCost != null
-                  ? `<tfoot><tr><td></td><td colspan="5">Total da etapa</td><td class="num">${fmtBrl(stageCost)}</td></tr></tfoot>`
+                  ? `<tfoot><tr><td></td><td colspan="4">Total da etapa</td><td class="num">${fmtBrl(stageCost)}</td><td class="num"></td></tr></tfoot>`
                   : ""
               }
             </table>`

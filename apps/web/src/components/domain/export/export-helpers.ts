@@ -1,6 +1,13 @@
 import { toast } from "sonner";
-import type { RecommendationShareData } from "@recomenda/domain/recommendations/share-message";
+import { buildApplicationRecipesWhatsappMessage } from "@recomenda/domain/recommendations/recipe-document";
+import {
+  buildMultiWhatsappMessage,
+  buildWhatsappMessage,
+  type RecommendationShareData,
+} from "@recomenda/domain/recommendations/share-message";
 import type { PagedResult } from "@/lib/print/paged-document";
+
+const WA_PART_DIVIDER = "————————————————";
 
 /** Textos e contas pequenas do padrão "Exportar" (talhão e safra). */
 
@@ -28,6 +35,39 @@ export function pagesByPart(result: PagedResult | null): { report: number; recip
     else out.report += 1;
   }
   return out;
+}
+
+/** WhatsApp do exportar: resumo e/ou receitas (tanques), conforme o que foi marcado. */
+export function composeRecommendationExportWhatsappMessage(opts: {
+  report: boolean;
+  recipes: boolean;
+  recipeCount: number;
+  single?: RecommendationShareData;
+  multi?: {
+    farmName?: string | null;
+    datas: RecommendationShareData[];
+    contextLabel?: string;
+  };
+}): string {
+  const parts: string[] = [];
+  if (opts.report) {
+    if (opts.single) parts.push(buildWhatsappMessage(opts.single));
+    else if (opts.multi) {
+      parts.push(
+        buildMultiWhatsappMessage(
+          opts.multi.farmName,
+          opts.multi.datas,
+          opts.multi.contextLabel,
+        ),
+      );
+    }
+  }
+  if (opts.recipes && opts.recipeCount > 0) {
+    const datas = opts.single ? [opts.single] : opts.multi?.datas ?? [];
+    const recipesText = buildApplicationRecipesWhatsappMessage(datas);
+    if (recipesText) parts.push(recipesText);
+  }
+  return parts.join(`\n\n${WA_PART_DIVIDER}\n\n`);
 }
 
 export function partsSummary(report: boolean, recipes: boolean, recipeCount: number): string {
@@ -65,4 +105,52 @@ export function stageKey(name: string): string {
     .replace(/[^a-zA-Z0-9]+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+type RecipeLike = {
+  spray_volume_l_ha?: number | string | null;
+  tank_capacity_l?: number | string | null;
+  application_time?: string | null;
+  nozzle?: string | null;
+  phenological_stage?: string | null;
+};
+
+/** Compara os cinco campos da receita de aplicação (normalizados). */
+export function applicationRecipeFingerprint(source: RecipeLike): string {
+  const num = (v: number | string | null | undefined) => {
+    if (v == null || v === "") return "";
+    const n = typeof v === "number" ? v : Number(String(v).replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? String(n) : "";
+  };
+  return JSON.stringify({
+    spray_volume_l_ha: num(source.spray_volume_l_ha),
+    tank_capacity_l: num(source.tank_capacity_l),
+    application_time: (source.application_time ?? "").trim(),
+    nozzle: (source.nozzle ?? "").trim(),
+    phenological_stage: (source.phenological_stage ?? "").trim(),
+  });
+}
+
+export function hasApplicationRecipeData(source: RecipeLike): boolean {
+  const fp = applicationRecipeFingerprint(source);
+  return fp !== JSON.stringify({
+    spray_volume_l_ha: "",
+    tank_capacity_l: "",
+    application_time: "",
+    nozzle: "",
+    phenological_stage: "",
+  });
+}
+
+/** Qualquer campo de receita vindo da API (antes da normalização). */
+export function rowHasStoredRecipeFields(row: RecipeLike): boolean {
+  if (hasApplicationRecipeData(row)) return true;
+  const text = (v: string | null | undefined) => Boolean(v?.trim());
+  return (
+    (row.spray_volume_l_ha != null && row.spray_volume_l_ha !== "") ||
+    (row.tank_capacity_l != null && row.tank_capacity_l !== "") ||
+    text(row.application_time) ||
+    text(row.nozzle) ||
+    text(row.phenological_stage)
+  );
 }

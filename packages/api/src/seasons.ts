@@ -210,7 +210,11 @@ export async function updateSeasonVarieties(
   return data;
 }
 
-export async function applySeasonTemplate(id: string, timingTemplateId: string) {
+export async function applySeasonTemplate(
+  id: string,
+  timingTemplateId: string,
+  stageIds?: string[],
+) {
   const { data } = await api.post<
     SeasonDetail & {
       list_impact?: {
@@ -229,6 +233,7 @@ export async function applySeasonTemplate(id: string, timingTemplateId: string) 
     }
   >(`/seasons/${id}/apply-template`, {
     timing_template_id: timingTemplateId,
+    ...(stageIds && stageIds.length > 0 ? { stage_ids: stageIds } : {}),
   });
   return data;
 }
@@ -301,6 +306,8 @@ export async function patchRecommendation(
     phenological_stage?: string | null;
     /** Leva os dados da aplicação para a mesma etapa pendente nos outros talhões. */
     apply_to_same_stage?: boolean;
+    /** Subconjunto dos talhões pendentes (ids da recomendação). Vazio = nenhum. */
+    same_stage_target_ids?: string[];
   },
 ) {
   const { data } = await api.patch<{ affected: number; replicated?: number }>(
@@ -318,6 +325,11 @@ export interface SameStageRecommendation {
   status: string;
   plot_name: string;
   farm_name: string;
+  spray_volume_l_ha?: number | string | null;
+  tank_capacity_l?: number | string | null;
+  application_time?: string | null;
+  nozzle?: string | null;
+  phenological_stage?: string | null;
 }
 
 export async function getSameStageRecommendations(id: string) {
@@ -353,6 +365,29 @@ export async function skipRecommendation(id: string, notes?: string) {
 
 export async function undoRecommendation(id: string) {
   const { data } = await api.post(`/recommendations/${id}/undo`);
+  return data;
+}
+
+export type StageItemReplication = {
+  operation: "create" | "update" | "delete";
+  local_product_id: string;
+  match_local_product_id?: string;
+  dose_per_hectare?: number;
+  dose_unit?: string;
+  area_factor?: number | null;
+  area_note?: string | null;
+  n_applications?: number | null;
+  target?: string | null;
+};
+
+export async function replicateRecommendationItem(
+  recommendationId: string,
+  payload: StageItemReplication & { target_recommendation_ids: string[] },
+) {
+  const { data } = await api.post<{ applied: number }>(
+    `/recommendations/${recommendationId}/items/replicate`,
+    payload,
+  );
   return data;
 }
 

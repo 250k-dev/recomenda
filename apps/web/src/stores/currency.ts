@@ -22,6 +22,9 @@ interface CurrencyState {
   /** Espaçamento entre linhas (m) — deriva a população das sementes. */
   spacing: string;
   setSpacing: (v: string) => void;
+  /** Sementes por bag (SOYBEAN) e por saco (CORN). Vazio = padrão. */
+  seedUnitSizes: Record<string, string>;
+  setSeedUnitSizes: (v: Record<string, string>) => void;
 }
 
 export const useCurrencyStore = create<CurrencyState>()(
@@ -37,6 +40,8 @@ export const useCurrencyStore = create<CurrencyState>()(
       setGrainPrices: (grainPrices) => set({ grainPrices }),
       spacing: "",
       setSpacing: (spacing) => set({ spacing }),
+      seedUnitSizes: {},
+      setSeedUnitSizes: (seedUnitSizes) => set({ seedUnitSizes }),
     }),
     { name: "recomenda-currency" }
   )
@@ -61,6 +66,28 @@ export function grainPricesFromList(
   for (const [crop, value] of Object.entries(prices ?? {})) {
     if (crop === mainCrop || !(Number(value) > 0)) continue;
     out[crop] = String(value);
+  }
+  return out;
+}
+
+/** Campos do header → números (> 0) de sementes por bag/saco. */
+export function seedUnitSizesToNumbers(raw: Record<string, string>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const crop of ["SOYBEAN", "CORN"] as const) {
+    const n = Number(String(raw[crop] ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(n) && n > 0) out[crop] = n;
+  }
+  return out;
+}
+
+/** `seed_unit_sizes` da lista → campos do header. */
+export function seedUnitSizesFromList(
+  sizes: Record<string, number> | null | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const crop of ["SOYBEAN", "CORN"] as const) {
+    const n = Number(sizes?.[crop]);
+    if (Number.isFinite(n) && n > 0) out[crop] = String(Math.round(n));
   }
   return out;
 }

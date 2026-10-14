@@ -21,6 +21,7 @@ import {
 } from "@recomenda/api-hooks";
 import { zeroPeriodStageNames } from "@recomenda/domain/timing/window-days";
 import { ZeroPeriodApplyDialog } from "@/components/domain/season/zero-period-apply-dialog";
+import { TemplateStagePicker } from "@/components/domain/season/template-stage-picker";
 import type { CycleDetail, CycleSeasonRow } from "@recomenda/api/cycles";
 import { CROP_LABELS, cropLabel } from "@recomenda/utils";
 import {
@@ -156,15 +157,30 @@ export function BulkApplyTemplateDialog({
     0,
   );
 
+  const stages = templateDetail?.stages ?? [];
+  const stageKey = stages.map((stage) => stage.id).join("|");
+  const [pickedKey, setPickedKey] = useState("");
+  const [pickedStages, setPickedStages] = useState<Set<string>>(new Set());
+  if (stageKey !== pickedKey) {
+    setPickedKey(stageKey);
+    setPickedStages(new Set(stages.map((stage) => stage.id)));
+  }
+  const partial = stages.length > 0 && pickedStages.size < stages.length;
+
   const zeroNames = useMemo(
-    () => zeroPeriodStageNames(templateDetail?.stages ?? []),
-    [templateDetail?.stages],
+    () => zeroPeriodStageNames(stages),
+    [stages],
   );
 
   const runApply = () => {
+    if (pickedStages.size === 0) {
+      toast.error("Selecione ao menos uma etapa.");
+      return;
+    }
     bulkApply.mutate(
       {
         timingTemplateId: templateId,
+        stageIds: partial ? [...pickedStages] : undefined,
         seasons: selectedSeasons.map((s) => ({
           id: s.id,
           label: s.plot_name,
@@ -239,6 +255,11 @@ export function BulkApplyTemplateDialog({
               placeholder={isLoading ? "Carregando…" : "Selecione um modelo…"}
               options={options}
             />
+            <TemplateStagePicker
+              stages={stages}
+              selectedIds={pickedStages}
+              onChange={setPickedStages}
+            />
             {options.length === 0 && !isLoading ? (
               <p className="text-xs text-muted-foreground">
                 Nenhum modelo cadastrado para este produtor.
@@ -255,11 +276,9 @@ export function BulkApplyTemplateDialog({
             <p className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2.5 text-[13px] font-medium leading-snug text-warning-strong">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
               <span>
-                {pendingToReplace}{" "}
-                {pendingToReplace === 1 ? "etapa pendente" : "etapas pendentes"}{" "}
-                {pendingToReplace === 1 ? "será substituída" : "serão substituídas"}{" "}
-                pelo modelo nos talhões marcados. Etapas já aplicadas ou puladas
-                permanecem.
+                {partial
+                  ? "Só as etapas marcadas entram nos talhões. Pendentes de outro nome permanecem."
+                  : `${pendingToReplace} ${pendingToReplace === 1 ? "etapa pendente será substituída" : "etapas pendentes serão substituídas"} pelo modelo nos talhões marcados. Etapas já aplicadas ou puladas permanecem.`}
               </span>
             </p>
           ) : null}

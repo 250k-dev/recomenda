@@ -217,6 +217,7 @@ export interface BlockPlotInput {
 export interface ApplyBlockPayload {
   timing_template_id: string;
   plots: BlockPlotInput[];
+  stage_ids?: string[];
 }
 
 export interface ApplyBlockResult {
@@ -308,7 +309,7 @@ export interface SyncListDosesResult {
 
 export async function applyCycleTemplateBulk(
   cycleId: string,
-  payload: { timing_template_id: string; season_ids: string[] },
+  payload: { timing_template_id: string; season_ids: string[]; stage_ids?: string[] },
 ) {
   const { data } = await api.post<{
     ok: number;
