@@ -29,7 +29,6 @@ import {
   ExportFooter,
   ExportShell,
   FooterButton,
-  PartCard,
   Pills,
   PreviewEmpty,
   PreviewToolbar,
@@ -46,8 +45,6 @@ import {
   composeRecommendationExportWhatsappMessage,
   copyText,
   openWhatsapp,
-  pagesByPart,
-  partsSummary,
   stageKey,
   stageWhen,
 } from "@/components/domain/export/export-helpers";
@@ -106,15 +103,11 @@ export function FarmSeasonsExportDialog({
   const [treeOpen, setTreeOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Nada vem marcado: o usuário escolhe o que entra (e a prévia nasce dele).
-  const [incReport, setIncReport] = useState(false);
-  const [incRecipes, setIncRecipes] = useState(false);
   const [showPrices, setShowPrices] = useState(() => readPricePreference());
   const [zoom, setZoom] = useState<PreviewZoom>(DEFAULT_PREVIEW_ZOOM);
   const [effectiveZoom, setEffectiveZoom] = useState(1);
   const [mView, setMView] = useState<"config" | "preview">("config");
   const [paged, setPaged] = useState<PagedResult | null>(null);
-  const [partPages, setPartPages] = useState({ report: 0, recipes: 0 });
   const [notebookDragging, setNotebookDragging] = useState(false);
 
   // Preço: só quando o payload traz (quem exporta tem PRICE_VIEW). A lista de
@@ -143,8 +136,6 @@ export function FarmSeasonsExportDialog({
       setMode("stage");
       setTreeOpen(false);
       setSelected(new Set());
-      setIncReport(false);
-      setIncRecipes(false);
       setMView("config");
       setPaged(null);
     }
@@ -193,39 +184,28 @@ export function FarmSeasonsExportDialog({
   const datas = useMemo(() => selectedItems.map((i) => i.data), [selectedItems]);
   const nSel = datas.reduce((sum, d) => sum + d.recommendations.length, 0);
   const tSel = datas.length;
-  const hasParts = incReport || incRecipes;
   const recipeCount = countApplicationRecipes(datas);
-  const title = `Recomendações - ${farmName ?? ""}`;
+  const title = cover?.title ?? `Recomendações - ${farmName ?? ""}`;
 
   const html = useMemo(
     () =>
-      tab === "export" && nSel > 0 && hasParts && (incReport || recipeCount > 0)
-        ? buildExportHtml(datas, title, { report: incReport, recipes: incRecipes, showPrices: priced, cover })
+      tab === "export" && nSel > 0 && recipeCount > 0
+        ? buildExportHtml(datas, title, { showPrices: priced })
         : null,
-    [tab, nSel, hasParts, incReport, incRecipes, recipeCount, datas, title, priced, cover],
+    [tab, nSel, recipeCount, datas, title, priced],
   );
   const total = html && paged ? paged.total : 0;
   const message = useMemo(
     () =>
-      nSel && hasParts
+      nSel && recipeCount > 0
         ? composeRecommendationExportWhatsappMessage({
-            report: incReport,
-            recipes: incRecipes,
-            recipeCount,
             multi: { farmName, datas, contextLabel },
           })
         : "",
-    [nSel, hasParts, incReport, incRecipes, recipeCount, farmName, datas, contextLabel],
+    [nSel, recipeCount, farmName, datas, contextLabel],
   );
 
-  const onPaged = (result: PagedResult) => {
-    setPaged(result);
-    const counts = pagesByPart(result);
-    setPartPages((prev) => ({
-      report: incReport ? counts.report : prev.report,
-      recipes: incRecipes ? counts.recipes : prev.recipes,
-    }));
-  };
+  const onPaged = (result: PagedResult) => setPaged(result);
 
   const setIds = (ids: string[], on: boolean) =>
     setSelected((prev) => {
@@ -259,7 +239,6 @@ export function FarmSeasonsExportDialog({
       setSelected(new Set(ids));
       setTab("export");
       setMode("stage");
-      setIncRecipes(true);
     },
   });
   const notebookTab = useNotebookTab({
@@ -406,11 +385,8 @@ export function FarmSeasonsExportDialog({
 
   const plotsWithSelection = items.filter((i) => i.data.recommendations.some((r) => selected.has(r.id))).length;
 
-  // PDF grande (safra com muitos talhões): avisa antes de paginar. Estimativa
-  // até a prévia contar: capa + ~2 etapas por folha de resumo + 1 por receita.
-  const estimatedPages =
-    total ||
-    (incReport ? 1 + tSel + Math.ceil(nSel / 2) : 0) + (incRecipes ? recipeCount : 0);
+  // PDF grande: visão geral + uma folha por receita, até a prévia contar.
+  const estimatedPages = total || 1 + recipeCount;
   const bigPdf = Boolean(html) && estimatedPages > 100;
 
   const exportLeft = isLoading ? (
@@ -419,39 +395,20 @@ export function FarmSeasonsExportDialog({
     <p className="text-sm text-[#6b6a62]">Nenhum talhão com cronograma para exportar.</p>
   ) : (
     <div className="flex flex-col gap-6">
-      <Step n={1} title="O que vai no PDF">
-        <div className="flex flex-col gap-2">
-          <PartCard
-            title="Resumo e cronograma"
-            tag="Para o produtor"
-            tagTone="producer"
-            desc="Capa da safra e as etapas de cada talhão."
-            pages={partPages.report ? fmtPages(partPages.report) : undefined}
-            on={incReport}
-            onToggle={() => setIncReport((v) => !v)}
-          >
-            <PriceSwitch on={priced} onToggle={togglePrices} canPrice={canPrice} disabled={!incReport} />
-          </PartCard>
-          <PartCard
-            title="Receitas de aplicação"
-            tag="Para o operador"
-            tagTone="operator"
-            desc="Uma folha por etapa, para quem aplica. Sem preço."
-            pages={partPages.recipes ? fmtPages(partPages.recipes) : undefined}
-            on={incRecipes}
-            onToggle={() => setIncRecipes((v) => !v)}
-          />
-          {bigPdf ? (
-            <p className="rounded-[10px] bg-[#fdf3e7] px-3 py-2 text-xs text-[#8a5a00]">
-              PDF grande (~{fmtPages(estimatedPages)}): pode levar alguns segundos para gerar. Para enxugar,
-              use “Por talhão” e marque só a fazenda que precisa.
-            </p>
-          ) : null}
+      {canPrice ? (
+        <div className="overflow-hidden rounded-xl border border-[#e2e0d6] bg-white">
+          <PriceSwitch flush on={priced} onToggle={togglePrices} canPrice={canPrice} />
         </div>
-      </Step>
+      ) : null}
+      {bigPdf ? (
+        <p className="rounded-[10px] bg-[#fdf3e7] px-3 py-2 text-xs text-[#8a5a00]">
+          PDF grande (~{fmtPages(estimatedPages)}): pode levar alguns segundos para gerar. Para enxugar,
+          use “Por talhão” e marque só a fazenda que precisa.
+        </p>
+      ) : null}
 
       <Step
-        n={2}
+        n={1}
         title="O que exportar"
         links={
           mode === "full"
@@ -534,9 +491,7 @@ export function FarmSeasonsExportDialog({
               text={
                 !nSel
                   ? "Marque ao menos uma etapa para ver as folhas do PDF."
-                  : !hasParts
-                    ? "Marque o resumo, as receitas ou os dois."
-                    : "As etapas marcadas foram puladas — não geram receita."
+                  : "As etapas marcadas foram puladas — não geram receita."
               }
             />
           )
@@ -556,14 +511,16 @@ export function FarmSeasonsExportDialog({
       }
       sub={
         nSel
-          ? `${partsSummary(incReport, incRecipes, recipeCount)}${incReport && canPrice ? (priced ? " · com preços" : " · sem preços") : ""}`
+          ? recipeCount > 0
+            ? `Visão geral + ${plural(recipeCount, "receita", "receitas")}${canPrice ? (priced ? " · com preços" : " · sem preços") : ""}`
+            : "As etapas marcadas foram puladas — não geram receita."
           : "Os botões liberam quando houver seleção."
       }
-      warn={!isLoading && (!nSel || !hasParts)}
+      warn={!isLoading && (!nSel || recipeCount === 0)}
     >
       <WhatsappButton
         message={message}
-        disabled={!nSel || !hasParts || !message.trim()}
+        disabled={!nSel || recipeCount === 0 || !message.trim()}
         onCopy={() => void copyText(message)}
         onSend={() => openWhatsapp(message)}
       />

@@ -22,7 +22,6 @@ import {
   ExportFooter,
   ExportShell,
   FooterButton,
-  PartCard,
   PreviewEmpty,
   PreviewToolbar,
   PriceSwitch,
@@ -39,8 +38,6 @@ import {
   composeRecommendationExportWhatsappMessage,
   copyText,
   openWhatsapp,
-  pagesByPart,
-  partsSummary,
   stageWhen,
 } from "@/components/domain/export/export-helpers";
 
@@ -74,9 +71,6 @@ export function RecommendationExportDialog({
   const allIds = useMemo(() => recs.map((r) => r.id), [recs]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Nada vem marcado: o usuário escolhe o que entra (e a prévia nasce dele).
-  const [incReport, setIncReport] = useState(false);
-  const [incRecipes, setIncRecipes] = useState(false);
   // O payload só traz preço para quem tem PRICE_VIEW — sem isso, a opção nem aparece.
   const canPrice = Boolean(data.unitPriceByProduct);
   const [showPrices, setShowPrices] = useState(() => readPricePreference());
@@ -84,8 +78,6 @@ export function RecommendationExportDialog({
   const [effectiveZoom, setEffectiveZoom] = useState(1);
   const [mView, setMView] = useState<"config" | "preview">("config");
   const [paged, setPaged] = useState<PagedResult | null>(null);
-  // Folhas por documento ficam lembradas mesmo quando ele é desmarcado.
-  const [partPages, setPartPages] = useState({ report: 0, recipes: 0 });
 
   // Ao abrir: nada marcado. Ajuste durante o render (padrão React).
   const [prevOpen, setPrevOpen] = useState(false);
@@ -94,8 +86,6 @@ export function RecommendationExportDialog({
     if (open) {
       setTab("export");
       setSelected(new Set());
-      setIncReport(false);
-      setIncRecipes(false);
       setMView("config");
       setPaged(null);
     }
@@ -109,43 +99,26 @@ export function RecommendationExportDialog({
   }, [selected, data, recs]);
 
   const hasStages = filtered.recommendations.length > 0;
-  const hasParts = incReport || incRecipes;
   const recipeCount = countApplicationRecipes([filtered]);
   const priced = canPrice && showPrices;
   const title = `Recomendação - ${data.plotName ?? data.title}`;
 
   const html = useMemo(
     () =>
-      hasStages && hasParts && (incReport || recipeCount > 0)
-        ? buildExportHtml([filtered], title, {
-            report: incReport,
-            recipes: incRecipes,
-            showPrices: priced,
-          })
+      hasStages && recipeCount > 0
+        ? buildExportHtml([filtered], title, { showPrices: priced })
         : null,
-    [filtered, hasStages, hasParts, incReport, incRecipes, priced, recipeCount, title],
+    [filtered, hasStages, priced, recipeCount, title],
   );
   const message = useMemo(
     () =>
-      hasStages && hasParts
-        ? composeRecommendationExportWhatsappMessage({
-            report: incReport,
-            recipes: incRecipes,
-            recipeCount,
-            single: filtered,
-          })
+      hasStages && recipeCount > 0
+        ? composeRecommendationExportWhatsappMessage({ single: filtered })
         : "",
-    [hasStages, hasParts, incReport, incRecipes, recipeCount, filtered],
+    [hasStages, recipeCount, filtered],
   );
 
-  const onPaged = (result: PagedResult) => {
-    setPaged(result);
-    const counts = pagesByPart(result);
-    setPartPages((prev) => ({
-      report: incReport ? counts.report : prev.report,
-      recipes: incRecipes ? counts.recipes : prev.recipes,
-    }));
-  };
+  const onPaged = (result: PagedResult) => setPaged(result);
   const total = html && paged ? paged.total : 0;
 
   const toggle = (id: string) =>
@@ -170,43 +143,26 @@ export function RecommendationExportDialog({
     if (!previewRef.current?.print()) printPaged(html);
   };
 
-  const ready = hasStages && hasParts;
+  const ready = hasStages && recipeCount > 0;
   const summary = !hasStages
     ? "Nenhuma etapa marcada"
     : `${filtered.recommendations.length} de ${recs.length} ${recs.length === 1 ? "etapa" : "etapas"}`;
-  const sub = hasStages
-    ? `${partsSummary(incReport, incRecipes, recipeCount)}${incReport && canPrice ? (priced ? " · com preços" : " · sem preços") : ""}`
-    : "Marque ao menos uma etapa para exportar.";
+  const sub = !hasStages
+    ? "Marque ao menos uma etapa para exportar."
+    : recipeCount > 0
+      ? `Visão geral + ${recipeCount} ${recipeCount === 1 ? "receita" : "receitas"}${canPrice ? (priced ? " · com preços" : " · sem preços") : ""}`
+      : "As etapas marcadas foram puladas — não geram receita.";
 
   const left = (
     <div className="flex flex-col gap-6">
-      <Step n={1} title="O que vai no PDF">
-        <div className="flex flex-col gap-2">
-          <PartCard
-            title="Resumo e cronograma"
-            tag="Para o produtor"
-            tagTone="producer"
-            desc="Etapas, produtos e doses do talhão."
-            pages={partPages.report ? fmtPages(partPages.report) : undefined}
-            on={incReport}
-            onToggle={() => setIncReport((v) => !v)}
-          >
-            <PriceSwitch on={priced} onToggle={togglePrices} canPrice={canPrice} disabled={!incReport} />
-          </PartCard>
-          <PartCard
-            title="Receitas de aplicação"
-            tag="Para o operador"
-            tagTone="operator"
-            desc="Uma folha por etapa, para quem aplica. Sem preço."
-            pages={partPages.recipes ? fmtPages(partPages.recipes) : undefined}
-            on={incRecipes}
-            onToggle={() => setIncRecipes((v) => !v)}
-          />
+      {canPrice ? (
+        <div className="overflow-hidden rounded-xl border border-[#e2e0d6] bg-white">
+          <PriceSwitch flush on={priced} onToggle={togglePrices} canPrice={canPrice} />
         </div>
-      </Step>
+      ) : null}
 
       <Step
-        n={2}
+        n={1}
         title="O que exportar"
         links={[
           { label: "Todas", onClick: () => setSelected(new Set(allIds)) },
@@ -279,9 +235,7 @@ export function RecommendationExportDialog({
             text={
               !hasStages
                 ? "Marque ao menos uma etapa para ver as folhas do PDF."
-                : !hasParts
-                  ? "Marque o resumo, as receitas ou os dois."
-                  : "As etapas marcadas foram puladas — não geram receita."
+                : "As etapas marcadas foram puladas — não geram receita."
             }
           />
         }
@@ -290,7 +244,7 @@ export function RecommendationExportDialog({
   );
 
   const exportFooter = (
-    <ExportFooter summary={summary} sub={sub} warn={!hasStages || !hasParts}>
+    <ExportFooter summary={summary} sub={sub} warn={!ready}>
       <WhatsappButton
         message={message}
         disabled={!ready || !message.trim()}

@@ -5,7 +5,6 @@ import {
   buildWhatsappMessage,
   type RecommendationShareData,
 } from "@recomenda/domain/recommendations/share-message";
-import type { PagedResult } from "@/lib/print/paged-document";
 
 const WA_PART_DIVIDER = "————————————————";
 
@@ -27,21 +26,8 @@ export function stageWhen(rec: RecommendationShareData["recommendations"][number
   return predicted ? `prevista ${predicted}` : "sem data";
 }
 
-/** Folhas por documento, a partir dos rótulos que a paginação devolve. */
-export function pagesByPart(result: PagedResult | null): { report: number; recipes: number } {
-  const out = { report: 0, recipes: 0 };
-  for (const page of result?.pages ?? []) {
-    if (page.label.startsWith("Receita")) out.recipes += 1;
-    else out.report += 1;
-  }
-  return out;
-}
-
-/** WhatsApp do exportar: resumo e/ou receitas (tanques), conforme o que foi marcado. */
+/** WhatsApp do exportar: resumo da visão geral e as receitas do operador. */
 export function composeRecommendationExportWhatsappMessage(opts: {
-  report: boolean;
-  recipes: boolean;
-  recipeCount: number;
   single?: RecommendationShareData;
   multi?: {
     farmName?: string | null;
@@ -50,32 +36,20 @@ export function composeRecommendationExportWhatsappMessage(opts: {
   };
 }): string {
   const parts: string[] = [];
-  if (opts.report) {
-    if (opts.single) parts.push(buildWhatsappMessage(opts.single));
-    else if (opts.multi) {
-      parts.push(
-        buildMultiWhatsappMessage(
-          opts.multi.farmName,
-          opts.multi.datas,
-          opts.multi.contextLabel,
-        ),
-      );
-    }
+  if (opts.single) parts.push(buildWhatsappMessage(opts.single));
+  else if (opts.multi) {
+    parts.push(
+      buildMultiWhatsappMessage(
+        opts.multi.farmName,
+        opts.multi.datas,
+        opts.multi.contextLabel,
+      ),
+    );
   }
-  if (opts.recipes && opts.recipeCount > 0) {
-    const datas = opts.single ? [opts.single] : opts.multi?.datas ?? [];
-    const recipesText = buildApplicationRecipesWhatsappMessage(datas);
-    if (recipesText) parts.push(recipesText);
-  }
+  const datas = opts.single ? [opts.single] : opts.multi?.datas ?? [];
+  const recipesText = buildApplicationRecipesWhatsappMessage(datas);
+  if (recipesText) parts.push(recipesText);
   return parts.join(`\n\n${WA_PART_DIVIDER}\n\n`);
-}
-
-export function partsSummary(report: boolean, recipes: boolean, recipeCount: number): string {
-  const r = `${recipeCount} ${recipeCount === 1 ? "receita" : "receitas"}`;
-  if (report && recipes) return `Resumo + ${r}`;
-  if (report) return "Só o resumo";
-  if (recipes) return r;
-  return "Nenhum documento";
 }
 
 export async function copyText(text: string): Promise<void> {

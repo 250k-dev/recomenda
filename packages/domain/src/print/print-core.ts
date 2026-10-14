@@ -56,7 +56,9 @@ export const CORE_CSS = `
     padding-bottom: 12px; border-bottom: 2px solid #2f6d3f;
   }
   .brand { display: flex; align-items: center; gap: 8px; }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
   .brand-name { font-size: 18px; font-weight: 700; color: #2f6d3f; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 10px; font-weight: 500; color: #6b6b62; margin-top: 2px; }
   .emitted { font-size: 11px; color: #6b6b62; }
   .title-block { margin-top: 18px; }
   .kicker { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #2f6d3f; margin: 0; }
@@ -100,19 +102,25 @@ export function htmlShell(title: string, body: string, extraCss = ""): string {
 }
 
 /**
- * Cabeçalho padrão (logo Recomenda + data de emissão). `context` acrescenta o
- * nome da seção — só vale a pena onde o cabeçalho se repete página a página
- * (Caderno de Safra), para o leitor saber onde está no meio de uma tabela longa.
+ * Cabeçalho padrão (logo Recomenda + data de emissão). `context` vai à direita,
+ * junto da data — útil quando o cabeçalho se repete no meio de uma tabela longa.
+ * `subtitle` fica sob o nome da marca. `emittedAt` nulo omite "Emitido em".
  */
-/** `emittedAt` nulo: sem "Emitido em" (o Caderno de Safra não leva data). */
-export function headerHtml(emittedAt: string | null, context?: string | null): string {
+export function headerHtml(
+  emittedAt: string | null,
+  context?: string | null,
+  subtitle?: string | null,
+): string {
   const parts: string[] = [];
   if (context) parts.push(escapeHtml(context));
   if (emittedAt) parts.push(`Emitido em ${escapeHtml(emittedAt)}`);
   const right = parts.join(" · ");
+  const name = subtitle
+    ? `<span class="brand-text"><span class="brand-name">Recomenda</span><span class="brand-sub">${escapeHtml(subtitle)}</span></span>`
+    : `<span class="brand-name">Recomenda</span>`;
   return `
     <header class="header">
-      <div class="brand">${LOGO_SVG}<span class="brand-name">Recomenda</span></div>
+      <div class="brand">${LOGO_SVG}${name}</div>
       <span class="emitted">${right}</span>
     </header>`;
 }

@@ -117,13 +117,23 @@ function cell(label: string, value: string, cls = ""): string {
   return `<div class="${cls}"><span class="k">${label}</span><span class="v">${value}</span></div>`;
 }
 
+/** Datas da janela (YYYY-MM-DD). Pré-plantio conta para trás do plantio. */
+export function applicationWindowDates(
+  rec: Pick<Recommendation, "window_start_days" | "window_end_days" | "trigger_type">,
+  plantingDate: string | null | undefined,
+): { fromYmd: string | null; toYmd: string | null } {
+  if (!plantingDate) return { fromYmd: null, toYmd: null };
+  const { window_start_days: ws, window_end_days: we, trigger_type: trigger } = rec;
+  const [from, to] = trigger === "PRE_PLANTING" ? [-we, -ws] : [ws, we];
+  return { fromYmd: addDays(plantingDate, from), toYmd: addDays(plantingDate, to) };
+}
+
 function windowLabel(rec: Recommendation, plantingDate: string | null | undefined): string {
   const { window_start_days: ws, window_end_days: we, trigger_type: trigger } = rec;
-  if (plantingDate) {
-    // Pré-plantio conta para trás do plantio (dias sempre positivos).
-    const [from, to] = trigger === "PRE_PLANTING" ? [-we, -ws] : [ws, we];
-    const a = ymdToBr(addDays(plantingDate, from))?.slice(0, 5);
-    const b = ymdToBr(addDays(plantingDate, to))?.slice(0, 5);
+  const { fromYmd, toYmd } = applicationWindowDates(rec, plantingDate);
+  if (fromYmd && toYmd) {
+    const a = ymdToBr(fromYmd)?.slice(0, 5);
+    const b = ymdToBr(toYmd)?.slice(0, 5);
     return a === b ? `Janela ${a}` : `Janela ${a} a ${b}`;
   }
   // Menor número primeiro: saía "4 a 0 dias antes do plantio".

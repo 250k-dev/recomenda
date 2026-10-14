@@ -299,69 +299,20 @@ export function StatusBadge({ status, short = false }: { status: string; short?:
   );
 }
 
-/** Cartão de documento do PDF (Resumo / Receitas). */
-export function PartCard({
-  title,
-  tag,
-  tagTone,
-  desc,
-  pages,
-  on,
-  onToggle,
-  children,
-}: {
-  title: string;
-  tag: string;
-  tagTone: "producer" | "operator";
-  desc: string;
-  pages?: string;
-  on: boolean;
-  onToggle: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-xl border transition-colors",
-        on ? "border-[#cfdccf] bg-white" : "border-[#e2e0d6] bg-[#faf9f5]",
-      )}
-    >
-      <button type="button" onClick={onToggle} className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left">
-        <span className="mt-0.5">
-          <TriCheck state={on ? "on" : "off"} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="text-[13.5px] font-semibold">{title}</span>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
-                tagTone === "producer" ? "bg-[#efe7d6] text-[#7a5a1e]" : "bg-[#e1eff6] text-[#2b6a86]",
-              )}
-            >
-              {tag}
-            </span>
-            {pages ? <span className="ml-auto text-xs text-[#6b6a62]">{pages}</span> : null}
-          </span>
-          <span className="mt-0.5 block text-[12.5px] leading-snug text-[#6b6a62]">{desc}</span>
-        </span>
-      </button>
-      {children}
-    </div>
-  );
-}
-
-/** Interruptor "Incluir preços e custos" (mora dentro do cartão do Resumo). */
+/** Interruptor "Incluir preços e custos" na visão geral do PDF. */
 export function PriceSwitch({
   on,
   onToggle,
   canPrice,
   disabled = false,
+  flush = false,
 }: {
   on: boolean;
   onToggle: () => void;
   canPrice: boolean;
   disabled?: boolean;
+  /** Sem a linha de cima — quando o interruptor não está dentro de outro cartão. */
+  flush?: boolean;
 }) {
   if (!canPrice) {
     return (
@@ -376,7 +327,8 @@ export function PriceSwitch({
       onClick={onToggle}
       disabled={disabled}
       className={cn(
-        "flex w-full items-center gap-2.5 border-t border-[#efede5] px-3 py-2 text-left",
+        "flex w-full items-center gap-2.5 px-3 py-2 text-left",
+        !flush && "border-t border-[#efede5]",
         disabled && "opacity-45",
       )}
     >
@@ -388,7 +340,7 @@ export function PriceSwitch({
       </span>
       <span>
         <span className="block text-[12.5px] font-semibold">Incluir preços e custos</span>
-        <span className="block text-[11.5px] text-[#6b6a62]">Custo/ha, total por etapa e total do talhão.</span>
+        <span className="block text-[11.5px] text-[#6b6a62]">Só na visão geral. A receita do operador não leva preço.</span>
       </span>
     </button>
   );
