@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { MobileTopbar } from "@/components/layout/mobile-topbar";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
+import { HelpTour } from "@/components/domain/help/help-tour";
 import type { UserRole } from "@recomenda/api/auth-types";
 import { SidebarProvider } from "@recomenda/ui/primitives/sidebar";
 import { AppSidebar } from "./app-sidebar";
@@ -22,6 +23,7 @@ export function AppShell({
           <div className="mx-auto w-full max-w-app">{children}</div>
         </main>
       </div>
+      <HelpTour />
     </SidebarProvider>
   );
 }

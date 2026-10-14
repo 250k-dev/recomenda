@@ -31,6 +31,7 @@ import { navFor } from "@/config/nav";
 import { routes } from "@recomenda/config";
 import type { AccessLevel, UserRole } from "@recomenda/api/auth-types";
 import { Logo } from "@recomenda/ui/assets/logo";
+import { HelpButton } from "./help-button";
 import { NotificationsBell } from "./notifications-bell";
 import { Badge } from "@recomenda/ui/primitives/badge";
 
@@ -96,10 +97,10 @@ export function AppSidebar({ role }: { role: UserRole }) {
               {roleLabel}
             </span>
           </div>
-          <NotificationsBell
-            align="start"
-            triggerClassName="ml-auto group-data-[collapsible=icon]:hidden"
-          />
+          <div className="ml-auto flex items-center gap-1.5 group-data-[collapsible=icon]:hidden">
+            <HelpButton shell="admin" />
+            <NotificationsBell align="start" />
+          </div>
         </div>
       </SidebarHeader>
 
@@ -108,7 +109,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
       {/* Nav */}
       <SidebarContent>
         <SidebarGroup>
-          <SidebarMenu>
+          <SidebarMenu data-tour="sidebar-nav">
             {items.map((item) => {
               const active =
                 item.href === "/admin"
@@ -138,7 +139,7 @@ export function AppSidebar({ role }: { role: UserRole }) {
 
       {/* User profile */}
       <SidebarFooter>
-        <SidebarMenu>
+        <SidebarMenu data-tour="sidebar-profile">
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"

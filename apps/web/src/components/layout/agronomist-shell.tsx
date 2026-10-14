@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { ActiveScopeBanner } from "@/components/layout/active-scope-banner";
+import { HelpTour } from "@/components/domain/help/help-tour";
 import { BreadcrumbsProvider } from "./breadcrumbs-context";
 import { AppHeader } from "./app-header";
 
@@ -17,6 +18,7 @@ export function AgronomistShell({ children }: { children: ReactNode }) {
           <div className="mx-auto w-full max-w-app">{children}</div>
         </main>
       </div>
+      <HelpTour />
     </BreadcrumbsProvider>
   );
 }

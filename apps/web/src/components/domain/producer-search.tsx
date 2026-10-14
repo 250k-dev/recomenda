@@ -189,6 +189,7 @@ export function ProducerSearchButton({
             isMac ? "Buscar produtor (⌘K)" : "Buscar produtor (Ctrl+K)"
           }
           onClick={() => setOpen(true)}
+          data-tour="producer-search"
           className={iconOnly ? undefined : "@min-[14rem]:hidden"}
         >
           <Search />
@@ -200,6 +201,7 @@ export function ProducerSearchButton({
               isMac ? "Buscar produtor (⌘K)" : "Buscar produtor (Ctrl+K)"
             }
             onClick={() => setOpen(true)}
+            data-tour="producer-search"
             className="hidden h-11 w-full max-w-96 items-center gap-2.5 rounded-lg border border-border-strong bg-search px-3.5 text-sm shadow-xs outline-none transition-colors hover:bg-hover focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 @min-[14rem]:flex"
           >
             <Search className="size-4 shrink-0 text-muted-foreground" />

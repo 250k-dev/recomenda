@@ -57,6 +57,7 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Menu do usuário"
+        data-tour="user-menu"
         disabled={userLoading}
         className="transition-shadow rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >

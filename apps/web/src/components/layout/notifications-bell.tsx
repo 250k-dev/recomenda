@@ -240,6 +240,7 @@ export function NotificationsBell({
           size="icon-lg"
           variant="outline"
           aria-label="Notificações"
+          data-tour="notifications"
           className={cn("relative", triggerClassName)}
         >
           <Bell />

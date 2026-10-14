@@ -7,6 +7,7 @@ import {
   CascadeBackButton,
   useCascadeNav,
 } from "./cascade-back-button";
+import { HelpButton } from "./help-button";
 import { NotificationsBell } from "./notifications-bell";
 import { ScopeSwitcher } from "./scope-switcher";
 import { UserMenu } from "./user-menu";
@@ -22,6 +23,7 @@ function HeaderActions({ compact }: { compact?: boolean }) {
     >
       {compact ? <ProducerSearchButton iconOnly /> : null}
       <ScopeSwitcher compact={compact} />
+      <HelpButton />
       <NotificationsBell />
       <UserMenu />
     </div>
@@ -45,13 +47,16 @@ export function AppHeader() {
           </div>
         ) : (
           <>
-            <div className="flex min-w-0 flex-1 items-center gap-1 md:hidden">
+            <div
+              data-tour="breadcrumb"
+              className="flex min-w-0 flex-1 items-center gap-1 md:hidden"
+            >
               <CascadeBackButton />
               <p className="min-w-0 flex-1 truncate font-display text-[17px] font-semibold leading-tight tracking-[-0.02em] text-text-strong">
                 {current?.label ?? "Recomenda"}
               </p>
             </div>
-            <div className="hidden min-w-0 shrink-0 md:block">
+            <div data-tour="breadcrumb" className="hidden min-w-0 shrink-0 md:block">
               <BreadcrumbTrail items={items} />
             </div>
           </>

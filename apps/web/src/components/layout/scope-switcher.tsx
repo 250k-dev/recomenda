@@ -47,6 +47,7 @@ export function ScopeSwitcher({ compact = false }: { compact?: boolean }) {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Trocar carteira"
+        data-tour="scope-switcher"
         disabled={isPending}
         className={cn(
           "flex items-center rounded-lg border border-border bg-card text-sm font-medium outline-none transition-shadow hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
